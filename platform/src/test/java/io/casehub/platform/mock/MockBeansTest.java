@@ -51,16 +51,18 @@ class MockBeansTest {
     }
 
     @Test
-    void preferenceProvider_asMap_contains_configured_value() {
+    void preferenceProvider_asMap_returns_typed_values() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
-        assertEquals("hello", prefs.asMap().get("test.greeting"));
+        assertEquals(42, prefs.asMap().get("test.count"));          // Integer
+        assertEquals(Boolean.TRUE, prefs.asMap().get("test.flag")); // Boolean
+        assertEquals("hello", prefs.asMap().get("test.label"));     // String
     }
 
     @Test
     void preferenceProvider_typed_get_returns_null() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
-        record GreetingPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
-        PreferenceKey<GreetingPref> key = new PreferenceKey<>("test", "greeting", new GreetingPref("fallback"));
+        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
+        PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label", new LabelPref("fallback"));
         assertNull(prefs.get(key));
         assertEquals("fallback", prefs.getOrDefault(key).value());
     }

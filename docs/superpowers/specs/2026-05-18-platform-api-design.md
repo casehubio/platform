@@ -187,6 +187,21 @@ public interface GroupMembershipProvider {
   The mock defaults to `actorId = "system"` (authenticated).
 - `ActorType` integration is deferred pending migration from `casehub-ledger-api`.
 
+**CDI scope note (for implementors):**
+Real `CurrentPrincipal` implementations must be `@RequestScoped`, backed by the active
+security context (e.g. Quarkus `SecurityIdentity`). Injecting a `@RequestScoped` bean into
+an `@ApplicationScoped` REST resource is safe — CDI client proxies delegate to the correct
+contextual instance per request.
+
+`MockCurrentPrincipal` is intentionally `@ApplicationScoped`: no request context exists in
+dev/test mode, and the mock reads from `@ConfigProperty` (fixed values, no per-request
+state). `@DefaultBean` yields to any non-default bean regardless of scope, so the mock is
+cleanly displaced by a `@RequestScoped` real implementation.
+
+⚠️ Do not access `CurrentPrincipal` inside reactive pipelines (`Uni`/`Multi`) without
+`@ActivateRequestContext` — `@RequestScoped` implementations will throw
+`ContextNotActiveException` when the request context is not active on the executing thread.
+
 ---
 
 ## Mock Implementations (io.casehub.platform.mock)

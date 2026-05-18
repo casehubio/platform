@@ -6,7 +6,6 @@ import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
-import io.casehub.platform.api.preferences.SingleValuePreference;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -59,10 +58,10 @@ class MockBeansTest {
 
     @Test
     void preferenceProvider_typed_get_returns_null() {
-        // Typed get() always returns null from MockPreferenceProvider.
-        // Callers must fall back to the Preference record's DEFAULT constant.
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
-        PreferenceKey<SingleValuePreference> key = new PreferenceKey<>("test", "greeting");
+        record GreetingPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
+        PreferenceKey<GreetingPref> key = new PreferenceKey<>("test", "greeting", new GreetingPref("fallback"));
         assertNull(prefs.get(key));
+        assertEquals("fallback", prefs.getOrDefault(key).value());
     }
 }

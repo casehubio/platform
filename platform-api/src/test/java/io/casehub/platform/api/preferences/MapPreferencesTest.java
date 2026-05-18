@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class MapPreferencesTest {
 
     record TestSinglePref(String value) implements SingleValuePreference {
-        static final PreferenceKey<TestSinglePref> KEY = new PreferenceKey<>("test", "single");
+        static final TestSinglePref DEFAULT = new TestSinglePref("default");
+        static final PreferenceKey<TestSinglePref> KEY = new PreferenceKey<>("test", "single", DEFAULT);
     }
 
     record TestMultiPref(String subKey, String value) implements MultiValuePreference {
-        static final PreferenceKey<TestMultiPref> KEY = new PreferenceKey<>("test", "multi");
+        static final TestMultiPref DEFAULT = new TestMultiPref("default", "default");
+        static final PreferenceKey<TestMultiPref> KEY = new PreferenceKey<>("test", "multi", DEFAULT);
     }
 
     @Test
@@ -49,5 +51,18 @@ class MapPreferencesTest {
     void asMap_is_unmodifiable() {
         MapPreferences prefs = new MapPreferences(new HashMap<>(Map.of("k", "v")));
         assertThrows(UnsupportedOperationException.class, () -> prefs.asMap().put("new", "value"));
+    }
+
+    @Test
+    void getOrDefault_returns_default_when_key_absent() {
+        MapPreferences prefs = new MapPreferences(Map.of());
+        assertSame(TestSinglePref.DEFAULT, prefs.getOrDefault(TestSinglePref.KEY));
+    }
+
+    @Test
+    void getOrDefault_returns_value_when_key_present() {
+        TestSinglePref pref = new TestSinglePref("hello");
+        MapPreferences prefs = new MapPreferences(Map.of("test.single", pref));
+        assertEquals(pref, prefs.getOrDefault(TestSinglePref.KEY));
     }
 }

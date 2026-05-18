@@ -7,44 +7,64 @@ import static org.junit.jupiter.api.Assertions.*;
 class PathTest {
 
     @Test
-    void of_string_splits_on_slash() {
-        Path p = Path.of("acme/backend/pr-review");
+    void parse_splits_on_slash() {
+        Path p = Path.parse("acme/backend/pr-review");
         assertEquals("acme/backend/pr-review", p.value());
         assertEquals(List.of("acme", "backend", "pr-review"), p.segments());
     }
 
     @Test
-    void of_string_strips_outer_whitespace() {
-        Path p = Path.of("  acme/backend  ");
+    void parse_strips_outer_whitespace() {
+        Path p = Path.parse("  acme/backend  ");
         assertEquals("acme/backend", p.value());
     }
 
     @Test
-    void of_string_single_segment() {
-        Path p = Path.of("root");
+    void parse_single_segment() {
+        Path p = Path.parse("root");
         assertEquals("root", p.value());
         assertEquals(List.of("root"), p.segments());
     }
 
     @Test
-    void of_string_throws_on_blank() {
-        assertThrows(IllegalArgumentException.class, () -> Path.of(""));
-        assertThrows(IllegalArgumentException.class, () -> Path.of("   "));
+    void parse_throws_on_blank() {
+        assertThrows(IllegalArgumentException.class, () -> Path.parse(""));
+        assertThrows(IllegalArgumentException.class, () -> Path.parse("   "));
     }
 
     @Test
-    void of_string_throws_on_leading_slash() {
-        assertThrows(IllegalArgumentException.class, () -> Path.of("/acme/backend"));
+    void parse_throws_on_leading_slash() {
+        assertThrows(IllegalArgumentException.class, () -> Path.parse("/acme/backend"));
     }
 
     @Test
-    void of_string_throws_on_trailing_slash() {
-        assertThrows(IllegalArgumentException.class, () -> Path.of("acme/backend/"));
+    void parse_throws_on_trailing_slash() {
+        assertThrows(IllegalArgumentException.class, () -> Path.parse("acme/backend/"));
     }
 
     @Test
-    void of_string_throws_on_consecutive_slashes() {
-        assertThrows(IllegalArgumentException.class, () -> Path.of("acme//backend"));
+    void parse_throws_on_consecutive_slashes() {
+        assertThrows(IllegalArgumentException.class, () -> Path.parse("acme//backend"));
+    }
+
+    @Test
+    void parse_with_explicit_parser_splits_on_custom_separator() {
+        PathParser dotParser = PathParser.of(".");
+        Path p = Path.parse("acme.backend.pr-review", dotParser);
+        assertEquals("acme.backend.pr-review", p.value());
+        assertEquals(List.of("acme", "backend", "pr-review"), p.segments());
+    }
+
+    @Test
+    void setDefaultParser_changes_parse_behaviour() {
+        PathParser original = PathParser.of("/");
+        try {
+            Path.setDefaultParser(PathParser.of("."));
+            Path p = Path.parse("acme.backend");
+            assertEquals(List.of("acme", "backend"), p.segments());
+        } finally {
+            Path.setDefaultParser(original); // always restore
+        }
     }
 
     @Test
@@ -66,7 +86,7 @@ class PathTest {
 
     @Test
     void parent_returns_all_but_last_segment() {
-        Path p = Path.of("acme/backend/pr-review");
+        Path p = Path.parse("acme/backend/pr-review");
         Path parent = p.parent();
         assertEquals("acme/backend", parent.value());
         assertEquals(List.of("acme", "backend"), parent.segments());
@@ -74,40 +94,40 @@ class PathTest {
 
     @Test
     void parent_returns_null_at_root() {
-        assertNull(Path.of("root").parent());
+        assertNull(Path.parse("root").parent());
     }
 
     @Test
     void depth_equals_segment_count() {
-        assertEquals(3, Path.of("a/b/c").depth());
-        assertEquals(1, Path.of("root").depth());
+        assertEquals(3, Path.parse("a/b/c").depth());
+        assertEquals(1, Path.parse("root").depth());
     }
 
     @Test
     void isAncestorOf_returns_true_for_prefix() {
-        assertTrue(Path.of("acme/backend").isAncestorOf(Path.of("acme/backend/pr-review")));
+        assertTrue(Path.parse("acme/backend").isAncestorOf(Path.parse("acme/backend/pr-review")));
     }
 
     @Test
     void isAncestorOf_returns_false_for_same_path() {
-        Path p = Path.of("acme/backend");
+        Path p = Path.parse("acme/backend");
         assertFalse(p.isAncestorOf(p));
     }
 
     @Test
     void isAncestorOf_returns_false_for_non_prefix() {
-        assertFalse(Path.of("acme/backend").isAncestorOf(Path.of("acme/frontend")));
+        assertFalse(Path.parse("acme/backend").isAncestorOf(Path.parse("acme/frontend")));
     }
 
     @Test
     void isAncestorOf_returns_false_when_other_is_shorter() {
-        assertFalse(Path.of("acme/backend/pr-review").isAncestorOf(Path.of("acme/backend")));
+        assertFalse(Path.parse("acme/backend/pr-review").isAncestorOf(Path.parse("acme/backend")));
     }
 
     @Test
     void isAncestorOf_returns_false_for_partial_name_match() {
         // "acme/back" is NOT an ancestor of "acme/backend" — segment comparison, not string prefix
-        assertFalse(Path.of("acme/back").isAncestorOf(Path.of("acme/backend")));
+        assertFalse(Path.parse("acme/back").isAncestorOf(Path.parse("acme/backend")));
     }
 
     @Test

@@ -37,6 +37,10 @@ every call site.
 * Default is colocated with the key — one place to read and change it
 * `getOrDefault(key)` never returns null — call sites are null-free
 * Compiler enforces `defaultValue` is the correct `T` at key definition time
+* Backend implementations are completely unaware of defaults — `getOrDefault()`
+  is a default method on `Preferences` implemented once in terms of `get()`.
+  Any backend (MapPreferences, JPA-backed, scope-walking) gets it for free
+  without implementing it
 
 ### Negative Consequences / Tradeoffs
 

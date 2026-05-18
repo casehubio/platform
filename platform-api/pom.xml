@@ -16,5 +16,13 @@
     <description>Zero-dependency foundational SPIs and types shared across all casehub modules.
         No Quarkus, no JPA, no casehubio deps. Pure Java only.</description>
 
-    <!-- No dependencies — this is the zero-dep foundation -->
+    <dependencies>
+        <!-- Test only — not a production dependency -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
 </project>

@@ -17,13 +17,15 @@ public final class MapPreferences implements Preferences {
     @Override
     @SuppressWarnings("unchecked")
     public <T extends SingleValuePreference> T get(PreferenceKey<T> key) {
-        return (T) values.get(key.qualifiedName());
+        Object value = values.get(key.qualifiedName());
+        return (value instanceof SingleValuePreference) ? (T) value : null;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T extends MultiValuePreference> T get(PreferenceKey<T> key, String subKey) {
-        return (T) values.get(key.qualifiedName() + "." + subKey);
+        Object value = values.get(key.qualifiedName() + "." + subKey);
+        return (value instanceof MultiValuePreference) ? (T) value : null;
     }
 
     @Override

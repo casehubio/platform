@@ -2,6 +2,7 @@ package io.casehub.platform.mock;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
+import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
@@ -9,6 +10,8 @@ import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -65,5 +68,12 @@ class MockBeansTest {
         PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label", new LabelPref("fallback"));
         assertNull(prefs.get(key));
         assertEquals("fallback", prefs.getOrDefault(key).value());
+    }
+
+    @Test
+    void pathParser_default_separator_is_slash() {
+        // PathParserConfigurator sets / as default at startup
+        Path p = Path.parse("acme/backend/pr-review");
+        assertEquals(List.of("acme", "backend", "pr-review"), p.segments());
     }
 }

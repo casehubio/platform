@@ -62,11 +62,34 @@ class MockBeansTest {
     }
 
     @Test
-    void preferenceProvider_typed_get_returns_null() {
+    void preferenceProvider_typed_get_returns_parsed_value() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
         record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
-        PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label", new LabelPref("fallback"));
-        assertNull(prefs.get(key));
+        PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label",
+                new LabelPref("fallback"),
+                LabelPref::new);
+        LabelPref result = prefs.get(key);
+        assertNotNull(result);
+        assertEquals("hello", result.value());
+    }
+
+    @Test
+    void preferenceProvider_getOrDefault_returns_parsed_value_when_configured() {
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
+        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
+        PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label",
+                new LabelPref("fallback"),
+                LabelPref::new);
+        assertEquals("hello", prefs.getOrDefault(key).value());
+    }
+
+    @Test
+    void preferenceProvider_getOrDefault_returns_key_default_when_absent() {
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
+        record MissingPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {}
+        PreferenceKey<MissingPref> key = new PreferenceKey<>("test", "missing",
+                new MissingPref("fallback"),
+                MissingPref::new);
         assertEquals("fallback", prefs.getOrDefault(key).value());
     }
 

@@ -1,5 +1,7 @@
 # casehub-platform Workspace
 
+**Name:** casehub-platform
+
 **Physical path:** `/Users/mdproctor/claude/casehub/platform/CLAUDE.md`
 **Symlinked at:** `/Users/mdproctor/claude/public/casehub/platform/CLAUDE.md`
 **Project repo:** `/Users/mdproctor/claude/casehub/platform`
@@ -81,14 +83,15 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
 | `platform/` | `casehub-platform` | Quarkus @DefaultBean mocks |
+| `testing/` | `casehub-platform-testing` | @Alternative @Priority(1) identity fixtures — no Quarkus runtime |
 
 ## Package Structure (platform-api)
 
 ```
 io.casehub.platform.api
   .path          — Path, hierarchical scope/label paths
-  .preferences   — CasePreferenceProvider, CasePreferences, PreferenceKey, SettingsScope,
-                   SingleValuePreference, MultiValuePreference
+  .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
+                   SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
   .identity      — CurrentPrincipal, GroupMembershipProvider
 ```
 

@@ -1,14 +1,14 @@
-# 0002 — Preference default value location — key record vs Preferences interface
+# 0002 — Preference key contract — defaultValue and parser colocated on PreferenceKey
 
 Date: 2026-05-18
 Status: Accepted
 
 ## Context and Problem Statement
 
-`Preferences.get(key)` returns null when a preference is not configured.
-Callers need a fallback. The question is where the fallback lives: on the
-`PreferenceKey<T>`, on the `Preferences` interface as a default method, or
-as a convention on the Preference record itself.
+`Preferences.get(key)` returns null when a preference is not configured. Callers need a fallback.
+Additionally, the `config/` module and `MockPreferenceProvider` need to construct typed preference
+values from raw config strings. The question is where these concerns live: on `PreferenceKey<T>`,
+on the `Preferences` interface, or scattered across call sites and provider implementations.
 
 ## Decision Drivers
 
@@ -26,11 +26,9 @@ as a convention on the Preference record itself.
 
 ## Decision Outcome
 
-Chosen option: **Option C**, because the default is a property of the key
-definition, not a per-call decision. The key is defined once (as a static
-constant on the Preference record); having it carry the default makes the
-fallback visible at the point of definition and eliminates null checks at
-every call site.
+Chosen option: **Option C** extended — `PreferenceKey<T>` carries both `defaultValue` and
+`Function<String, T> parser`. This is the Drools `get(String)` factory pattern colocated with
+the key definition rather than on the option class itself.
 
 ### Positive Consequences
 
@@ -41,6 +39,10 @@ every call site.
   is a default method on `Preferences` implemented once in terms of `get()`.
   Any backend (MapPreferences, JPA-backed, scope-walking) gets it for free
   without implementing it
+* Parser colocated with key — `config/` module and `MockPreferenceProvider` call `key.parse(raw)`
+  without knowing the target type; no reflection, no type registry required
+* `MockPreferenceProvider.get()` now returns typed values from config strings — eliminates the
+  need for a separate `InMemoryPreferenceProvider` test fixture for preferences
 
 ### Negative Consequences / Tradeoffs
 

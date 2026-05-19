@@ -95,6 +95,10 @@ io.casehub.platform.api
   .identity      — CurrentPrincipal, GroupMembershipProvider
 ```
 
+## Writing Style Guide
+
+**The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries.** Load it in full before drafting. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without verifying it against the style guide.
+
 ## Work Tracking
 
 **Issue tracking:** enabled

@@ -18,15 +18,16 @@ import java.util.stream.Collectors;
 /**
  * @DefaultBean mock for dev/test.
  *
- * <p>Typed {@code get()} always returns {@code null} — callers should use
- * {@code getOrDefault(key)} to apply the key's compile-time default automatically.
- *
  * <p>{@code asMap()} returns values in their natural Java types (Integer, Long, Boolean,
  * Double, List, String) suitable for injection into CaseContext. Config keys match
  * {@code PreferenceKey.qualifiedName()} (namespace.name), e.g.:
  * <pre>
  *   casehub.platform.preferences.defaults.devtown.humanApprovalThreshold=500
  * </pre>
+ *
+ * <p>{@code get(key)} parses the raw config string using {@code key.parse()} — returns a
+ * typed value when the key is configured, {@code null} when absent (caller falls back to
+ * {@code key.defaultValue()} via {@code getOrDefault(key)}).
  *
  * <p>Ignores scope hierarchy — returns the same flat map for every {@code SettingsScope}.
  * Real implementations walk {@code scope.scope().segments()} applying inheritance per level.

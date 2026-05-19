@@ -22,12 +22,26 @@ class PreferenceKeyTest {
     }
 
     @Test
-    void qualifiedName_is_value_based_for_equality() {
+    void function_components_break_record_equality_use_qualifiedName_instead() {
+        // PreferenceKey is a record with a Function component.
+        // Function instances only have identity equality — two separately-created
+        // keys with distinct lambda instances are NOT equal() even if semantically the same.
+        // Always use qualifiedName() for comparison, not equals().
+        // Use explicit lambdas (not method references) to guarantee distinct instances.
+        PreferenceKey<TestPref> k1 = new PreferenceKey<>("devtown", "humanApprovalThreshold",
+                TestPref.DEFAULT, s -> new TestPref(s));
+        PreferenceKey<TestPref> k2 = new PreferenceKey<>("devtown", "humanApprovalThreshold",
+                TestPref.DEFAULT, s -> new TestPref(s));
+        assertNotEquals(k1, k2);  // distinct lambda instances break equals()
+    }
+
+    @Test
+    void keys_with_same_namespace_and_name_have_equal_qualifiedName() {
         PreferenceKey<TestPref> k1 = key("devtown", "humanApprovalThreshold");
         PreferenceKey<TestPref> k2 = key("devtown", "humanApprovalThreshold");
-        // Note: records with Function fields do NOT provide value equality for the function component.
-        // Keys are equal when namespace and name match — equality based on qualifiedName() is the contract.
         assertEquals(k1.qualifiedName(), k2.qualifiedName());
+        assertEquals(k1.qualifiedName(), k2.qualifiedName());
+        assertEquals(k1.hashCode(), k1.hashCode()); // same instance is self-equal
     }
 
     @Test

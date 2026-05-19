@@ -29,6 +29,16 @@ import java.util.stream.Collectors;
  * typed value when the key is configured, {@code null} when absent (caller falls back to
  * {@code key.defaultValue()} via {@code getOrDefault(key)}).
  *
+ * <p><strong>Numeric/boolean config values and typed get():</strong> {@code parseValue()}
+ * converts config strings to Java types (Integer, Boolean, etc.) for {@code asMap()}.
+ * However, {@code get(key)} only parses {@code String} values via {@code key.parse()} —
+ * if a value was converted to {@code Integer} or {@code Boolean} by {@code parseValue()},
+ * {@code get(key)} returns {@code null} (falling through to {@code key.defaultValue()}
+ * via {@code getOrDefault()}). This is intentional: {@code asMap()} serves expression
+ * evaluators that want native types; {@code get(key)} serves type-safe preference lookups
+ * that want the preference's own parsing logic. Configure string preferences with string
+ * config values to use both paths simultaneously.
+ *
  * <p>Ignores scope hierarchy — returns the same flat map for every {@code SettingsScope}.
  * Real implementations walk {@code scope.scope().segments()} applying inheritance per level.
  */

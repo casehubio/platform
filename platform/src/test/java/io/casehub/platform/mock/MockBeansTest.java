@@ -7,6 +7,7 @@ import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
+import io.casehub.platform.api.preferences.SingleValuePreference;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,21 @@ class MockBeansTest {
                 new MissingPref("fallback"),
                 MissingPref::new);
         assertEquals("fallback", prefs.getOrDefault(key).value());
+    }
+
+    @Test
+    void preferenceProvider_numeric_config_returns_null_for_typed_get() {
+        // parseValue() converts "42" to Integer(42) for asMap().
+        // MapPreferences.get(key) only handles String — Integer falls through to null.
+        // getOrDefault() then returns key.defaultValue().
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("acme/backend"));
+        assertEquals(42, prefs.asMap().get("test.count"));          // Integer in asMap ✓
+        record CountPref(int value) implements SingleValuePreference {}
+        PreferenceKey<CountPref> key = new PreferenceKey<>("test", "count",
+                new CountPref(-1),
+                s -> new CountPref(Integer.parseInt(s)));
+        assertNull(prefs.get(key));                                   // null — Integer, not String
+        assertEquals(-1, prefs.getOrDefault(key).value());            // falls to defaultValue
     }
 
     @Test

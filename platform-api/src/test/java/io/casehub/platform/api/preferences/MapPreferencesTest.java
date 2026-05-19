@@ -50,6 +50,14 @@ class MapPreferencesTest {
     }
 
     @Test
+    void get_with_subkey_parses_string_value_using_key_parser() {
+        MapPreferences prefs = new MapPreferences(Map.of("test.multi.sub1", "parsedValue"));
+        TestMultiPref result = prefs.get(TestMultiPref.KEY, "sub1");
+        assertNotNull(result);
+        assertEquals("parsedValue", result.value());
+    }
+
+    @Test
     void asMap_returns_all_values() {
         Map<String, Object> values = Map.of("test.single", "strVal");
         assertEquals(values, new MapPreferences(values).asMap());

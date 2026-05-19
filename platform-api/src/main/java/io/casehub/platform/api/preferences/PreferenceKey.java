@@ -24,7 +24,11 @@ public record PreferenceKey<T extends Preference>(String namespace, String name,
 
     public String qualifiedName() { return namespace + "." + name; }
 
-    /** Parses a raw string value (already interpolated) into a typed preference instance. */
+    /**
+     * Converts a raw string value from a config source into a typed preference instance.
+     * The caller is responsible for any {@code ${VAR}} interpolation before invoking this method;
+     * the parser performs type conversion only.
+     */
     public T parse(String raw) {
         Objects.requireNonNull(raw, "raw value must not be null");
         return parser.apply(raw);

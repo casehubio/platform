@@ -46,9 +46,9 @@ the key definition rather than on the option class itself.
 
 ### Negative Consequences / Tradeoffs
 
-* `PreferenceKey` constructor gains a third argument — slightly more verbose
-* The `DEFAULT` constant on the record is now duplicated in the key definition;
-  by convention they should be the same instance
+* `PreferenceKey` constructor now requires four arguments (namespace, name, defaultValue, parser) — more verbose at definition site
+* The `DEFAULT` constant on the record is now duplicated in the key definition; by convention they should be the same instance
+* `Function<String, T>` components break record value equality — keys must be compared via `qualifiedName()`, not `equals()`
 
 ## Pros and Cons of the Options
 

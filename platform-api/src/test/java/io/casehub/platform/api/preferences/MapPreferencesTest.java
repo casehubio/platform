@@ -9,12 +9,12 @@ class MapPreferencesTest {
 
     record TestSinglePref(String value) implements SingleValuePreference {
         static final TestSinglePref DEFAULT = new TestSinglePref("default");
-        static final PreferenceKey<TestSinglePref> KEY = new PreferenceKey<>("test", "single", DEFAULT);
+        static final PreferenceKey<TestSinglePref> KEY = new PreferenceKey<>("test", "single", DEFAULT, TestSinglePref::new);
     }
 
     record TestMultiPref(String subKey, String value) implements MultiValuePreference {
         static final TestMultiPref DEFAULT = new TestMultiPref("default", "default");
-        static final PreferenceKey<TestMultiPref> KEY = new PreferenceKey<>("test", "multi", DEFAULT);
+        static final PreferenceKey<TestMultiPref> KEY = new PreferenceKey<>("test", "multi", DEFAULT, s -> new TestMultiPref("parsed", s));
     }
 
     @Test
@@ -39,6 +39,14 @@ class MapPreferencesTest {
         TestMultiPref pref = new TestMultiPref("sub1", "val");
         MapPreferences prefs = new MapPreferences(Map.of("test.multi.sub1", pref));
         assertEquals(pref, prefs.get(TestMultiPref.KEY, "sub1"));
+    }
+
+    @Test
+    void get_parses_string_value_using_key_parser() {
+        MapPreferences prefs = new MapPreferences(Map.of("test.single", "hello"));
+        TestSinglePref result = prefs.get(TestSinglePref.KEY);
+        assertNotNull(result);
+        assertEquals("hello", result.value());
     }
 
     @Test

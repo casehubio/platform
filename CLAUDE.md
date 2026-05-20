@@ -56,6 +56,7 @@ git -C /Users/mdproctor/claude/casehub/platform ...          # project artifacts
 - `platform/` contains Quarkus @DefaultBean mocks only — no domain logic
 - Every SPI in platform-api gets a @DefaultBean mock in platform
 - All @DefaultBean mocks must be configurable via @ConfigProperty
+- `config/` reads YAML preference files at startup — declare as compile scope in production; not needed on test-only classpaths (mock handles test defaults via `application.properties`)
 
 ## Project Type
 
@@ -84,6 +85,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
 | `platform/` | `casehub-platform` | Quarkus @DefaultBean mocks |
 | `testing/` | `casehub-platform-testing` | @Alternative @Priority(1) identity fixtures — no Quarkus runtime |
+| `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 
 ## Package Structure (platform-api)
 

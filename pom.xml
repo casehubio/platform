@@ -12,6 +12,8 @@
     <modules>
         <module>platform-api</module>
         <module>platform</module>
+        <module>testing</module>
+        <module>config</module>
     </modules>
 
     <properties>

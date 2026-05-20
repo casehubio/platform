@@ -1,0 +1,3 @@
+entries:
+  - scope: casehubio/devtown
+    devtown.humanApprovalThreshold: "750"

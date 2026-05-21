@@ -75,5 +75,5 @@ the key definition rather than on the option class itself.
 
 * casehubio/platform#1 — initial implementation
 * casehubio/platform#2 — v2 revision that introduced defaultValue
-* `docs/protocols/casehub/typed-preference-keys.md`
-* `docs/protocols/casehub/platform-spi-contract.md` (Rule 3)
+* `casehub/parent — docs/protocols/casehub/typed-preference-keys.md`
+* `casehub/parent — docs/protocols/casehub/platform-spi-contract.md` (Rule 3)

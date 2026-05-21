@@ -14,6 +14,7 @@
         <module>platform</module>
         <module>testing</module>
         <module>config</module>
+        <module>oidc</module>
     </modules>
 
     <properties>

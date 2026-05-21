@@ -26,7 +26,7 @@ module pattern exactly:
 - Depends on `casehub-platform-api` + `quarkus-oidc`
 - Jandex plugin for CDI library discovery
 - Quarkus maven plugin
-- Test scope: `quarkus-junit5` + `quarkus-test-security`
+- Test scope: `quarkus-junit` + `quarkus-junit-mockito` (for `@InjectMock`)
 - Registered in root `pom.xml` `<modules>`
 
 No `@DefaultBean` anywhere in this module. `OidcCurrentPrincipal` is a plain
@@ -79,7 +79,9 @@ Claim names are fixed — they are part of the platform JWT schema, not deployme
 ### Anonymous handling
 
 When `identity.isAnonymous()` is true (unauthenticated request to a public endpoint),
-returns sentinel values matching `MockCurrentPrincipal` defaults:
+returns sentinel values consistent with `CurrentPrincipal.isAuthenticated()` semantics.
+Note: `actorId` intentionally differs from the mock's default (`"system"`) — the mock
+represents a dev/test authenticated actor; anonymous means no authenticated context.
 
 - `actorId()` → `"anonymous"`
 - `groups()` → empty set

@@ -68,4 +68,4 @@ before falling through to parent.
 
 * casehubio/platform#1 — initial implementation
 * casehubio/platform#2 — v2 revision that introduced getOrDefault
-* `docs/protocols/casehub/platform-spi-contract.md` (Rule 3)
+* `casehub/parent — docs/protocols/casehub/platform-spi-contract.md` (Rule 3)

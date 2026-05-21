@@ -20,8 +20,6 @@ import java.util.Set;
  * implementations will throw {@code ContextNotActiveException} when the request context
  * is not active on the executing thread.
  *
- * <p>TODO: add {@code ActorType actorType()} once ActorType migrates from
- * casehub-ledger-api to casehub-platform-api (see casehubio/ledger migration issue).
  */
 public interface CurrentPrincipal {
 
@@ -42,7 +40,9 @@ public interface CurrentPrincipal {
      */
     default boolean hasGroup(String group) { return groups().contains(group); }
 
-    default boolean isSystem() { return "system".equals(actorId()); }
+    default ActorType actorType() { return ActorTypeResolver.resolve(actorId()); }
+
+    default boolean isSystem() { return actorType() == ActorType.SYSTEM; }
 
     default boolean isAuthenticated() { return !"anonymous".equals(actorId()); }
 

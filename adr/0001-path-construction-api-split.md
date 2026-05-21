@@ -69,4 +69,4 @@ responsible for applying the configured separator.
 ## Links
 
 * casehubio/platform#2 — v2 revision that introduced PathParser
-* `docs/protocols/casehub/platform-spi-contract.md`
+* `casehub/parent — docs/protocols/casehub/platform-spi-contract.md`

@@ -41,6 +41,7 @@ git -C /Users/mdproctor/claude/casehub/platform ...          # project artifacts
 | Artifact   | Destination | Notes |
 |------------|-------------|-------|
 | adr        | project     | lands in `adr/` |
+| protocols  | garden      | `/Users/mdproctor/claude/casehub/garden/docs/protocols/` — never create local protocol files |
 | specs      | project     | lands in `docs/` |
 | blog       | workspace   | staged; published to mdproctor.github.io via publish-blog |
 | plans      | workspace   | stay in workspace permanently |

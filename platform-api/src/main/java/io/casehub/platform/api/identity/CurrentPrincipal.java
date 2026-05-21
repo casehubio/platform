@@ -45,4 +45,24 @@ public interface CurrentPrincipal {
     default boolean isSystem() { return "system".equals(actorId()); }
 
     default boolean isAuthenticated() { return !"anonymous".equals(actorId()); }
+
+    /**
+     * The tenant this principal belongs to.
+     *
+     * <p>Single-tenant deployments return {@link TenancyConstants#DEFAULT_TENANT_ID}.
+     * Real implementations read from the JWT {@code tenancyId} claim.
+     *
+     * <p>This value must never be sourced from user-supplied input — always derived
+     * from the authenticated security context.
+     */
+    String tenancyId();
+
+    /**
+     * Whether this principal has cross-tenant admin access.
+     *
+     * <p>Must return {@code true} only for platform-level super-admin principals.
+     * Intended to be checked once at CDI injection time in cross-tenant data access
+     * classes — never at call sites. See protocol PP-20260520-e6a5f0.
+     */
+    boolean isCrossTenantAdmin();
 }

@@ -1,5 +1,6 @@
 package io.casehub.platform.testing;
 
+import io.casehub.platform.api.identity.TenancyConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -81,12 +82,38 @@ class FixedCurrentPrincipalTest {
     }
 
     @Test
+    void default_tenancyId_is_default_tenant_id() {
+        assertEquals(TenancyConstants.DEFAULT_TENANT_ID, principal.tenancyId());
+    }
+
+    @Test
+    void default_isCrossTenantAdmin_is_false() {
+        assertFalse(principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void setTenancyId_changes_tenancyId() {
+        principal.setTenancyId("acme-corp");
+        assertEquals("acme-corp", principal.tenancyId());
+    }
+
+    @Test
+    void setCrossTenantAdmin_changes_isCrossTenantAdmin() {
+        principal.setCrossTenantAdmin(true);
+        assertTrue(principal.isCrossTenantAdmin());
+    }
+
+    @Test
     void reset_restores_defaults() {
         principal.setActorId("alice");
         principal.addGroup("admin");
+        principal.setTenancyId("acme-corp");
+        principal.setCrossTenantAdmin(true);
         principal.reset();
         assertEquals("system", principal.actorId());
         assertTrue(principal.groups().isEmpty());
+        assertEquals(TenancyConstants.DEFAULT_TENANT_ID, principal.tenancyId());
+        assertFalse(principal.isCrossTenantAdmin());
         assertTrue(principal.isSystem());
     }
 

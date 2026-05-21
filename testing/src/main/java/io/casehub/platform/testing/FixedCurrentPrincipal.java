@@ -1,6 +1,7 @@
 package io.casehub.platform.testing;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.TenancyConstants;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
@@ -27,6 +28,8 @@ public class FixedCurrentPrincipal implements CurrentPrincipal {
 
     private String actorId = "system";
     private Set<String> groups = new HashSet<>();
+    private String tenancyId = TenancyConstants.DEFAULT_TENANT_ID;
+    private boolean crossTenantAdmin = false;
 
     public void setActorId(String actorId) {
         this.actorId = actorId;
@@ -40,22 +43,35 @@ public class FixedCurrentPrincipal implements CurrentPrincipal {
         this.groups.add(group);
     }
 
+    public void setTenancyId(String tenancyId) {
+        this.tenancyId = tenancyId;
+    }
+
+    public void setCrossTenantAdmin(boolean crossTenantAdmin) {
+        this.crossTenantAdmin = crossTenantAdmin;
+    }
+
     /**
-     * Resets to defaults: {@code actorId="system"}, groups empty.
+     * Resets to defaults: {@code actorId="system"}, groups empty, tenancyId to
+     * {@link TenancyConstants#DEFAULT_TENANT_ID}, crossTenantAdmin false.
      * Call in {@code @BeforeEach} to isolate tests.
      */
     public void reset() {
         actorId = "system";
         groups = new HashSet<>();
+        tenancyId = TenancyConstants.DEFAULT_TENANT_ID;
+        crossTenantAdmin = false;
     }
 
     @Override
-    public String actorId() {
-        return actorId;
-    }
+    public String actorId() { return actorId; }
 
     @Override
-    public Set<String> groups() {
-        return Set.copyOf(groups);
-    }
+    public Set<String> groups() { return Set.copyOf(groups); }
+
+    @Override
+    public String tenancyId() { return tenancyId; }
+
+    @Override
+    public boolean isCrossTenantAdmin() { return crossTenantAdmin; }
 }

@@ -1,6 +1,7 @@
 package io.casehub.platform.mock;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -34,6 +35,14 @@ public class MockCurrentPrincipal implements CurrentPrincipal {
     @ConfigProperty(name = "casehub.platform.principal.groups")
     Optional<List<String>> groups;
 
+    // Default matches TenancyConstants.DEFAULT_TENANT_ID — annotation requires a string literal
+    @ConfigProperty(name = "casehub.tenancy.default-id",
+                    defaultValue = "278776f9-e1b0-46fb-9032-8bddebdcf9ce")
+    String tenancyId;
+
+    @ConfigProperty(name = "casehub.platform.principal.crossTenantAdmin", defaultValue = "false")
+    boolean crossTenantAdmin;
+
     @Override
     public String actorId() { return actorId; }
 
@@ -43,4 +52,10 @@ public class MockCurrentPrincipal implements CurrentPrincipal {
             .filter(Predicate.not(String::isBlank))
             .collect(Collectors.toUnmodifiableSet());
     }
+
+    @Override
+    public String tenancyId() { return tenancyId; }
+
+    @Override
+    public boolean isCrossTenantAdmin() { return crossTenantAdmin; }
 }

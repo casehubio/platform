@@ -8,6 +8,7 @@ import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
 import io.casehub.platform.api.preferences.SingleValuePreference;
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -107,6 +108,16 @@ class MockBeansTest {
                 s -> new CountPref(Integer.parseInt(s)));
         assertNull(prefs.get(key));                                   // null — Integer, not String
         assertEquals(-1, prefs.getOrDefault(key).value());            // falls to defaultValue
+    }
+
+    @Test
+    void currentPrincipal_tenancyId_defaults_to_default_tenant_id() {
+        assertEquals(TenancyConstants.DEFAULT_TENANT_ID, principal.tenancyId());
+    }
+
+    @Test
+    void currentPrincipal_isCrossTenantAdmin_false_by_default() {
+        assertFalse(principal.isCrossTenantAdmin());
     }
 
     @Test

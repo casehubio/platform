@@ -10,6 +10,8 @@ class CurrentPrincipalSpiTest {
         return new CurrentPrincipal() {
             @Override public String actorId() { return actorId; }
             @Override public Set<String> groups() { return groups; }
+            @Override public String tenancyId() { return TenancyConstants.DEFAULT_TENANT_ID; }
+            @Override public boolean isCrossTenantAdmin() { return false; }
         };
     }
 
@@ -52,5 +54,17 @@ class CurrentPrincipalSpiTest {
     @Test
     void isAuthenticated_returns_true_for_named_user() {
         assertTrue(principal("alice", Set.of()).isAuthenticated());
+    }
+
+    @Test
+    void tenancyId_returns_non_blank_string() {
+        final String id = principal("alice", Set.of()).tenancyId();
+        assertNotNull(id);
+        assertFalse(id.isBlank());
+    }
+
+    @Test
+    void isCrossTenantAdmin_returns_false_in_minimal_implementation() {
+        assertFalse(principal("alice", Set.of()).isCrossTenantAdmin());
     }
 }

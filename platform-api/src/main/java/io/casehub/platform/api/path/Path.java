@@ -44,6 +44,17 @@ public record Path(String value, List<String> segments) {
     }
 
     /**
+     * Returns the root path — zero segments, represents the org-wide scope.
+     * Use as the fallback when no scope has been assigned to a work unit.
+     *
+     * <p>Root is the ancestor of every non-root path. {@link #isAncestorOf} and
+     * {@link #parent} both handle root correctly.
+     */
+    public static Path root() {
+        return new Path("", List.of());
+    }
+
+    /**
      * Constructs a Path from explicit segments. No parsing — each segment is used as-is
      * after stripping and blank validation. Prefer this over {@link #parse(String)} when
      * building paths programmatically.
@@ -62,13 +73,19 @@ public record Path(String value, List<String> segments) {
         return new Path(joined, List.of(stripped));
     }
 
+    /** Returns the parent path, or {@code null} if this path is a root or single-segment path. */
     public Path parent() {
-        if (segments.size() == 1) return null;
+        if (segments.size() <= 1) return null;
         List<String> parentSegments = segments.subList(0, segments.size() - 1);
         return new Path(String.join("/", parentSegments), List.copyOf(parentSegments));
     }
 
+    /**
+     * Returns true if this path is a strict ancestor of {@code other}.
+     * Root (zero segments) is an ancestor of every non-root path.
+     */
     public boolean isAncestorOf(Path other) {
+        if (this.segments.isEmpty()) return !other.segments.isEmpty();
         if (other.segments.size() <= this.segments.size()) return false;
         return other.segments.subList(0, this.segments.size()).equals(this.segments);
     }

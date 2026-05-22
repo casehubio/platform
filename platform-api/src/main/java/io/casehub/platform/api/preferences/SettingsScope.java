@@ -19,4 +19,9 @@ public record SettingsScope(Path scope, Instant effectiveAt) {
     public static SettingsScope of(String... segments) {
         return new SettingsScope(Path.of(segments), Instant.now());
     }
+
+    /** Root scope — org-wide defaults; used when a work unit has no assigned scope. */
+    public static SettingsScope root() {
+        return new SettingsScope(Path.root(), Instant.now());
+    }
 }

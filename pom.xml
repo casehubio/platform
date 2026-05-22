@@ -16,6 +16,7 @@
         <module>config</module>
         <module>oidc</module>
         <module>expression</module>
+        <module>persistence-jpa</module>
     </modules>
 
     <properties>

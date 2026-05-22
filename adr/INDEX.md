@@ -8,3 +8,4 @@
 | 0004 | [OIDC-backed CurrentPrincipal in a separate optional module](0004-oidc-optional-module.md) | Accepted | 2026-05-21 |
 | 0005 | [ActorType ownership in casehub-platform-api](0005-actortype-in-platform-api.md) | Accepted | 2026-05-22 |
 | 0006 | [JPA PreferenceProvider is current-only — effectiveAt ignored](0006-jpa-preference-provider-current-only.md) | Accepted | 2026-05-22 |
+| 0007 | [SlaBreachPolicy belongs in casehub-work-api, not casehub-platform](0007-sla-breach-policy-in-work-api-not-platform.md) | Accepted | 2026-05-22 |

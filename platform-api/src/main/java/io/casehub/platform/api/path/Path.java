@@ -43,6 +43,8 @@ public record Path(String value, List<String> segments) {
         return new Path(trimmed, List.of(parts));
     }
 
+    private static final Path ROOT = new Path("", List.of());
+
     /**
      * Returns the root path — zero segments, represents the org-wide scope.
      * Use as the fallback when no scope has been assigned to a work unit.
@@ -51,7 +53,7 @@ public record Path(String value, List<String> segments) {
      * {@link #parent} both handle root correctly.
      */
     public static Path root() {
-        return new Path("", List.of());
+        return ROOT;
     }
 
     /**

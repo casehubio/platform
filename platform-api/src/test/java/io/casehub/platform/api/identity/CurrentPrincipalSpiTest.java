@@ -67,4 +67,19 @@ class CurrentPrincipalSpiTest {
     void isCrossTenantAdmin_returns_false_in_minimal_implementation() {
         assertFalse(principal("alice", Set.of()).isCrossTenantAdmin());
     }
+
+    @Test
+    void actorType_returns_human_for_named_user() {
+        assertEquals(ActorType.HUMAN, principal("alice", Set.of()).actorType());
+    }
+
+    @Test
+    void actorType_returns_system_for_system_actorId() {
+        assertEquals(ActorType.SYSTEM, principal("system", Set.of()).actorType());
+    }
+
+    @Test
+    void actorType_returns_agent_for_versioned_persona() {
+        assertEquals(ActorType.AGENT, principal("claude:analyst@v1", Set.of()).actorType());
+    }
 }

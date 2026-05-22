@@ -15,8 +15,8 @@ import java.util.Set;
  * <p>Defaults to {@code actorId="system"} with empty groups, matching
  * {@code MockCurrentPrincipal} defaults so switching providers has no surprises.
  *
- * <p>All four default methods ({@code roles()}, {@code hasGroup()}, {@code isSystem()},
- * {@code isAuthenticated()}) are inherited from the interface — nothing to override.
+ * <p>All five default methods ({@code roles()}, {@code hasGroup()}, {@code actorType()},
+ * {@code isSystem()}, {@code isAuthenticated()}) are inherited from the interface — nothing to override.
  *
  * <p><strong>Not thread-safe</strong> — designed for single-threaded test use only.
  * Call {@link #reset()} in a {@code @BeforeEach} method to isolate tests.

@@ -6,6 +6,8 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
@@ -60,5 +62,15 @@ class JQEvaluatorTest {
         ObjectNode node = MAPPER.createObjectNode().put("x", 1);
         ValidationResult result = jqEvaluator.eval(".x", node);
         assertTrue(result.ok());
+    }
+
+    @Test
+    void eval_injects_secret_scope_variable() {
+        // casehub.platform.secrets.testservice.apiKey=sk-test-key set in application.properties
+        ObjectNode node = MAPPER.createObjectNode();
+        ValidationResult result = jqEvaluator.eval(
+                "$secret.testservice.apiKey", node, Set.of("testservice"), Set.of());
+        assertTrue(result.ok(), () -> "eval failed: " + result.error());
+        assertEquals("sk-test-key", result.output().get(0).asText());
     }
 }

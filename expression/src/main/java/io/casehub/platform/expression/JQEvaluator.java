@@ -97,7 +97,8 @@ public class JQEvaluator {
             query.apply(childScope, input, out::add);
             return ValidationResult.ok(out);
         } catch (Exception e) {
-            return ValidationResult.error(e.getClass().getSimpleName() + ": " + e.getMessage());
+            Throwable cause = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
+            return ValidationResult.error(cause.getClass().getSimpleName() + ": " + cause.getMessage());
         }
     }
 }

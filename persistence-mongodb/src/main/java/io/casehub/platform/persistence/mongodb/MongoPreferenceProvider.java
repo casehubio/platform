@@ -44,8 +44,8 @@ public class MongoPreferenceProvider implements PreferenceProvider {
             scopeOrder.put(ancestors.get(i), i);
         }
         docs.sort((a, b) -> Integer.compare(
-                scopeOrder.getOrDefault(a.scope, 0),
-                scopeOrder.getOrDefault(b.scope, 0)));
+                scopeOrder.getOrDefault(a.scope, -1),
+                scopeOrder.getOrDefault(b.scope, -1)));
 
         final Map<String, Object> merged = new HashMap<>();
         for (final MongoPreferenceDocument doc : docs) {
@@ -58,13 +58,19 @@ public class MongoPreferenceProvider implements PreferenceProvider {
         return new MapPreferences(merged);
     }
 
-    /** Returns ancestor scope strings shortest-first, ending with the target scope. */
+    /** Returns ancestor scope strings shortest-first (root first), ending with the target scope. */
     private static List<String> ancestors(final Path path) {
         final List<String> result = new ArrayList<>();
         Path current = path;
         while (current != null) {
             result.add(0, current.value());
             current = current.parent();
+        }
+        // Root scope ("") is always the base ancestor — preferences stored there apply universally.
+        // Path.parent() returns null for single-segment paths (not root), so root is not naturally
+        // reached by the walk above for non-root paths.
+        if (path.depth() > 0) {
+            result.add(0, Path.root().value());
         }
         return result;
     }

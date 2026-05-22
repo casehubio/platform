@@ -1,6 +1,5 @@
 package io.casehub.platform.persistence.jpa;
 
-import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
@@ -89,6 +88,59 @@ class JpaPreferenceProviderTest {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio", "devtown"));
 
         assertEquals(0, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    @Transactional
+    void resolve_root_scope_directly() {
+        insert("", "test", "count", "", "7");
+
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.root());
+
+        assertEquals(7, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    @Transactional
+    void resolve_root_scope_is_fallback_for_single_segment_scope() {
+        insert("", "test", "count", "", "5");
+
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio"));
+
+        assertEquals(5, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    @Transactional
+    void resolve_root_scope_is_fallback_for_multi_segment_scope() {
+        insert("", "test", "count", "", "3");
+
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio", "devtown"));
+
+        assertEquals(3, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    @Transactional
+    void resolve_explicit_scope_overrides_root() {
+        insert("", "test", "count", "", "1");
+        insert("casehubio", "test", "count", "", "99");
+
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio"));
+
+        assertEquals(99, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    @Transactional
+    void resolve_three_level_chain_with_root_base() {
+        insert("", "test", "count", "", "1");
+        insert("casehubio", "test", "count", "", "10");
+        insert("casehubio/devtown", "test", "count", "", "100");
+
+        Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio", "devtown"));
+
+        assertEquals(100, prefs.getOrDefault(Count.KEY).value());
     }
 
     private void insert(String scope, String namespace, String name, String subKey, String value) {

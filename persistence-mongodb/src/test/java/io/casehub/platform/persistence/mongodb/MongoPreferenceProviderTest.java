@@ -102,6 +102,54 @@ class MongoPreferenceProviderTest {
         assertNull(prefs.get(Threshold.KEY, "absent"));
     }
 
+    @Test
+    void resolve_root_scope_directly() {
+        insert("", "test", "count", "", "7");
+
+        final Preferences prefs = preferenceProvider.resolve(SettingsScope.root());
+
+        assertEquals(7, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    void resolve_root_scope_is_fallback_for_single_segment_scope() {
+        insert("", "test", "count", "", "5");
+
+        final Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio"));
+
+        assertEquals(5, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    void resolve_root_scope_is_fallback_for_multi_segment_scope() {
+        insert("", "test", "count", "", "3");
+
+        final Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio", "devtown"));
+
+        assertEquals(3, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    void resolve_explicit_scope_overrides_root() {
+        insert("", "test", "count", "", "1");
+        insert("casehubio", "test", "count", "", "99");
+
+        final Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio"));
+
+        assertEquals(99, prefs.getOrDefault(Count.KEY).value());
+    }
+
+    @Test
+    void resolve_three_level_chain_with_root_base() {
+        insert("", "test", "count", "", "1");
+        insert("casehubio", "test", "count", "", "10");
+        insert("casehubio/devtown", "test", "count", "", "100");
+
+        final Preferences prefs = preferenceProvider.resolve(SettingsScope.of("casehubio", "devtown"));
+
+        assertEquals(100, prefs.getOrDefault(Count.KEY).value());
+    }
+
     private void insert(final String scope, final String namespace,
                         final String name, final String subKey, final String value) {
         final MongoPreferenceDocument doc = new MongoPreferenceDocument();

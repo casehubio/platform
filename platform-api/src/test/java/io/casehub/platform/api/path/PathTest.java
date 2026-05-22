@@ -134,4 +134,38 @@ class PathTest {
     void of_varargs_throws_on_null_element() {
         assertThrows(NullPointerException.class, () -> Path.of("acme", null, "backend"));
     }
+
+    @Test
+    void root_has_zero_segments_and_empty_value() {
+        Path root = Path.root();
+        assertEquals("", root.value());
+        assertEquals(List.of(), root.segments());
+        assertEquals(0, root.depth());
+    }
+
+    @Test
+    void root_parent_returns_null() {
+        assertNull(Path.root().parent());
+    }
+
+    @Test
+    void root_isAncestorOf_non_root_returns_true() {
+        assertTrue(Path.root().isAncestorOf(Path.parse("acme")));
+        assertTrue(Path.root().isAncestorOf(Path.parse("acme/backend/pr-review")));
+    }
+
+    @Test
+    void root_isAncestorOf_root_returns_false() {
+        assertFalse(Path.root().isAncestorOf(Path.root()));
+    }
+
+    @Test
+    void non_root_isAncestorOf_root_returns_false() {
+        assertFalse(Path.parse("acme").isAncestorOf(Path.root()));
+    }
+
+    @Test
+    void root_returns_same_instance() {
+        assertSame(Path.root(), Path.root());
+    }
 }

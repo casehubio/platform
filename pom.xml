@@ -15,6 +15,7 @@
         <module>testing</module>
         <module>config</module>
         <module>oidc</module>
+        <module>expression</module>
     </modules>
 
     <properties>

@@ -4,18 +4,18 @@ import io.casehub.platform.api.expression.SecretManager;
 import io.casehub.platform.api.expression.SecretNotFoundException;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * {@code @DefaultBean} mock for {@link SecretManager}.
  *
- * <p>Reads secrets from SmallRye Config using the prefix {@code casehub.platform.secrets.*}.
- * Example: {@code casehub.platform.secrets.openai.apiKey=sk-test} makes
- * {@code $secret.openai.apiKey} available in JQ expressions during dev and test.
+ * <p>Reads secrets from SmallRye Config by sweeping all properties with the prefix
+ * {@code casehub.platform.secrets.{secretName}.}. Example: setting
+ * {@code casehub.platform.secrets.openai.apiKey=sk-test} in {@code application.properties}
+ * makes {@code $secret.openai.apiKey} available in JQ expressions during dev and test.
  *
  * <p>Displaced automatically when a non-default {@code @ApplicationScoped} {@link SecretManager}
  * is on the classpath (e.g. engine's {@code ConfigSecretManager}).
@@ -24,17 +24,14 @@ import java.util.Optional;
 @ApplicationScoped
 public class MockSecretManager implements SecretManager {
 
-    @ConfigProperty(name = "casehub.platform.secrets")
-    Optional<Map<String, String>> secretsConfig;
-
     @Override
     public Map<String, Object> secret(String secretName) {
-        Map<String, String> all = secretsConfig.orElse(Map.of());
-        String prefix = secretName + ".";
+        String prefix = "casehub.platform.secrets." + secretName + ".";
         Map<String, Object> result = new HashMap<>();
-        for (Map.Entry<String, String> entry : all.entrySet()) {
-            if (entry.getKey().startsWith(prefix)) {
-                put(result, entry.getKey().substring(prefix.length()), entry.getValue());
+        for (String name : ConfigProvider.getConfig().getPropertyNames()) {
+            if (name.startsWith(prefix)) {
+                ConfigProvider.getConfig().getOptionalValue(name, String.class)
+                        .ifPresent(v -> put(result, name.substring(prefix.length()), v));
             }
         }
         if (result.isEmpty()) throw new SecretNotFoundException(secretName);

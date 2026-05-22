@@ -36,6 +36,16 @@ git -C /Users/mdproctor/claude/public/casehub/platform ...   # workspace artifac
 git -C /Users/mdproctor/claude/casehub/platform ...          # project artifacts
 ```
 
+Two remotes are configured on the project repo:
+- `origin` → `casehubio/platform` (canonical)
+- `mdproctor` → `mdproctor/platform` (personal fork)
+
+Push to both after squash or significant merges:
+```bash
+git push --force-with-lease origin main
+git push --force mdproctor main   # --force on first push after fork creation
+```
+
 ## Routing
 
 | Artifact   | Destination | Notes |

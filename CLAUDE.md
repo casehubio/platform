@@ -40,6 +40,11 @@ Two remotes are configured on the project repo:
 - `origin` → `casehubio/platform` (canonical)
 - `mdproctor` → `mdproctor/platform` (personal fork)
 
+**Git hooks:** `.githooks/pre-push` is committed. Activate on each clone:
+```bash
+git config core.hooksPath .githooks
+```
+
 Push to both after squash or significant merges:
 ```bash
 git push --force-with-lease origin main

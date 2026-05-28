@@ -9,3 +9,4 @@
 | 0005 | [ActorType ownership in casehub-platform-api](0005-actortype-in-platform-api.md) | Accepted | 2026-05-22 |
 | 0006 | [JPA PreferenceProvider is current-only — effectiveAt ignored](0006-jpa-preference-provider-current-only.md) | Accepted | 2026-05-22 |
 | 0007 | [SlaBreachPolicy belongs in casehub-work-api, not casehub-platform](0007-sla-breach-policy-in-work-api-not-platform.md) | Accepted | 2026-05-22 |
+| 0008 | [CaseMemoryStore adapter repository placement](0008-casememory-adapter-repository-placement.md) | Accepted | 2026-05-28 |

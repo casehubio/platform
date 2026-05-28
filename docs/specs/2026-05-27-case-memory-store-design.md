@@ -214,8 +214,8 @@ oversight.
 public record EraseRequest(
     String entityId,               // required
     MemoryDomain domain,           // nullable — null erases across ALL domains (GDPR Art.17)
-    String caseId,                 // nullable — null matches any case
-    String tenantId                // required
+    String tenantId,               // required
+    String caseId                  // nullable — null matches any case
 ) {
     public EraseRequest {
         Objects.requireNonNull(entityId, "entityId required");
@@ -427,36 +427,37 @@ class CaseMemoryStoreSpiTest {
             .isInstanceOf(UnsupportedOperationException.class);
     }
 
-    // Via interface default (proves delegation)
+    // Via interface default (proves delegation to MemoryPermissions)
     @Test
-    void assertTenant_throwsOnMismatch() {
-        CurrentPrincipal principal = mock(CurrentPrincipal.class);
-        when(principal.tenancyId()).thenReturn("real-tenant");
-        assertThatThrownBy(() -> sut.assertTenant("wrong-tenant", principal))
-            .isInstanceOf(SecurityException.class);
+    void assertTenant_throws_on_mismatch() {
+        assertThrows(SecurityException.class,
+            () -> sut.assertTenant("wrong", principal("real")));
     }
 
     @Test
-    void assertTenant_passesOnMatch() {
-        CurrentPrincipal principal = mock(CurrentPrincipal.class);
-        when(principal.tenancyId()).thenReturn("real-tenant");
-        sut.assertTenant("real-tenant", principal); // must not throw
+    void assertTenant_passes_on_match() {
+        assertDoesNotThrow(() -> sut.assertTenant("real", principal("real")));
     }
 
     // Via static utility directly (callable by native reactive adapters)
     @Test
-    void memoryPermissions_throwsOnMismatch() {
-        CurrentPrincipal principal = mock(CurrentPrincipal.class);
-        when(principal.tenancyId()).thenReturn("real-tenant");
-        assertThatThrownBy(() -> MemoryPermissions.assertTenant("wrong-tenant", principal))
-            .isInstanceOf(SecurityException.class);
+    void memoryPermissions_throws_on_mismatch() {
+        assertThrows(SecurityException.class,
+            () -> MemoryPermissions.assertTenant("wrong", principal("real")));
     }
 
     @Test
-    void memoryPermissions_passesOnMatch() {
-        CurrentPrincipal principal = mock(CurrentPrincipal.class);
-        when(principal.tenancyId()).thenReturn("real-tenant");
-        MemoryPermissions.assertTenant("real-tenant", principal); // must not throw
+    void memoryPermissions_passes_on_match() {
+        assertDoesNotThrow(() -> MemoryPermissions.assertTenant("real", principal("real")));
+    }
+
+    private static CurrentPrincipal principal(String tenancyId) {
+        return new CurrentPrincipal() {
+            @Override public String actorId() { return "actor"; }
+            @Override public Set<String> groups() { return Set.of(); }
+            @Override public String tenancyId() { return tenancyId; }
+            @Override public boolean isCrossTenantAdmin() { return false; }
+        };
     }
 }
 ```

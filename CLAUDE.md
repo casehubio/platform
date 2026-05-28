@@ -69,9 +69,11 @@ git push --force mdproctor main   # --force on first push after fork creation
 ## Rules
 
 - `platform-api/` must remain zero-dependency — no Quarkus, no JPA, no casehubio imports. Pure Java only.
-- `platform/` contains Quarkus @DefaultBean mocks only — no domain logic
-- Every SPI in platform-api gets a @DefaultBean mock in platform
-- All @DefaultBean mocks must be configurable via @ConfigProperty
+- `platform/` contains Quarkus @DefaultBean implementations only — no domain logic
+- Every SPI in platform-api gets a @DefaultBean implementation in platform
+- Two @DefaultBean patterns exist:
+  - **Configurable mock** (PreferenceProvider, CurrentPrincipal): returns values driven by @ConfigProperty — suitable when tests need to set specific return values
+  - **Silent no-op** (CaseMemoryStore): always returns empty/void — suitable when the capability is optional and "not installed" means "nothing happens"
 - `config/` reads YAML preference files at startup — declare as compile scope in production; not needed on test-only classpaths (mock handles test defaults via `application.properties`)
 
 ## Project Type
@@ -99,7 +101,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | Module | Artifact | Purpose |
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
-| `platform/` | `casehub-platform` | Quarkus @DefaultBean mocks |
+| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `ReactiveCaseMemoryStore` interface + `BlockingToReactiveBridge` |
 | `testing/` | `casehub-platform-testing` | @Alternative @Priority(1) identity fixtures — no Quarkus runtime |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @RequestScoped OIDC-backed CurrentPrincipal — reads actorId/groups from SecurityIdentity |
@@ -115,7 +117,12 @@ io.casehub.platform.api
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
   .identity      — CurrentPrincipal, GroupMembershipProvider
+  .memory        — CaseMemoryStore (blocking SPI), MemoryDomain, MemoryInput, Memory,
+                   MemoryQuery, EraseRequest, MemoryPermissions (static tenant assertion utility)
 ```
+
+`platform/` also exposes `ReactiveCaseMemoryStore` (Mutiny SPI) and `BlockingToReactiveBridge @DefaultBean`
+at `io.casehub.platform.memory`.
 
 ## Writing Style Guide
 

@@ -1,7 +1,7 @@
 # 0008 — CaseMemoryStore adapter repository placement
 
 Date: 2026-05-28
-Status: Accepted
+Status: Accepted — amended 2026-05-29 (see bottom)
 
 ## Context and Problem Statement
 
@@ -72,4 +72,30 @@ in `casehub-platform` regardless.
 ## Links
 
 * casehubio/platform#27 — CaseMemoryStore implementation
-* casehubio/platform#31 — Create casehub-memory repo
+* casehubio/platform#31 — Create casehub-memory repo (closed — see amendment)
+
+---
+
+## Amendment — 2026-05-29
+
+**Revised status:** Option A (in-platform modules) adopted initially; Option B (standalone repo) deferred.
+
+**Context:** ADR-0008 chose Option B before any adapters existed. Platform#31 was filed to create the
+`casehub-memory` repo infrastructure as the next immediate step. On review, this is premature: repo setup,
+CI wiring, and parent-POM plumbing add real overhead for a capability with zero concrete adapters and no
+confirmed non-CaseHub consumer.
+
+**Revised decision:** Adapters start as submodules within `casehub-platform` — `memory-memori/`,
+`memory-mem0/` etc. — following the same pattern as `persistence-jpa/` and `persistence-mongodb/`.
+The SPI (`CaseMemoryStore`) and `@DefaultBean` no-op (`NoOpCaseMemoryStore`) remain in `platform-api` /
+`platform` as specified. Platform#31 is closed.
+
+**Extraction triggers:** Extract to `casehub-memory` when either:
+- A non-CaseHub consumer needs the adapters independently, OR
+- Adapter complexity (release cadence, versioning) outgrows the platform repo's scope.
+
+**Effect on original rationale:** The extraction-cost concern (casehub-eidos precedent) remains valid —
+it is now a deferred concern rather than a day-zero forcing function. Module isolation already provides
+the dependency separation that a standalone repo would give.
+
+See also: protocol `PP-20260529-spi-adapter-placement` (casehub garden).

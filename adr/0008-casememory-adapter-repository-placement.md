@@ -98,4 +98,4 @@ The SPI (`CaseMemoryStore`) and `@DefaultBean` no-op (`NoOpCaseMemoryStore`) rem
 it is now a deferred concern rather than a day-zero forcing function. Module isolation already provides
 the dependency separation that a standalone repo would give.
 
-See also: protocol `PP-20260529-spi-adapter-placement` (casehub garden).
+See also: garden protocol `PP-20260529-spi-adapter-placement` (`docs/protocols/universal/spi-adapter-module-placement.md`).

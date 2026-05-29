@@ -38,6 +38,12 @@
 
     <build>
         <plugins>
+            <!--
+                No quarkus-maven-plugin here. memory-inmem is a pure CDI library — it declares
+                one @Alternative @Priority(1) bean and a Jandex index. There is no REST layer,
+                no augmentation, and no generate-code/generate-code-tests needed. Adding the
+                plugin would introduce unnecessary augmentation overhead without any benefit.
+            -->
             <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>

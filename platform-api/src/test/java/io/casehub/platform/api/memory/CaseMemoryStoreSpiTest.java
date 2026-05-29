@@ -33,6 +33,12 @@ class CaseMemoryStoreSpiTest {
             () -> sut.eraseById("mem-1", "tenant-1"));
     }
 
+    @Test
+    void eraseEntity_default_throws() {
+        assertThrows(UnsupportedOperationException.class,
+            () -> sut.eraseEntity("entity-1", "tenant-1"));
+    }
+
     // Via interface default (proves delegation to MemoryPermissions)
     @Test
     void assertTenant_throws_on_mismatch() {

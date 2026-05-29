@@ -24,13 +24,27 @@ public interface CaseMemoryStore {
     List<Memory> query(MemoryQuery query);
 
     /**
-     * Erase memories matching the request.
+     * Erase memories matching the request. Domain is required — use {@link #eraseEntity}
+     * for GDPR Art.17 cross-domain full-entity wipe.
      *
-     * <p>GDPR Art.17: {@code request.domain() == null} erases across ALL domains for the entity
-     * within the tenant. Adapters MUST perform hard deletion.
+     * <p>Adapters MUST perform hard deletion.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
      */
     void erase(EraseRequest request);
+
+    /**
+     * GDPR Art.17 full-entity wipe across ALL domains for this entity within the tenant.
+     *
+     * <p>Adapters MUST perform hard deletion across every domain.
+     * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
+     *
+     * <p>Default throws {@link UnsupportedOperationException} — consistent with
+     * {@link #eraseById}. {@code NoOpCaseMemoryStore} overrides with a true no-op.
+     * Real adapters must override with actual cross-domain deletion.
+     */
+    default void eraseEntity(String entityId, String tenantId) {
+        throw new UnsupportedOperationException("eraseEntity not supported by this adapter");
+    }
 
     /**
      * Erase a specific memory by its assigned memoryId.
@@ -54,9 +68,6 @@ public interface CaseMemoryStore {
 
     /**
      * Security guard. Delegates to {@link MemoryPermissions#assertTenant}.
-     * Adapters implementing only {@link ReactiveCaseMemoryStore} (bypassing this interface)
-     * MUST call {@link MemoryPermissions#assertTenant} directly — this default is not
-     * reachable from that interface.
      *
      * @throws SecurityException if tenantId does not match principal.tenancyId()
      */

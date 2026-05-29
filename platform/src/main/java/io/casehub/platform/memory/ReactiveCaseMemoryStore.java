@@ -16,10 +16,18 @@ public interface ReactiveCaseMemoryStore {
     Uni<Void> erase(EraseRequest request);
 
     /**
+     * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#eraseEntity}.
+     * Default returns a failed Uni — consistent with the blocking default-throw contract.
+     */
+    default Uni<Void> eraseEntity(String entityId, String tenantId) {
+        return Uni.createFrom().failure(
+            new UnsupportedOperationException("eraseEntity not supported by this adapter"));
+    }
+
+    /**
      * Erase a specific memory by its assigned memoryId.
      *
-     * <p>Default returns a failed Uni matching the blocking interface's
-     * {@link io.casehub.platform.api.memory.CaseMemoryStore#eraseById} default contract.
+     * <p>Default returns a failed Uni matching the blocking interface's contract.
      */
     default Uni<Void> eraseById(String memoryId, String tenantId) {
         return Uni.createFrom().failure(

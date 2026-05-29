@@ -13,15 +13,9 @@ import java.util.List;
 @ApplicationScoped
 public class NoOpCaseMemoryStore implements CaseMemoryStore {
 
-    @Override
-    public String store(MemoryInput input) { return ""; }
-
-    @Override
-    public List<Memory> query(MemoryQuery query) { return List.of(); }
-
-    @Override
-    public void erase(EraseRequest request) {}
-
-    @Override
-    public void eraseById(String memoryId, String tenantId) {}
+    @Override public String store(MemoryInput input) { return ""; }
+    @Override public List<Memory> query(MemoryQuery query) { return List.of(); }
+    @Override public void erase(EraseRequest request) {}
+    @Override public void eraseById(String memoryId, String tenantId) {}
+    @Override public void eraseEntity(String entityId, String tenantId) {}
 }

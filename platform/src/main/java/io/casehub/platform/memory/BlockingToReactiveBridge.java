@@ -15,8 +15,7 @@ import java.util.List;
 @ApplicationScoped
 public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
 
-    @Inject
-    CaseMemoryStore delegate;
+    @Inject CaseMemoryStore delegate;
 
     @Override
     public Uni<String> store(MemoryInput input) {
@@ -37,5 +36,11 @@ public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
     public Uni<Void> eraseById(String memoryId, String tenantId) {
         return Uni.createFrom().voidItem()
             .invoke(() -> delegate.eraseById(memoryId, tenantId));
+    }
+
+    @Override
+    public Uni<Void> eraseEntity(String entityId, String tenantId) {
+        return Uni.createFrom().voidItem()
+            .invoke(() -> delegate.eraseEntity(entityId, tenantId));
     }
 }

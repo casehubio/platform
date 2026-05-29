@@ -6,7 +6,7 @@ CREATE TABLE memory_entry (
     case_id    VARCHAR(255),
     text       TEXT         NOT NULL,
     attributes TEXT         NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ  NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT memory_entry_pk PRIMARY KEY (memory_id)
 );
 

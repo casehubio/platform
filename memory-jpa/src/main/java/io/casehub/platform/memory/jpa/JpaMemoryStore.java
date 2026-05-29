@@ -43,7 +43,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    @Transactional(TxType.SUPPORTS)
+    @Transactional(TxType.REQUIRED)
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal);
 

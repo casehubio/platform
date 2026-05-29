@@ -7,6 +7,7 @@ import io.casehub.platform.api.memory.MemoryInput;
 import io.casehub.platform.api.memory.MemoryQuery;
 import io.quarkus.arc.DefaultBean;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
@@ -19,28 +20,31 @@ public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
 
     @Override
     public Uni<String> store(MemoryInput input) {
-        return Uni.createFrom().item(() -> delegate.store(input));
+        return Uni.createFrom().item(() -> delegate.store(input))
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @Override
     public Uni<List<Memory>> query(MemoryQuery query) {
-        return Uni.createFrom().item(() -> delegate.query(query));
+        return Uni.createFrom().item(() -> delegate.query(query))
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @Override
     public Uni<Void> erase(EraseRequest request) {
-        return Uni.createFrom().voidItem().invoke(() -> delegate.erase(request));
+        return Uni.createFrom().<Void>item(() -> { delegate.erase(request); return null; })
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @Override
     public Uni<Void> eraseById(String memoryId, String tenantId) {
-        return Uni.createFrom().voidItem()
-            .invoke(() -> delegate.eraseById(memoryId, tenantId));
+        return Uni.createFrom().<Void>item(() -> { delegate.eraseById(memoryId, tenantId); return null; })
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @Override
     public Uni<Void> eraseEntity(String entityId, String tenantId) {
-        return Uni.createFrom().voidItem()
-            .invoke(() -> delegate.eraseEntity(entityId, tenantId));
+        return Uni.createFrom().<Void>item(() -> { delegate.eraseEntity(entityId, tenantId); return null; })
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }

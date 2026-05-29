@@ -10,6 +10,7 @@ public record EraseRequest(
 ) {
     public EraseRequest {
         Objects.requireNonNull(entityId, "entityId required");
+        Objects.requireNonNull(domain,   "domain required");
         Objects.requireNonNull(tenantId, "tenantId required");
     }
 }

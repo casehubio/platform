@@ -29,8 +29,14 @@ class EraseRequestTest {
     }
 
     @Test
-    void domain_and_caseId_are_nullable() {
-        assertDoesNotThrow(() -> new EraseRequest("e1", null, "t1", null));
+    void null_domain_throws() {
+        assertThrows(NullPointerException.class,
+            () -> new EraseRequest("e1", null, "t1", null));
+    }
+
+    @Test
+    void caseId_is_nullable() {
+        assertDoesNotThrow(() -> new EraseRequest("e1", DOMAIN, "t1", null));
         assertDoesNotThrow(() -> new EraseRequest("e1", DOMAIN, "t1", "case-1"));
     }
 }

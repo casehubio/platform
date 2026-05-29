@@ -18,6 +18,8 @@
         <module>expression</module>
         <module>persistence-jpa</module>
         <module>persistence-mongodb</module>
+        <module>memory-inmem</module>
+        <module>memory-jpa</module>
     </modules>
 
     <properties>

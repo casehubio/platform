@@ -1,5 +1,7 @@
 package io.casehub.platform.api.memory;
 
+import java.util.Locale;
+
 /**
  * Reserved cross-domain attribute keys for {@link MemoryInput#attributes()}.
  *
@@ -50,7 +52,7 @@ public final class MemoryAttributeKeys {
     public static String formatConfidence(double v) {
         if (v < 0 || v > 1)
             throw new IllegalArgumentException("confidence must be in [0,1], got: " + v);
-        return String.format("%.4f", v);
+        return String.format(Locale.ROOT, "%.4f", v);
     }
 
     /**

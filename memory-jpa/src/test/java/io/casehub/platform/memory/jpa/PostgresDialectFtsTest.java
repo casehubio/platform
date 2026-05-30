@@ -54,4 +54,14 @@ class PostgresDialectFtsTest {
         assertEquals(2, results.size());
         assertEquals("bark bark bark bark bark", results.get(0).text());
     }
+
+    @Test @TestTransaction
+    void fts_multi_entity_returns_results_from_all_entities() {
+        store.store(new MemoryInput("entity-a", DOMAIN, TENANT, null, "The cat sat on the mat", Map.of()));
+        store.store(new MemoryInput("entity-b", DOMAIN, TENANT, null, "The cat chased the mouse", Map.of()));
+        var q = MemoryQuery.forEntities(List.of("entity-a", "entity-b"), DOMAIN, TENANT)
+            .withQuestion("cat").withOrder(MemoryOrder.RELEVANCE);
+        var results = store.query(q);
+        assertEquals(2, results.size());
+    }
 }

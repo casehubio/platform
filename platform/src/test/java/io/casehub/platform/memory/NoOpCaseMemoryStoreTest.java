@@ -19,8 +19,7 @@ class NoOpCaseMemoryStoreTest {
         "entity-1", DOMAIN, "tenant-1", null, "sample", Map.of());
     static final MemoryInput  SAMPLE_WITH_CASE = new MemoryInput(
         "entity-1", DOMAIN, "tenant-1", "case-99", "sample", Map.of());
-    static final MemoryQuery  QUERY   = new MemoryQuery(
-        "entity-1", DOMAIN, "tenant-1", null, null, 10, null);
+    static final MemoryQuery  QUERY   = MemoryQuery.forEntity("entity-1", DOMAIN, "tenant-1").withLimit(10);
     static final EraseRequest ERASE_SCOPED = new EraseRequest(
         "entity-1", DOMAIN, "tenant-1", null);
 

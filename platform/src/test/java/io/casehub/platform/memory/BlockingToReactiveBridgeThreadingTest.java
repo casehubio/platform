@@ -18,7 +18,7 @@ class BlockingToReactiveBridgeThreadingTest {
     private static final MemoryDomain DOMAIN = new MemoryDomain("d");
     private static final String       TENANT = "t";
     private static final MemoryInput  INPUT  = new MemoryInput("e", DOMAIN, TENANT, null, "text", Map.of());
-    private static final MemoryQuery  QUERY  = new MemoryQuery("e", DOMAIN, TENANT, null, null, 1, null);
+    private static final MemoryQuery  QUERY  = MemoryQuery.forEntity("e", DOMAIN, TENANT).withLimit(1);
     private static final EraseRequest ERASE  = new EraseRequest("e", DOMAIN, TENANT, null);
 
     private BlockingToReactiveBridge bridgeWith(AtomicLong capturedThreadId) {

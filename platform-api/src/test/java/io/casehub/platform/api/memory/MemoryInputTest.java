@@ -64,4 +64,16 @@ class MemoryInputTest {
     void caseId_is_nullable() {
         assertDoesNotThrow(() -> new MemoryInput("e1", DOMAIN, "t1", "case-1", "text", Map.of()));
     }
+
+    @Test
+    void blank_text_throws() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new MemoryInput("e1", DOMAIN, "t1", null, "   ", Map.of()));
+    }
+
+    @Test
+    void empty_text_throws() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new MemoryInput("e1", DOMAIN, "t1", null, "", Map.of()));
+    }
 }

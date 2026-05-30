@@ -15,7 +15,8 @@ public record MemoryInput(
         Objects.requireNonNull(entityId,  "entityId required");
         Objects.requireNonNull(domain,    "domain required");
         Objects.requireNonNull(tenantId,  "tenantId required");
-        Objects.requireNonNull(text,       "text required");
+        Objects.requireNonNull(text,      "text required");
+        if (text.isBlank()) throw new IllegalArgumentException("text must not be blank");
         Objects.requireNonNull(attributes, "attributes required");
         attributes = Map.copyOf(attributes);
     }

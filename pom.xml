@@ -20,6 +20,7 @@
         <module>persistence-mongodb</module>
         <module>memory-inmem</module>
         <module>memory-jpa</module>
+        <module>scim</module>
     </modules>
 
     <properties>

@@ -1,5 +1,6 @@
 package io.casehub.platform.mock;
 
+import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -12,7 +13,7 @@ import java.util.Set;
 public class MockGroupMembershipProvider implements GroupMembershipProvider {
 
     @Override
-    public Set<String> membersOf(String groupName) {
+    public Set<GroupMember> membersOf(String groupName) {
         return Set.of();
     }
 }

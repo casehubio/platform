@@ -1,5 +1,6 @@
 package io.casehub.platform.testing;
 
+import io.casehub.platform.api.identity.GroupMember;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,13 @@ class InMemoryGroupMembershipProviderTest {
         provider = new InMemoryGroupMembershipProvider();
     }
 
+    private static boolean containsActorId(Iterable<GroupMember> members, String actorId) {
+        for (GroupMember m : members) {
+            if (m.actorId().equals(actorId)) return true;
+        }
+        return false;
+    }
+
     @Test
     void unknown_group_returns_empty_set() {
         assertTrue(provider.membersOf("admin").isEmpty());
@@ -22,7 +30,7 @@ class InMemoryGroupMembershipProviderTest {
     @Test
     void addMember_creates_group_implicitly() {
         provider.addMember("admin", "alice");
-        assertTrue(provider.membersOf("admin").contains("alice"));
+        assertTrue(containsActorId(provider.membersOf("admin"), "alice"));
     }
 
     @Test
@@ -30,16 +38,24 @@ class InMemoryGroupMembershipProviderTest {
         provider.addMember("admin", "alice");
         provider.addMember("admin", "bob");
         assertEquals(2, provider.membersOf("admin").size());
-        assertTrue(provider.membersOf("admin").contains("alice"));
-        assertTrue(provider.membersOf("admin").contains("bob"));
+        assertTrue(containsActorId(provider.membersOf("admin"), "alice"));
+        assertTrue(containsActorId(provider.membersOf("admin"), "bob"));
     }
 
     @Test
     void addMember_different_groups_are_independent() {
         provider.addMember("admin", "alice");
         provider.addMember("reviewer", "bob");
-        assertFalse(provider.membersOf("admin").contains("bob"));
-        assertFalse(provider.membersOf("reviewer").contains("alice"));
+        assertFalse(containsActorId(provider.membersOf("admin"), "bob"));
+        assertFalse(containsActorId(provider.membersOf("reviewer"), "alice"));
+    }
+
+    @Test
+    void addMember_GroupMember_overload_preserves_displayName() {
+        provider.addMember("admin", new GroupMember("uuid-alice", "Alice Smith"));
+        GroupMember m = provider.membersOf("admin").iterator().next();
+        assertEquals("uuid-alice", m.actorId());
+        assertEquals("Alice Smith", m.displayName());
     }
 
     @Test
@@ -47,8 +63,8 @@ class InMemoryGroupMembershipProviderTest {
         provider.addMember("admin", "alice");
         provider.addMember("admin", "bob");
         provider.removeMember("admin", "alice");
-        assertFalse(provider.membersOf("admin").contains("alice"));
-        assertTrue(provider.membersOf("admin").contains("bob"));
+        assertFalse(containsActorId(provider.membersOf("admin"), "alice"));
+        assertTrue(containsActorId(provider.membersOf("admin"), "bob"));
     }
 
     @Test
@@ -69,6 +85,6 @@ class InMemoryGroupMembershipProviderTest {
     void membersOf_returns_unmodifiable_set() {
         provider.addMember("admin", "alice");
         assertThrows(UnsupportedOperationException.class,
-                () -> provider.membersOf("admin").add("hacker"));
+                () -> provider.membersOf("admin").add(new GroupMember("hacker", "hacker")));
     }
 }

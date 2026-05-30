@@ -1,5 +1,6 @@
 package io.casehub.platform.testing;
 
+import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -24,15 +25,20 @@ import java.util.Set;
 @Priority(1)
 public class InMemoryGroupMembershipProvider implements GroupMembershipProvider {
 
-    private final Map<String, Set<String>> members = new HashMap<>();
+    private final Map<String, Set<GroupMember>> members = new HashMap<>();
 
+    /** Adds an actor by ID only; displayName defaults to the actorId for test convenience. */
     public void addMember(String groupName, String actorId) {
-        members.computeIfAbsent(groupName, k -> new HashSet<>()).add(actorId);
+        addMember(groupName, new GroupMember(actorId, actorId));
+    }
+
+    public void addMember(String groupName, GroupMember member) {
+        members.computeIfAbsent(groupName, k -> new HashSet<>()).add(member);
     }
 
     public void removeMember(String groupName, String actorId) {
-        Set<String> group = members.get(groupName);
-        if (group != null) group.remove(actorId);
+        Set<GroupMember> group = members.get(groupName);
+        if (group != null) group.removeIf(m -> m.actorId().equals(actorId));
     }
 
     /**
@@ -43,7 +49,7 @@ public class InMemoryGroupMembershipProvider implements GroupMembershipProvider 
     }
 
     @Override
-    public Set<String> membersOf(String groupName) {
+    public Set<GroupMember> membersOf(String groupName) {
         return Set.copyOf(members.getOrDefault(groupName, Set.of()));
     }
 }

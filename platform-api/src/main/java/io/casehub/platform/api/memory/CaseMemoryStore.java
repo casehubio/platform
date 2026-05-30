@@ -10,6 +10,27 @@ public interface CaseMemoryStore {
      *
      * <p>Append-only at the SPI level. The no-op returns {@code ""}.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
+     *
+     * <p><b>Emission pattern — under investigation:</b> consumer apps should evaluate which
+     * approach fits their architecture and feed back via platform#48:
+     * <ul>
+     *   <li><b>Option A — Application-layer CDI observer:</b> application emits a domain event
+     *       from its case outcome handler; an observer calls {@code store()}. Keeps messaging
+     *       and memory decoupled at the cost of per-application boilerplate.</li>
+     *   <li><b>Option B — Optional {@code memory-cdi/} platform module:</b> platform provides CDI
+     *       infrastructure wiring domain events to {@code store()}. Reduces boilerplate at the
+     *       cost of coupling domain event types to the platform.</li>
+     *   <li><b>Option C — Platform-defined narrow event type:</b> platform defines a
+     *       {@code MemoryStoreRequest} event type that applications emit; a thin platform CDI
+     *       module listens and calls {@code store()}. Applications map domain events to
+     *       {@code MemoryStoreRequest} (preserving separation); platform handles wire-up.</li>
+     * </ul>
+     *
+     * <p><b>Text field guidance:</b> {@link MemoryInput#text()} must be human-readable natural
+     * language when using semantic adapters (Mem0, Graphiti) — it is the field embedded for
+     * vector search. Both accuracy and completeness matter; truncating or abbreviating degrades
+     * retrieval quality. Use {@link MemoryInput#attributes()} for structured metadata.
+     * See {@link MemoryAttributeKeys} for reserved cross-domain attribute keys.
      */
     String store(MemoryInput input);
 

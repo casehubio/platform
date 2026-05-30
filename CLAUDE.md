@@ -121,7 +121,10 @@ io.casehub.platform.api
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
   .identity      — CurrentPrincipal, GroupMembershipProvider
   .memory        — CaseMemoryStore (blocking SPI), MemoryDomain, MemoryInput, Memory,
-                   MemoryQuery, EraseRequest, MemoryPermissions (static tenant assertion utility)
+                   MemoryQuery (entityIds: List<String>, MemoryOrder, with* fluent API),
+                   EraseRequest, MemoryPermissions (static tenant assertion utility),
+                   MemoryOrder (enum: CHRONOLOGICAL / RELEVANCE),
+                   MemoryAttributeKeys (reserved cross-domain keys + confidence helpers)
 ```
 
 `platform/` also exposes `ReactiveCaseMemoryStore` (Mutiny SPI) and `BlockingToReactiveBridge @DefaultBean`

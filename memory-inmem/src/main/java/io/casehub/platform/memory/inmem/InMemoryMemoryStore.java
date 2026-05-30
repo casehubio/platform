@@ -44,11 +44,13 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     @Override
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal);
-        var bucket = store.getOrDefault(
-            new BucketKey(query.tenantId(), query.entityId(), query.domain()),
-            new CopyOnWriteArrayList<>()
-        );
-        return bucket.stream()
+        // MemoryOrder is ignored — in-mem always sorts chronologically (createdAt DESC).
+        return query.entityIds().stream()
+            .flatMap(entityId -> store.getOrDefault(
+                    new BucketKey(query.tenantId(), entityId, query.domain()),
+                    new CopyOnWriteArrayList<>()
+                ).stream()
+            )
             .filter(m -> query.caseId() == null || query.caseId().equals(m.caseId()))
             .filter(m -> query.since() == null || !m.createdAt().isBefore(query.since()))
             .filter(m -> query.question() == null

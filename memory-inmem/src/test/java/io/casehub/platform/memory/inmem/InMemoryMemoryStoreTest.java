@@ -18,9 +18,9 @@ class InMemoryMemoryStoreTest {
     static final MemoryDomain OTHER_DOMAIN = new MemoryDomain("other");
 
     private final CurrentPrincipal principal = new CurrentPrincipal() {
-        @Override public String actorId() { return "actor"; }
-        @Override public Set<String> groups() { return Set.of(); }
-        @Override public String tenancyId() { return TENANT; }
+        @Override public String actorId()           { return "actor"; }
+        @Override public Set<String> groups()       { return Set.of(); }
+        @Override public String tenancyId()         { return TENANT; }
         @Override public boolean isCrossTenantAdmin() { return false; }
     };
 
@@ -35,12 +35,16 @@ class InMemoryMemoryStoreTest {
         return new MemoryInput("entity-1", DOMAIN, TENANT, null, text, Map.of());
     }
 
+    private MemoryInput input(String entityId, String text) {
+        return new MemoryInput(entityId, DOMAIN, TENANT, null, text, Map.of());
+    }
+
     private MemoryInput inputWithCase(String text, String caseId) {
         return new MemoryInput("entity-1", DOMAIN, TENANT, caseId, text, Map.of());
     }
 
     private MemoryQuery query() {
-        return new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 10, null);
+        return MemoryQuery.forEntity("entity-1", DOMAIN, TENANT);
     }
 
     private EraseRequest eraseRequest() {
@@ -65,7 +69,7 @@ class InMemoryMemoryStoreTest {
         assertThrows(SecurityException.class, () -> sut.store(bad));
     }
 
-    // --- query ---
+    // --- query single entity ---
 
     @Test
     void query_returns_stored_memories_in_desc_order() {
@@ -85,14 +89,14 @@ class InMemoryMemoryStoreTest {
     @Test
     void query_does_not_leak_across_tenants() {
         sut.store(input("secret"));
-        var crossQuery = new MemoryQuery("entity-1", DOMAIN, OTHER_TENANT, null, null, 10, null);
+        var crossQuery = MemoryQuery.forEntity("entity-1", DOMAIN, OTHER_TENANT);
         assertThrows(SecurityException.class, () -> sut.query(crossQuery));
     }
 
     @Test
     void query_does_not_leak_across_domains() {
         sut.store(input("finance fact"));
-        var otherDomainQuery = new MemoryQuery("entity-1", OTHER_DOMAIN, TENANT, null, null, 10, null);
+        var otherDomainQuery = MemoryQuery.forEntity("entity-1", OTHER_DOMAIN, TENANT);
         assertTrue(sut.query(otherDomainQuery).isEmpty());
     }
 
@@ -102,8 +106,7 @@ class InMemoryMemoryStoreTest {
         sut.store(inputWithCase("case A", "case-1"));
         sut.store(inputWithCase("case B", "case-2"));
 
-        var caseQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, "case-1", null, 10, null);
-        var results = sut.query(caseQuery);
+        var results = sut.query(query().withCaseId("case-1"));
         assertEquals(1, results.size());
         assertEquals("case A", results.get(0).text());
     }
@@ -122,8 +125,7 @@ class InMemoryMemoryStoreTest {
         Thread.sleep(5);
         sut.store(input("new"));
 
-        var sinceQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 10, barrier);
-        var results = sut.query(sinceQuery);
+        var results = sut.query(query().withSince(barrier));
         assertEquals(1, results.size());
         assertEquals("new", results.get(0).text());
     }
@@ -131,8 +133,7 @@ class InMemoryMemoryStoreTest {
     @Test
     void query_limit_is_honoured() {
         for (int i = 0; i < 5; i++) sut.store(input("item " + i));
-        var limitQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 3, null);
-        assertEquals(3, sut.query(limitQuery).size());
+        assertEquals(3, sut.query(query().withLimit(3)).size());
     }
 
     @Test
@@ -140,8 +141,7 @@ class InMemoryMemoryStoreTest {
         sut.store(input("the cat sat on the mat"));
         sut.store(input("the dog barked loudly"));
 
-        var questionQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, null, "cat", 10, null);
-        var results = sut.query(questionQuery);
+        var results = sut.query(query().withQuestion("cat"));
         assertEquals(1, results.size());
         assertEquals("the cat sat on the mat", results.get(0).text());
     }
@@ -151,6 +151,70 @@ class InMemoryMemoryStoreTest {
         sut.store(input("anything"));
         sut.store(input("something else"));
         assertEquals(2, sut.query(query()).size());
+    }
+
+    // --- multi-entity query ---
+
+    @Test
+    void multi_entity_query_returns_facts_from_all_entities() {
+        sut.store(input("entity-1", "fact about e1"));
+        sut.store(input("entity-2", "fact about e2"));
+
+        var results = sut.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT));
+        assertEquals(2, results.size());
+        assertTrue(results.stream().anyMatch(m -> "fact about e1".equals(m.text())));
+        assertTrue(results.stream().anyMatch(m -> "fact about e2".equals(m.text())));
+    }
+
+    @Test
+    void multi_entity_query_limit_applies_to_combined_result_set() {
+        for (int i = 0; i < 5; i++) sut.store(input("entity-1", "e1-" + i));
+        for (int i = 0; i < 5; i++) sut.store(input("entity-2", "e2-" + i));
+
+        var results = sut.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT)
+                .withLimit(6));
+        assertEquals(6, results.size());
+    }
+
+    @Test
+    void multi_entity_result_carries_entityId_per_memory() {
+        sut.store(input("entity-1", "fact about e1"));
+        sut.store(input("entity-2", "fact about e2"));
+
+        var results = sut.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT));
+        assertTrue(results.stream().anyMatch(m -> "entity-1".equals(m.entityId())));
+        assertTrue(results.stream().anyMatch(m -> "entity-2".equals(m.entityId())));
+    }
+
+    // --- MemoryOrder ---
+
+    @Test
+    void relevance_order_accepted_without_error() {
+        sut.store(input("some text"));
+        assertDoesNotThrow(() ->
+            sut.query(query().withOrder(MemoryOrder.RELEVANCE).withQuestion("some")));
+    }
+
+    // --- MemoryAttributeKeys round-trip ---
+
+    @Test
+    void attribute_keys_round_trip_correctly() {
+        var attrs = Map.of(
+            MemoryAttributeKeys.ACTOR_ID, "actor-123",
+            MemoryAttributeKeys.OUTCOME,  "DONE",
+            MemoryAttributeKeys.CONFIDENCE, MemoryAttributeKeys.formatConfidence(0.87)
+        );
+        sut.store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "reviewer completed task", attrs));
+
+        var results = sut.query(query());
+        assertEquals(1, results.size());
+        var stored = results.get(0).attributes();
+        assertEquals("actor-123", stored.get(MemoryAttributeKeys.ACTOR_ID));
+        assertEquals("DONE", stored.get(MemoryAttributeKeys.OUTCOME));
+        assertEquals(0.87, MemoryAttributeKeys.parseConfidence(stored.get(MemoryAttributeKeys.CONFIDENCE)), 0.0001);
     }
 
     // --- erase ---
@@ -211,7 +275,7 @@ class InMemoryMemoryStoreTest {
         sut.eraseEntity("entity-1", TENANT);
 
         assertTrue(sut.query(query()).isEmpty());
-        assertTrue(sut.query(new MemoryQuery("entity-1", OTHER_DOMAIN, TENANT, null, null, 10, null)).isEmpty());
+        assertTrue(sut.query(MemoryQuery.forEntity("entity-1", OTHER_DOMAIN, TENANT)).isEmpty());
     }
 
     @Test
@@ -226,8 +290,8 @@ class InMemoryMemoryStoreTest {
 
         sut.eraseEntity("entity-1", TENANT);
 
-        var e2query = new MemoryQuery("entity-2", DOMAIN, TENANT, null, null, 10, null);
-        assertEquals(1, sut.query(e2query).size());
-        assertEquals("other", sut.query(e2query).get(0).text());
+        var e2results = sut.query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
+        assertEquals(1, e2results.size());
+        assertEquals("other", e2results.get(0).text());
     }
 }

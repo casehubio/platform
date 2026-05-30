@@ -34,7 +34,10 @@ class PostgresDialectFtsFrenchTest {
     }
 
     private MemoryQuery ftsQuery(String question) {
-        return new MemoryQuery("entity-fr", DOMAIN, TENANT, null, question, 10, null);
+        return MemoryQuery.forEntity("entity-fr", DOMAIN, TENANT)
+            .withQuestion(question)
+            .withLimit(10)
+            .withOrder(MemoryOrder.RELEVANCE);
     }
 
     @Test @TestTransaction

@@ -47,7 +47,9 @@ public class JpaMemoryStore implements CaseMemoryStore {
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal);
 
-        if (config.fts().enabled() && query.question() != null) {
+        if (config.fts().enabled()
+                && query.order() == MemoryOrder.RELEVANCE
+                && query.question() != null) {
             return queryFts(query);
         }
         return queryChronological(query);
@@ -55,15 +57,15 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     private List<Memory> queryChronological(MemoryQuery query) {
         var jpql = new StringBuilder(
-            "FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId AND domain = :domain");
+            "FROM MemoryEntry WHERE tenantId = :tenantId AND entityId IN (:entityIds) AND domain = :domain");
         if (query.caseId() != null) jpql.append(" AND caseId = :caseId");
         if (query.since()  != null) jpql.append(" AND createdAt >= :since");
         jpql.append(" ORDER BY createdAt DESC");
 
         var jq = em.createQuery(jpql.toString(), MemoryEntry.class)
-            .setParameter("tenantId", query.tenantId())
-            .setParameter("entityId", query.entityId())
-            .setParameter("domain",   query.domain().name())
+            .setParameter("tenantId",  query.tenantId())
+            .setParameter("entityIds", query.entityIds())
+            .setParameter("domain",    query.domain().name())
             .setMaxResults(query.limit());
 
         if (query.caseId() != null) jq.setParameter("caseId", query.caseId());
@@ -76,7 +78,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     private List<Memory> queryFts(MemoryQuery query) {
         var sql = new StringBuilder("""
             SELECT * FROM memory_entry
-            WHERE tenant_id = :tenantId AND entity_id = :entityId AND domain = :domain
+            WHERE tenant_id = :tenantId AND entity_id IN (:entityIds) AND domain = :domain
               AND to_tsvector(CAST(:lang AS regconfig), text)
                   @@ websearch_to_tsquery(CAST(:lang AS regconfig), :question)
             """);
@@ -90,11 +92,11 @@ public class JpaMemoryStore implements CaseMemoryStore {
             """);
 
         var nq = em.createNativeQuery(sql.toString(), MemoryEntry.class)
-            .setParameter("tenantId", query.tenantId())
-            .setParameter("entityId", query.entityId())
-            .setParameter("domain",   query.domain().name())
-            .setParameter("lang",     config.fts().language())
-            .setParameter("question", query.question())
+            .setParameter("tenantId",  query.tenantId())
+            .setParameter("entityIds", query.entityIds())
+            .setParameter("domain",    query.domain().name())
+            .setParameter("lang",      config.fts().language())
+            .setParameter("question",  query.question())
             .setMaxResults(query.limit());
 
         if (query.caseId() != null) nq.setParameter("caseId", query.caseId());

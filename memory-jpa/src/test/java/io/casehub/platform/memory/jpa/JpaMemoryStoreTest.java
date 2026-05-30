@@ -6,6 +6,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,12 +24,16 @@ class JpaMemoryStoreTest {
         return new MemoryInput("entity-1", DOMAIN, TENANT, null, text, Map.of());
     }
 
+    private MemoryInput input(String entityId, String text) {
+        return new MemoryInput(entityId, DOMAIN, TENANT, null, text, Map.of());
+    }
+
     private MemoryInput inputWithCase(String text, String caseId) {
         return new MemoryInput("entity-1", DOMAIN, TENANT, caseId, text, Map.of());
     }
 
     private MemoryQuery query() {
-        return new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 10, null);
+        return MemoryQuery.forEntity("entity-1", DOMAIN, TENANT);
     }
 
     private EraseRequest eraseRequest() {
@@ -56,18 +61,17 @@ class JpaMemoryStoreTest {
     @Test @TestTransaction
     void store_does_not_leak_across_tenants() {
         store.store(input("secret"));
-        var crossQuery = new MemoryQuery("entity-1", DOMAIN, OTHER_TENANT, null, null, 10, null);
+        var crossQuery = MemoryQuery.forEntity("entity-1", DOMAIN, OTHER_TENANT);
         assertThrows(SecurityException.class, () -> store.query(crossQuery));
     }
 
     @Test @TestTransaction
     void store_does_not_leak_across_domains() {
         store.store(input("finance fact"));
-        var otherQuery = new MemoryQuery("entity-1", OTHER_DOMAIN, TENANT, null, null, 10, null);
-        assertTrue(store.query(otherQuery).isEmpty());
+        assertTrue(store.query(MemoryQuery.forEntity("entity-1", OTHER_DOMAIN, TENANT)).isEmpty());
     }
 
-    // --- query ---
+    // --- query single entity ---
 
     @Test @TestTransaction
     void query_returns_stored_memories_in_desc_order() {
@@ -90,8 +94,7 @@ class JpaMemoryStoreTest {
         store.store(inputWithCase("case A", "case-1"));
         store.store(inputWithCase("case B", "case-2"));
 
-        var caseQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, "case-1", null, 10, null);
-        var results = store.query(caseQuery);
+        var results = store.query(query().withCaseId("case-1"));
         assertEquals(1, results.size());
         assertEquals("case A", results.get(0).text());
     }
@@ -110,8 +113,7 @@ class JpaMemoryStoreTest {
         Thread.sleep(5);
         store.store(input("new"));
 
-        var sinceQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 10, barrier);
-        var results = store.query(sinceQuery);
+        var results = store.query(query().withSince(barrier));
         assertEquals(1, results.size());
         assertEquals("new", results.get(0).text());
     }
@@ -119,8 +121,82 @@ class JpaMemoryStoreTest {
     @Test @TestTransaction
     void query_limit_is_honoured() {
         for (int i = 0; i < 5; i++) store.store(input("item " + i));
-        var limitQuery = new MemoryQuery("entity-1", DOMAIN, TENANT, null, null, 3, null);
-        assertEquals(3, store.query(limitQuery).size());
+        assertEquals(3, store.query(query().withLimit(3)).size());
+    }
+
+    // --- multi-entity query ---
+
+    @Test @TestTransaction
+    void multi_entity_query_returns_facts_from_all_entities() {
+        store.store(input("entity-1", "fact about e1"));
+        store.store(input("entity-2", "fact about e2"));
+
+        var results = store.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT));
+        assertEquals(2, results.size());
+        assertTrue(results.stream().anyMatch(m -> "fact about e1".equals(m.text())));
+        assertTrue(results.stream().anyMatch(m -> "fact about e2".equals(m.text())));
+    }
+
+    @Test @TestTransaction
+    void multi_entity_query_limit_applies_to_combined_result_set() {
+        for (int i = 0; i < 5; i++) store.store(input("entity-1", "e1-" + i));
+        for (int i = 0; i < 5; i++) store.store(input("entity-2", "e2-" + i));
+
+        var results = store.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT)
+                .withLimit(6));
+        assertEquals(6, results.size());
+    }
+
+    @Test @TestTransaction
+    void multi_entity_result_carries_entityId_per_memory() {
+        store.store(input("entity-1", "fact about e1"));
+        store.store(input("entity-2", "fact about e2"));
+
+        var results = store.query(
+            MemoryQuery.forEntities(List.of("entity-1", "entity-2"), DOMAIN, TENANT));
+        assertTrue(results.stream().anyMatch(m -> "entity-1".equals(m.entityId())));
+        assertTrue(results.stream().anyMatch(m -> "entity-2".equals(m.entityId())));
+    }
+
+    // --- MemoryOrder ---
+
+    @Test @TestTransaction
+    void chronological_order_is_default() {
+        store.store(input("first"));
+        store.store(input("second"));
+        var results = store.query(query());
+        assertEquals("second", results.get(0).text());
+        assertEquals("first",  results.get(1).text());
+    }
+
+    @Test @TestTransaction
+    void relevance_order_without_question_falls_back_to_chronological() {
+        store.store(input("first"));
+        store.store(input("second"));
+        // RELEVANCE with no question → chronological fallback
+        var results = store.query(query().withOrder(MemoryOrder.RELEVANCE));
+        assertEquals("second", results.get(0).text());
+    }
+
+    // --- MemoryAttributeKeys round-trip ---
+
+    @Test @TestTransaction
+    void attribute_keys_round_trip_correctly() {
+        var attrs = Map.of(
+            MemoryAttributeKeys.ACTOR_ID, "actor-123",
+            MemoryAttributeKeys.OUTCOME,  "DONE",
+            MemoryAttributeKeys.CONFIDENCE, MemoryAttributeKeys.formatConfidence(0.87)
+        );
+        store.store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "reviewer completed task", attrs));
+
+        var results = store.query(query());
+        assertEquals(1, results.size());
+        var stored = results.get(0).attributes();
+        assertEquals("actor-123", stored.get(MemoryAttributeKeys.ACTOR_ID));
+        assertEquals("DONE", stored.get(MemoryAttributeKeys.OUTCOME));
+        assertEquals(0.87, MemoryAttributeKeys.parseConfidence(stored.get(MemoryAttributeKeys.CONFIDENCE)), 0.0001);
     }
 
     // --- erase ---
@@ -166,8 +242,6 @@ class JpaMemoryStoreTest {
 
     @Test
     void eraseById_does_not_cross_tenant_boundary() {
-        // SecurityException is thrown before any DB operation, so no follow-up query is needed.
-        // The assertTenant guard fires first — if it throws, nothing was deleted.
         assertThrows(SecurityException.class, () -> store.eraseById("any-id", OTHER_TENANT));
     }
 
@@ -181,8 +255,7 @@ class JpaMemoryStoreTest {
         store.eraseEntity("entity-1", TENANT);
 
         assertTrue(store.query(query()).isEmpty());
-        var otherDomainQuery = new MemoryQuery("entity-1", OTHER_DOMAIN, TENANT, null, null, 10, null);
-        assertTrue(store.query(otherDomainQuery).isEmpty());
+        assertTrue(store.query(MemoryQuery.forEntity("entity-1", OTHER_DOMAIN, TENANT)).isEmpty());
     }
 
     @Test @TestTransaction
@@ -197,9 +270,9 @@ class JpaMemoryStoreTest {
 
         store.eraseEntity("entity-1", TENANT);
 
-        var e2query = new MemoryQuery("entity-2", DOMAIN, TENANT, null, null, 10, null);
-        assertEquals(1, store.query(e2query).size());
-        assertEquals("other", store.query(e2query).get(0).text());
+        var e2results = store.query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
+        assertEquals(1, e2results.size());
+        assertEquals("other", e2results.get(0).text());
     }
 
     // --- security ---

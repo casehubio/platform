@@ -49,6 +49,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-jdbc-h2</artifactId>
             <scope>test</scope>
@@ -114,7 +120,9 @@
                             </systemPropertyVariables>
                         </configuration>
                     </execution>
-                    <!-- H2 tests run SECOND after PostgreSQL augmentation cache is written. -->
+                    <!-- H2 tests run SECOND after PostgreSQL augmentation cache is written.
+                         Re-assert db-kind=h2 to override the postgresql system property set by the
+                         postgres-dialect-test execution above (fork=false shares the JVM process). -->
                     <execution>
                         <id>h2-tests</id>
                         <phase>test</phase>
@@ -123,6 +131,9 @@
                             <excludes>
                                 <exclude>**/PostgresDialect*.java</exclude>
                             </excludes>
+                            <systemPropertyVariables>
+                                <quarkus.datasource.db-kind>h2</quarkus.datasource.db-kind>
+                            </systemPropertyVariables>
                         </configuration>
                     </execution>
                 </executions>

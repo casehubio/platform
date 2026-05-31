@@ -1,10 +1,12 @@
 package io.casehub.platform.memory.jpa;
 
 import io.casehub.platform.api.memory.*;
+import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,12 @@ class PostgresDialectFtsTest {
     static final MemoryDomain DOMAIN = new MemoryDomain("fts-en");
 
     @Inject JpaMemoryStore store;
+    @Inject FixedCurrentPrincipal principal;
+
+    @BeforeEach
+    void setTenant() {
+        principal.setTenancyId(TENANT);
+    }
 
     private MemoryInput input(String text) {
         return new MemoryInput("entity-fts", DOMAIN, TENANT, null, text, Map.of());

@@ -108,6 +108,41 @@ class ScimGroupMembershipProviderTest {
         wireMock().verify(1, getRequestedFor(urlPathEqualTo("/Groups")));
     }
 
+    @Test
+    void group_with_paginated_members_fetches_all_pages() {
+        // Step 1: listGroups — no inline members
+        wireMock().stubFor(get(urlPathEqualTo("/Groups"))
+            .withQueryParam("filter", equalTo("displayName eq \"paginated-group\""))
+            .willReturn(okJson(
+                "{ \"totalResults\": 1, \"Resources\": " +
+                "[{ \"id\": \"group-pg1\", \"displayName\": \"paginated-group\" }] }")));
+        // Step 2, page 1 — full page of 3 (member-page-size=3 in test properties)
+        wireMock().stubFor(get(urlPathEqualTo("/Groups/group-pg1"))
+            .withQueryParam("startIndex", equalTo("1"))
+            .willReturn(okJson(
+                "{ \"id\": \"group-pg1\", \"members\": [" +
+                "{ \"value\": \"u1\", \"display\": \"User One\"   }," +
+                "{ \"value\": \"u2\", \"display\": \"User Two\"   }," +
+                "{ \"value\": \"u3\", \"display\": \"User Three\" }] }")));
+        // Step 2, page 2 — partial page of 2 → triggers loop exit
+        wireMock().stubFor(get(urlPathEqualTo("/Groups/group-pg1"))
+            .withQueryParam("startIndex", equalTo("4"))
+            .willReturn(okJson(
+                "{ \"id\": \"group-pg1\", \"members\": [" +
+                "{ \"value\": \"u4\", \"display\": \"User Four\" }," +
+                "{ \"value\": \"u5\", \"display\": \"User Five\" }] }")));
+
+        Set<GroupMember> members = provider.membersOf("paginated-group");
+
+        assertEquals(5, members.size());
+        for (int i = 1; i <= 5; i++) {
+            int fi = i;
+            assertTrue(members.stream().anyMatch(m -> m.actorId().equals("u" + fi)),
+                "Expected member u" + fi);
+        }
+        wireMock().verify(2, getRequestedFor(urlPathEqualTo("/Groups/group-pg1")));
+    }
+
     // ─── helpers ───────────────────────────────────────────────────────────────
 
     private void stubScimGroup(String groupName, String groupId, String membersJson) {

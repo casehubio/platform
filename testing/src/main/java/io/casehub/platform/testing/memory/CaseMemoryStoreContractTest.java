@@ -214,6 +214,16 @@ public abstract class CaseMemoryStoreContractTest {
     }
 
     @Test
+    void erase_null_caseId_removes_all_entries_including_case_scoped() {
+        store().store(input("no case"));
+        store().store(inputWithCase("case A", "case-1"));
+        store().store(inputWithCase("case B", "case-2"));
+        store().erase(eraseRequest()); // null caseId = erase ALL
+        assertTrue(store().query(query()).isEmpty(),
+            "erase with null caseId must remove all entries regardless of their caseId");
+    }
+
+    @Test
     void erase_tenant_mismatch_throws() {
         assertThrows(SecurityException.class,
             () -> store().erase(new EraseRequest("entity-1", DOMAIN, OTHER_TENANT, null)));

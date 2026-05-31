@@ -40,6 +40,10 @@ class BlockingToReactiveBridgeThreadingTest {
             @Override public void eraseEntity(String eid, String tid) {
                 capturedThreadId.set(Thread.currentThread().getId());
             }
+            @Override public List<String> storeAll(List<MemoryInput> inputs) {
+                capturedThreadId.set(Thread.currentThread().getId());
+                return inputs.stream().map(i -> "mem-batch").toList();
+            }
         };
         var bridge = new BlockingToReactiveBridge();
         bridge.delegate = spy;
@@ -85,5 +89,15 @@ class BlockingToReactiveBridgeThreadingTest {
         bridgeWith(capturedId).eraseEntity("entity-1", TENANT).await().indefinitely();
         assertNotEquals(Thread.currentThread().getId(), capturedId.get(),
             "eraseEntity() must offload delegate to a worker thread, not run on the subscribing thread");
+    }
+
+    @Test
+    void storeAll_executes_delegate_on_worker_thread() {
+        var capturedId = new AtomicLong(Thread.currentThread().getId());
+        var inputs = List.of(INPUT, new MemoryInput("e", DOMAIN, TENANT, null, "text2", Map.of()));
+        var ids = bridgeWith(capturedId).storeAll(inputs).await().indefinitely();
+        assertNotEquals(Thread.currentThread().getId(), capturedId.get(),
+            "storeAll() must offload delegate to a worker thread, not run on the subscribing thread");
+        assertEquals(2, ids.size());
     }
 }

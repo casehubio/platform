@@ -27,4 +27,13 @@ public interface ScimClient {
         @PathParam("id") String id,
         @QueryParam("attributes") String attributes
     );
+
+    @GET
+    @Path("/Groups/{id}")
+    ScimGroupResource getGroup(
+        @PathParam("id") String id,
+        @QueryParam("attributes") String attributes,
+        @QueryParam("startIndex") int startIndex,
+        @QueryParam("count") int count
+    );
 }

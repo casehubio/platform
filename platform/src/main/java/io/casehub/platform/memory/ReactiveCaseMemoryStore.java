@@ -6,6 +6,7 @@ import io.casehub.platform.api.memory.MemoryInput;
 import io.casehub.platform.api.memory.MemoryQuery;
 import io.smallrye.mutiny.Uni;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public interface ReactiveCaseMemoryStore {
 
@@ -14,6 +15,15 @@ public interface ReactiveCaseMemoryStore {
     Uni<List<Memory>> query(MemoryQuery query);
 
     Uni<Void> erase(EraseRequest request);
+
+    /**
+     * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#storeAll}.
+     * Default calls store() sequentially. Adapters may override for batch efficiency.
+     */
+    default Uni<List<String>> storeAll(List<MemoryInput> inputs) {
+        return Uni.join().all(inputs.stream().map(this::store).collect(Collectors.toList()))
+            .andFailFast();
+    }
 
     /**
      * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#eraseEntity}.

@@ -8,5 +8,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScimListResponse<T>(
     int totalResults,
+    int startIndex,
+    int itemsPerPage,
     @JsonProperty("Resources") List<T> resources
 ) {}

@@ -106,6 +106,7 @@ public abstract class CaseMemoryStoreContractTest {
     @Test
     void query_with_since_excludes_older_memories() throws InterruptedException {
         store().store(input("old"));
+        Thread.sleep(5);      // ensure "old" timestamp < barrier (since uses >=)
         Instant barrier = Instant.now();
         Thread.sleep(5);
         store().store(input("new"));

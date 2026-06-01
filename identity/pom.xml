@@ -41,6 +41,11 @@
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging</artifactId>
         </dependency>
+        <!-- Mutiny for ReactiveAgentIdentityVerificationService -->
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>mutiny</artifactId>
+        </dependency>
 
         <!-- Test -->
         <dependency>

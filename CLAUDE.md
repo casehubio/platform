@@ -112,6 +112,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `memory-jpa/` | `casehub-platform-memory-jpa` | @ApplicationScoped JPA CaseMemoryStore — PostgreSQL, Flyway V1000 (`classpath:db/memory/migration`), FTS via websearch_to_tsquery when question provided. No quarkus:build goal (CurrentPrincipal only on test classpath). Use @TestTransaction not @Transactional in tests |
 | `memory-sqlite/` | `casehub-platform-memory-sqlite` | @Alternative @Priority(1) SQLite CaseMemoryStore — xerial JDBC + HikariCP (WAL mode) + FTS5 + Flyway programmatic. Configure `casehub.memory.sqlite.path`. No quarkus:build goal. Do NOT combine with memory-inmem or memory-jpa in the same scope |
 | `scim/` | `casehub-platform-scim` | @ApplicationScoped SCIM 2.0 GroupMembershipProvider — displaces @DefaultBean mock. Auth: casehub.platform.scim.token (static) or quarkus.oidc-client.scim.* (client-credentials). @CacheResult on membersOf(). Pagination: casehub.platform.scim.member-page-size (default 1000). No quarkus:build goal |
+| `identity/` | `casehub-platform-identity` | @Alternative ActorDIDProvider/DIDResolver/AgentCredentialValidator impls — did:key, did:web, SCIM2, config-based. SPIs and model types in platform-api. Config prefix: casehub.identity.* |
 
 ## Package Structure (platform-api)
 
@@ -120,7 +121,17 @@ io.casehub.platform.api
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
-  .identity      — CurrentPrincipal, GroupMembershipProvider
+  .identity      — CurrentPrincipal, GroupMembershipProvider,
+                   ActorDIDProvider (SPI: didFor(actorId) → Optional<String>),
+                   DIDResolver (SPI: resolve(did) → Optional<DIDDocument>),
+                   AgentCredentialValidator (SPI: validate(actorId, did) → Optional<CredentialValidationResult>),
+                   DIDDocument (record: id, verificationMethods, alsoKnownAs),
+                   VerificationMethod (record: id, type, publicKeyBytes — defensive copy),
+                   IdentityVerificationResult (VALID | UNVERIFIABLE | UNSIGNED | DID_UNRESOLVABLE | IDENTITY_MISMATCH | KEY_MISMATCH),
+                   CredentialValidationResult (VALID | EXPIRED | INVALID_SIGNATURE | ISSUER_UNKNOWN | NOT_FOUND),
+                   IdentityBindingStatus (VALID | UNSIGNED | DID_UNRESOLVABLE | IDENTITY_MISMATCH | KEY_MISMATCH | CREDENTIAL_EXPIRED | CREDENTIAL_INVALID),
+                   AgentIdentityValidatedEvent (CDI event record: VALID binding),
+                   AgentIdentityViolationEvent (CDI event record: non-VALID binding)
   .memory        — CaseMemoryStore (blocking SPI), MemoryDomain, MemoryInput, Memory,
                    MemoryQuery (entityIds: List<String>, MemoryOrder, with* fluent API),
                    EraseRequest, MemoryPermissions (static tenant assertion utility),

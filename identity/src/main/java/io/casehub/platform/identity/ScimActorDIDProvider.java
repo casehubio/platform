@@ -70,8 +70,8 @@ public class ScimActorDIDProvider
     }
 
     /** Test constructor — bypasses {@code @PostConstruct}; use with {@code http://} WireMock endpoints. */
-    ScimActorDIDProvider(final String endpoint, final String authToken,
-                         final int timeoutMs, final Duration cacheTtl) {
+    public ScimActorDIDProvider(final String endpoint, final String authToken,
+                                final int timeoutMs, final Duration cacheTtl) {
         super(cacheTtl);
         this.scimEndpoint = endpoint;
         this.authToken = authToken;
@@ -81,7 +81,7 @@ public class ScimActorDIDProvider
     }
 
     @PostConstruct
-    void validateEndpoint() {
+    public void validateEndpoint() {
         if (scimEndpoint == null || scimEndpoint.isBlank()) {
             throw new IllegalArgumentException(
                     "casehub.identity.scim.endpoint must be configured");

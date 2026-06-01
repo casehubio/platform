@@ -8,7 +8,6 @@ import io.casehub.platform.scim.model.ScimMemberRef;
 import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.util.ArrayList;
@@ -20,9 +19,9 @@ import java.util.stream.Collectors;
 public class ScimGroupMembershipProvider implements GroupMembershipProvider {
 
     @Inject @RestClient ScimClient scimClient;
+    @Inject ScimConfig config;
 
-    @ConfigProperty(name = "casehub.platform.scim.member-page-size", defaultValue = "1000")
-    int memberPageSize;
+    private int memberPageSize() { return config.memberPageSize(); }
 
     @Override
     @CacheResult(cacheName = "scim-group-members")
@@ -39,7 +38,7 @@ public class ScimGroupMembershipProvider implements GroupMembershipProvider {
         ScimGroupResource group = response.resources().get(0);
         List<ScimMemberRef> members = group.members();
 
-        if (members == null || members.isEmpty() || members.size() >= memberPageSize) {
+        if (members == null || members.isEmpty() || members.size() >= memberPageSize()) {
             // members absent OR possibly truncated at server page size — fetch with pagination
             members = fetchAllMembers(group.id());
         }
@@ -58,12 +57,12 @@ public class ScimGroupMembershipProvider implements GroupMembershipProvider {
         int startIndex = 1;
         List<ScimMemberRef> page;
         do {
-            ScimGroupResource resource = scimClient.getGroup(groupId, "members", startIndex, memberPageSize);
+            ScimGroupResource resource = scimClient.getGroup(groupId, "members", startIndex, memberPageSize());
             page = resource != null ? resource.members() : null;
             if (page == null || page.isEmpty()) break;
             allMembers.addAll(page);
             startIndex += page.size();
-        } while (page.size() >= memberPageSize);
+        } while (page.size() >= memberPageSize());
         return allMembers;
     }
 }

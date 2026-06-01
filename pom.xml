@@ -22,6 +22,7 @@
         <module>memory-jpa</module>
         <module>memory-sqlite</module>
         <module>scim</module>
+        <module>identity</module>
     </modules>
 
     <properties>

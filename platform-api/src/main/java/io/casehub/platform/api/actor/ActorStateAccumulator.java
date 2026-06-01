@@ -13,10 +13,20 @@ import java.util.UUID;
  */
 public interface ActorStateAccumulator {
 
-    /** Global trust score. {@code null} when actor has no computed score yet (not 0.0). */
+    /**
+     * Set the global trust score for this actor.
+     *
+     * @param score the global trust score, or {@code null} when no score has been computed yet
+     *              (distinct from {@code 0.0}, which would mean zero trust)
+     */
     void trustScore(Double score);
 
-    /** Per-capability trust score. */
+    /**
+     * Set a per-capability trust score for this actor.
+     *
+     * @param capability non-null capability tag (e.g. {@code "sar-drafting"})
+     * @param score      the trust score for this capability
+     */
     void capabilityScore(String capability, double score);
 
     /**

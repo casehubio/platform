@@ -16,42 +16,140 @@ every app solves this independently.
 
 This spec defines two flat modules:
 
-- `casehub-platform-agent-api` — SPI types and `AgentProvider` interface
+- `casehub-platform-agent-api` — `AgentProvider` SPI + all API types
 - `casehub-platform-agent-claude` — Claude Agent SDK Quarkus integration
 
-**Originating use case:** casehubio/drafthouse#29 — `DebateAgentProvider`, two
-implementations: LangChain4j default + Claude Agent SDK alternative.
+**Originating use case:** casehubio/drafthouse#29 — `DebateAgentProvider`.
 
-**Architectural decisions made:**
-- Single-shot only (v1). `AgentSession` / multi-turn deferred to v2 — no current use
-  case requires it, and subprocess-held conversational state has no recovery path on
-  crash. State persistence uses `CaseMemoryStore` instead.
-- `AgentProvider` SPI in `agent-api/` with `NoOpAgentProvider @DefaultBean` in
-  `platform/`. Apps inject the SPI, not `ClaudeAgentClient` directly.
+**Architectural decisions:**
+- Single-shot only (v1). Multi-turn deferred — see platform#58.
+- `AgentProvider` SPI in `agent-api/`; `NoOpAgentProvider @DefaultBean` in `platform/`.
+  Apps inject the SPI, never `ClaudeAgentClient` directly.
 
 ---
 
 ## Module Structure
 
-Flat modules at repo root, following `memory-jpa/`, `memory-inmem/` convention.
+Flat modules at repo root — `memory-jpa/`, `memory-inmem/` naming convention.
 No aggregator POM.
 
 ```
-agent-api/     casehub-platform-agent-api     — AgentProvider SPI + types (Mutiny allowed)
+agent-api/     casehub-platform-agent-api     — SPI types + exceptions (Mutiny, no Quarkus)
 agent-claude/  casehub-platform-agent-claude  — Claude Agent SDK Quarkus integration
 ```
 
-`agent-api/` depends on Mutiny — a deliberate exception to the `platform-api/`
-zero-dependency rule. Agent sessions are inherently streaming; the exception is bounded
-to this module. `platform-api/` is unaffected. The `NoOpAgentProvider @DefaultBean`
-lives in the existing `platform/` module.
+### Root POM module ordering
 
-### Root POM
+Maven reactor resolves build order from declared `<dependency>` relationships, not
+`<module>` list order. The ordering below is defensive convention:
 
 ```xml
-<module>agent-api</module>
-<module>agent-claude</module>
+<module>platform-api</module>
+<module>agent-api</module>      <!-- before platform/ — platform depends on it -->
+<module>platform</module>
+<module>testing</module>
+<!-- ... other existing modules ... -->
+<module>agent-claude</module>   <!-- last — depends on agent-api and platform -->
 ```
+
+### agent-api/pom.xml
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.smallrye.reactive</groupId>
+        <artifactId>mutiny</artifactId>          <!-- version managed by BOM -->
+    </dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+
+<build><plugins>
+    <!-- Required: ARC resolves AgentProvider supertype from this JAR's index
+         when ClaudeAgentProvider implements it in agent-claude/. Without the
+         index, CDI wiring silently fails at deployment. -->
+    <plugin>
+        <groupId>io.smallrye</groupId>
+        <artifactId>jandex-maven-plugin</artifactId>
+        <version>${jandex-maven-plugin.version}</version>
+        <executions><execution>
+            <id>make-index</id><goals><goal>jandex</goal></goals>
+        </execution></executions>
+    </plugin>
+</plugins></build>
+```
+
+No Quarkus. No CDI annotations. No `quarkus-maven-plugin`.
+
+### agent-claude/pom.xml
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-agent-api</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-arc</artifactId>   <!-- CDI + SmallRye Config for @ConfigMapping -->
+    </dependency>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>claude-code-sdk</artifactId>
+        <version>1.0.0</version>               <!-- NOT in BOM — explicit version required -->
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-junit5</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+
+<build><plugins>
+    <plugin>
+        <groupId>io.smallrye</groupId>
+        <artifactId>jandex-maven-plugin</artifactId>
+        <version>${jandex-maven-plugin.version}</version>
+        <executions><execution>
+            <id>make-index</id><goals><goal>jandex</goal></goals>
+        </execution></executions>
+    </plugin>
+    <!-- No build goal — library module (same as identity/, scim/) -->
+    <plugin>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-maven-plugin</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <extensions>true</extensions>
+        <executions><execution>
+            <goals>
+                <goal>generate-code</goal>
+                <goal>generate-code-tests</goal>
+            </goals>
+        </execution></executions>
+    </plugin>
+</plugins></build>
+```
+
+No additional deps for the `ScheduledExecutorService` timer — `java.util.concurrent`
+is JDK standard. No Vert.x dep needed.
+
+### platform/pom.xml change
+
+Add one compile dependency for `NoOpAgentProvider`:
+
+```xml
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-agent-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+```
+
+`platform/` already has Jandex and `quarkus:build` — no other POM changes needed.
 
 ### BOM entry (casehub-parent)
 
@@ -68,34 +166,36 @@ lives in the existing `platform/` module.
 </dependency>
 ```
 
-**Reactor transitive dependency:** `org.springaicommunity:claude-code-sdk:1.0.0`
-transitively pulls `reactor-core 3.7.0` (via `io.modelcontextprotocol.sdk:mcp:0.15.0`).
-Quarkus 3.32.2 does not manage `reactor-core` in its BOM — no conflict. Both Mutiny
-and Reactor will be on the classpath of any app that depends on `agent-claude/`.
-This is expected and documented.
+### Reactor transitive dependency
+
+`claude-code-sdk:1.0.0` → `reactor-core 3.6.10`; `mcp:0.15.0` (transitive) → `reactor-core
+3.7.0`. Maven resolves to 3.7.0. Quarkus 3.32.2 does not manage `reactor-core`. Both
+Mutiny and Reactor on the classpath of any app taking `agent-claude/`. Expected.
 
 ---
 
 ## agent-api/ — SPI Types
 
 **Package:** `io.casehub.platform.agent`
-**Dependencies:** Mutiny, slf4j only. No Quarkus, no claude-code-sdk, no casehubio imports.
+**Dependencies:** Mutiny only. No Quarkus, no CDI, no claude-code-sdk, no casehubio imports.
 
 ### `AgentProvider`
 
-The SPI. Apps inject this — they never depend on `ClaudeAgentClient` directly.
-
 ```java
+/**
+ * Platform SPI for single-shot AI agent invocation.
+ *
+ * <p>Implementations should be {@code @ApplicationScoped} — agent infrastructure
+ * is shared across requests.
+ */
 public interface AgentProvider {
     /**
-     * Invoke the agent with the given config and stream response events.
+     * Invoke the agent and stream response events.
      *
-     * The returned Multi completes when the agent signals done, fails with
-     * AgentTimeoutException on wall-clock timeout, or fails with
-     * AgentProcessException on subprocess error.
-     *
-     * Subscriber-driven cancellation (unsubscribing from the Multi) is also
-     * supported and triggers subprocess cleanup — no exception is raised.
+     * The returned Multi completes when the agent signals done.
+     * Fails with AgentTimeoutException on wall-clock timeout.
+     * Fails with AgentProcessException on subprocess error.
+     * Subscriber cancellation triggers subprocess cleanup — no exception raised.
      */
     Multi<AgentEvent> invoke(AgentSessionConfig config);
 }
@@ -107,32 +207,21 @@ public interface AgentProvider {
 public sealed interface AgentEvent permits AgentEvent.TextDelta {
 
     /**
-     * A streaming text chunk. Each emission is a token-level delta — NOT a buffered
-     * complete response. Consumers building a full response must accumulate deltas.
+     * A token-level streaming chunk. NOT a buffered complete response.
+     * Accumulate deltas to build the full response.
      *
      * Absent intentionally:
-     * - ToolCall: Claude Code tool invocations happen inside the CLI subprocess and
-     *   are not observable from outside.
-     * - UsageReport: SDK cost/token metadata (ResultMessage) is out of scope for v1.
-     *   Add as AgentEvent.UsageReport when a concrete consumer requires it.
+     * - ToolCall: Claude Code tool invocations are opaque to the observer.
+     * - UsageReport: SDK cost metadata out of scope for v1.
      */
     record TextDelta(String text) implements AgentEvent {}
 }
 ```
 
-**Terminal state belongs in stream termination, not in event items:**
-- Normal completion → `Multi` completes (onComplete)
+Terminal state via stream termination only:
+- Normal completion → `Multi` completes
 - Timeout → `Multi` fails with `AgentTimeoutException`
 - Subprocess error → `Multi` fails with `AgentProcessException(cause)`
-
-Callers use standard Mutiny idioms:
-
-```java
-agentProvider.invoke(config)
-    .onFailure(AgentTimeoutException.class).recoverWithItem(gracefulFallback)
-    .onFailure(AgentProcessException.class).invoke(e -> log.error("subprocess failed", e))
-    .subscribe().with(delta -> buffer.append(delta.text()), Multi::createFrom);
-```
 
 ### `AgentSessionConfig`
 
@@ -141,10 +230,18 @@ public record AgentSessionConfig(
     String systemPrompt,
     String userPrompt,
     List<AgentMcpServer> mcpServers,
-    @Nullable Duration timeout,      // null → ClaudeAgentProperties.defaultTimeout()
-    @Nullable String correlationId   // optional; logged via MDC for production tracing
+    Duration timeout,        // null → ClaudeAgentProperties.defaultTimeout()
+    String correlationId     // null → no correlation logging
 ) {
-    /** Minimal — default timeout, no MCP servers, no correlation. */
+    // Compact constructor — enforce non-null on required fields.
+    // Defensive copy of mcpServers prevents external mutation.
+    public AgentSessionConfig {
+        Objects.requireNonNull(systemPrompt, "systemPrompt");
+        Objects.requireNonNull(userPrompt, "userPrompt");
+        mcpServers = mcpServers != null ? List.copyOf(mcpServers) : List.of();
+    }
+
+    /** Default timeout, no MCP, no correlation. */
     public static AgentSessionConfig of(String systemPrompt, String userPrompt) {
         return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null);
     }
@@ -154,33 +251,22 @@ public record AgentSessionConfig(
                                         Duration timeout) {
         return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null);
     }
-
-    /** Full config. */
-    public static AgentSessionConfig of(String systemPrompt, String userPrompt,
-                                        List<AgentMcpServer> mcpServers,
-                                        Duration timeout, String correlationId) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers,
-                                      timeout, correlationId);
-    }
 }
 ```
 
-`userPrompt` is required and non-null — single-shot invocations always have a user
-prompt. `Optional<Duration>` is not used — it is a return-type idiom and does not
-belong as a record component.
+`userPrompt` is required and non-null. `timeout` and `correlationId` are nullable with
+documented null contracts. `Optional<Duration>` is not used — return-type idiom only.
 
 ### `AgentMcpServer`
-
-Our own sealed interface — keeps `agent-api/` free of the SDK dep. `agent-claude/`
-converts to SDK `McpServerConfig` types at invocation time.
 
 ```java
 public sealed interface AgentMcpServer
     permits AgentMcpServer.Stdio, AgentMcpServer.Sse, AgentMcpServer.Http {
 
     /**
-     * env behaviour: merged OVER the parent process environment (not a replacement).
-     * PATH and system variables are preserved. To unset a parent var, set it to "".
+     * Stdio MCP server: launched as a subprocess by the Claude CLI.
+     * env: MERGED over the parent process environment (not a replacement).
+     * PATH and system variables are preserved. Set a key to "" to unset it.
      */
     record Stdio(String command, List<String> args, Map<String, String> env)
         implements AgentMcpServer {
@@ -188,34 +274,41 @@ public sealed interface AgentMcpServer
         public Stdio(String command, List<String> args) { this(command, args, Map.of()); }
     }
 
+    /**
+     * SSE MCP server: legacy HTTP transport (Server-Sent Events).
+     * Prefer Http for new deployments.
+     */
     record Sse(String url, Map<String, String> headers) implements AgentMcpServer {
         public Sse(String url) { this(url, Map.of()); }
     }
 
+    /**
+     * Streamable HTTP MCP server: current MCP transport standard.
+     * Prefer this over Sse for new servers.
+     */
     record Http(String url, Map<String, String> headers) implements AgentMcpServer {
         public Http(String url) { this(url, Map.of()); }
     }
 }
 ```
 
+External MCP servers only. In-process Java tool handlers out of scope for v1.
+
 ### Typed exceptions
 
 ```java
-/** Wall-clock session timeout exceeded. */
 public class AgentTimeoutException extends RuntimeException {
     public AgentTimeoutException(Duration timeout) {
         super("Agent session exceeded wall-clock timeout of " + timeout);
     }
 }
 
-/** Claude CLI subprocess error. */
 public class AgentProcessException extends RuntimeException {
     public AgentProcessException(String message, Throwable cause) {
         super(message, cause);
     }
 }
 
-/** Concurrent session cap reached. Thrown synchronously before Multi is returned. */
 public class AgentSessionLimitException extends RuntimeException {
     public AgentSessionLimitException(int limit) {
         super("Agent session limit reached (" + limit + " concurrent sessions). " +
@@ -228,46 +321,37 @@ public class AgentSessionLimitException extends RuntimeException {
 
 ## platform/ — NoOpAgentProvider
 
-Lives in the existing `platform/` module alongside `NoOpCaseMemoryStore` and the
-other `@DefaultBean` no-ops.
-
 ```java
 @DefaultBean
 @ApplicationScoped
 public class NoOpAgentProvider implements AgentProvider {
 
+    private static final Logger LOG = Logger.getLogger(NoOpAgentProvider.class);
+
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+        LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
+                 "to the classpath to get real Claude output");
         return Multi.createFrom().empty();
     }
 }
 ```
 
-Active when `agent-claude/` is not on the classpath (dev mode, `@QuarkusTest` without
-Claude CLI). Downstream tests that need specific agent responses use `@InjectMock
-AgentProvider` and stub `invoke()` with test fixtures.
+The real agent and the NoOp both complete the Multi normally. The `LOG.warn` is the only
+observable distinction for dev misconfiguration. `platform/` already has Jandex and
+`quarkus:build`.
 
 ---
 
 ## agent-claude/ — Claude Agent SDK Integration
 
-**Dependencies:** `agent-api/`, `org.springaicommunity:claude-code-sdk:1.0.0`,
-`platform/` (for Quarkus CDI), Mutiny.
-
-**Maven coordinate note:** The originating issue listed
-`com.github.spring-ai-community:claude-agent-sdk-java:1.0.0` — this is wrong.
-The correct coordinate confirmed on Maven Central is
-`org.springaicommunity:claude-code-sdk:1.0.0`.
+**Maven coordinate:** `org.springaicommunity:claude-code-sdk:1.0.0`.
+The originating issue listed a different coordinate — incorrect.
 
 ### `ClaudeAgentProvider`
 
-The `@Alternative @Priority(1)` implementation. Activates by classpath presence of
-`agent-claude/`.
-
 ```java
-@Alternative
-@Priority(1)
-@ApplicationScoped
+@ApplicationScoped   // beats NoOpAgentProvider @DefaultBean automatically
 public class ClaudeAgentProvider implements AgentProvider {
 
     @Inject ClaudeAgentClient client;
@@ -279,93 +363,254 @@ public class ClaudeAgentProvider implements AgentProvider {
 }
 ```
 
+CDI tier for `AgentProvider`:
+- Tier 1: `NoOpAgentProvider @DefaultBean @ApplicationScoped` (platform/) — default
+- Tier 2: `ClaudeAgentProvider @ApplicationScoped` (agent-claude/) — active on classpath
+
+`@Alternative @Priority(1)` is not used — that is Tier 3, for secondary backends that
+beat a Tier 2 primary. There is no Tier 2 primary; using it prematurely would cause an
+ambiguous dependency exception if a second `@Priority(1)` bean were added later.
+
 ### `ClaudeAgentClient`
 
-Implementation detail inside `agent-claude/`. Not injected directly by app code.
+Implementation detail inside `agent-claude/`. App code never injects this directly.
 
 ```java
+/**
+ * @Startup forces eager initialization on the main thread during application startup,
+ * before any reactive handlers can run. Without @Startup, ARC initializes lazily on
+ * first injection. If that happens on the Vert.x IO thread, @PostConstruct
+ * validateBinary() would call ProcessBuilder.start().waitFor() there — blocking the IO
+ * thread in violation of spi-reactive-blocking-io.md (PP-20260529-9f9627).
+ *
+ * Same pattern as PathParserConfigurator and MongoPreferenceIndexes in this module.
+ */
+@Startup
 @ApplicationScoped
 public class ClaudeAgentClient {
 
+    private final ClaudeAgentProperties properties;
+    private final Semaphore semaphore;
+    private final CopyOnWriteArraySet<ClaudeAsyncClient> activeSessions;
+    private final ScheduledExecutorService timeoutScheduler;
+    // Non-null in tests only — set by test constructor, checked in buildEventStream()
+    private final Function<AgentSessionConfig, Multi<AgentEvent>> streamFactory;
+
+    @Inject
+    public ClaudeAgentClient(ClaudeAgentProperties properties) {
+        this.properties = properties;
+        this.semaphore = new Semaphore(properties.maxConcurrentSessions());
+        this.activeSessions = new CopyOnWriteArraySet<>();
+        this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "casehub-agent-timeout");
+            t.setDaemon(true);
+            return t;
+        });
+        this.streamFactory = null;
+    }
+
+    /** Required by ARC for subclass-based proxy generation. Must not be called directly. */
+    protected ClaudeAgentClient() {
+        this.properties = null;
+        this.semaphore = null;
+        this.activeSessions = null;
+        this.timeoutScheduler = null;
+        this.streamFactory = null;
+    }
+
     /**
-     * Invoke the Claude CLI, stream TextDelta events until completion or timeout.
+     * Test constructor — bypasses {@code @PostConstruct}. Call with {@code new} in tests;
+     * do not expose to CDI. Prefer this over subclassing — CDI proxies are subclass-based
+     * and a test subclass risks firing @PostConstruct if CDI manages the instance.
+     * Follows the ScimActorDIDProvider pattern established in this codebase.
+     */
+    public ClaudeAgentClient(ClaudeAgentProperties properties,
+                             Function<AgentSessionConfig, Multi<AgentEvent>> streamFactory) {
+        this.properties = properties;
+        this.semaphore = new Semaphore(properties.maxConcurrentSessions());
+        this.activeSessions = new CopyOnWriteArraySet<>();
+        this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "casehub-agent-timeout");
+            t.setDaemon(true);
+            return t;
+        });
+        this.streamFactory = streamFactory;
+    }
+
+    @PostConstruct
+    void validateBinary() {
+        String binary = properties.binaryPath().orElse("claude");
+        try {
+            Process process = new ProcessBuilder(binary, "--version").start();
+            // 10-second bound: --version completes in milliseconds.
+            // A hung probe means something is wrong with the install — fail fast.
+            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new IllegalStateException(
+                    "claude binary probe timed out after 10s: " + binary);
+            }
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                throw new IllegalStateException(
+                    "claude binary at '" + binary + "' exited with code " + exitCode +
+                    " — possible broken installation");
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                "Interrupted while probing claude binary: " + binary, e);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                "claude binary not found or not executable: " + binary +
+                " — configure casehub.platform.agent.claude.binary-path " +
+                "or ensure 'claude' is on PATH", e);
+        }
+        LOG.warnf("claude binary resolved at '%s'. Authentication not verified — " +
+                  "AgentProcessException will surface on first invocation if unauthenticated.",
+                  binary);
+    }
+
+    /**
+     * Stream TextDelta events until the agent completes or the wall-clock timeout fires.
+     * All error cases are surfaced via onFailure() on the returned Multi — run() never throws.
      *
-     * Threading: subscription is shifted to the worker pool via
-     * runSubscriptionOn(Infrastructure.getDefaultWorkerPool()). Safe to call from
-     * Vert.x IO threads and reactive handlers. Required — the SDK makes blocking
-     * subprocess calls during subscription. Without the shift, subscription runs on
-     * the calling thread, violating spi-reactive-blocking-io.md (PP-20260529-9f9627).
+     * Responsibility split:
+     *   buildEventStream() owns: timer cancel, session deregister, sdkClient.close() — on all paths
+     *   run() owns: semaphore release — on all paths, as the outer handler layer
      *
-     * Timeout: wall-clock, not idle. Fires after config.timeout() (or
-     * defaultTimeout() if null) from subscription time, regardless of whether items
-     * are flowing. Fails with AgentTimeoutException.
-     *
-     * @throws AgentSessionLimitException before returning Multi if cap is reached
+     * Threading: subscription shifted to the worker pool via runSubscriptionOn(). The SDK
+     * creates a subprocess during subscription setup — this blocks. Without the shift,
+     * subscription blocks the Vert.x IO thread, violating PP-20260529-9f9627.
      */
     public Multi<AgentEvent> run(AgentSessionConfig config) {
         if (!semaphore.tryAcquire()) {
-            throw new AgentSessionLimitException(properties.maxConcurrentSessions());
+            // Semaphore not acquired — return failure directly. No termination handlers
+            // registered on this Multi because there is nothing to release.
+            return Multi.createFrom().failure(
+                new AgentSessionLimitException(properties.maxConcurrentSessions()));
         }
         try {
-            Multi<AgentEvent> events = buildEventStream(config)
+            // buildEventStream() returns a Multi with cleanup handlers already wired.
+            // run() adds semaphore release as the outer layer on top.
+            return buildEventStream(config)
                 .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
                 .onCompletion().invoke(semaphore::release)
                 .onFailure().invoke(t -> semaphore.release())
                 .onCancellation().invoke(semaphore::release);
-            return applyTimeout(events, config);
         } catch (Exception e) {
             semaphore.release();
-            throw e;
+            return Multi.createFrom().failure(e);
         }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        // Shut down timer scheduler first — no new timeouts will fire.
+        // Then close all sessions that are still active.
+        // Isolate per-client so one failure doesn't abort the rest.
+        timeoutScheduler.shutdownNow();
+        activeSessions.forEach(c -> {
+            try { c.close().subscribe(); } catch (Exception ignored) {}
+        });
     }
 }
 ```
 
-**Semaphore:** `Semaphore(maxConcurrentSessions)`, non-blocking `tryAcquire()`.
-All three termination paths must be covered — completion, failure, and subscriber-
-driven cancellation. One missed path silently exhausts the pool permanently.
-The `try/catch` around stream construction ensures the semaphore is released even
-if `buildEventStream()` throws before the Multi is returned.
+### buildEventStream() — architecture
 
-**Reactor → Mutiny bridge:**
-```java
-Multi.createFrom().publisher(sdkFlux).map(this::toAgentEvent)
+`buildEventStream()` is responsible for SDK client creation, session tracking, timeout
+scheduling, and cleanup wiring. It returns a "thick" Multi with all cleanup handlers
+already registered. `run()` adds semaphore release as the outer layer on top.
+
+`buildEventStream()` is package-private — called only from `run()` in the same class.
+The test constructor bypasses it via `streamFactory`, so its visibility has no test surface.
+
+```
+/* package-private */ Multi<AgentEvent> buildEventStream(AgentSessionConfig config):
+
+1. If streamFactory != null (test path): return streamFactory.apply(config)
+
+2. Production path:
+   a. Resolve effectiveTimeout (config.timeout() or properties.defaultTimeout())
+   b. Create ClaudeAsyncClient per-invocation via ClaudeClient.async() builder:
+      - system prompt via CLIOptions.systemPrompt(config.systemPrompt())
+      - MCP servers converted from List<AgentMcpServer> to Map<String, McpServerConfig>
+   c. Register sdkClient in activeSessions
+   d. Declare AtomicBoolean timedOut = new AtomicBoolean(false)
+   e. Schedule subprocess closure:
+        ScheduledFuture<?> timeoutFuture = timeoutScheduler.schedule(() -> {
+            if (timedOut.compareAndSet(false, true)) {
+                sdkClient.close().subscribe();  // only fires if not already closed
+            }
+        }, effectiveTimeout.toMillis(), TimeUnit.MILLISECONDS);
+      compareAndSet(false, true) prevents double-close if completion and timer race.
+   f. try {
+        Obtain Flux<String> via sdkClient.connect(config.userPrompt()).textStream()
+        textStream() emits token-level text deltas — no Message type inspection needed.
+        Bridge to Multi<AgentEvent>:
+          Multi.createFrom().publisher(textFlux).map(text -> new AgentEvent.TextDelta(text))
+        Apply failure transformation — if timedOut, subprocess error from timer-driven
+        close() is typed as AgentTimeoutException; otherwise AgentProcessException.
+        Throwable.getMessage() may be null — use Objects.toString(e.getMessage(), e.getClass().getSimpleName()):
+          .onFailure().transform(e ->
+              timedOut.get()
+                  ? new AgentTimeoutException(effectiveTimeout)
+                  : new AgentProcessException(
+                        Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e))
+        Wire cleanup on all three termination paths:
+          .onCompletion().invoke(() -> { timeoutFuture.cancel(false);
+                                         activeSessions.remove(sdkClient);
+                                         sdkClient.close().subscribe(); })
+          .onFailure().invoke(t -> { timeoutFuture.cancel(false);
+                                     activeSessions.remove(sdkClient);
+                                     sdkClient.close().subscribe(); })
+          .onCancellation().invoke(() -> { timeoutFuture.cancel(false);
+                                           activeSessions.remove(sdkClient);
+                                           sdkClient.close().subscribe(); })
+        sdkClient.close() is idempotent — safe even if already closed by timer.
+        Explicit close() on all paths: Flux cancellation does NOT guarantee subprocess
+        termination in the SDK implementation.
+        return eventStream;
+      } catch (Exception e) {
+        // buildEventStream() threw synchronously after c and e above.
+        // Semaphore is released by run()'s catch block.
+        // Clean up timer and session registered before the failure:
+        timeoutFuture.cancel(false);
+        activeSessions.remove(sdkClient);
+        sdkClient.close().subscribe();
+        throw e;
+      }
 ```
 
-**Timeout:** wall-clock timeout applied to the composed pipeline. The correct Mutiny
-operator is not `.ifNoItem().after()` (that is idle timeout). Use a wall-clock racing
-approach — merge the event stream with a `Multi` that fails with `AgentTimeoutException`
-after the configured duration, then take first-to-terminate.
+**Timeout correctness note:** Merge-based timeout approaches (`Multi.createBy().merging()`)
+have a correctness flaw: Mutiny's merge completes only when ALL upstream streams complete.
+If events completes before the timer fires, the merged stream stays open, then fails with
+`AgentTimeoutException` — falsely reporting timeout on a successful session. Scheduled
+subprocess closure avoids this by tying the timer to subprocess lifecycle, not stream
+composition.
 
-**correlationId:** if `config.correlationId()` is non-null, set in MDC at stream start
-and remove at all termination paths (completion, failure, cancellation).
-
-**`@PreDestroy`:** cancels all active subprocess handles tracked in a
-`CopyOnWriteArrayList`. Sessions that complete normally before shutdown are unaffected.
+**Correlating sessions:** if `config.correlationId()` is non-null, log it as a structured
+field at key lifecycle points (stream start, completion, failure, cancellation) using the
+logging framework's structured parameter support. SLF4J MDC is thread-local and does not
+propagate across `runSubscriptionOn()` — no MDC-based approach is used.
 
 ### `ClaudeAgentProperties`
 
 ```java
 @ConfigMapping(prefix = "casehub.platform.agent.claude")
 public interface ClaudeAgentProperties {
-
-    /** Path to claude CLI binary. Default: resolved from PATH. */
     Optional<String> binaryPath();
 
-    /** Default timeout when AgentSessionConfig.timeout() is null. Default: 5 minutes. */
     @WithDefault("PT5M")
     Duration defaultTimeout();
 
-    /** Maximum concurrent sessions. Excess calls throw AgentSessionLimitException. */
     @WithDefault("4")
     int maxConcurrentSessions();
 }
 ```
-
-**Startup validation:** `@PostConstruct` verifies the claude binary is resolvable
-(via `binaryPath` or `PATH`). Throws if missing — fail fast at startup, not per-call.
-Authentication is not checked at startup (requires network); unauthenticated CLI
-surfaces as `AgentProcessException` at invocation time.
 
 ---
 
@@ -373,88 +618,115 @@ surfaces as `AgentProcessException` at invocation time.
 
 | Requirement | Failure mode |
 |---|---|
-| `claude` binary on PATH (or `binaryPath` set) | Startup failure — `@PostConstruct` |
-| Claude authenticated (`ANTHROPIC_API_KEY` or session) | Per-call `AgentProcessException` |
-| Subprocess memory available | Per-call `AgentProcessException` or OS kill |
-| Container/CI: binary in image/environment | Startup failure |
+| `claude` binary on PATH (or `binaryPath` configured) | `IllegalStateException` at startup |
+| Claude authenticated (`ANTHROPIC_API_KEY` or session) | `AgentProcessException` at first call |
+| Subprocess memory available | `AgentProcessException` or OS kill |
+| Container/CI: binary in image/environment | `IllegalStateException` at startup |
 
-For environments without Claude CLI (CI unit tests, `@QuarkusTest`), do not add
-`agent-claude/` to the test classpath. Use `NoOpAgentProvider` (active by default)
-or `@InjectMock AgentProvider`.
+For environments without Claude CLI: don't add `agent-claude/` to classpath.
+`NoOpAgentProvider` is active by default (with `LOG.warn` at invocation time).
 
 ---
 
 ## CDI Priority Pattern
 
-This follows the classpath-presence activation mechanism from
-`persistence-backend-cdi-priority.md`, applied as a two-tier model (not three).
-There is no intermediate primary tier — only NoOp (default) and Claude (alternative).
+### AgentProvider (platform SPI)
+
+Classpath-presence activation — two tiers per `persistence-backend-cdi-priority.md`:
+
+| Tier | Annotation | Module | Active when |
+|------|-----------|--------|-------------|
+| 1 — NoOp | `@DefaultBean @ApplicationScoped` | `platform/` | Default |
+| 2 — Claude | `@ApplicationScoped` | `agent-claude/` | `agent-claude/` on classpath |
+
+### Domain SPI pattern — module separation required
+
+**Both implementations of a domain SPI must not live in the same Maven module.**
+If `ClaudeDebateAgentProvider @ApplicationScoped` and `LangChain4jDebateAgentProvider
+@DefaultBean` are in the same module, CDI always resolves to Claude regardless of
+classpath — `@ApplicationScoped` unconditionally beats `@DefaultBean`.
+`LangChain4jDebateAgentProvider` becomes dead code. CI never tests it.
+
+**Correct structure for a downstream app (e.g., drafthouse):**
+
+```
+drafthouse/
+  drafthouse-api/     — DebateAgentProvider SPI (pure Java)
+  drafthouse/         — main app; LangChain4jDebateAgentProvider @DefaultBean
+  drafthouse-claude/  — NEW module; ClaudeDebateAgentProvider @ApplicationScoped here;
+                        declares casehub-platform-agent-claude as compile dep
+```
+
+Adding `drafthouse-claude/` to the app's compile deps activates both `agent-claude/`
+and `ClaudeDebateAgentProvider`. Removing it falls back to LangChain4j. Per
+`optional-module-pattern.md` applied to domain SPIs.
+
+**Domain SPI Claude implementation (in the -claude module):**
 
 ```java
-// LangChain4j — @DefaultBean, works with any LLM, always runs in CI
-@DefaultBean
-@ApplicationScoped
-public class LangChain4jDebateAgentProvider implements DebateAgentProvider {
-    @RegisterAiService interface DebateAiService { ... }
-    @Inject DebateAiService aiService;
-    // implements DebateAgentProvider using aiService
-}
-
-// Claude — activates when agent-claude/ is on the compile classpath
-@Alternative @Priority(1)
 @ApplicationScoped
 public class ClaudeDebateAgentProvider implements DebateAgentProvider {
     @Inject AgentProvider agentProvider;  // NOT ClaudeAgentClient
-    // implements DebateAgentProvider using agentProvider.invoke(config)
+    // implement DebateAgentProvider using agentProvider.invoke(config)
 }
 ```
-
-App code injects `DebateAgentProvider` (the domain SPI). The CDI runtime selects the
-active implementation based on classpath. No registration call. No conditional bean.
 
 ---
 
 ## Testing Pattern
 
-### Integration tests
-
-ITs that invoke the real Claude CLI are opt-in via environment variable — compatible
-with library modules that omit `quarkus:build`:
+### Integration tests (real Claude CLI)
 
 ```java
 @EnabledIfEnvironmentVariable(named = "CLAUDE_AGENT_TESTS_ENABLED", matches = "true")
 class ClaudeAgentClientIT {
     @Inject AgentProvider agentProvider;
-    // ...
 }
 ```
 
-Set `CLAUDE_AGENT_TESTS_ENABLED=true` locally when Claude CLI is installed and
-authenticated. CI runs without it.
+### ClaudeAgentClient infrastructure unit tests
 
-### Parity contract tests
-
-The contract test pattern is an **application-repo convention**, not a platform
-artifact. The abstract base class and both concrete tests live in the app repo
-alongside the domain SPI:
+Test infrastructure behavior (semaphore limit, timeout) without a real Claude CLI using
+the test constructor. Do not subclass — CDI proxies are subclass-based and a test subclass
+risks firing `@PostConstruct` when CDI manages the instance. The test constructor bypasses
+`@PostConstruct` entirely (same pattern as `ScimActorDIDProvider`):
 
 ```java
-// In drafthouse — abstract contract, tests structural correctness
-public abstract class DebateAgentProviderContractTest {
-    protected abstract DebateAgentProvider provider();
-    @Test void outputHasRequiredShape() { ... }
+// In agent-claude/ test sources
+class ClaudeAgentClientTest {
+
+    private ClaudeAgentClient clientWith(Multi<AgentEvent> stream) {
+        var props = mock(ClaudeAgentProperties.class);
+        when(props.maxConcurrentSessions()).thenReturn(2);
+        when(props.defaultTimeout()).thenReturn(Duration.ofMinutes(5));
+        return new ClaudeAgentClient(props, config -> stream);
+    }
+
+    @Test
+    void limitReached_returnsFailureMulti() {
+        // Fill cap with slow streams
+        var client = clientWith(Multi.createFrom().nothing());
+        client.run(config());
+        client.run(config());
+
+        // Third call must fail via onFailure (not throw synchronously).
+        // collect().asList() on a failure Multi itself fails when awaited.
+        var result = client.run(config());
+        assertThatThrownBy(() -> result.collect().asList().await().indefinitely())
+            .isInstanceOf(AgentSessionLimitException.class);
+    }
 }
-
-// LangChain4j — always runs in CI
-class LangChain4jDebateAgentProviderTest extends DebateAgentProviderContractTest { ... }
-
-// Claude — opt-in locally
-@EnabledIfEnvironmentVariable(named = "CLAUDE_AGENT_TESTS_ENABLED", matches = "true")
-class ClaudeDebateAgentProviderTest extends DebateAgentProviderContractTest { ... }
 ```
 
-Reasoning quality is out of CI scope. Contract tests verify output shape and required
-fields only.
+The test constructor returns `streamFactory.apply(config)` from `buildEventStream()`.
+This covers semaphore limit rejection, timeout propagation, and termination handler
+correctness without any subprocess involvement.
+
+### Dev/test mock path for downstream apps
+
+1. **Separate test classpath** — don't add `drafthouse-claude/` to the test module.
+2. **`@InjectMock AgentProvider`** — Quarkus CDI mock; stub `invoke()` with fixtures.
+3. **Profile-scoped module** — add `drafthouse-claude/` only in a Maven profile.
 
 ---
 
@@ -462,19 +734,20 @@ fields only.
 
 Captured now — target: `casehub/garden/docs/protocols/universal/`.
 
-> **Rule:** When an application domain SPI has both a LangChain4j implementation
-> (any LLM, portable, works in CI) and a Claude Agent SDK implementation (Claude
-> only, requires CLI), apply classpath-presence activation:
+> **Rule:** When an application domain SPI has a LangChain4j default and a Claude
+> Agent SDK alternative, use classpath-presence activation:
 >
-> - `@DefaultBean @ApplicationScoped` — LangChain4j implementation, always active
-> - `@Alternative @Priority(1) @ApplicationScoped` — Claude implementation, activates
->   when `casehub-platform-agent-claude` is on the compile classpath
+> - `@DefaultBean @ApplicationScoped` — LangChain4j in the main app module
+> - `@ApplicationScoped` — Claude in a **separate module** that declares
+>   `casehub-platform-agent-claude` as a compile dependency
 >
-> This is a two-tier model. The Claude implementation injects `AgentProvider` (the
-> platform SPI), not `ClaudeAgentClient` directly.
+> Module separation is required. Both implementations in the same module
+> defeats classpath-presence activation: @ApplicationScoped always wins.
+>
+> Claude implementation injects `AgentProvider` (platform SPI), not `ClaudeAgentClient`.
 >
 > Both implementations must pass the domain SPI's parity contract tests.
-> Reasoning quality is out of CI scope; test structural correctness only.
+> Structural correctness only in CI; reasoning quality is out of scope.
 >
 > Reference: casehubio/platform#55, spec 2026-06-02.
 
@@ -482,39 +755,39 @@ Captured now — target: `casehub/garden/docs/protocols/universal/`.
 
 ## Out of Scope for v1
 
-- **AgentSession / multi-turn:** Deferred. No current use case requires it. Subprocess-
-  held state has no crash-recovery path. State persistence belongs in `CaseMemoryStore`.
-  Design when a concrete multi-turn use case emerges.
-- **In-process MCP tools (McpSdkServerConfig):** Primary use cases inject context into
-  the prompt. Revisit if an open-ended investigation use case requires Claude to query
-  application data on demand mid-task.
-- **ToolCall events:** Claude Code tool invocations are opaque to the observer.
-- **UsageReport / cost metadata:** Add as `AgentEvent.UsageReport` when a consumer
-  requires it.
-- **Multi-model support:** `ClaudeAgentProperties` targets Claude CLI only. Other models
-  use the LangChain4j `@DefaultBean` path.
+- **AgentSession / multi-turn:** platform#58.
+- **In-process MCP tools:** Primary use cases inject context into the prompt.
+- **ToolCall events:** Opaque inside the subprocess.
+- **UsageReport / cost metadata:** Add as `AgentEvent.UsageReport` when needed.
+- **Multi-model support:** Claude CLI only.
+- **openclaw migration:** platform#57.
+- **PLATFORM.md / CLAUDE.md update:** platform#59.
 
 ---
 
 ## Downstream Migration (post-ship)
 
-Open a tracking issue per repo after this module ships. Priority order:
+Each adopting app requires a **new Maven module** (e.g., `drafthouse-claude/`)
+per `optional-module-pattern.md`. Adding a class to an existing module is insufficient.
 
-1. `casehubio/drafthouse` — originating use case (`DebateAgentProvider`)
-2. `casehubio/eidos` — `SystemPromptRenderer` with optional `ChatModel`
-3. `casehubio/engine` — `casehub-engine-ai` embedding and routing
+Priority order:
+1. `casehubio/drafthouse` — originating use case
+2. `casehubio/eidos` — `SystemPromptRenderer`
+3. `casehubio/engine` — `casehub-engine-ai`
 4. `casehubio/devtown`, `casehubio/aml`, `casehubio/clinical` — confirm LLM usage first
-
-`casehubio/openclaw`: tmux-based `WorkerProvisioner` already wraps Claude Code —
-assess whether `ClaudeAgentProvider` is additive or redundant before opening.
 
 ---
 
 ## References
 
-- casehubio/platform#55 — originating issue (dep analysis + design decisions)
+- casehubio/platform#55 — originating issue
+- casehubio/platform#57 — openclaw assessment
+- casehubio/platform#58 — AgentSession v2
+- casehubio/platform#59 — PLATFORM.md / CLAUDE.md update
 - casehubio/drafthouse#29 — originating use case
 - Maven Central: `org.springaicommunity:claude-code-sdk:1.0.0`
-- `persistence-backend-cdi-priority.md` — classpath-presence activation pattern
-- `spi-reactive-blocking-io.md` (PP-20260529-9f9627) — Vert.x IO thread rule
-- `spi-adapter-module-placement.md` — module in platform; extract if cross-org adoption
+- `persistence-backend-cdi-priority.md` (PP-20260522-0cfa30)
+- `spi-reactive-blocking-io.md` (PP-20260529-9f9627)
+- `library-jars-require-jandex.md` (PP-20260601-37179a)
+- `optional-module-pattern.md` (PP-20260508-6d1f5c)
+- `spi-adapter-module-placement.md` (PP-20260529-spi-adapter-placement)

@@ -137,6 +137,9 @@ io.casehub.platform.api
                    EraseRequest, MemoryPermissions (static tenant assertion utility),
                    MemoryOrder (enum: CHRONOLOGICAL / RELEVANCE),
                    MemoryAttributeKeys (reserved cross-domain keys + confidence helpers)
+  .actor         — ActorStateContributor (SPI: contribute actor workload data to an ActorStateAccumulator),
+                   ActorStateAccumulator (visitor passed to each contributor to accumulate active-cases,
+                   open-WorkItems, and open-obligation slices of the actor state view)
 ```
 
 `platform/` also exposes `ReactiveCaseMemoryStore` (Mutiny SPI) and `BlockingToReactiveBridge @DefaultBean`

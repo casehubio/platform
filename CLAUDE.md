@@ -118,6 +118,8 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 
 ```
 io.casehub.platform.api
+  .actor         — ActorStateContributor (SPI: contribute data to a unified actor state view, @ApplicationScoped),
+                   ActorStateAccumulator (visitor: trustScore, capabilityScore — assembled concurrently by aggregator)
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference

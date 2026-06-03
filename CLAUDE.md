@@ -113,6 +113,8 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `memory-sqlite/` | `casehub-platform-memory-sqlite` | @Alternative @Priority(1) SQLite CaseMemoryStore — xerial JDBC + HikariCP (WAL mode) + FTS5 + Flyway programmatic. Configure `casehub.memory.sqlite.path`. No quarkus:build goal. Do NOT combine with memory-inmem or memory-jpa in the same scope |
 | `scim/` | `casehub-platform-scim` | @ApplicationScoped SCIM 2.0 GroupMembershipProvider — displaces @DefaultBean mock. Auth: casehub.platform.scim.token (static) or quarkus.oidc-client.scim.* (client-credentials). @CacheResult on membersOf(). Pagination: casehub.platform.scim.member-page-size (default 1000). No quarkus:build goal |
 | `identity/` | `casehub-platform-identity` | @Alternative ActorDIDProvider/DIDResolver/AgentCredentialValidator impls — did:key, did:web, SCIM2, config-based. SPIs and model types in platform-api. Config prefix: casehub.identity.* |
+| `agent-api/` | `casehub-platform-agent-api` | AgentProvider SPI + AgentSessionConfig, AgentEvent, AgentMcpServer, typed exceptions (AgentProcessException, AgentSessionLimitException, AgentTimeoutException). Mutiny only — no Quarkus. Package: `io.casehub.platform.agent` |
+| `agent-claude/` | `casehub-platform-agent-claude` | `ClaudeAgentProvider @ApplicationScoped` + `ClaudeAgentClient @Startup` — activates by classpath presence, requires Claude CLI. Concurrent-session semaphore enforces `AgentSessionConfig.maxConcurrentSessions`. Scheduled subprocess closure for wall-clock timeout. Package: `io.casehub.platform.agent.claude` |
 
 ## Package Structure (platform-api)
 

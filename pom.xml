@@ -11,6 +11,7 @@
 
     <modules>
         <module>platform-api</module>
+        <module>agent-api</module>
         <module>platform</module>
         <module>testing</module>
         <module>config</module>
@@ -23,6 +24,7 @@
         <module>memory-sqlite</module>
         <module>scim</module>
         <module>identity</module>
+        <module>agent-claude</module>
     </modules>
 
     <properties>

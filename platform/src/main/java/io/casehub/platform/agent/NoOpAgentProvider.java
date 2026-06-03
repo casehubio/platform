@@ -1,0 +1,28 @@
+package io.casehub.platform.agent;
+
+import io.quarkus.arc.DefaultBean;
+import io.smallrye.mutiny.Multi;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
+
+/**
+ * No-op {@link AgentProvider} active when {@code casehub-platform-agent-claude} is not
+ * on the classpath. Returns an empty completed stream.
+ *
+ * <p>A {@code WARN} log line is emitted on each invocation to make dev misconfiguration
+ * immediately visible. The real agent and the NoOp both produce an empty completed Multi;
+ * the log is the only observable distinction.
+ */
+@DefaultBean
+@ApplicationScoped
+public class NoOpAgentProvider implements AgentProvider {
+
+    private static final Logger LOG = Logger.getLogger(NoOpAgentProvider.class);
+
+    @Override
+    public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+        LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
+                 "to the classpath to get real Claude output");
+        return Multi.createFrom().empty();
+    }
+}

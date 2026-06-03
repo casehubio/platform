@@ -155,12 +155,12 @@ Add one compile dependency for `NoOpAgentProvider`:
 
 ```xml
 <dependency>
-    <groupId>io.casehub.platform</groupId>
+    <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-agent-api</artifactId>
     <version>${casehub-platform.version}</version>
 </dependency>
 <dependency>
-    <groupId>io.casehub.platform</groupId>
+    <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-agent-claude</artifactId>
     <version>${casehub-platform.version}</version>
 </dependency>

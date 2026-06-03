@@ -4,6 +4,7 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.smallrye.mutiny.Multi;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -81,7 +82,7 @@ class ClaudeAgentClientTest {
     }
 
     @Test
-    void semaphore_releasedOnCancellation() throws Exception {
+    void semaphore_releasedOnCancellation() throws InterruptedException {
         var subscribed = new CountDownLatch(1);
         var cancelled = new CountDownLatch(1);
         // Use AtomicReference to track which stream factory invocation
@@ -104,8 +105,10 @@ class ClaudeAgentClientTest {
         assertThat(cancelled.await(2, TimeUnit.SECONDS))
             .as("cancellation should propagate within 2s").isTrue();
 
-        // Wait for outer onCancellation (semaphore release) to fire after inner one
-        Thread.sleep(300);
+        Awaitility.await("outer semaphore release after cancellation")
+            .atMost(2, TimeUnit.SECONDS)
+            .pollInterval(10, TimeUnit.MILLISECONDS)
+            .until(() -> client.availablePermits() == 1);
 
         // Semaphore was released — second run on same client should succeed
         var result = client.run(config());

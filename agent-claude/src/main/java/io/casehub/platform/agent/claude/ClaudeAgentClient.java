@@ -102,6 +102,11 @@ public class ClaudeAgentClient {
         this.streamFactory = streamFactory;
     }
 
+    /** For testing only — allows tests to observe semaphore state without exposing the field. */
+    int availablePermits() {
+        return semaphore.availablePermits();
+    }
+
     @PostConstruct
     void validateBinary() {
         String binary = properties.binaryPath().orElse("claude");

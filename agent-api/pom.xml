@@ -12,4 +12,41 @@
 
     <artifactId>casehub-platform-agent-api</artifactId>
     <packaging>jar</packaging>
+    <name>CaseHub Platform Agent API</name>
+    <description>AgentProvider SPI and API types for AI agent invocation.
+        Depends only on Mutiny — no Quarkus, no CDI, no casehubio imports.
+        Jandex index required so ARC resolves AgentProvider supertype from downstream JARs.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>mutiny</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>${jandex-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals><goal>jandex</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

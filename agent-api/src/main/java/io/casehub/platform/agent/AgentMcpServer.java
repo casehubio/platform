@@ -14,6 +14,10 @@ public sealed interface AgentMcpServer
      */
     record Stdio(String command, List<String> args, Map<String, String> env)
             implements AgentMcpServer {
+        public Stdio {
+            args = args != null ? List.copyOf(args) : List.of();
+            env  = env  != null ? Map.copyOf(env)  : Map.of();
+        }
         public Stdio(String command) { this(command, List.of(), Map.of()); }
         public Stdio(String command, List<String> args) { this(command, args, Map.of()); }
     }
@@ -23,6 +27,9 @@ public sealed interface AgentMcpServer
      * Prefer {@link Http} for new servers.
      */
     record Sse(String url, Map<String, String> headers) implements AgentMcpServer {
+        public Sse {
+            headers = headers != null ? Map.copyOf(headers) : Map.of();
+        }
         public Sse(String url) { this(url, Map.of()); }
     }
 
@@ -31,6 +38,9 @@ public sealed interface AgentMcpServer
      * Prefer this over {@link Sse} for new deployments.
      */
     record Http(String url, Map<String, String> headers) implements AgentMcpServer {
+        public Http {
+            headers = headers != null ? Map.copyOf(headers) : Map.of();
+        }
         public Http(String url) { this(url, Map.of()); }
     }
 }

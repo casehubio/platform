@@ -1,9 +1,10 @@
 # ACL Design Specification — casehub-platform
 
-**Date:** 2026-06-01  
-**Status:** Draft — pending quarkus-flow and drools worker use cases  
-**Author:** Mark Proctor  
-**Scope:** casehub-platform ACL SPI, data model, hierarchy, multi-tenancy, worker access
+**Date:** 2026-06-01, updated 2026-06-04
+**Status:** Draft — authorization model decisions pending (see §6 and §8)
+**Author:** Mark Proctor
+**Scope:** casehub-platform ACL SPI, data model, hierarchy, multi-tenancy, cross-module enforcement, worker access, external token delegation
+**Tracking:** platform#68
 
 ---
 
@@ -19,7 +20,9 @@ casehub-platform currently provides three foundational cross-cutting capabilitie
 
 The immediate driver is admin API design — REST endpoints that return cases, work items, plan items, and event logs need to restrict their responses based on the caller's permissions. The requirement is data-level ACL, not method-level: the permission is a property of the data object itself, not of the code path that retrieves it. A case accessible to an actor should be accessible regardless of whether it is fetched via REST, a CDI bean, a background job, or a reactive stream.
 
-Additionally, quarkus-flow workers and drools workers are arriving imminently (within 24 hours of this document being written). They are the first concrete worker use cases for ACL and their requirements must inform the design before implementation begins.
+**This is a platform-level concern, not an engine concern.** Every module with state — engine (cases, plan items, event log), work (work items), ledger, memory, and future modules — must enforce the same authorization primitive at its API boundary. The `AccessControlProvider` SPI must be usable by all of them, not scoped to engine internals.
+
+Additionally, once the authorization model is in place, workers and quarkus-flow workflow steps must run under scoped permissions — not with implicit access to everything in the engine's trust boundary.
 
 ---
 
@@ -361,37 +364,99 @@ This follows the same pattern as `persistence-jpa/` (`classpath:db/platform/migr
 
 ---
 
-## 6. Worker Access — Open Design Area
+## 6. Authorization Model — Identity, Workers, and Delegation
 
-### 6.1 Context
+This section captures the full research from the 2026-06-04 design session. The original §6 framed worker access narrowly around provisioning grants. That framing is wrong — it assumed the quarkus-flow worker was an external actor making ACL-gated requests. The research revealed a deeper problem: there is no actor identity at all in the case execution hierarchy. This section replaces and significantly expands the original worker access section.
 
-quarkus-flow workers and drools workers are arriving within 24 hours of this document being written. They represent the first concrete worker use cases for ACL and must inform the design before implementation.
+### 6.1 The Missing Foundation — No Actor Identity on CaseInstance
 
-This section captures what is known and what must be resolved once those use cases land.
+`CaseInstance` (`engine/common/src/main/java/io/casehub/engine/common/internal/model/CaseInstance.java`) carries only:
 
-### 6.2 What Is Known
+- `tenancyId` — which tenant owns this case
+- `uuid`, `state`, `version`, `caseContext`, `propagationContext`, `parentCaseId`, `parentPlanItemId`
 
-Workers are provisioned *to* a specific case via the `WorkerProvisioner` SPI. Provisioning is already an explicit act — the engine knows which worker is being assigned to which case at the moment it calls `WorkerProvisioner.provision()`.
+**There is no `actorId` field.** The initiating principal is known at case creation time — `CaseHubReactor.java:147` calls `caseInstanceRepository.save(instance, currentPrincipal.tenancyId())` — but the `actorId` from `currentPrincipal` is discarded immediately after the save. The case then has no record of who created it.
 
-This means provisioning is the natural ACL write event:
+This means:
+- Workers running inside a case have no identity to inherit from the case
+- Sub-cases spawned during execution have no parent actor to inherit from
+- ACL enforcement on any internal execution path is currently impossible — there is nothing to check against
 
-- When a worker is provisioned to `case:abc-123`, the provisioning call should write:
-  `grant(workerDid, "case:abc-123", READ, expiresAt)`  
-  `grant(workerDid, "case:abc-123", WRITE, expiresAt)`
-- The `expiresAt` should be bounded to the worker's expected execution window (or the case deadline).
-- When the worker completes or is terminated, the engine calls `revoke(workerDid, "case:abc-123", ...)`.
+### 6.2 PropagationContext — Designed for Identity, Never Wired
 
-The `WorkerProvisioner` SPI (or the engine's provisioning handling code) becomes an ACL write path.
+`PropagationContext` (`engine/api/src/main/java/io/casehub/api/context/PropagationContext.java`) was designed to carry identity through the case hierarchy. Its Javadoc explicitly mentions "e.g. tenantId, userId" as intended `inheritedAttributes`. The `createChild()` method propagates all attributes from parent to child.
 
-The `expires_at` column in the ACL table was designed specifically for this use case — worker grants are time-bounded and should not outlive their provisioning window.
+**However, all production `createRoot()` call sites pass `Map.of()` — empty attributes.** The infrastructure exists; the wiring does not. Key call sites:
 
-### 6.3 Worker Isolation Requirement
+```java
+// CaseHubReactor.java — root case creation
+PropagationContext.createRoot(traceId, Map.<String, String>of(), budget)  // empty attributes
+PropagationContext.createRoot(traceId)                                      // no attributes at all
 
-A worker provisioned to case A must not be able to access case B, even if both cases are in the same tenant and both are active concurrently. This is a fundamental isolation requirement.
+// EmptyWorkerContextProvider.java
+PropagationContext.createRoot()  // no attributes
+
+// CaseContextChangedEventHandler.java
+PropagationContext.createRoot()  // no attributes
+```
+
+`PropagationContext` currently carries only `traceId` (for distributed tracing) and optional budget/deadline. The `inheritedAttributes` map is always empty in production.
+
+### 6.3 quarkus-flow Worker Research Findings
+
+The `casehub-engine-flow` module (`engine/flow/`) bridges quarkus-flow and the engine. Key findings:
+
+**`FlowWorkerExecutor`** (`flow/src/main/java/io/casehub/engine/flow/FlowWorkerExecutor.java`): implements `WorkflowExecutor` — runs after a `Worker(type=Workflow)` has been provisioned. It creates a quarkus-flow `WorkflowInstance` and registers it in `FlowExecutionRegistry`. This is **not a `WorkerProvisioner`** — there is no `WorkerProvisioner.provision()` call in this path.
+
+**`CasehubDispatch`** (`flow/src/main/java/io/casehub/engine/flow/CasehubDispatch.java`): handles `call: casehub:dispatch` steps from within a running workflow. It calls:
+
+```java
+orchestrator.submit(execution.caseInstance(), WorkRequest.of(capability, Map.of()))
+```
+
+**No token, no actorId, no roles.** The dispatched sub-worker runs with no caller identity. `WorkRequest` has no identity carrier.
+
+**Conclusion:** quarkus-flow workers are not external actors making ACL-gated requests — they run inside the engine's execution boundary. But "inside the engine" is not a safe authorization zone. Everything executing inside the engine still needs a scoped identity.
+
+### 6.4 The Required Authorization Model
+
+The model that emerged from the 2026-06-04 design session:
+
+**Principal identity propagates down the case hierarchy.** `PropagationContext.inheritedAttributes` should carry `userId` (human or system) and `roles`. These are set at root case creation from `currentPrincipal` and cascade to all sub-cases and workers via `createChild()`. A sub-case runs under the identity of whoever initiated the root case unless the case definition explicitly overrides it for a specific worker.
+
+**Workers may need elevated permissions the case creator does not hold.** This is normal — analogous to how developers define IAM role policies without holding production access themselves. The model:
+
+1. **Case definition declares intent** — the YAML states "this worker needs role X on resource Y." The case creator does not need to hold X.
+2. **An authorization service reviews and approves** — separate from the engine, separate from the case creator. Think of it as a PR review for permissions. If approved, the grant is written into the ACL system.
+3. **Engine enforces pre-approved grants at runtime** — the engine checks that a worker's action is within its approved grant. It does NOT re-evaluate creator permissions. It trusts the pre-approved grant and enforces it.
+
+This is the IAM/Kubernetes RBAC model applied to case execution: define intent → approve offline → enforce at runtime. The engine is a pure enforcer, not an authorizer.
+
+**The authorization service is a separate SPI** — likely in `platform-api`, not in engine. It receives "worker W in case definition D wants role R on resource type S" and produces an approved (or rejected) ACL entry.
+
+### 6.5 Cross-Module Enforcement
+
+The authorization model spans all modules with state, not just the engine. A worker or user making API calls across:
+
+- **engine** — cases, plan items, event log
+- **work** — work items
+- **ledger** — audit entries
+- **memory** — case memory store
+- **future modules**
+
+...must be authorized at each module's API boundary using the same `AccessControlProvider` SPI. The resource namespace must accommodate cross-module resource types: `case:{uuid}`, `workitem:{uuid}`, `memory:{entityId}`, and so on (see §4.1).
+
+Each module enforces at its own boundary. The ACL table is shared infrastructure (a deployment concern, not a platform constraint — modules could share a schema or federate).
+
+### 6.6 Worker Isolation Requirement
+
+A worker provisioned to case A must not be able to access case B, even if both cases are in the same tenant and both are active concurrently.
 
 Current engine behaviour: workers operate via `WorkerContext` (injected at execution time), which carries channels and context for their assigned case. There is no mechanism preventing a malicious or buggy worker from querying the case repository for other cases. ACL is the mechanism that would enforce this boundary.
 
-### 6.4 Sub-Case Access for Workers
+Once `PropagationContext` carries `userId`+`roles`, ACL enforcement at the data retrieval layer would naturally scope each worker's access to cases where it holds a grant.
+
+### 6.7 Sub-Case Access for Workers
 
 When a worker spawns a sub-case (via a `subCase` binding in the case definition), should the worker automatically receive ACL access to that sub-case?
 
@@ -399,21 +464,41 @@ Arguments for: the worker needs to observe sub-case outcomes (completion, contex
 
 Arguments against: automatic cascade from parent case already handles this — if the worker has access to the parent case, and sub-cases cascade, the worker can access sub-cases transitively.
 
-This question is unresolved. It depends on whether sub-case access is granted via parent cascade (the current default) or requires explicit worker grants. The answer should come from the quarkus-flow and drools use cases.
+This question is unresolved. The answer depends on whether sub-case access is granted via parent cascade (the current default) or requires explicit worker grants.
 
-### 6.5 Open Questions for Worker ACL
+### 6.8 External Service Token Delegation
 
-These must be resolved before implementation:
+When a worker calls an external service (Jira, GitHub, any REST API), it needs credentials representing either:
+- The **initiating user** (OAuth 2.0 on-behalf-of / token exchange — RFC 8693)
+- An **approved service identity** (static credential or service account)
 
-1. **Does provisioning automatically write ACL entries, or is that an opt-in?** Requiring all `WorkerProvisioner` implementations to call `AccessControlProvider.grant()` couples them to the ACL system. An alternative: the engine's provisioning handling code writes the grant after `provision()` returns.
+**What quarkus-flow currently provides** (researched 2026-06-04):
 
-2. **What is the worker's `actorId`?** For DID-bearing agents (covered by `ActorDIDProvider`), the DID is the natural actor ID. For quarkus-flow workers and drools workers — what identity do they carry?
+| Pattern | Mechanism | Where Proven |
+|---------|-----------|--------------|
+| JWT bearer (user token) | Token passed as workflow input (`"token": jwt.getRawToken()`); referenced in HTTP step headers via JQ: `.header("Authorization", "${ \"Bearer \" + (.token) }")` | `JwtWithinWorkflowTest`, `SubmissionWorkflow` in `core/integration-tests/` |
+| Static credentials | `secret("name")` declares a Quarkus secret dependency; `basic($secret.name.username, $secret.name.password)` injects into HTTP calls | `CustomerProfileFlow` in `examples/http-basic-auth/` |
+| Formal CNCF `authRef` | `JWTConverter` + `HttpRequestDecorator` registered via ServiceLoader in `FlowNativeProcessor`. Supports `authRef` on workflow function definitions per Serverless Workflow spec. | `core/deployment/src/main/java/io/quarkiverse/flow/deployment/FlowNativeProcessor.java` — not yet used in casehub |
 
-3. **What is the `expiresAt` value for a worker grant?** Case deadline? A configurable window? Infinite (revoked explicitly on completion)?
+**The gap in casehub:** `CasehubCallableTaskBuilder` dispatches via `WorkRequest.of(capability, Map.of())` — no token reaches the dispatched worker. For on-behalf-of delegation to work, `PropagationContext` would need to carry the raw OIDC token or a token reference, and `CasehubDispatch` would need to thread it through `WorkRequest`.
 
-4. **Does worker termination automatically revoke ACL grants?** If so, which lifecycle event triggers revocation — `WorkerStatusListener.onWorkerCompleted`, `onWorkerStalled`?
+Carrying a raw JWT has expiry implications (long-running cases outlive short-lived tokens). A token reference (looked up from a store) defers expiry management but requires a lookup service. This is an open design question (see §8).
 
-5. **Should workers get `READ` only, or `READ + WRITE`?** Workers update case context — that's a write. But should they be able to cancel the case (`ADMIN`)? Probably not.
+### 6.9 Open Questions Before Implementation
+
+These must be resolved before implementation of the authorization model can begin:
+
+1. **Flat grant vs role-based bindings.** The current ACL table (§4.3) is a flat grant model: `(actor_id, resource_id, action, expires_at)`. Cross-module scope and organizational scoping may push toward role-based bindings: `(actor → role → scope)` + separate `(role → permission set)` table. Role-based allows the authorization service to reason about "does this worker's requested role exceed what I should approve?" and to express org-level scope. Flat is simpler to implement and sufficient for the initial case-level use case. **This decision gates the schema.**
+
+2. **Static vs dynamic permission requests.** If permissions must be known at deploy time (case definition deployed → authorization service review → approved grant stored), the authorization service is an offline workflow. If permissions can be requested at runtime ("this worker just discovered it needs access to X"), the engine needs "permission pending" states — significantly more complex.
+
+3. **What `PropagationContext.inheritedAttributes` carries.** Options: `userId`+`roles` as strings (simple, no expiry); raw OIDC token (enables on-behalf-of delegation, but expires); token reference looked up from a store (defers expiry, requires infrastructure). The choice affects both internal ACL checks and external token delegation (§6.8).
+
+4. **Where the authorization service SPI lives.** It is a platform concern (`platform-api`), but it must be usable by all consuming modules without pulling in engine dependencies.
+
+5. **How `casehub:dispatch` threads caller identity to dispatched workers.** `WorkRequest` has no identity field today. Options: add an identity carrier to `WorkRequest`; thread `PropagationContext` through `WorkOrchestrator.submit()`; derive identity at dispatch time from the `FlowExecution`'s `CaseInstance`.
+
+6. **Multi-tenancy intersection for inherited identities.** If `userId=alice` is inherited by a worker running in a sub-case that spans to a different tenancy, which tenancy's role definitions apply?
 
 ---
 
@@ -466,19 +551,30 @@ Admin APIs for managing ACL entries (grant, revoke, list grants for a resource) 
 
 ## 8. What Remains Before Implementation
 
-In priority order:
+**Completed research (2026-06-04):**
+- quarkus-flow worker architecture reviewed — `FlowWorkerExecutor`, `CasehubDispatch`, `CasehubCallableTaskBuilder`
+- `CaseInstance` and `PropagationContext` reviewed — actor identity gap confirmed
+- quarkus-flow token delegation patterns surveyed — three patterns documented in §6.8
+- Design conversation on authorization model — corrected worker model, cross-module scope, delegation model
+- platform#68 filed capturing full research
 
-1. **quarkus-flow worker use cases** — arriving within 24 hours. Must answer questions in §6.5 before implementation begins.
+**Remaining before implementation, in priority order:**
 
-2. **drools worker use cases** — same timing. Same questions.
+1. **Resolve open question §6.9.1 — flat grant vs role-based bindings.** This gates the schema. Everything else depends on it. Consider: what does "this worker needs role X on resource type Y scoped to org Z" look like in each model? The answer shapes the SPI, the JPA schema, and the authorization service interface.
 
-3. **Worker actor identity** — what `actorId` do quarkus-flow and drools workers carry? This determines what goes in the `actor_id` column for worker grants.
+2. **Resolve open question §6.9.2 — static vs dynamic permission requests.** Static (deploy-time) is dramatically simpler. Dynamic (runtime) requires the engine to handle pending-permission states. Start with a concrete use case that would require dynamic — if none exists, choose static.
 
-4. **casehub-work entity review** — open the casehub-work repo and confirm work item entity carries `caseId` and `tenancyId`. Verify the work item → case hierarchy assumption.
+3. **Resolve open question §6.9.3 — what `PropagationContext.inheritedAttributes` carries.** Wire `userId`+`roles` at minimum. Decide whether to carry a token reference for external delegation.
 
-5. **GitHub issue** — file a platform issue capturing this design once questions 1-3 are resolved. The issue should reference this spec.
+4. **Engine integration — wire `userId`+`roles` into `PropagationContext` at case creation.** `CaseHubReactor` must populate `inheritedAttributes` from `currentPrincipal` when calling `createRoot()`. Until this is done, nothing in §6.4 is implementable.
 
-6. **Engine integration points** — identify exactly where in the engine's provisioning code ACL grants are written. Likely `CaseContextChangedEventHandler.tryProvision()` after `provision()` returns a `ProvisionResult`.
+5. **Identify the authorization service SPI contract.** What does the "offline approval" workflow look like? What does the SPI return (an `AclEntry`? a role binding)? Who calls it and when?
+
+6. **casehub-work entity review** — open the casehub-work repo and confirm work item entity carries `caseId` and `tenancyId`. Verify the work item → case hierarchy assumption (§7.2).
+
+7. **Engine ACL write point** — once the model is decided, identify exactly where ACL grants are written in the engine's provisioning code. Likely `CaseContextChangedEventHandler.tryProvision()` after `provision()` returns a `ProvisionResult`. But this may change depending on whether grants come from the authorization service pre-approval or from provisioning events.
+
+8. **GitHub issue** — platform#68 is filed. Implementation work should be child issues of platform#68 once the design decisions in §6.9 are resolved.
 
 ---
 
@@ -493,17 +589,29 @@ In priority order:
 | Sub-case cascade | Default yes, override by exception | No concrete use case for blocking cascade yet |
 | Multi-tenancy | Data layer filter, not ABAC | tenancyId already on all entities; universal invariants belong below ACL |
 | ABAC | Reserved, not implemented | No concrete requirement; condition column reserved for future |
-| Worker access | Time-bounded grants via provisioning | Provisioning is the authorization act; grants expire with the worker |
 | jCasbin | Not used | Delta too small; list queries unsolved anyway |
 | OpenFGA / SpiceDB | Optional provider module later | External service; pure Java default required |
+| Worker authorization | **Open — see §6.9** | Original "time-bounded grants via provisioning" model replaced by corrected model in §6.4; design decisions §6.9.1–6.9.6 must be resolved first |
+| Flat grant vs role-based | **Open — §6.9.1** | Cross-module and org scope may require role-based; flat is simpler; decision gates the schema |
+| PropagationContext identity | **Open — §6.9.3** | userId+roles minimum; token reference for external delegation TBD |
 
 ---
 
 ## 10. References
 
 - casehub-engine entities reviewed: `CaseInstanceEntity`, `PlanItemEntity`, `SubCaseGroupEntity`, `WorkAdapterPlanItemEntity`, `CaseLedgerEntry` — all via IntelliJ MCP
+- `CaseInstance`: `engine/common/src/main/java/io/casehub/engine/common/internal/model/CaseInstance.java`
+- `PropagationContext`: `engine/api/src/main/java/io/casehub/api/context/PropagationContext.java`
+- `CaseHubReactor` (case creation, identity discard): `engine/runtime/src/main/java/io/casehub/engine/internal/engine/CaseHubReactor.java`
+- `FlowWorkerExecutor`: `engine/flow/src/main/java/io/casehub/engine/flow/FlowWorkerExecutor.java`
+- `CasehubDispatch`: `engine/flow/src/main/java/io/casehub/engine/flow/CasehubDispatch.java`
+- `CasehubCallableTaskBuilder`: `engine/flow/src/main/java/io/casehub/engine/flow/CasehubCallableTaskBuilder.java`
+- quarkus-flow JWT token test: `core/integration-tests/src/test/java/io/quarkiverse/flow/it/JwtWithinWorkflowTest.java`
+- quarkus-flow secrets example: `examples/http-basic-auth/src/main/java/org/acme/http/CustomerProfileFlow.java`
+- quarkus-flow JWTConverter registration: `core/deployment/src/main/java/io/quarkiverse/flow/deployment/FlowNativeProcessor.java`
 - Platform module patterns: `persistence-jpa/`, `memory-jpa/`, `memory-inmem/`, `scim/`
 - Related platform SPIs: `GroupMembershipProvider`, `ActorDIDProvider`, `CurrentPrincipal`
 - Quarkus extension research: `quarkus-keycloak-authorization`, `quarkus-zanzibar-openfga`, `quarkus-zanzibar-authzed`
 - jCasbin: https://github.com/casbin/jcasbin
 - OpenFGA Quarkus extension: `io.quarkiverse.openfga:quarkus-openfga-client`
+- Tracking issue: platform#68

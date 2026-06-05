@@ -271,4 +271,52 @@ public abstract class CaseMemoryStoreContractTest {
         assertEquals(1, e2results.size());
         assertEquals("other", e2results.get(0).text());
     }
+
+    // --- storeAll ---
+
+    @Test
+    void storeAll_empty_returns_empty_list() {
+        assertEquals(List.of(), store().storeAll(List.of()));
+    }
+
+    @Test
+    void storeAll_returns_non_empty_ids_in_input_order() {
+        var a = input("entity-1", "fact-a");
+        var b = input("entity-2", "fact-b");
+
+        List<String> ids = store().storeAll(List.of(a, b));
+
+        assertEquals(2, ids.size());
+        ids.forEach(id -> assertFalse(id.isEmpty(), "each returned ID must be non-empty"));
+        assertNotEquals(ids.get(0), ids.get(1));
+
+        // Verify ordering: ids.get(0) must correspond to input a (entity-1).
+        // Erase by the first returned ID — only entity-1's entry must disappear.
+        store().eraseById(ids.get(0), TENANT);
+        assertTrue(store().query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT)).isEmpty(),
+            "ids.get(0) must be the ID assigned to the first input (entity-1)");
+        assertFalse(store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT)).isEmpty(),
+            "erasing ids.get(0) must not affect the second input (entity-2)");
+    }
+
+    @Test
+    void storeAll_all_entries_queryable_after_call() {
+        var a = input("entity-1", "fact-a");
+        var b = input("entity-2", "fact-b");
+
+        store().storeAll(List.of(a, b));
+
+        var e1 = store().query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT));
+        var e2 = store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
+        assertEquals(1, e1.size());
+        assertEquals("fact-a", e1.get(0).text());
+        assertEquals(1, e2.size());
+        assertEquals("fact-b", e2.get(0).text());
+    }
+
+    @Test
+    void storeAll_all_wrong_tenant_throws_security_exception() {
+        var bad = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "x", Map.of());
+        assertThrows(SecurityException.class, () -> store().storeAll(List.of(bad)));
+    }
 }

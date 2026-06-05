@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Alternative
-@Priority(1)
+@Priority(10)
 @ApplicationScoped
 public class InMemoryMemoryStore implements CaseMemoryStore {
 

@@ -69,8 +69,8 @@ class JpaMemoryStoreTest extends CaseMemoryStoreContractTest {
         assertThrows(SecurityException.class,
             () -> store().storeAll(List.of(good, bad)));
 
-        // With the single-transaction override: exception fires during stream.toList(),
-        // before MemoryEntry.persist() is called → 0 rows.
+        // With the single-transaction override: SecurityException fires on the first mismatched
+        // item during stream.toList() materialisation, before MemoryEntry.persist() is called → 0 rows.
         // Without the override (SPI default): item 0 committed in its own transaction → 1 row.
         assertEquals(0, store().query(query()).size(),
             "Mixed-tenant storeAll must not persist any entries");

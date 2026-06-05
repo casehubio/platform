@@ -7,6 +7,7 @@ import io.casehub.platform.api.memory.MemoryInput;
 import io.casehub.platform.api.memory.MemoryQuery;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.util.Collections;
 import java.util.List;
 
 @DefaultBean
@@ -18,4 +19,9 @@ public class NoOpCaseMemoryStore implements CaseMemoryStore {
     @Override public void erase(EraseRequest request) {}
     @Override public void eraseById(String memoryId, String tenantId) {}
     @Override public void eraseEntity(String entityId, String tenantId) {}
+
+    @Override
+    public List<String> storeAll(List<MemoryInput> inputs) {
+        return Collections.nCopies(inputs.size(), "");
+    }
 }

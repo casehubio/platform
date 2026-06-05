@@ -16,7 +16,7 @@ public interface CaseMemoryStore {
      * direct injection keeps exception propagation intact ({@link SecurityException} from
      * {@code assertTenant()} reaches the caller), keeps request context active for
      * {@code @RequestScoped} implementations, and is consistent with the read API
-     * ({@link #query}).
+     * ({@link #query(MemoryQuery)}).
      *
      * <p>This analysis assumes an active request scope. Callers in non-request contexts
      * (batch jobs, startup) must activate request scope explicitly before calling any
@@ -32,9 +32,10 @@ public interface CaseMemoryStore {
      * <p><b>{@code @Observes} (synchronous) is acceptable</b> — it preserves request
      * context and propagates exceptions normally. A synchronous CDI observer that calls
      * {@code store()} directly is a valid consumption pattern equivalent to Option A
-     * with an intervening domain event. The tradeoff is that it couples the store call
-     * to the event publisher's transaction, which is correct for compliance-adjacent
-     * writes.
+     * with an intervening domain event. The tradeoff is that it makes the store write
+     * atomic with the event-firing transaction — desirable for compliance writes that
+     * must not persist if the enclosing operation rolls back, but wrong if the caller
+     * expects a fire-and-forget side effect.
      *
      * <p><b>Text field guidance:</b> {@link MemoryInput#text()} must be human-readable
      * natural language when using semantic adapters (Mem0, Graphiti) — it is the field

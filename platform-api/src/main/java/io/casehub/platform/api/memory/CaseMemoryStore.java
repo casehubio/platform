@@ -11,26 +11,36 @@ public interface CaseMemoryStore {
      * <p>Append-only at the SPI level. The no-op returns {@code ""}.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
      *
-     * <p><b>Emission pattern — under investigation:</b> consumer apps should evaluate which
-     * approach fits their architecture and feed back via platform#48:
-     * <ul>
-     *   <li><b>Option A — Application-layer CDI observer:</b> application emits a domain event
-     *       from its case outcome handler; an observer calls {@code store()}. Keeps messaging
-     *       and memory decoupled at the cost of per-application boilerplate.</li>
-     *   <li><b>Option B — Optional {@code memory-cdi/} platform module:</b> platform provides CDI
-     *       infrastructure wiring domain events to {@code store()}. Reduces boilerplate at the
-     *       cost of coupling domain event types to the platform.</li>
-     *   <li><b>Option C — Platform-defined narrow event type:</b> platform defines a
-     *       {@code MemoryStoreRequest} event type that applications emit; a thin platform CDI
-     *       module listens and calls {@code store()}. Applications map domain events to
-     *       {@code MemoryStoreRequest} (preserving separation); platform handles wire-up.</li>
-     * </ul>
+     * <p><b>Emission pattern:</b> inject {@code CaseMemoryStore} directly and call
+     * {@code store()} from your domain event handler. This is the canonical pattern —
+     * direct injection keeps exception propagation intact ({@link SecurityException} from
+     * {@code assertTenant()} reaches the caller), keeps request context active for
+     * {@code @RequestScoped} implementations, and is consistent with the read API
+     * ({@link #query(MemoryQuery)}).
      *
-     * <p><b>Text field guidance:</b> {@link MemoryInput#text()} must be human-readable natural
-     * language when using semantic adapters (Mem0, Graphiti) — it is the field embedded for
-     * vector search. Both accuracy and completeness matter; truncating or abbreviating degrades
-     * retrieval quality. Use {@link MemoryInput#attributes()} for structured metadata.
-     * See {@link MemoryAttributeKeys} for reserved cross-domain attribute keys.
+     * <p>This analysis assumes an active request scope. Callers in non-request contexts
+     * (batch jobs, startup) must activate request scope explicitly before calling any
+     * {@code @RequestScoped} SPI implementation.
+     *
+     * <p><b>{@code @ObservesAsync} is not safe for memory writes.</b> Async observers
+     * run on a thread pool where the request scope is not propagated by default — a
+     * {@code @RequestScoped CurrentPrincipal} is unavailable, causing
+     * {@link jakarta.enterprise.context.ContextNotActiveException} before
+     * {@code assertTenant()} fires. Exceptions are also invisible to the original caller,
+     * so compliance failures are swallowed silently.
+     *
+     * <p><b>{@code @Observes} (synchronous) is acceptable</b> — it preserves request
+     * context and propagates exceptions normally. A synchronous CDI observer that calls
+     * {@code store()} directly is a valid consumption pattern equivalent to Option A
+     * with an intervening domain event. The tradeoff is that it makes the store write
+     * atomic with the event-firing transaction — desirable for compliance writes that
+     * must not persist if the enclosing operation rolls back, but wrong if the caller
+     * expects a fire-and-forget side effect.
+     *
+     * <p><b>Text field guidance:</b> {@link MemoryInput#text()} must be human-readable
+     * natural language when using semantic adapters (Mem0, Graphiti) — it is the field
+     * embedded for vector search. Use {@link MemoryInput#attributes()} for structured
+     * metadata. See {@link MemoryAttributeKeys} for reserved cross-domain attribute keys.
      */
     String store(MemoryInput input);
 

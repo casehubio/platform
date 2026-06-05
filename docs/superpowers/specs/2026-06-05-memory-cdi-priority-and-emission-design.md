@@ -61,12 +61,15 @@ mis-scoping. Prevention is build-level (Maven scope review, CI), not CDI.
 
 ### Priority reserved bands
 
-| Range | Tier | Purpose |
+| CDI Mechanism | Tier | Purpose |
 |---|---|---|
 | `@DefaultBean` | 0 — no-op | `NoOpCaseMemoryStore` — active when no adapter on classpath |
 | `@ApplicationScoped` (no qualifier) | 1 — production SQL | `JpaMemoryStore` — default when module on classpath |
-| Priority(1–9) | 2 — production override | `SqliteMemoryStore`, `Mem0CaseMemoryStore` (and future adapters) |
-| Priority(10+) | 3 — test override | `InMemoryMemoryStore` — test scope only (compile only for ephemeral) |
+| `@Alternative @Priority(1–9)` | 2 — production override | `SqliteMemoryStore`, `Mem0CaseMemoryStore` (and future adapters) |
+| `@Alternative @Priority(10+)` | 3 — test override | `InMemoryMemoryStore` — test scope only (compile only for ephemeral) |
+
+Tiers 0 and 1 are CDI mechanism tiers (`@DefaultBean` and plain `@ApplicationScoped`) — they do
+not use a numeric `@Priority` annotation. Only Tiers 2 and 3 use `@Alternative @Priority(N)`.
 
 Future production adapters land in Priority(1–9). Future test-override adapters land in Priority(10+).
 If a future adapter needs to beat an existing production adapter, use Priority(2–9).
@@ -123,19 +126,32 @@ Replacement:
 > event handler. This is the canonical pattern — direct injection keeps exception propagation
 > intact (`SecurityException` from `assertTenant()` reaches the caller), keeps request context
 > active for `@RequestScoped` implementations, and is consistent with the read API (`query()`).
+> This analysis assumes an active request scope. Callers in non-request contexts (batch jobs,
+> startup) must activate request scope explicitly before calling any `@RequestScoped` SPI
+> implementation.
 >
-> CDI event indirection — firing a platform or domain event that a CDI observer then stores —
-> is not recommended. `@ObservesAsync` observers run on a thread pool where the request scope
-> is not propagated, causing `ContextNotActiveException` on `@RequestScoped CurrentPrincipal`
-> injection. `@Observes` (synchronous) preserves request context but couples the caller's
-> transaction to the store call — which is usually correct for compliance-adjacent writes.
+> **`@ObservesAsync` is not safe for memory writes.** Async observers run on a thread pool
+> where the request scope is not propagated by default — `@RequestScoped CurrentPrincipal` is
+> unavailable, causing `ContextNotActiveException` before `assertTenant()` even fires.
+> Exceptions are also invisible to the original caller, so compliance failures are swallowed.
+>
+> **`@Observes` (synchronous) is acceptable** — it preserves request context and propagates
+> exceptions normally. A synchronous CDI observer that calls `store()` directly is a valid
+> consumption pattern: it is Option A with an intervening domain event rather than a direct
+> call, and the semantics are equivalent. The tradeoff is that it couples the store call to
+> the event publisher's transaction, which is correct for compliance-adjacent writes.
 
 ### Transaction atomicity note
 
 `JpaMemoryStore.store()` is `@Transactional(REQUIRED)`. Called from within a transaction (the
 typical case for a domain event handler), it joins that transaction and rolls back atomically with
-it. Called from `@ObservesAsync`, it runs outside the original transaction — a rollback of the
-publisher's transaction does not roll back the stored memory. This is the dual-write problem.
+it. With REQUIRED, a `SecurityException` thrown by `store()` or `storeAll()` marks the joined
+transaction for rollback — including any caller work done before the call. This is correct for
+compliance-adjacent memory (reject the whole unit of work if the write is unauthorized) but may
+be surprising if the caller expected to handle the exception and continue.
+
+Called from `@ObservesAsync`, `store()` runs outside the original transaction — a rollback of
+the publisher's transaction does not roll back the stored memory. This is the dual-write problem.
 Direct synchronous injection avoids it. Callers using async patterns must handle idempotency
 themselves; this is out of scope for the platform SPI.
 
@@ -167,9 +183,8 @@ with SQLite's approach:
 @Transactional(TxType.REQUIRED)
 public List<String> storeAll(List<MemoryInput> inputs) {
     if (inputs.isEmpty()) return List.of();
-    MemoryPermissions.assertTenant(inputs.getFirst().tenantId(), principal);
     var entries = inputs.stream().map(input -> {
-        MemoryPermissions.assertTenant(input.tenantId(), principal);  // per-item guard
+        MemoryPermissions.assertTenant(input.tenantId(), principal);  // per-item — throws SecurityException on mismatch
         MemoryEntry e = new MemoryEntry();
         e.memoryId   = UUID.randomUUID().toString();
         e.tenantId   = input.tenantId();
@@ -187,9 +202,9 @@ public List<String> storeAll(List<MemoryInput> inputs) {
 ```
 
 **Key properties:**
-- Single `assertTenant` on item 0 before the loop, then per-item `assertTenant` inside the stream
-  for mixed-tenant detection — throws `SecurityException` on the offending item, consistent with
-  SQLite's behavior. No entries are persisted if any item fails.
+- Per-item `assertTenant` inside the stream — throws `SecurityException` on the first mismatched
+  item. No entries are persisted if any item fails (stream evaluates fully before persist; the
+  transaction rolls back on exception). Consistent with SQLite's per-item guard.
 - Per-entry `Instant.now()` — consistent with SQLite; avoids identical-timestamp ordering ambiguity
   in `createdAt DESC` queries.
 - `MemoryEntry.persist(Iterable)` — all N inserts in one transaction. Hibernate JDBC batching
@@ -207,8 +222,7 @@ and the transaction rolls back.
 
 `Mem0CaseMemoryStore` has no `storeAll()` override. The SPI default issues N sequential REST
 calls to the Mem0 server. The Mem0 OSS REST API (`POST /memories`) does not support batch
-creation, so N round-trips is unavoidable without a client-side workaround. Mem0 batch
-optimization is deferred; a follow-up issue will be filed.
+creation, so N round-trips is unavoidable without a client-side workaround. Mem0 batch optimization is deferred; tracked as platform#69.
 
 ### NoOpCaseMemoryStore storeAll()
 
@@ -234,8 +248,8 @@ none exist in the current codebase. If a native reactive adapter is added, it mu
 |------|-----------|
 | `storeAll([])` | Returns `[]`, no DB interaction |
 | `storeAll([a, b, c])` | Returns 3 distinct IDs in order; all 3 entries visible on `query()` within `@TestTransaction` |
-| Mixed-tenant: principal=A, inputs=[{tenant:A}, {tenant:B}] | Throws `SecurityException` on item 1; 0 rows inserted |
-| All-wrong-tenant: principal=A, inputs=[{tenant:B}] | Throws `SecurityException` on item 0; 0 rows inserted |
+| Mixed-tenant: principal=A, inputs=[{tenant:A}, {tenant:B}] | Throws `SecurityException` on the first mismatched item; 0 rows inserted |
+| All-wrong-tenant: principal=A, inputs=[{tenant:B}] | Throws `SecurityException` on the first item; 0 rows inserted |
 | `storeAll([a, b, c])` vs 3 individual `store()` calls | Both produce entries with identical fields (text, domain, entityId, caseId, attributes); timestamps and IDs differ |
 
 ---
@@ -253,7 +267,7 @@ resolution, reserved bands, multi-store note).
 (`SecurityException` vs default's per-store isolation). `NoOpCaseMemoryStore.storeAll()`
 override is purely explicit.
 
-**Deferred:** Mem0 `storeAll()` batch optimization — to be filed as a follow-up issue.
+**Deferred:** Mem0 `storeAll()` batch optimization — platform#69.
 
 **Out of scope:** Multi-store composite adapter design, trust-routing implications of memory
 storage failures, Quarkus request context propagation patterns for async memory emission.

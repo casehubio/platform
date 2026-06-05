@@ -10,3 +10,4 @@
 | 0006 | [JPA PreferenceProvider is current-only — effectiveAt ignored](0006-jpa-preference-provider-current-only.md) | Accepted | 2026-05-22 |
 | 0007 | [SlaBreachPolicy belongs in casehub-work-api, not casehub-platform](0007-sla-breach-policy-in-work-api-not-platform.md) | Accepted | 2026-05-22 |
 | 0008 | [CaseMemoryStore adapter repository placement](0008-casememory-adapter-repository-placement.md) | Accepted | 2026-05-28 |
+| 0009 | [ARC42STORIES.MD lives in the project repo, not the workspace](0009-arc42stories-placement-in-project-repo.md) | Accepted | 2026-06-06 |

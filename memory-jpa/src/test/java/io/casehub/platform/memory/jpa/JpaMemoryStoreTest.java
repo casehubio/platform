@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -58,5 +59,20 @@ class JpaMemoryStoreTest extends CaseMemoryStoreContractTest {
     void assertTenant_mismatch_throws_before_backend_call() {
         var bad = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "x", Map.of());
         assertThrows(SecurityException.class, () -> store().store(bad));
+    }
+
+    @Test
+    void storeAll_mixed_tenant_does_not_persist_any_entry() {
+        var good = new MemoryInput("entity-1", DOMAIN, TENANT,       null, "good", Map.of());
+        var bad  = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "bad",  Map.of());
+
+        assertThrows(SecurityException.class,
+            () -> store().storeAll(List.of(good, bad)));
+
+        // With the single-transaction override: exception fires during stream.toList(),
+        // before MemoryEntry.persist() is called → 0 rows.
+        // Without the override (SPI default): item 0 committed in its own transaction → 1 row.
+        assertEquals(0, store().query(query()).size(),
+            "Mixed-tenant storeAll must not persist any entries");
     }
 }

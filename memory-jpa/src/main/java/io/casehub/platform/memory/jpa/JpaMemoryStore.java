@@ -44,6 +44,27 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
     @Transactional(TxType.REQUIRED)
+    public List<String> storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return List.of();
+        var entries = inputs.stream().map(input -> {
+            MemoryPermissions.assertTenant(input.tenantId(), principal);
+            MemoryEntry e = new MemoryEntry();
+            e.memoryId   = UUID.randomUUID().toString();
+            e.tenantId   = input.tenantId();
+            e.entityId   = input.entityId();
+            e.domain     = input.domain().name();
+            e.caseId     = input.caseId();
+            e.text       = input.text();
+            e.attributes = serializeAttributes(input.attributes());
+            e.createdAt  = Instant.now();
+            return e;
+        }).toList();
+        MemoryEntry.persist(entries);
+        return entries.stream().map(e -> e.memoryId).toList();
+    }
+
+    @Override
+    @Transactional(TxType.REQUIRED)
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal);
 

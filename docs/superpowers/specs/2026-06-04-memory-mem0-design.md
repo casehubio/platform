@@ -239,12 +239,13 @@ Quarkus to instantiate it directly, bypassing CDI and leaving `@Inject` fields n
 5. On non-2xx: catch `WebApplicationException` (per GE-20260526-a08a81), wrap in
    `Mem0StoreException` with HTTP status and Mem0 error body.
 
-**`storeAll` partial failure.** The default sequential implementation
-(`inputs.stream().map(this::store).toList()`) means a mid-stream exception leaves
-previously stored memories in Mem0 with no rollback. Callers must treat a thrown exception
-from `storeAll()` as a partial write. The IDs stored before failure are not surfaced.
-This is a platform-api design problem tracked in platform#67 — the SPI return type cannot
-represent partial success. Mitigation is out of scope for this module.
+**`storeAll` partial failure.** *(Updated by platform#69.)* `Mem0CaseMemoryStore` now
+overrides `storeAll()` with pre-flight `assertTenant` for all inputs before any HTTP call.
+A `SecurityException` from `storeAll()` is therefore always clean — the pre-flight caught
+the tenant violation before any `POST /memories` was issued, so nothing is in Mem0.
+A `Mem0StoreException` from a mid-batch HTTP failure may still indicate a partial write —
+items sent before the failing call are already persisted in Mem0 with no rollback path.
+The IDs stored before failure are not surfaced. Tracked in platform#67.
 
 ### `query(MemoryQuery)`
 
@@ -440,7 +441,7 @@ return fewer than 3 of your application's "stored" memories.
 | Multi-entity RELEVANCE ordering | Scores from separate `/search` calls are not reliably comparable — Mem0's `max_possible` denominator (1.0/2.0/2.5) varies by call depending on BM25 signal. Cross-entity interleaving by score would be misleading. Results are concatenated in entity fan-out order, with per-entity relevance ordering preserved. |
 | eraseById intra-tenant IDOR | Any entity within the same tenant holding a memoryId can delete another entity's memory. Cross-tenant IDOR is prevented by compound user_id + `assertTenant`. Preflight GET mitigation tracked in platform#64. |
 | Multi-entity fan-out | Sequential — up to 25 HTTP requests for `MAX_ENTITY_IDS`. |
-| `storeAll` partial failure | Mid-stream exception leaves prior memories stored with no rollback. Caller cannot recover stored IDs. Platform-api design problem tracked in platform#67. |
+| `storeAll` partial failure | `SecurityException` from `storeAll()` is always clean — pre-flight (platform#69) ensures zero HTTP before any tenant violation throws. `Mem0StoreException` from a mid-batch HTTP failure may still leave prior items in Mem0 with no rollback. Caller cannot recover stored IDs. Tracked in platform#67. |
 | `agent_id` mismatch | Mem0's `agent_id` semantically means "which AI agent owns this." We use it for `domain.name()`. Harmless with `infer: false`. Could produce unexpected deduplication if `infer: true` is enabled. |
 | Score not surfaced in `Memory` | Scores are adapter-specific; the `CaseMemoryStore` SPI is adapter-neutral (other adapters have no scores). Callers receive relevance-ordered results but cannot inspect individual scores post-query. |
 | RELEVANCE + null question | Valid-by-design — degrades to CHRONOLOGICAL, consistent with JPA and SQLite adapters. Callers expecting semantic ranking must supply a question. `MemoryOrder.RELEVANCE` javadoc should be updated to document the fallback (tracked as minor doc task). |

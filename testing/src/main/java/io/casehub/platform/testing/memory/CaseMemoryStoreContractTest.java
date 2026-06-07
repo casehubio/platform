@@ -319,4 +319,13 @@ public abstract class CaseMemoryStoreContractTest {
         var bad = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "x", Map.of());
         assertThrows(SecurityException.class, () -> store().storeAll(List.of(bad)));
     }
+
+    @Test
+    void storeAll_second_item_tenant_mismatch_no_entries_stored() {
+        var good = input("entity-1", "fact");
+        var bad  = new MemoryInput("entity-2", DOMAIN, OTHER_TENANT, null, "x", Map.of());
+        assertThrows(SecurityException.class, () -> store().storeAll(List.of(good, bad)));
+        assertTrue(store().query(query()).isEmpty(),
+            "first item must not be persisted when second item fails tenant check");
+    }
 }

@@ -42,6 +42,13 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     }
 
     @Override
+    public List<String> storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return List.of();
+        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal));
+        return inputs.stream().map(this::store).toList();
+    }
+
+    @Override
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal);
         // MemoryOrder is ignored — in-mem always sorts chronologically (createdAt DESC).

@@ -91,7 +91,16 @@ public interface CaseMemoryStore {
 
     /**
      * Convenience bulk store. Returns assigned memoryIds in input order.
-     * Adapters may override for efficiency.
+     *
+     * <p>Adapters that override this method MUST: (1) call
+     * {@link MemoryPermissions#assertTenant} for every input; (2) return IDs in input
+     * order; (3) ensure no items are durably written if any tenant check fails — via
+     * pre-flight for REST-backed adapters, or single-transaction rollback for
+     * JDBC-backed adapters. See {@code memory-storeall-transactional-contract.md}
+     * for the full contract.
+     *
+     * <p>The default implementation is not safe for mixed-tenant batches where
+     * partial-write prevention is required — override in production adapters.
      */
     default List<String> storeAll(List<MemoryInput> inputs) {
         return inputs.stream().map(this::store).toList();

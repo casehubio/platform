@@ -472,4 +472,31 @@ class Mem0CaseMemoryStoreTest {
         assertEquals(List.of("mem-aaa", "mem-bbb"), ids);
         wireMock().verify(2, postRequestedFor(urlEqualTo("/memories")));
     }
+
+    @Test
+    void storeAll_empty_returns_empty_no_http() {
+        assertEquals(List.of(), store.storeAll(List.of()));
+        wireMock().verify(0, postRequestedFor(urlEqualTo("/memories")));
+    }
+
+    @Test
+    void storeAll_any_tenant_mismatch_fires_zero_http_calls() {
+        assertThrows(SecurityException.class, () ->
+            store.storeAll(List.of(
+                new MemoryInput("entity-1", DOMAIN, TENANT,       null, "ok",  Map.of()),
+                new MemoryInput("entity-2", DOMAIN, OTHER_TENANT, null, "bad", Map.of())
+            )));
+        wireMock().verify(0, postRequestedFor(urlEqualTo("/memories")));
+    }
+
+    @Test
+    void storeAll_http_failure_stops_remaining_items() {
+        wireMock().stubFor(post(urlEqualTo("/memories")).willReturn(serverError()));
+        assertThrows(Mem0StoreException.class, () ->
+            store.storeAll(List.of(
+                new MemoryInput("entity-1", DOMAIN, TENANT, null, "a", Map.of()),
+                new MemoryInput("entity-1", DOMAIN, TENANT, null, "b", Map.of())
+            )));
+        wireMock().verify(1, postRequestedFor(urlEqualTo("/memories")));
+    }
 }

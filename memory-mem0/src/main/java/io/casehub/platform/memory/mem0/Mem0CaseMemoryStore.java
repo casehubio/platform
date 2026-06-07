@@ -34,7 +34,22 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
     @Override
     public String store(MemoryInput input) {
         MemoryPermissions.assertTenant(input.tenantId(), principal);
+        return sendAdd(input);
+    }
 
+    @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "storeAll"})
+    @Override
+    public List<String> storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return List.of();
+        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal));
+        final var ids = new ArrayList<String>(inputs.size());
+        for (final var input : inputs) {
+            ids.add(sendAdd(input));
+        }
+        return List.copyOf(ids);
+    }
+
+    private String sendAdd(MemoryInput input) {
         final var request = new Mem0AddRequest(
             List.of(new Mem0AddRequest.Mem0Message("user", input.text())),
             compoundUserId(input.tenantId(), input.entityId()),
@@ -43,14 +58,12 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
             config.infer(),
             new HashMap<>(input.attributes())
         );
-
         final Mem0AddResponse response;
         try {
             response = client.add(request);
         } catch (WebApplicationException e) {
             throw toStoreException(e);
         }
-
         if (response.results() == null || response.results().isEmpty()) {
             throw new Mem0StoreException("store produced no result for: " + input.entityId());
         }

@@ -1,0 +1,9 @@
+branch: issue-68-acl-authorization-model
+project-sha: 0efcbe5a81c1271a8d976bf9b226cd06a1c13c30
+date: 2026-06-05
+issue: 68
+issue-repo: casehubio/platform
+covers: 68
+flyway-next-v: 1
+design-repo: project
+design-section-hashes:

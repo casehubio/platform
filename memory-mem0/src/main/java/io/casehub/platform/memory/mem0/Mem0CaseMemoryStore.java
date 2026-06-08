@@ -22,6 +22,21 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class Mem0CaseMemoryStore implements CaseMemoryStore {
 
+    @Override
+    public java.util.Set<MemoryCapability> capabilities() {
+        return java.util.Set.of(
+            MemoryCapability.CHRONOLOGICAL_ORDER,
+            MemoryCapability.DOMAIN_SCOPED,
+            MemoryCapability.CASE_SCOPED,
+            MemoryCapability.SINCE_FILTER,
+            MemoryCapability.BATCH_STORE,
+            MemoryCapability.SEMANTIC_SEARCH,
+            MemoryCapability.ERASE_BY_ID,
+            MemoryCapability.ERASE_ENTITY,
+            MemoryCapability.ERASE_DOMAIN_CASE
+        );
+    }
+
     private static final Logger LOG = Logger.getLogger(Mem0CaseMemoryStore.class);
 
     static final String SEP = "::";

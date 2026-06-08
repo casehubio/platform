@@ -17,6 +17,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @ApplicationScoped
 public class InMemoryMemoryStore implements CaseMemoryStore {
 
+    @Override
+    public java.util.Set<MemoryCapability> capabilities() {
+        return java.util.Set.of(
+            MemoryCapability.CHRONOLOGICAL_ORDER,
+            MemoryCapability.DOMAIN_SCOPED,
+            MemoryCapability.CASE_SCOPED,
+            MemoryCapability.SINCE_FILTER,
+            MemoryCapability.BATCH_STORE,
+            MemoryCapability.ERASE_BY_ID,
+            MemoryCapability.ERASE_ENTITY,
+            MemoryCapability.ERASE_DOMAIN_CASE
+        );
+    }
+
+
     private final ConcurrentHashMap<BucketKey, CopyOnWriteArrayList<Memory>> store
         = new ConcurrentHashMap<>();
     private final CurrentPrincipal principal;

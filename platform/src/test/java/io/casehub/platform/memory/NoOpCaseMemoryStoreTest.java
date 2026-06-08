@@ -1,6 +1,8 @@
 package io.casehub.platform.memory;
 
 import io.casehub.platform.api.memory.*;
+import io.casehub.platform.api.memory.GraphCaseMemoryStore;
+import io.casehub.platform.api.memory.GraphMemoryQuery;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NoOpCaseMemoryStoreTest {
 
     @Inject CaseMemoryStore store;
+    @Inject GraphCaseMemoryStore graphStore;
     @Inject ReactiveCaseMemoryStore reactiveStore;
 
     static final MemoryDomain DOMAIN  = new MemoryDomain("test");
@@ -31,6 +34,19 @@ class NoOpCaseMemoryStoreTest {
     @Test void eraseEntity_does_not_throw()  { assertDoesNotThrow(() -> store.eraseEntity("entity-1", "tenant-1")); }
     @Test void storeAll_returns_empty_ids() {
         assertEquals(List.of("", ""), store.storeAll(List.of(SAMPLE, SAMPLE_WITH_CASE)));
+    }
+
+    // --- GraphCaseMemoryStore injection ---
+    @Test void graphStore_injection_resolves_to_noop() {
+        assertNotNull(graphStore, "GraphCaseMemoryStore must resolve to NoOpCaseMemoryStore when no graph adapter is deployed");
+    }
+    @Test void graphQuery_returns_empty() {
+        final var q = GraphMemoryQuery.forEntity("entity-1", DOMAIN, "tenant-1", "what happened?");
+        assertTrue(graphStore.graphQuery(q).isEmpty());
+    }
+    @Test void capabilities_returns_empty_set() {
+        assertTrue(store.capabilities().isEmpty());
+        assertTrue(graphStore.capabilities().isEmpty());
     }
 
     // --- reactive bridge (delegates to blocking no-op) ---

@@ -112,6 +112,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `memory-jpa/` | `casehub-platform-memory-jpa` | @ApplicationScoped JPA CaseMemoryStore — PostgreSQL, Flyway V1000 (`classpath:db/memory/migration`), FTS via websearch_to_tsquery when question provided. No quarkus:build goal (CurrentPrincipal only on test classpath). Use @TestTransaction not @Transactional in tests |
 | `memory-sqlite/` | `casehub-platform-memory-sqlite` | @Alternative @Priority(1) SQLite CaseMemoryStore — xerial JDBC + HikariCP (WAL mode) + FTS5 + Flyway programmatic. Configure `casehub.memory.sqlite.path`. No quarkus:build goal. Do NOT combine with memory-inmem or memory-jpa in the same scope |
 | `memory-mem0/` | `casehub-platform-memory-mem0` | @Alternative @Priority(1) Mem0 REST CaseMemoryStore — vector embeddings via Mem0 OSS (Docker + pgvector), infer:false (verbatim storage). Tenant isolation via compound `user_id={tenantId}::{entityId}` (Mem0 OSS has no app_id). GET /memories unbounded; limit client-side. RELEVANCE uses POST /search with top_k + threshold. Configure: `quarkus.rest-client.mem0.url`, `casehub.memory.mem0.api-key`. No quarkus:build goal. Do NOT combine with memory-inmem or memory-sqlite in same scope |
+| `memory-graphiti/` | `casehub-platform-memory-graphiti` | @Alternative @Priority(2) Graphiti REST GraphCaseMemoryStore — temporal knowledge graph (Neo4j/FalkorDB/Kuzu via Graphiti OSS). LLM entity extraction (async). group_id={tenantId}::{entityId}. RELEVANCE/graphQuery() → POST /search per entity; CHRONOLOGICAL → GET /episodes/{group_id} per entity. Configure: `quarkus.rest-client.graphiti.url`, `casehub.memory.graphiti.api-key`. No Flyway. Do NOT combine with other @Priority(2) adapters |
 | `scim/` | `casehub-platform-scim` | @ApplicationScoped SCIM 2.0 GroupMembershipProvider — displaces @DefaultBean mock. Auth: casehub.platform.scim.token (static) or quarkus.oidc-client.scim.* (client-credentials). @CacheResult on membersOf(). Pagination: casehub.platform.scim.member-page-size (default 1000). No quarkus:build goal |
 | `identity/` | `casehub-platform-identity` | @Alternative ActorDIDProvider/DIDResolver/AgentCredentialValidator impls — did:key, did:web, SCIM2, config-based. SPIs and model types in platform-api. Config prefix: casehub.identity.* |
 | `agent-api/` | `casehub-platform-agent-api` | AgentProvider SPI + AgentSessionConfig, AgentEvent, AgentMcpServer, typed exceptions (AgentProcessException, AgentSessionLimitException, AgentTimeoutException). Mutiny only — no Quarkus. Package: `io.casehub.platform.agent` |
@@ -137,11 +138,15 @@ io.casehub.platform.api
                    IdentityBindingStatus (VALID | UNSIGNED | DID_UNRESOLVABLE | IDENTITY_MISMATCH | KEY_MISMATCH | CREDENTIAL_EXPIRED | CREDENTIAL_INVALID),
                    AgentIdentityValidatedEvent (CDI event record: VALID binding),
                    AgentIdentityViolationEvent (CDI event record: non-VALID binding)
-  .memory        — CaseMemoryStore (blocking SPI), MemoryDomain, MemoryInput, Memory,
+  .memory        — CaseMemoryStore (blocking SPI) + GraphCaseMemoryStore (graph-native extension: graphQuery(GraphMemoryQuery)),
+                   MemoryCapability (enum: declared adapter capabilities), MemoryCapabilityException,
+                   MemoryResultType (DEFAULT/FACTS), GraphMemoryQuery (graph-native query: tenantId, entityIds, domain,
+                   question, limit, since, validAt, entityTypes, resultType),
+                   MemoryDomain, MemoryInput, Memory,
                    MemoryQuery (entityIds: List<String>, MemoryOrder, with* fluent API),
                    EraseRequest, MemoryPermissions (static tenant assertion utility),
                    MemoryOrder (enum: CHRONOLOGICAL / RELEVANCE),
-                   MemoryAttributeKeys (reserved cross-domain keys + confidence helpers)
+                   MemoryAttributeKeys (reserved cross-domain keys + confidence helpers + VALID_FROM/VALID_UNTIL)
   .actor         — ActorStateContributor (SPI: contribute actor workload data to an ActorStateAccumulator),
                    ActorStateAccumulator (visitor passed to each contributor to accumulate active-cases,
                    open-WorkItems, and open-obligation slices of the actor state view)

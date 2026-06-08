@@ -42,6 +42,19 @@ public final class MemoryAttributeKeys {
      */
     public static final String CONFIDENCE = "confidence";
 
+    /**
+     * ISO-8601 Instant string — when this fact became valid (LLM-extracted by graph adapters).
+     * Populated by {@link GraphCaseMemoryStore} adapters (e.g. Graphiti) from
+     * {@code FactResult.valid_at} in the RELEVANCE result path.
+     */
+    public static final String VALID_FROM = "valid-from";
+
+    /**
+     * ISO-8601 Instant string — when this fact was invalidated; absent if still valid.
+     * Populated by {@link GraphCaseMemoryStore} adapters from {@code FactResult.invalid_at}.
+     */
+    public static final String VALID_UNTIL = "valid-until";
+
     private MemoryAttributeKeys() {}
 
     /**

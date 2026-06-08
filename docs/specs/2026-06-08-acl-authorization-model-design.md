@@ -49,13 +49,9 @@ The SPI contract does not preclude dynamic approval. A future `authorizationServ
 
 All ACL code — SPIs, model types, implementations, interceptor — lives in the `casehub-engine` repository. Other modules (work, ledger, memory) depend on `engine-api` for the ACL contract. `CurrentPrincipal` and `GroupMembershipProvider` remain in `platform-api`.
 
-### 2.4 Dual Enforcement
+### 2.4 Programmatic Enforcement
 
-Two enforcement paths:
-- **CDI interceptor** (`@Authorized`) for declarative enforcement on service methods and REST endpoints
-- **Inline `AccessControlProvider.canAccess()`** for edge cases: reactive pipelines, batch jobs, custom logic
-
-Both compose over the same `AccessControlProvider` SPI.
+All enforcement is programmatic via `AccessControlProvider.canAccess()`. No annotation-based interceptor. Consumers call the SPI explicitly at their API boundaries. This keeps enforcement transparent, debuggable, and works uniformly across REST endpoints, CDI beans, reactive pipelines, and batch jobs.
 
 ---
 
@@ -251,64 +247,17 @@ Neither SPI takes `tenancyId` as a parameter. Implementations resolve `tenancyId
 
 ---
 
-## 6. CDI Interceptor
+## 6. Enforcement Pattern
 
-### 6.1 @Authorized Annotation
-
-Lives in `engine/api`:
-
-```java
-package io.casehub.engine.api.acl;
-
-import jakarta.interceptor.InterceptorBinding;
-import java.lang.annotation.*;
-
-@InterceptorBinding
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
-public @interface Authorized {
-    AclAction action();
-    ResourceType resourceType() default ResourceType.CASE;
-}
-```
-
-### 6.2 @ResourceParam Annotation
-
-Marks the method parameter that carries the resource ID:
-
-```java
-package io.casehub.engine.api.acl;
-
-import java.lang.annotation.*;
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface ResourceParam {}
-```
-
-### 6.3 Usage
-
-```java
-@Authorized(action = AclAction.READ, resourceType = ResourceType.CASE)
-public CaseInstance getCase(@ResourceParam String caseId) { ... }
-
-@Authorized(action = AclAction.ADMIN, resourceType = ResourceType.CASE_DEFINITION)
-public CaseInstance startCase(@ResourceParam String definitionId, Map<String, Object> input) { ... }
-```
-
-### 6.4 Interceptor Implementation
-
-Lives in `engine/security/security-impl/`. Resolves `CurrentPrincipal`, extracts the `@ResourceParam` value, calls `accessControlProvider.canAccess()`, throws `AccessDeniedException` if denied.
-
-### 6.5 Inline Enforcement
-
-For reactive pipelines, batch jobs, or custom logic:
+All enforcement is programmatic. Consumers inject `AccessControlProvider` and call `canAccess()` at their API boundary:
 
 ```java
 if (!accessControlProvider.canAccess(principal.actorId(), resourceId, AclAction.READ)) {
     throw new AccessDeniedException(principal.actorId(), resourceId, AclAction.READ);
 }
 ```
+
+No annotations, no interceptor. Transparent, debuggable, works in all contexts.
 
 ---
 
@@ -322,7 +271,6 @@ Extends the existing `engine-api` module with:
 - Package `io.casehub.engine.api.acl`
 - All model types: `AclAction`, `ResourceType`, `ResourceId`, `Permission`, `Role`, `AccessDeniedException`
 - SPI interfaces: `AccessControlProvider`, `RoleManager`
-- Annotations: `@Authorized`, `@ResourceParam`
 
 ### 7.2 engine/security/security-noop (new module)
 
@@ -332,8 +280,6 @@ Extends the existing `engine-api` module with:
 - `NoOpAccessControlProvider`: `canAccess()` → always `true` (allow-all). `hasRole()` → always `false`. `accessibleResources()` → empty list. `registerParent()` → no-op.
 - `NoOpRoleManager`: `defineRole()` → no-op. `removeRole()` → no-op. `getRole()` → `Optional.empty()`. `listRoles()` → empty list.
 
-No-op interceptor that passes all checks.
-
 ### 7.3 engine/security/security-impl (new module)
 
 `casehub-engine-security`
@@ -341,7 +287,6 @@ No-op interceptor that passes all checks.
 `@Alternative @Priority(1)` JPA-backed implementations:
 - `JpaAccessControlProvider` — queries `role_definition`, `role_permission`, `resource_parent` tables. Composes with `CurrentPrincipal` (from platform-api) and `GroupMembershipProvider` (from platform-api).
 - `JpaRoleManager` — CRUD on `role_definition` and `role_permission` tables.
-- `AuthorizationInterceptor` — CDI interceptor for `@Authorized` annotation.
 
 Dependencies:
 - `engine-api` (SPIs)
@@ -466,11 +411,7 @@ Add identity fields to `WorkRequest` so that `CasehubDispatch.dispatch()` thread
 
 Create `engine/security/security-noop/` and `engine/security/security-impl/` modules with pom.xml, default beans, JPA entities, Flyway migrations, and interceptor implementation.
 
-### 11.4 @Authorized Interceptor Implementation
-
-CDI interceptor in `security-impl` that resolves `CurrentPrincipal`, extracts `@ResourceParam`, calls `AccessControlProvider.canAccess()`, and throws `AccessDeniedException` on denial.
-
-### 11.5 Case Definition YAML Authorization Extension
+### 11.4 Case Definition YAML Authorization Extension
 
 Extend case definition YAML schema with an `authorization` section that declares which Keycloak groups are required for each operation (READ, WRITE, ADMIN, CLAIM) on the case and its resources.
 
@@ -485,7 +426,7 @@ Extend case definition YAML schema with an `authorization` section that declares
 | ACL code location | Engine repo (engine-api, engine/security/) | Authorization is tightly coupled to case execution; other modules depend on engine-api |
 | Grant timing | Static-first, dynamic-ready | Deploy-time role definitions; SPI shape allows future async approval |
 | Action model | READ, WRITE, ADMIN, CLAIM | Covers all case operations; extensible via enum addition |
-| Enforcement | Dual: @Authorized interceptor + inline canAccess() | Interceptor for convenience, inline for reactive/batch |
+| Enforcement | Programmatic canAccess() | Transparent, debuggable, works in all contexts |
 | SPI split | AccessControlProvider (check) + RoleManager (manage) | Enforcement consumers never see management; each SPI is focused |
 | Default behavior | NoOp allow-all | Consistent with platform @DefaultBean pattern; safe for environments without ACL |
 | Resource hierarchy | Implicit inheritance via resource_parent | Write-path minimal; case children inherit; consistent with prior spec §3.3 |

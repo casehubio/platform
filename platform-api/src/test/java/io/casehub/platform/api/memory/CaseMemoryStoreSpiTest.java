@@ -28,15 +28,29 @@ class CaseMemoryStoreSpiTest {
     }
 
     @Test
-    void eraseById_default_throws() {
-        assertThrows(UnsupportedOperationException.class,
+    void eraseById_default_throws_MemoryCapabilityException() {
+        final var ex = assertThrows(MemoryCapabilityException.class,
             () -> sut.eraseById("mem-1", "tenant-1"));
+        assertEquals(MemoryCapability.ERASE_BY_ID, ex.required());
     }
 
     @Test
-    void eraseEntity_default_throws() {
-        assertThrows(UnsupportedOperationException.class,
+    void eraseEntity_default_throws_MemoryCapabilityException() {
+        final var ex = assertThrows(MemoryCapabilityException.class,
             () -> sut.eraseEntity("entity-1", "tenant-1"));
+        assertEquals(MemoryCapability.ERASE_ENTITY, ex.required());
+    }
+
+    @Test
+    void capabilities_default_returns_empty_set() {
+        assertTrue(sut.capabilities().isEmpty());
+    }
+
+    @Test
+    void requireCapability_throws_for_undeclared_capability() {
+        final var ex = assertThrows(MemoryCapabilityException.class,
+            () -> sut.requireCapability(MemoryCapability.TEMPORAL_GRAPH));
+        assertEquals(MemoryCapability.TEMPORAL_GRAPH, ex.required());
     }
 
     // Via interface default (proves delegation to MemoryPermissions)

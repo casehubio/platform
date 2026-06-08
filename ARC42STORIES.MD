@@ -15,9 +15,9 @@
 
 `casehub-platform` is the zero-dependency foundational SPI layer for the CaseHub ecosystem. It defines shared interfaces and default implementations that all foundation modules and application-tier repos depend on without creating circular dependencies.
 
-Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI), `AgentProvider` (agent execution SPI), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
+Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI), `agent-claude/` (Claude SDK integration).
+Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI), `agent-claude/` (Claude SDK integration).
 
 ### Artifact Schema
 
@@ -135,7 +135,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L3: Testing Infrastructure | `testing` | `@Alternative @Priority(1)` test fixtures |
 | L4: Platform Extensions | `config/`, `oidc/`, `expression/` | Opt-in non-mock implementations |
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
-| L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/` | CaseMemoryStore implementations (mutually exclusive) |
+| L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
 | L8: Agent Infrastructure | `agent-api/`, `agent-claude/` | AgentProvider SPI + Claude subprocess execution |
 
@@ -177,11 +177,12 @@ C4Container
     Container(jpaPrefs, "casehub-platform-persistence-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaPreferenceProvider")
     Container(mongoPrefs, "casehub-platform-persistence-mongodb", "Panache MongoDB", "@Alternative @Priority(1) MongoPreferenceProvider")
   }
-  Container_Boundary(l6, "L6: Memory Adapters — mutually exclusive") {
+  Container_Boundary(l6, "L6: Memory Adapters — mutually exclusive per priority tier") {
     Container(memInmem, "casehub-platform-memory-inmem", "Java", "@Alternative @Priority(10) InMemoryMemoryStore")
     Container(memJpa, "casehub-platform-memory-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaMemoryStore + FTS")
     Container(memSqlite, "casehub-platform-memory-sqlite", "HikariCP + xerial + FTS5", "@Alternative @Priority(1) SqliteMemoryStore")
     Container(memMem0, "casehub-platform-memory-mem0", "Quarkus REST client", "@Alternative @Priority(1) Mem0CaseMemoryStore")
+    Container(memGraphiti, "casehub-platform-memory-graphiti", "Quarkus REST client", "@Alternative @Priority(2) GraphitiCaseMemoryStore — temporal knowledge graph")
   }
   Container_Boundary(l7, "L7: Identity Extensions") {
     Container(scim, "casehub-platform-scim", "Quarkus REST client", "@ApplicationScoped ScimGroupMembershipProvider")
@@ -203,6 +204,7 @@ C4Container
   Rel(memJpa, api, "implements CaseMemoryStore from")
   Rel(memSqlite, api, "implements CaseMemoryStore from")
   Rel(memMem0, api, "implements CaseMemoryStore from")
+  Rel(memGraphiti, api, "implements GraphCaseMemoryStore from")
   Rel(scim, api, "implements GroupMembershipProvider from")
   Rel(identity, api, "implements ActorDIDProvider/DIDResolver/AgentCredentialValidator from")
   Rel(agentClaude, agentApi, "implements AgentProvider from")
@@ -269,6 +271,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-memory-jpa` | `compile` + Flyway location | `classpath:db/memory/migration` required |
 | `casehub-platform-memory-sqlite` | `compile` | Configure `casehub.memory.sqlite.path` |
 | `casehub-platform-memory-mem0` | `compile` | Configure `quarkus.rest-client.mem0.url` + api-key |
+| `casehub-platform-memory-graphiti` | `compile` | Configure `quarkus.rest-client.graphiti.url` + api-key. Beats Mem0 via `@Alternative @Priority(2)`. Do NOT combine with other `@Priority(2)` adapters |
 | `casehub-platform-scim` | `compile` | Configure SCIM URL + auth |
 | `casehub-platform-identity` | `compile` | Configure `casehub.identity.*` |
 | `casehub-platform-agent-api` | `compile` | SPI only — no-op default active |
@@ -343,7 +346,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | Journey | Description | Chapters | Status |
 |---|---|---|---|
 | J1: Configuration & Identity Foundation | Zero-dep SPI layer: preferences, identity, expression evaluation — all non-memory, non-agent capabilities | C1–C7 | ✅ Complete |
-| J2: Semantic Memory | Queryable, permission-aware cross-case agent memory with four adapter options | C8–C11 | ✅ Complete |
+| J2: Semantic Memory | Queryable, permission-aware cross-case agent memory — blocking + graph-native SPIs, five adapter options, capability self-description | C8–C11, C16 | ✅ C8–C11 complete; C16 ✅ |
 | J3: Group & Agent Identity | SCIM directory membership, DID/VC agent identity binding, Claude subprocess execution | C12–C15 | ✅ Complete |
 
 ### §9.2 Chapter Index
@@ -361,6 +364,7 @@ flowchart LR
   C8 --> C9["C9: SQLite\nL6"]
   C9 --> C10["C10: Mem0\nL6"]
   C10 --> C11["C11: Hardening\nL6"]
+  C11 --> C16["C16: Graphiti\nL1+L2+L6"]
   C12 --> C13["C13: Agent ID\n+L7"]
   C13 --> C14["C14: Agent SPI\n+L8"]
   C14 --> C15["C15: ActorState\nL1"]
@@ -380,6 +384,7 @@ flowchart LR
   style C13 fill:#90EE90,color:#000
   style C14 fill:#90EE90,color:#000
   style C15 fill:#90EE90,color:#000
+  style C16 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -399,19 +404,20 @@ flowchart LR
 | 13 | Agent Identity — DID/VC | J3 | +L7 | ✅ |
 | 14 | Agent SPI — Claude | J3 | +L8 | ✅ |
 | 15 | ActorState SPI | J3 | L1 | ✅ |
+| 16 | Graphiti Temporal Memory | J2 | L1, L2, L6 | ✅ |
 
 **Layer × Chapter matrix**
 
-| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low |
-| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — |
-| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — |
-| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — |
-| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — |
-| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — |
-| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — |
-| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — |
+| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med |
+| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med |
+| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — |
+| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — |
+| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — |
+| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High |
+| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — |
+| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — |
 
 **Sequencing rationale:**
 
@@ -704,7 +710,7 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C15 — ActorState SPI
 
-**Journey:** J3 | **Sequence:** 15 of 15 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 15 of 16 | **Status:** ✅
 **Delivered:** 2026-06-03 | **Issues:** casehubio/parent#56 | **Blog:** —
 
 **What this delivers**
@@ -720,11 +726,33 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 ---
 
+#### C16 — Graphiti Temporal Memory
+
+**Journey:** J2 | **Sequence:** 16 of 16 | **Status:** ✅
+**Delivered:** 2026-06-08 | **Issues:** casehubio/platform#34 | **Blog:** —
+
+**What this delivers**
+`GraphCaseMemoryStore extends CaseMemoryStore` adds graph-native memory queries (`graphQuery(GraphMemoryQuery)`) as a first-class SPI extension. `MemoryCapability` enum + `capabilities()` default on `CaseMemoryStore` gives every adapter a self-description mechanism; callers use `requireCapability()` for typed exceptions instead of `UnsupportedOperationException`. `memory-graphiti/` provides the `@Alternative @Priority(2)` Graphiti REST adapter: temporal knowledge graph backed by Neo4j/FalkorDB/Kuzu, LLM entity extraction, bi-temporal fact validity (`valid_at`/`invalid_at`). `NoOpCaseMemoryStore` now implements `GraphCaseMemoryStore` so no `UnsatisfiedResolutionException` occurs when the graph injection type is used without a deployed adapter.
+
+**Accountability gaps closed**
+- Temporal knowledge graph memory — "what was factually valid at instant T?" → L6 (`GraphitiCaseMemoryStore`)
+- Graph-native SPI extension with typed query parameters → L1 (`GraphCaseMemoryStore`, `GraphMemoryQuery`)
+- Adapter capability self-description → L1 (`MemoryCapability`, `MemoryCapabilityException`)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | Med — new `GraphCaseMemoryStore`, `GraphMemoryQuery`, `MemoryCapability`, `MemoryCapabilityException`, `MemoryResultType` |
+| L2: Default Impls | Med — `NoOpCaseMemoryStore` now implements `GraphCaseMemoryStore`; `capabilities()` added |
+| L6: Memory Adapt | High — `memory-graphiti/` new module; `capabilities()` on all five adapters |
+
+---
+
 ### §9.4 Layer Entries
 
 #### Layer — L1: API Tier
 
-**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15
+**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16
 **Architectural patterns:** SPI (Service Provider Interface), Typed key with colocated parser (Drools OptionKey<T>)
 **Key protocols:** `docs/protocols/universal/module-tier-structure.md`, `docs/protocols/casehub/platform-spi-contract.md`
 **Issues:** #1, #2, #22, #27, #45, #52, casehubio/parent#56
@@ -820,7 +848,7 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 
 #### Layer — L2: Default Implementations
 
-**Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14
+**Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14, C16
 **Architectural patterns:** `@DefaultBean` CDI displacement, Blocking-to-reactive bridge
 **Key protocols:** `docs/protocols/casehub/alternative-extension-patterns.md`
 **Issues:** #1, #27
@@ -1050,8 +1078,8 @@ CDI priority ladder — `@DefaultBean` (lowest) → `@ApplicationScoped` (middle
 
 #### Layer — L6: Memory Adapters
 
-**Participates in chapters:** C8, C9, C10, C11
-**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge
+**Participates in chapters:** C8, C9, C10, C11, C16
+**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
 **ADRs:** ADR-0008
 **Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #69
 **Navigation:** `git log --grep="#32\|#33\|#36\|#37\|#39\|#48\|#49" --oneline`

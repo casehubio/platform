@@ -18,6 +18,21 @@ import java.util.UUID;
 @ApplicationScoped
 public class JpaMemoryStore implements CaseMemoryStore {
 
+    @Override
+    public java.util.Set<MemoryCapability> capabilities() {
+        return java.util.Set.of(
+            MemoryCapability.CHRONOLOGICAL_ORDER,
+            MemoryCapability.DOMAIN_SCOPED,
+            MemoryCapability.CASE_SCOPED,
+            MemoryCapability.SINCE_FILTER,
+            MemoryCapability.BATCH_STORE,
+            MemoryCapability.FULL_TEXT_SEARCH,
+            MemoryCapability.ERASE_BY_ID,
+            MemoryCapability.ERASE_ENTITY,
+            MemoryCapability.ERASE_DOMAIN_CASE
+        );
+    }
+
     @Inject CurrentPrincipal principal;
     @Inject MemoryJpaConfig config;
     @Inject EntityManager em;

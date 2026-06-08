@@ -2,6 +2,7 @@ package io.casehub.platform.api.memory;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import java.util.List;
+import java.util.Set;
 
 public interface CaseMemoryStore {
 
@@ -60,6 +61,10 @@ public interface CaseMemoryStore {
      *
      * <p>Adapters MUST perform hard deletion.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
+     *
+     * <p>Adapters that do not declare {@link MemoryCapability#ERASE_DOMAIN_CASE} will throw
+     * {@link MemoryCapabilityException}. Check {@link #capabilities()} before calling on
+     * adapters that may not support domain+caseId scoped deletion.
      */
     void erase(EraseRequest request);
 
@@ -69,24 +74,43 @@ public interface CaseMemoryStore {
      * <p>Adapters MUST perform hard deletion across every domain.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
      *
-     * <p>Default throws {@link UnsupportedOperationException} — consistent with
-     * {@link #eraseById}. {@code NoOpCaseMemoryStore} overrides with a true no-op.
-     * Real adapters must override with actual cross-domain deletion.
+     * <p>Default throws {@link MemoryCapabilityException} with {@link MemoryCapability#ERASE_ENTITY}.
+     * {@code NoOpCaseMemoryStore} overrides with a true no-op (nothing stored → erasure trivially
+     * satisfied). Real adapters must override with actual cross-domain deletion.
      */
     default void eraseEntity(String entityId, String tenantId) {
-        throw new UnsupportedOperationException("eraseEntity not supported by this adapter");
+        throw new MemoryCapabilityException(MemoryCapability.ERASE_ENTITY, getClass());
     }
 
     /**
      * Erase a specific memory by its assigned memoryId.
      *
-     * <p>The default throws {@link UnsupportedOperationException} — a silent no-op on a
-     * GDPR-adjacent erasure would give a false success signal. {@code NoOpCaseMemoryStore}
-     * overrides with a true no-op (nothing stored). Real adapters override with actual deletion.
+     * <p>Default throws {@link MemoryCapabilityException} with {@link MemoryCapability#ERASE_BY_ID}.
+     * {@code NoOpCaseMemoryStore} overrides with a true no-op (nothing stored). Real adapters
+     * override with actual deletion.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
      */
     default void eraseById(String memoryId, String tenantId) {
-        throw new UnsupportedOperationException("eraseById not supported by this adapter");
+        throw new MemoryCapabilityException(MemoryCapability.ERASE_BY_ID, getClass());
+    }
+
+    /**
+     * Returns the set of capabilities this adapter declares.
+     * Callers should check capabilities before invoking optional operations.
+     * The returned set is immutable.
+     */
+    default Set<MemoryCapability> capabilities() {
+        return Set.of();
+    }
+
+    /**
+     * Asserts this adapter supports the given capability.
+     *
+     * @throws MemoryCapabilityException if the capability is not in {@link #capabilities()}
+     */
+    default void requireCapability(final MemoryCapability capability) {
+        if (!capabilities().contains(capability))
+            throw new MemoryCapabilityException(capability, getClass());
     }
 
     /**

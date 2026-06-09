@@ -3,6 +3,7 @@ package io.casehub.platform.api.identity;
 /** Fired async when actorId→DID binding validation succeeds (VALID result). */
 public record AgentIdentityValidatedEvent(
         String actorId,
+        String tenancyId,
         String actorDid,
         IdentityBindingStatus status,
         boolean alsoKnownAsVerified,

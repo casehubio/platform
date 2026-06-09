@@ -93,6 +93,22 @@ Classification rationale:
 
 If finer granularity is needed later (e.g., separate START from CLOSE), the enum can be extended without breaking existing code — new values are additive.
 
+### 3.1 CaseHubRuntime Operation Mapping
+
+Mapping of `CaseHubRuntime` API methods to `AclAction`:
+
+| Method | AclAction | Resource | Notes |
+|--------|-----------|----------|-------|
+| `startCase(definition, ...)` | ADMIN | `casedefinition:<id>` | Case instance does not exist yet — ACL check is against the case definition |
+| `signal(caseId, path, value)` | WRITE | `case:<caseId>` | Mutates running case state |
+| `cancelCase(caseId)` | ADMIN | `case:<caseId>` | Terminal lifecycle operation |
+| `suspendCase(caseId)` | ADMIN | `case:<caseId>` | Stops execution |
+| `resumeCase(caseId)` | ADMIN | `case:<caseId>` | Resumes execution |
+| `query(caseId, ...)` | READ | `case:<caseId>` | Reads case state |
+| `eventLog(caseId, ...)` | READ | `case:<caseId>` | Reads event log — inherits from case |
+
+`CLAIM` does not appear in `CaseHubRuntime` — it is a `casehub-work` operation for work item claiming.
+
 ---
 
 ## 4. Model Types
@@ -349,7 +365,88 @@ If type-level grants are needed later (e.g., "all case-managers can READ all cas
 
 ---
 
-## 10. Phase 1 — Resolved Decisions
+## 10. Case Definition Authorization Schema
+
+The `CaseDefinitionSpec` gains an optional `authorization` property that declares which groups are granted each `AclAction` when a case of this type is created.
+
+### 10.1 YAML Structure
+
+```yaml
+spec:
+  authorization:
+    read:  [case-manager, supervisor, auditor]
+    write: [case-manager, supervisor]
+    admin: [supervisor]
+    claim: [case-worker]
+
+  milestones: [...]
+  capabilities: [...]
+  workers: [...]
+```
+
+All fields are optional. If `authorization` is absent, no ACL entries are created (NoOp default applies — allow-all). If partially specified, grants are created only for the listed actions.
+
+Groups are IdP-agnostic strings — resolved via `CurrentPrincipal.roles()` at runtime.
+
+### 10.2 JSON Schema Addition
+
+Added to `CaseDefinition.yaml` `$defs`:
+
+```yaml
+Authorization:
+  type: object
+  description: >
+    Declares which groups are granted each ACL action when a case
+    of this type is created. Groups are IdP-agnostic — resolved
+    via CurrentPrincipal.roles(). All fields are optional.
+  unevaluatedProperties: false
+  properties:
+    read:
+      type: array
+      items: { type: string }
+      description: "Groups granted READ — query case, view plan items, event log, work items"
+    write:
+      type: array
+      items: { type: string }
+      description: "Groups granted WRITE — signal, update context, assign work items"
+    admin:
+      type: array
+      items: { type: string }
+      description: "Groups granted ADMIN — start, close, suspend, resume, dispatch"
+    claim:
+      type: array
+      items: { type: string }
+      description: "Groups granted CLAIM — claim work items for execution"
+```
+
+`CaseDefinitionSpec.properties` adds:
+
+```yaml
+authorization:
+  $ref: "#/$defs/Authorization"
+  description: >
+    ACL grants created when a case instance of this type is started.
+    Maps AclAction to groups. Absent = no ACL enforcement (NoOp default).
+```
+
+### 10.3 Engine Behaviour
+
+When `CaseHubRuntime.startCase(definition, ...)` creates a case instance:
+
+1. Engine reads `definition.spec.authorization`
+2. For each action with groups listed, engine calls `AccessControlProvider.grant()` for each group:
+   ```java
+   // e.g. for read: [case-manager, auditor]
+   accessControlProvider.grant("group:case-manager", "case:" + caseId, AclAction.READ, null);
+   accessControlProvider.grant("group:auditor", "case:" + caseId, AclAction.READ, null);
+   ```
+3. The initiating principal receives ADMIN grant automatically (case creator is always admin of their case)
+
+If `authorization` is absent, no grants are created. The `NoOpAccessControlProvider` returns `true` for all `canAccess()` — environments without ACL installed remain unaffected.
+
+---
+
+## 11. Phase 1 — Resolved Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
@@ -370,7 +467,6 @@ If type-level grants are needed later (e.g., "all case-managers can READ all cas
 - PropagationContext changes
 - Worker grants of any kind
 - Authorization service SPI
-- Case definition YAML authorization section
 
 ---
 
@@ -380,7 +476,7 @@ Scope: Wire actor identity through the engine's execution hierarchy so ACL enfor
 
 ---
 
-## 11. PropagationContext Wiring
+## 12. PropagationContext Wiring
 
 Populate `PropagationContext.inheritedAttributes` with `userId` and `roles` (plain strings, comma-separated) at root case creation. `createChild()` already propagates all attributes — no changes needed there.
 
@@ -397,23 +493,23 @@ Map<String, String> identity = Map.of(
 PropagationContext.createRoot(traceId, identity, budget);
 ```
 
-## 12. Dispatch Identity Threading
+## 13. Dispatch Identity Threading
 
 `CasehubDispatch` reads identity from the current `PropagationContext` when submitting via `WorkOrchestrator`. `WorkRequest` stays data-only — no identity fields added. Identity is a cross-cutting concern carried by `PropagationContext`, not coupled to `WorkRequest`.
 
-## 13. CaseInstance Identity Gap
+## 14. CaseInstance Identity Gap
 
 `CaseHubReactor.java:147` calls `caseInstanceRepository.save(instance, currentPrincipal.tenancyId())` — the `actorId` from `currentPrincipal` is discarded immediately after save. The case then has no record of who created it.
 
 Resolution: store `actorId` on `CaseInstance` at creation or carry it exclusively via `PropagationContext` — decision to be made in Phase 2 design session.
 
-## 14. Sub-Case rootCaseId
+## 15. Sub-Case rootCaseId
 
 `CaseInstanceEntity` currently has `parentCaseId` (nullable) but no `rootCaseId`. Sub-case cascade traversal for ACL checks requires walking the `parentCaseId` chain upward — a recursive CTE in SQL.
 
 Adding `rootCaseId` to `CaseInstanceEntity` would allow direct cascade checks without recursive traversal. This is an engine-side schema change required before `acl-jpa/` can efficiently enforce sub-case cascade.
 
-## 15. External Token Delegation (Documented, Deferred)
+## 16. External Token Delegation (Documented, Deferred)
 
 Three existing quarkus-flow patterns for external service token delegation:
 
@@ -449,7 +545,7 @@ This section is roadmap framing — enough for the next design session to pick u
 
 ---
 
-## 16. Worker Rights — Design Space
+## 17. Worker Rights — Design Space
 
 ### 16.1 In-Process vs External Workers
 
@@ -479,7 +575,7 @@ If the privileged external worker scenario is ever pursued, the offline approval
 
 ---
 
-## 17. References
+## 18. References
 
 - Prior spec: `docs/specs/2026-06-01-acl-design.md`
 - `CurrentPrincipal`: `platform-api/src/main/java/io/casehub/platform/api/identity/CurrentPrincipal.java`

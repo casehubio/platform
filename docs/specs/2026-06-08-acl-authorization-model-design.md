@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-08
 **Status:** Approved
-**Scope:** Role-based access control SPI, Keycloak integration, operation-level enforcement, engine module structure
+**Scope:** Flat grant ACL SPI, instance-level enforcement, implicit inheritance, identity propagation, engine module structure
 **Tracking:** platform#68
 **Supersedes:** §6–§8 of `2026-06-01-acl-design.md` (open questions resolved here)
 
@@ -23,33 +23,33 @@ The prior spec (`2026-06-01-acl-design.md`) established data-level ACL, implicit
 
 ## 2. Design Decisions
 
-### 2.1 Role-Based Bindings via Keycloak Groups
+### 2.1 Flat Grant Model — Direct Actor-to-Resource Grants
 
-Roles are managed in Keycloak. `CurrentPrincipal.roles()` (which defaults to `groups()`) provides the actor's roles from the OIDC token. The platform does not maintain a role-binding table — Keycloak owns who has which role.
+Grants are direct entries in an `acl_entry` table: `(actor_id, resource_id, action, expires_at)`. No role-definition tables, no role-permission mapping. An actor either has a grant on a resource or they don't.
 
-The ACL layer maps Keycloak group names to resource-level permissions. This mapping is stored in the engine's database (`role_definition` + `role_permission` tables). The flow:
+The `actor_id` field accepts both individual actor IDs and group-prefixed IDs (`group:<groupName>`). Group-based grants compose with `GroupMembershipProvider` at check time — the SPI resolves an actor's groups internally, not at the call site.
 
-```
-Keycloak groups → OIDC token → CurrentPrincipal.roles()
-                                       ↓
-                              ACL layer resolves:
-                              role → role_definition → role_permission
-                                       ↓
-                              Permission(resourceType, action) checked
-                              against requested (resource, action)
-```
+This model is IdP-agnostic. `CurrentPrincipal.roles()` (which defaults to `groups()`) provides the actor's group memberships from whatever identity provider is deployed. The ACL layer does not reference any specific IdP.
 
 ### 2.2 Static-First, Dynamic-Ready SPI
 
-Permissions are declared at deploy time and approved before deployment. At runtime, the engine enforces pre-approved grants. No "permission pending" states are implemented.
+Grants are declared at deploy time. At runtime, the engine enforces pre-approved grants. No "permission pending" states are implemented.
 
-The SPI contract does not preclude dynamic approval. A future `authorizationService.requestBinding()` could produce role definitions asynchronously — the `RoleManager.defineRole()` call is the same regardless of whether it happens at deploy time or after async approval.
+The SPI contract does not preclude dynamic approval. A future authorization service could produce grants asynchronously — the `grant()` call is the same regardless of whether it happens at deploy time or after async approval.
 
-### 2.3 All Code in Engine
+### 2.3 SPI in platform-api, Implementation in Engine
 
-All ACL code — SPIs, model types, implementations, interceptor — lives in the `casehub-engine` repository. Other modules (work, ledger, memory) depend on `engine-api` for the ACL contract. `CurrentPrincipal` and `GroupMembershipProvider` remain in `platform-api`.
+The `AccessControlProvider` SPI lives in `platform-api` (package `io.casehub.platform.api.acl`) — zero dependencies, usable by all consuming modules (engine, work, ledger, memory). The `@DefaultBean` no-op lives in `platform/`. JPA-backed implementations live in `engine/security/`.
 
-### 2.4 Programmatic Enforcement
+This follows the existing platform pattern: SPIs in `platform-api`, default beans in `platform/`, real implementations in dedicated modules.
+
+### 2.4 Instance-Level ACL with Implicit Inheritance
+
+Grants target specific resource instances (`case:abc-123`), not resource types. An actor who can READ `case:abc-123` cannot necessarily READ `case:def-456`. Instance isolation is the default.
+
+Child resources inherit access from their parent via `registerParent()`. Plan items, event log entries, and work items inherit from their case. Sub-cases inherit from their parent case. The inheritance chain is walked at check time.
+
+### 2.5 Programmatic Enforcement
 
 All enforcement is programmatic via `AccessControlProvider.canAccess()`. No annotation-based interceptor. Consumers call the SPI explicitly at their API boundaries. This keeps enforcement transparent, debuggable, and works uniformly across REST endpoints, CDI beans, reactive pipelines, and batch jobs.
 
@@ -59,12 +59,12 @@ All enforcement is programmatic via `AccessControlProvider.canAccess()`. No anno
 
 Four actions cover all case operations:
 
-| AclAction | Maps to | Typical role |
-|-----------|---------|--------------|
-| `READ` | query case, view plan items, event log, work items | case-viewer, auditor |
-| `WRITE` | signal, update context, assign work items | case-manager |
-| `ADMIN` | start case, close, suspend, resume, dispatch, modify definition | supervisor |
-| `CLAIM` | claim work items for execution | worker |
+| AclAction | Maps to | Typical use |
+|-----------|---------|-------------|
+| `READ` | query case, view plan items, event log, work items | observers, auditors |
+| `WRITE` | signal, update context, assign work items | case managers |
+| `ADMIN` | start case, close, suspend, resume, dispatch, modify definition | supervisors |
+| `CLAIM` | claim work items for execution | workers |
 
 Classification rationale:
 - `signal` is `WRITE` — mutates running case state, common case-manager operation
@@ -78,7 +78,7 @@ If finer granularity is needed later (e.g., separate START from CLOSE), the enum
 
 ## 4. Model Types
 
-All types in `io.casehub.engine.api.acl` (engine-api module). Pure Java, zero framework dependencies.
+All types in `io.casehub.platform.api.acl` (platform-api module). Pure Java, zero framework dependencies.
 
 ### 4.1 AclAction
 
@@ -91,71 +91,24 @@ public enum AclAction {
 }
 ```
 
-### 4.2 ResourceType
+### 4.2 AclEntry
 
 ```java
-public enum ResourceType {
-    CASE,
-    PLAN_ITEM,
-    WORK_ITEM,
-    EVENT_LOG,
-    MEMORY,
-    CASE_DEFINITION
-}
-```
-
-### 4.3 ResourceId
-
-Typed resource identifier. Renders as `case:abc-123`, `workitem:def-456`.
-
-```java
-public record ResourceId(ResourceType type, String id) {
-
-    public String value() {
-        return type.name().toLowerCase().replace("_", "") + ":" + id;
-    }
-
-    public static ResourceId parse(String value) {
-        int colon = value.indexOf(':');
-        if (colon < 0) throw new IllegalArgumentException("Invalid resource ID: " + value);
-        String prefix = value.substring(0, colon).toUpperCase();
-        String id = value.substring(colon + 1);
-        // map prefix to ResourceType
-        ResourceType type = switch (prefix) {
-            case "CASE" -> ResourceType.CASE;
-            case "PLANITEM" -> ResourceType.PLAN_ITEM;
-            case "WORKITEM" -> ResourceType.WORK_ITEM;
-            case "EVENTLOG" -> ResourceType.EVENT_LOG;
-            case "MEMORY" -> ResourceType.MEMORY;
-            case "CASEDEFINITION" -> ResourceType.CASE_DEFINITION;
-            default -> throw new IllegalArgumentException("Unknown resource type: " + prefix);
-        };
-        return new ResourceId(type, id);
+public record AclEntry(
+    String actorId,
+    String resourceId,
+    AclAction action,
+    Instant grantedAt,
+    Instant expiresAt,
+    String tenancyId
+) {
+    public boolean isExpired() {
+        return expiresAt != null && Instant.now().isAfter(expiresAt);
     }
 }
 ```
 
-### 4.4 Permission
-
-A `(resourceType, action)` pair granted by a role.
-
-```java
-public record Permission(ResourceType resourceType, AclAction action) {}
-```
-
-### 4.5 Role
-
-A named set of permissions.
-
-```java
-public record Role(String name, Set<Permission> permissions) {
-    public Role {
-        permissions = Set.copyOf(permissions);
-    }
-}
-```
-
-### 4.6 AccessDeniedException
+### 4.3 AccessDeniedException
 
 ```java
 public class AccessDeniedException extends SecurityException {
@@ -178,72 +131,66 @@ public class AccessDeniedException extends SecurityException {
 
 ---
 
-## 5. SPI Interfaces
+## 5. SPI Interface
 
-### 5.1 AccessControlProvider — Enforcement
-
-What most modules inject. Answers "can this actor do this?"
+In `platform-api`, zero dependencies:
 
 ```java
-package io.casehub.engine.api.acl;
+package io.casehub.platform.api.acl;
 
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.Uni;
+import java.time.Instant;
 import java.util.List;
 
 public interface AccessControlProvider {
 
+    /**
+     * Returns true if the actor has the given action on the resource,
+     * either directly or via inheritance from a registered parent.
+     */
     boolean canAccess(String actorId, String resourceId, AclAction action);
 
-    boolean hasRole(String actorId, String roleName);
+    /**
+     * Reactive variant.
+     */
+    Uni<Boolean> canAccessReactive(String actorId, String resourceId, AclAction action);
 
-    List<String> accessibleResources(String actorId, ResourceType resourceType, AclAction action);
+    /**
+     * Grant access. expires = null for permanent; non-null for time-bounded.
+     */
+    void grant(String actorId, String resourceId, AclAction action, Instant expires);
 
-    /** Reserved for future instance-level ACL. No-op in initial implementation. */
+    /**
+     * Revoke a specific grant.
+     */
+    void revoke(String actorId, String resourceId, AclAction action);
+
+    /**
+     * Revoke all grants for an actor on a resource (all actions).
+     */
+    void revokeAll(String actorId, String resourceId);
+
+    /**
+     * Register a parent relationship for implicit inheritance.
+     * childResourceId inherits access from parentResourceId.
+     */
     void registerParent(String childResourceId, String parentResourceId);
+
+    /**
+     * Return all resource IDs of the given type that the actor can access.
+     * Used for filtered list APIs.
+     */
+    List<String> accessibleResources(String actorId, String resourceType, AclAction action);
+
+    /**
+     * Reactive variant for filtered lists.
+     */
+    Multi<String> accessibleResourcesReactive(String actorId, String resourceType, AclAction action);
 }
 ```
 
-**`canAccess`** — resolves actor's roles via `CurrentPrincipal`, expands permissions via role definitions, checks against (resourceType, action). Type-level check.
-
-**`hasRole`** — checks if any of the actor's Keycloak groups match the named role.
-
-**`accessibleResources`** — capability check: does the actor have any role granting the required action on the given resource type? Returns matching role names; the caller queries the data layer for actual instances.
-
-**`registerParent`** — reserved for future instance-level ACL. No-op in initial implementation. Will register parent→child relationships for implicit inheritance when instance-level grants are added.
-
-### 5.2 RoleManager — Permission Mapping Management
-
-Used by admin tools and the authorization service to manage what each Keycloak group can do.
-
-```java
-package io.casehub.engine.api.acl;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-public interface RoleManager {
-
-    void defineRole(String roleName, Set<Permission> permissions);
-
-    void removeRole(String roleName);
-
-    Optional<Role> getRole(String roleName);
-
-    List<Role> listRoles();
-}
-```
-
-**No `bindRole`/`unbindRole`** — Keycloak handles role assignment to actors.
-
-**`defineRole`** — maps a Keycloak group name to a set of resource-level permissions. Overwrites if the role already exists.
-
-### 5.3 Tenancy Handling
-
-Neither SPI takes `tenancyId` as a parameter. Implementations resolve `tenancyId` internally via `CurrentPrincipal.tenancyId()` and apply it as a data-layer filter. This is consistent with `CaseMemoryStore`.
-
-### 5.4 Group Expansion
-
-`canAccess` takes `actorId`, not groups. The implementation composes with `GroupMembershipProvider` internally to resolve group-based checks. Call sites never handle group expansion.
+This is the same SPI contract as the original spec (§4.4). Group expansion is internal — the implementation calls `GroupMembershipProvider` to resolve `group:*` entries. Call sites never handle group expansion.
 
 ---
 
@@ -261,179 +208,250 @@ No annotations, no interceptor. Transparent, debuggable, works in all contexts.
 
 ---
 
-## 7. Module Structure
+## 7. Identity Propagation
 
-All modules in the `casehub-engine` repository.
+### 7.1 PropagationContext Carries userId + roles
 
-### 7.1 engine/api (extension)
+`PropagationContext.inheritedAttributes` carries `userId` and `roles` as plain strings. No raw tokens, no token references, no expiry concerns.
 
-Extends the existing `engine-api` module with:
-- Package `io.casehub.engine.api.acl`
-- All model types: `AclAction`, `ResourceType`, `ResourceId`, `Permission`, `Role`, `AccessDeniedException`
-- SPI interfaces: `AccessControlProvider`, `RoleManager`
+```java
+// At root case creation in CaseHubReactor:
+Map<String, String> identity = Map.of(
+    "userId", currentPrincipal.actorId(),
+    "roles", String.join(",", currentPrincipal.roles())
+);
+PropagationContext.createRoot(traceId, identity, budget);
+```
 
-### 7.2 engine/security/security-noop (new module)
+`createChild()` propagates all attributes from parent to child. Sub-cases and workers inherit the initiating principal's identity automatically.
 
-`casehub-engine-security-noop`
+### 7.2 Dispatch Identity via PropagationContext
 
-`@DefaultBean` implementations:
-- `NoOpAccessControlProvider`: `canAccess()` → always `true` (allow-all). `hasRole()` → always `false`. `accessibleResources()` → empty list. `registerParent()` → no-op.
-- `NoOpRoleManager`: `defineRole()` → no-op. `removeRole()` → no-op. `getRole()` → `Optional.empty()`. `listRoles()` → empty list.
+`CasehubDispatch` threads caller identity through `PropagationContext`, not through `WorkRequest`. `WorkRequest` remains `record WorkRequest(String capability, Map<String, Object> input)` — no identity fields added.
 
-### 7.3 engine/security/security-impl (new module)
+The dispatched worker receives identity from the `PropagationContext` of its parent execution context. This is consistent with `PropagationContext`'s design intent and avoids coupling `WorkRequest` to identity concerns.
+
+### 7.3 External Token Delegation
+
+External service token delegation (§6.8 in the original spec) is a separate concern from internal identity propagation. The `PropagationContext` carries identity for internal ACL checks. External delegation (OAuth 2.0 on-behalf-of, static credentials, `authRef`) uses quarkus-flow's existing token patterns and is out of scope for this spec.
+
+---
+
+## 8. Multi-Tenancy
+
+ACL checks use the **tenant of the current resource**, not the actor's home tenant. When a worker running under `userId=alice` (from tenant A) accesses a resource in tenant B (e.g., a cross-tenant sub-case), the ACL check queries `acl_entry` rows where `tenancy_id` matches the resource's tenant.
+
+This is consistent with the original spec's §3.6: tenant isolation is a data layer filter applied before ACL is consulted. ACL operates within already-tenancy-filtered data. The `tenancy_id` on `acl_entry` is for operational filtering and auditing.
+
+Cross-tenant access requires explicit grants in the target tenant. `CurrentPrincipal.isCrossTenantAdmin()` can bypass this for administrative operations.
+
+---
+
+## 9. Module Structure
+
+### 9.1 platform-api (extension)
+
+Extends the existing `platform-api` module with:
+- Package `io.casehub.platform.api.acl`
+- Model types: `AclAction`, `AclEntry`, `AccessDeniedException`
+- SPI interface: `AccessControlProvider`
+
+### 9.2 platform/ (extension)
+
+`@DefaultBean` no-op `AccessControlProvider`:
+- `canAccess()` → always `true` (allow-all)
+- `canAccessReactive()` → `Uni.createFrom().item(true)`
+- `grant()`, `revoke()`, `revokeAll()`, `registerParent()` → no-op
+- `accessibleResources()` → empty list
+- `accessibleResourcesReactive()` → `Multi.createFrom().empty()`
+
+Consistent with the existing `@DefaultBean` pattern (`NoOpCaseMemoryStore`, `NoOpWorkerProvisioner`).
+
+### 9.3 engine/security/security-noop (new module in engine repo)
+
+`casehub-engine-security-noop` — reserved for engine-specific no-op extensions if needed. May not be required if the platform-level `@DefaultBean` suffices.
+
+### 9.4 engine/security/security-impl (new module in engine repo)
 
 `casehub-engine-security`
 
-`@Alternative @Priority(1)` JPA-backed implementations:
-- `JpaAccessControlProvider` — queries `role_definition`, `role_permission`, `resource_parent` tables. Composes with `CurrentPrincipal` (from platform-api) and `GroupMembershipProvider` (from platform-api).
-- `JpaRoleManager` — CRUD on `role_definition` and `role_permission` tables.
+`@Alternative @Priority(1)` JPA-backed implementation:
+- `JpaAccessControlProvider` — queries `acl_entry` and `resource_parent` tables. Composes with `GroupMembershipProvider` (from platform-api) for group-based grant resolution.
 
 Dependencies:
-- `engine-api` (SPIs)
-- `platform-api` (`CurrentPrincipal`, `GroupMembershipProvider`)
+- `platform-api` (`AccessControlProvider` SPI, `CurrentPrincipal`, `GroupMembershipProvider`)
 - Quarkus Hibernate ORM, Flyway
 
 Flyway location: `classpath:db/security/migration`
 
 ---
 
-## 8. JPA Schema
+## 10. JPA Schema
 
 Flyway migration `V1__acl_schema.sql` in `security-impl`:
 
 ```sql
-CREATE TABLE role_definition (
+CREATE TABLE acl_entry (
     id          BIGSERIAL PRIMARY KEY,
-    role_name   VARCHAR(255) NOT NULL UNIQUE,
+    actor_id    VARCHAR(255) NOT NULL,
+    resource_id VARCHAR(255) NOT NULL,
+    action      VARCHAR(50)  NOT NULL,
+    condition   TEXT         NULL,
+    granted_at  TIMESTAMP    NOT NULL DEFAULT now(),
+    expires_at  TIMESTAMP    NULL,
     tenancy_id  VARCHAR(64)  NOT NULL,
-    created_at  TIMESTAMP    NOT NULL DEFAULT now()
+
+    CONSTRAINT uq_acl_entry UNIQUE (actor_id, resource_id, action)
 );
 
-CREATE TABLE role_permission (
-    id                 BIGSERIAL PRIMARY KEY,
-    role_definition_id BIGINT       NOT NULL REFERENCES role_definition(id) ON DELETE CASCADE,
-    resource_type      VARCHAR(50)  NOT NULL,
-    action             VARCHAR(50)  NOT NULL,
-    CONSTRAINT uq_role_perm UNIQUE (role_definition_id, resource_type, action)
+CREATE TABLE resource_parent (
+    child_resource_id  VARCHAR(255) NOT NULL,
+    parent_resource_id VARCHAR(255) NOT NULL,
+    tenancy_id         VARCHAR(64)  NOT NULL,
+    PRIMARY KEY (child_resource_id)
 );
 
--- Reserved for future instance-level ACL (not created in initial migration)
--- CREATE TABLE resource_parent (
---     child_resource_id  VARCHAR(255) NOT NULL,
---     parent_resource_id VARCHAR(255) NOT NULL,
---     tenancy_id         VARCHAR(64)  NOT NULL,
---     PRIMARY KEY (child_resource_id)
--- );
-
-CREATE INDEX idx_rd_tenancy ON role_definition (tenancy_id);
-CREATE INDEX idx_rp_role ON role_permission (role_definition_id);
+CREATE INDEX idx_acl_actor_resource ON acl_entry (actor_id, resource_id);
+CREATE INDEX idx_acl_resource       ON acl_entry (resource_id);
+CREATE INDEX idx_acl_tenancy        ON acl_entry (tenancy_id);
+CREATE INDEX idx_rp_parent          ON resource_parent (parent_resource_id);
 ```
 
-No `role_binding` table — Keycloak handles role assignment.
+Key differences from the old spec:
+- **`acl_entry`** replaces `role_definition` + `role_permission` — flat grants, not role mappings
+- **`resource_parent`** is created immediately (not reserved/commented out) — instance-level inheritance is active from day one
+- **`expires_at`** enables time-bounded grants for worker access
+- **`condition`** is reserved for future ABAC; not evaluated initially
+- **No `role_binding` table** — grants are direct, not mediated through roles
 
 ---
 
-## 9. Check Algorithm
+## 11. Check Algorithm
 
-### 9.1 canAccess(actorId, resourceId, action)
+### 11.1 canAccess(actorId, resourceId, action)
 
 ```
-1. Resolve actor's roles via CurrentPrincipal.roles()
-2. Parse resourceId → ResourceType (e.g., "case:abc-123" → CASE)
-3. For each role:
-   a. Look up role_definition by role_name + tenancy_id
-   b. Expand role_permission to get Set<Permission>
-   c. If any Permission matches (resourceType, action) → GRANT
-4. No match → DENY
+1. Resolve actor's groups via GroupMembershipProvider
+2. Check acl_entry for a matching row:
+   (actor_id = actorId OR actor_id IN actor's groups as 'group:<name>')
+   AND resource_id = resourceId
+   AND action = action
+   AND (expires_at IS NULL OR expires_at > now())
+3. If no match, look up resource_parent for resourceId
+4. If parent exists, repeat from step 2 with parent_resource_id
+5. Walk up until match found or chain exhausted
+6. Return result
 ```
 
-This is a type-level check: "does any of the actor's roles grant this action on this resource type?" The specific resource instance (`abc-123`) is not consulted — if the actor's roles permit READ on CASE, they can read any case in their tenant.
+This is an **instance-level check**: "does this actor have a grant for this specific resource?" The grant is on `case:abc-123`, not on "all cases." Instance isolation is the default.
 
-### 9.2 accessibleResources(actorId, resourceType, action)
-
-This is a **capability check**, not an instance enumeration. It answers: "does this actor have any role granting `action` on `resourceType`?" If yes, the caller queries the data layer for actual resource instances (filtered by tenancy and visibility).
+### 11.2 accessibleResources(actorId, resourceType, action)
 
 ```sql
-SELECT DISTINCT rd.role_name
-FROM role_definition rd
-JOIN role_permission rp ON rp.role_definition_id = rd.id
-WHERE rd.role_name IN (:actorRoles)
-  AND rd.tenancy_id = :tenancyId
-  AND rp.resource_type = :resourceType
-  AND rp.action = :action
+SELECT DISTINCT e.resource_id
+FROM acl_entry e
+WHERE e.action = :action
+  AND (e.expires_at IS NULL OR e.expires_at > now())
+  AND (
+    e.actor_id = :actorId
+    OR e.actor_id IN (:actorGroupPrefixed)
+  )
+  AND e.resource_id LIKE :resourceTypePrefix
 ```
 
-The implementation composes this capability check with the engine's data layer: if the actor has the capability, the engine returns all resources of that type within the actor's tenant. Instance-level filtering (which specific cases within the tenant) is done by the data layer, not the ACL layer.
+Returns directly-granted resource IDs. Sub-resources that inherit access from a parent are not returned directly — the caller traverses hierarchies via the engine's existing relationships.
 
-### 9.3 Type-Level vs Instance-Level
+### 11.3 Instance-Level vs Type-Level
 
-This spec defines **type-level RBAC**: roles grant permissions on resource types (e.g., "case-managers can WRITE CASE resources"), not on specific resource instances. Instance-level isolation is provided by:
+This spec defines **instance-level ACL**: grants target specific resource instances. An actor who can READ `case:abc-123` cannot automatically READ `case:def-456`.
 
-- **Tenant filtering** — `tenancy_id` on all entities scopes visibility to the actor's tenant
-- **Case hierarchy** — the engine's existing `parentCaseId` relationships scope sub-case visibility
-
-If instance-level ACL is needed later (e.g., "actor X can only access case:abc-123, not case:def-456"), the `resource_parent` table and a new resource-grant table can be added without changing the SPI — `canAccess()` would compose type-level capability with instance-level grants. The SPI is shaped to accommodate this.
+If type-level grants are needed later (e.g., "all case-managers can READ all cases in their tenant"), a wildcard resource ID pattern (`case:*`) or a separate type-grant table can be added. The SPI does not need to change — `canAccess()` would compose instance-level and type-level checks internally.
 
 ---
 
-## 10. Relationship to Prior Spec
+## 12. Resolved Open Questions
 
-This spec resolves the open questions from `2026-06-01-acl-design.md` §6.9:
+This spec resolves all 6 open questions from `2026-06-01-acl-design.md` §6.9:
 
-| Question | Resolution |
-|----------|------------|
-| §6.9.1 — Flat grant vs role-based bindings | **Role-based.** Keycloak groups map to role definitions with permission sets. |
-| §6.9.2 — Static vs dynamic permission requests | **Static-first.** Deploy-time role definitions. SPI does not preclude dynamic. |
-| §6.9.3 — What PropagationContext carries | **actorId + roles** (from CurrentPrincipal). No raw token. External delegation is a separate concern. |
-| §6.9.4 — Where authorization service SPI lives | **engine-api.** Both `AccessControlProvider` and `RoleManager` in engine. |
-| §6.9.5 — How casehub:dispatch threads identity | **Engine issue filed.** WorkRequest needs identity carrier; PropagationContext needs wiring. |
-| §6.9.6 — Multi-tenancy intersection | **Tenant-scoped role definitions.** `role_definition.tenancy_id` scopes role definitions per tenant. Cross-tenant roles require cross-tenant admin. |
-
-This spec also updates the module structure from the prior spec:
-- Prior: SPIs in `platform-api`, implementations in `acl-jpa/` and `acl-inmem/` platform modules
-- Current: All ACL code in engine — SPIs in `engine-api`, implementations in `engine/security/`
-
-The prior spec's §1–§5 (motivation, research, core design decisions, resource identity, case as ACL boundary, implicit inheritance, sub-case cascade, multi-tenancy separation) remain valid and are not superseded.
+| # | Question | Resolution |
+|---|----------|------------|
+| §6.9.1 | Flat grant vs role-based bindings | **Flat grants.** `acl_entry(actor_id, resource_id, action, expires_at)`. No role-definition tables. Direct grants on specific resource instances. |
+| §6.9.2 | Static vs dynamic permission requests | **Static-first, dynamic-ready.** Deploy-time grants. SPI shape (`grant()`/`revoke()`) allows future dynamic approval without changes. |
+| §6.9.3 | What PropagationContext carries | **userId + roles as strings.** No raw tokens, no token references. External delegation is a separate concern using quarkus-flow's existing patterns. |
+| §6.9.4 | Where authorization service SPI lives | **platform-api** (SPI). Implementations in engine. All consuming modules (work, ledger, memory) depend on platform-api for the `AccessControlProvider` contract. |
+| §6.9.5 | How dispatch threads identity | **PropagationContext.** `CasehubDispatch` threads identity via `PropagationContext.inheritedAttributes`, not by adding fields to `WorkRequest`. |
+| §6.9.6 | Multi-tenancy intersection | **Tenant of current resource.** ACL checks query grants in the resource's tenant, not the actor's home tenant. Cross-tenant access requires explicit grants. |
 
 ---
 
-## 11. Engine Issues to File
+## 13. Engine Issues
 
-### 11.1 PropagationContext Identity Wiring
+### 13.1 PropagationContext Identity Wiring
 
 Populate `PropagationContext.inheritedAttributes` with `userId` and `roles` at `CaseHubReactor.createRoot()`. Currently all `createRoot()` call sites pass `Map.of()` (empty). Wire `currentPrincipal.actorId()` and `currentPrincipal.roles()` into the attributes map.
 
-### 11.2 WorkRequest Identity Carrier
+### 13.2 CasehubDispatch Identity Threading
 
-Add identity fields to `WorkRequest` so that `CasehubDispatch.dispatch()` threads caller identity to dispatched workers. Currently `WorkRequest.of(capability, Map.of())` carries no identity.
+Update `CasehubDispatch` to thread identity from the current `PropagationContext` when dispatching workers. Currently `WorkRequest.of(capability, Map.of())` carries no identity. The fix is in PropagationContext propagation, not in WorkRequest.
 
-### 11.3 engine/security Module Creation
+### 13.3 engine/security Module Creation
 
-Create `engine/security/security-noop/` and `engine/security/security-impl/` modules with pom.xml, default beans, JPA entities, Flyway migrations, and interceptor implementation.
+Create `engine/security/security-impl/` module with pom.xml, JPA entities, Flyway migrations, and `JpaAccessControlProvider` implementation. Depends on `platform-api` for the `AccessControlProvider` SPI and `GroupMembershipProvider`.
 
-### 11.4 Case Definition YAML Authorization Extension
+### 13.4 AccessControlProvider SPI + Default Bean
 
-Extend case definition YAML schema with an `authorization` section that declares which Keycloak groups are required for each operation (READ, WRITE, ADMIN, CLAIM) on the case and its resources.
+Add `AccessControlProvider`, `AclAction`, `AclEntry`, `AccessDeniedException` to `platform-api`. Add `@DefaultBean` no-op to `platform/`.
+
+### 13.5 Case Definition YAML Authorization Extension
+
+Extend case definition YAML schema with an `authorization` section that declares which actor groups are required for each operation (READ, WRITE, ADMIN, CLAIM) on the case and its resources. IdP-agnostic — references group names, not IdP-specific constructs.
 
 ---
 
-## 12. Design Decisions Summary
+## 14. Design Decisions Summary
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Role source | Keycloak groups via OIDC | CurrentPrincipal.roles() already wired; no separate binding table |
-| Permission mapping storage | Engine DB (role_definition + role_permission) | Maps Keycloak groups to resource-level permissions; manageable at deploy time |
-| ACL code location | Engine repo (engine-api, engine/security/) | Authorization is tightly coupled to case execution; other modules depend on engine-api |
-| Grant timing | Static-first, dynamic-ready | Deploy-time role definitions; SPI shape allows future async approval |
+| Grant model | Flat grants `(actor, resource, action)` | Simpler than role-based; sufficient for instance-level case ACL; no role-mapping tables |
+| Identity source | IdP-agnostic via `CurrentPrincipal` | `CurrentPrincipal.roles()` already wired; no IdP coupling |
+| ACL code location | SPI in platform-api, impl in engine | Authorization is a platform concern; all modules need the SPI; engine provides JPA backend |
+| Grant timing | Static-first, dynamic-ready | Deploy-time grants; `grant()`/`revoke()` SPI allows future async approval |
 | Action model | READ, WRITE, ADMIN, CLAIM | Covers all case operations; extensible via enum addition |
-| Enforcement | Programmatic canAccess() | Transparent, debuggable, works in all contexts |
-| SPI split | AccessControlProvider (check) + RoleManager (manage) | Enforcement consumers never see management; each SPI is focused |
-| Default behavior | NoOp allow-all | Consistent with platform @DefaultBean pattern; safe for environments without ACL |
-| Resource hierarchy | Implicit inheritance via resource_parent | Write-path minimal; case children inherit; consistent with prior spec §3.3 |
+| Enforcement | Programmatic `canAccess()` | Transparent, debuggable, works in all contexts |
+| Default behavior | NoOp allow-all `@DefaultBean` | Consistent with platform pattern; safe for environments without ACL |
+| Resource hierarchy | Implicit inheritance via `resource_parent` | Write-path minimal; case children inherit; consistent with prior spec §3.3 |
+| Time-bounded grants | `expires_at` on `acl_entry` | Worker access naturally scoped to execution lifetime |
+| Identity propagation | userId + roles in PropagationContext | Strings, no expiry issues, cascades via `createChild()` |
+| Dispatch identity | PropagationContext, not WorkRequest | WorkRequest stays data-only; identity is a cross-cutting concern |
+| Multi-tenancy | Tenant of current resource | Consistent with data-layer tenant filtering; cross-tenant needs explicit grants |
 
 ---
 
-## 13. References
+## 15. Relationship to Prior Spec
+
+The prior spec's §1–§5 (motivation, research, core design decisions, resource identity, platform module design) remain valid and are not superseded. Specifically:
+
+- §3.1 Data-level enforcement — unchanged
+- §3.2 Custom flat JPA — unchanged
+- §3.3 Implicit inheritance — unchanged, now active from day one
+- §3.4 Case as ACL boundary — unchanged
+- §3.5 Sub-case cascade — unchanged
+- §3.6 Multi-tenancy as data layer filter — unchanged
+- §4.1 Resource identity format — unchanged
+- §4.2 Actions — unchanged
+- §4.3 ACL table schema — unchanged (adopted as-is)
+- §4.4 SPI interface — unchanged (adopted as-is)
+- §5 Module design — SPI in platform-api (as original spec specified)
+
+This spec updates the module structure from the prior spec:
+- Prior: `acl-jpa/` and `acl-inmem/` as platform modules
+- Current: JPA implementation in `engine/security/security-impl/` (engine repo, not platform repo)
+
+The `acl-inmem/` module for `@QuarkusTest` isolation remains valid and will follow the `memory-inmem/` pattern. It can live in either platform or engine depending on test infrastructure needs.
+
+---
+
+## 16. References
 
 - Prior spec: `docs/specs/2026-06-01-acl-design.md`
 - `CurrentPrincipal`: `platform-api/src/main/java/io/casehub/platform/api/identity/CurrentPrincipal.java`
@@ -441,4 +459,6 @@ Extend case definition YAML schema with an `authorization` section that declares
 - `PropagationContext`: `engine/api/src/main/java/io/casehub/api/context/PropagationContext.java`
 - `CaseHubReactor`: `engine/runtime/src/main/java/io/casehub/engine/internal/engine/CaseHubReactor.java`
 - `CasehubDispatch`: `engine/flow/src/main/java/io/casehub/engine/flow/CasehubDispatch.java`
+- `NoOpCaseMemoryStore`: `platform/src/main/java/io/casehub/platform/memory/NoOpCaseMemoryStore.java`
+- Platform module patterns: `persistence-jpa/`, `memory-jpa/`, `memory-inmem/`, `scim/`
 - Tracking issue: platform#68

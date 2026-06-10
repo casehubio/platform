@@ -792,9 +792,9 @@ Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
 - `platform-api/src/main/java/io/casehub/platform/api/identity/GroupMembershipProvider.java` — `membersOf(groupName)` returns `Set<GroupMember>`
 - `platform-api/src/main/java/io/casehub/platform/api/identity/GroupMember.java` — record: `actorId` (SCIM `value` = OIDC `sub`, stable), `displayName` (never use as routing key)
 - `platform-api/src/main/java/io/casehub/platform/api/identity/TenancyConstants.java` — `DEFAULT_TENANT_ID`, `PLATFORM_TENANT_ID` sentinels
-- `platform-api/src/main/java/io/casehub/platform/api/memory/CaseMemoryStore.java` — blocking SPI; `store()` is append-only; `eraseById()` and `eraseEntity()` defaults throw (not silent no-ops)
+- `platform-api/src/main/java/io/casehub/platform/api/memory/CaseMemoryStore.java` — blocking SPI; `store()` is append-only; `eraseById(memoryId, entityId, tenantId)` default throws `MemoryCapabilityException` (not silent no-op); `eraseEntity(entityId, tenantId)` returns `int` (count deleted) and default throws `MemoryCapabilityException`; entity mismatch in `eraseById` is a silent no-op (no information leak)
 - `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryDomain.java` — record wrapping domain name; strict equality isolation — `query.domain()` must exactly equal stored domain tag
-- `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryPermissions.java` — static `assertTenant(tenantId, CurrentPrincipal)` — must be static to be callable from reactive-only adapters
+- `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryPermissions.java` — static `assertTenant(tenantId, CurrentPrincipal)` (synchronous) and `assertTenant(tenantId, CurrentPrincipal, boolean requestContextActive)` (async-aware: skips check when no CDI request scope) — must be static to be callable from reactive-only adapters; adapters use the 3-arg form with `Arc.container()` null-check for `@ObservesAsync` support
 - `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryQuery.java` — `entityIds: List<String>` (evolved from single `entityId` in #48), `MemoryOrder`, fluent `with*` API; `MAX_ENTITY_IDS=25`
 - `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryAttributeKeys.java` — reserved cross-domain attribute keys (e.g. `CONFIDENCE`, `SOURCE`) + `formatConfidence(double)` / `parseConfidence(String)` helpers
 - `platform-api/src/main/java/io/casehub/platform/api/actor/ActorStateContributor.java` — SPI: `contribute(actorId, ActorStateAccumulator)` — `@ApplicationScoped`
@@ -806,7 +806,7 @@ Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
 
 **`tenancyId()` and `isCrossTenantAdmin()` are abstract on `CurrentPrincipal`.** Not default methods — every implementor is forced at compile time to declare a tenancy position. Single-tenant deployments return `TenancyConstants.DEFAULT_TENANT_ID`; OIDC implementations read a required JWT claim named `tenancyId`.
 
-**`CaseMemoryStore.eraseById()` default throws `UnsupportedOperationException`.** A silent success on an erasure default is a false GDPR compliance signal. Any adapter that does not implement erasure must declare that explicitly, not succeed silently.
+**`CaseMemoryStore.eraseById()` default throws `MemoryCapabilityException`.** A silent success on an erasure default is a false GDPR compliance signal. Any adapter that does not implement erasure must declare that explicitly, not succeed silently. Entity mismatch (memory exists in tenant but under a different `entityId`) is a silent no-op — returning silently reveals no information about cross-entity memory existence.
 
 **`isSystem()` must delegate to `actorType() == ActorType.SYSTEM`.** An exact-match `"system".equals(actorId())` check contradicts the resolver, which matches the full `system:*` namespace. For `system:scheduler`, `actorType()` returns SYSTEM but the exact match returns false — two methods on the same interface giving contradictory answers. Protocol `PP-20260522-359dfc` captures this.
 

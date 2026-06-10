@@ -174,11 +174,17 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
 
     @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
-    public void eraseEntity(String entityId, String tenantId) {
+    public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         // No agent_id → all domains. No run_id → all cases. GDPR Art.17 wipe.
+        // Count is best-effort: new writes arriving between list() and deleteAll()
+        // may cause the returned count to understate the actual deletion.
+        final String userId = compoundUserId(tenantId, entityId);
         try {
-            client.deleteAll(compoundUserId(tenantId, entityId), null, null);
+            final Mem0ListResponse listed = client.list(userId, null, null);
+            final int count = listed.results() != null ? listed.results().size() : 0;
+            client.deleteAll(userId, null, null);
+            return count;
         } catch (WebApplicationException e) {
             throw toStoreException(e);
         }

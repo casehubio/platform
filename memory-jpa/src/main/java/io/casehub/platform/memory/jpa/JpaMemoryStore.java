@@ -179,13 +179,15 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
     @Transactional(TxType.REQUIRED)
-    public void eraseEntity(String entityId, String tenantId) {
+    public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
-        em.createQuery("DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId")
+        final int count = em.createQuery(
+                "DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId")
             .setParameter("tenantId", tenantId)
             .setParameter("entityId", entityId)
             .executeUpdate();
         em.clear();
+        return count;
     }
 
     private Memory toMemory(MemoryEntry e) {

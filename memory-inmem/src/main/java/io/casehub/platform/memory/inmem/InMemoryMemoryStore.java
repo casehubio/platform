@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Alternative
 @Priority(10)
@@ -108,10 +109,16 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void eraseEntity(String entityId, String tenantId) {
+    public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
-        store.keySet().removeIf(
-            k -> k.tenantId().equals(tenantId) && k.entityId().equals(entityId)
-        );
+        final var count = new AtomicInteger();
+        store.entrySet().removeIf(e -> {
+            if (e.getKey().tenantId().equals(tenantId) && e.getKey().entityId().equals(entityId)) {
+                count.addAndGet(e.getValue().size());
+                return true;
+            }
+            return false;
+        });
+        return count.get();
     }
 }

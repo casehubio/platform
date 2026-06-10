@@ -413,13 +413,23 @@ class GraphitiCaseMemoryStoreTest {
     // ── eraseEntity ───────────────────────────────────────────────────────────
 
     @Test
-    void eraseEntity_deletes_group() {
+    void eraseEntity_deletes_group_and_returns_episode_count() {
+        // Stub getEpisodes to return 2 episodes
+        wireMock.stubFor(get(urlPathEqualTo("/episodes/" + GROUP_ID))
+            .willReturn(okJson("""
+                [
+                  {"uuid":"ep-1","content":"a","created_at":"2026-01-01T00:00:00Z","group_id":"%s"},
+                  {"uuid":"ep-2","content":"b","created_at":"2026-01-02T00:00:00Z","group_id":"%s"}
+                ]
+                """.formatted(GROUP_ID, GROUP_ID))));
         wireMock.stubFor(delete(urlEqualTo("/group/" + GROUP_ID))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"success\":true,\"message\":\"deleted\"}")));
 
-        assertDoesNotThrow(() -> store.eraseEntity(ENTITY, TENANT));
+        final int count = store.eraseEntity(ENTITY, TENANT);
+        assertEquals(2, count);
+        wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/" + GROUP_ID)));
         wireMock.verify(deleteRequestedFor(urlEqualTo("/group/" + GROUP_ID)));
     }
 
@@ -427,6 +437,7 @@ class GraphitiCaseMemoryStoreTest {
     void eraseEntity_tenant_mismatch_throws_before_http() {
         assertThrows(SecurityException.class, () -> store.eraseEntity(ENTITY, "wrong-tenant"));
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
+        wireMock.verify(0, getRequestedFor(anyUrl()));
     }
 
     // ── eraseById ─────────────────────────────────────────────────────────────

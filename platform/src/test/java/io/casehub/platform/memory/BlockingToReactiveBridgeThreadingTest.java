@@ -37,8 +37,9 @@ class BlockingToReactiveBridgeThreadingTest {
             @Override public void eraseById(String id, String tid) {
                 capturedThreadId.set(Thread.currentThread().getId());
             }
-            @Override public void eraseEntity(String eid, String tid) {
+            @Override public int eraseEntity(String eid, String tid) {
                 capturedThreadId.set(Thread.currentThread().getId());
+                return 0;
             }
             @Override public List<String> storeAll(List<MemoryInput> inputs) {
                 capturedThreadId.set(Thread.currentThread().getId());

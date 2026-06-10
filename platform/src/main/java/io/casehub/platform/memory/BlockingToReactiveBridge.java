@@ -49,8 +49,8 @@ public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
     }
 
     @Override
-    public Uni<Void> eraseEntity(String entityId, String tenantId) {
-        return Uni.createFrom().<Void>item(() -> { delegate.eraseEntity(entityId, tenantId); return null; })
+    public Uni<Integer> eraseEntity(String entityId, String tenantId) {
+        return Uni.createFrom().item(() -> delegate.eraseEntity(entityId, tenantId))
             .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }

@@ -206,14 +206,14 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void eraseEntity(String entityId, String tenantId) {
+    public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
                  "DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ?")) {
             ps.setString(1, tenantId);
             ps.setString(2, entityId);
-            ps.executeUpdate();
+            return ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("eraseEntity() failed", e);
         }

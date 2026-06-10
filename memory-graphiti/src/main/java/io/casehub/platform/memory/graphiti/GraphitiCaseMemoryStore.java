@@ -232,12 +232,27 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
         requireCapability(MemoryCapability.ERASE_DOMAIN_CASE); // throws
     }
 
+    /** Maximum episodes fetched for count; actual deletion is always complete. */
+    private static final int MAX_EPISODES_FOR_COUNT = 10_000;
+
+    /**
+     * Erases all data for an entity via {@code DELETE /group/{groupId}} (cascading).
+     *
+     * <p>Count is episode count at deletion time, capped at {@code MAX_EPISODES_FOR_COUNT}.
+     * Entities with more episodes will report an understated count — the cap is a count
+     * limitation only; the deletion itself is complete. Derived entity nodes and edges
+     * extracted by the LLM have no independent count API.
+     */
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
-    public void eraseEntity(final String entityId, final String tenantId) {
+    public int eraseEntity(final String entityId, final String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+        final String groupId = compoundGroupId(tenantId, entityId);
         try {
-            client.deleteGroup(compoundGroupId(tenantId, entityId));
+            final List<GraphitiEpisodicNode> episodes = client.getEpisodes(groupId, MAX_EPISODES_FOR_COUNT);
+            final int count = episodes != null ? episodes.size() : 0;
+            client.deleteGroup(groupId);
+            return count;
         } catch (final WebApplicationException e) {
             throw GraphitiStoreException.from(e);
         }

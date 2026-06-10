@@ -31,7 +31,7 @@ class NoOpCaseMemoryStoreTest {
     @Test void query_returns_empty()         { assertTrue(store.query(QUERY).isEmpty()); }
     @Test void erase_scoped_does_not_throw() { assertDoesNotThrow(() -> store.erase(ERASE_SCOPED)); }
     @Test void eraseById_does_not_throw()    { assertDoesNotThrow(() -> store.eraseById("mem-1", "tenant-1")); }
-    @Test void eraseEntity_does_not_throw()  { assertDoesNotThrow(() -> store.eraseEntity("entity-1", "tenant-1")); }
+    @Test void eraseEntity_returns_zero()    { assertEquals(0, store.eraseEntity("entity-1", "tenant-1")); }
     @Test void storeAll_returns_empty_ids() {
         assertEquals(List.of("", ""), store.storeAll(List.of(SAMPLE, SAMPLE_WITH_CASE)));
     }
@@ -62,7 +62,7 @@ class NoOpCaseMemoryStoreTest {
     @Test void bridge_eraseById_does_not_throw() {
         assertDoesNotThrow(() -> reactiveStore.eraseById("mem-1", "tenant-1").await().indefinitely());
     }
-    @Test void bridge_eraseEntity_does_not_throw() {
-        assertDoesNotThrow(() -> reactiveStore.eraseEntity("entity-1", "tenant-1").await().indefinitely());
+    @Test void bridge_eraseEntity_returns_zero() {
+        assertEquals(0, reactiveStore.eraseEntity("entity-1", "tenant-1").await().indefinitely());
     }
 }

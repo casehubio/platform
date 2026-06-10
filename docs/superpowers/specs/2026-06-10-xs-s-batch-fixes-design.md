@@ -3,7 +3,7 @@
 **Issues:** platform#54, #62, #64, #72, #79  
 **Branch:** `issue-54-xs-s-batch-fixes`  
 **Date:** 2026-06-10  
-**Revised:** 2026-06-10 (post-review)
+**Revised:** 2026-06-10 (post-review rev 3)
 
 ---
 
@@ -98,10 +98,20 @@ Mem0Memory getById(@PathParam("memoryId") String memoryId);
 
 `Mem0Memory` already has a `userId()` field containing `"{tenantId}::{entityId}"`.
 
+### eraseById SPI contract: silent no-op on entity mismatch
+
+**Contract (defined in SPI Javadoc):** If `memoryId` does not exist in this tenant under `entityId`, the method returns without erasing anything and without revealing whether the memory exists under a different entity. Callers receive no signal distinguishing "memory not found", "memory belongs to another entity", and "memory already deleted". This is the correct contract for three reasons:
+1. **No information leak** — throwing `SecurityException` reveals that the memoryId exists in the system but belongs to a different entity, leaking storage metadata.
+2. **GDPR satisfied** — the wrong-entity memory is untouched; the caller's GDPR erasure obligation for their entity is correctly handled.
+3. **Natural adapter behavior** — JDBC adapters `WHERE entity_id = ?` silently affect 0 rows when entity doesn't match; a throw would require a read-before-delete.
+
+This aligns with the 404 handling: absent memory = silent no-op, erasure satisfied.
+
 ### eraseById implementation in Mem0CaseMemoryStore
 
 ```java
-// Preflight: verify the memory belongs to this entity within this tenant
+// Preflight: verify the memory belongs to this entity within this tenant.
+// On mismatch or absence, return silently — no information leak.
 final Mem0Memory existing;
 try {
     existing = client.getById(memoryId);
@@ -109,13 +119,11 @@ try {
     if (e.getResponse() != null && e.getResponse().getStatus() == 404) return;
     throw toStoreException(e);
 }
-// A null userId on a 200 response is treated as a violation —
+// A null userId on a 200 response is treated as mismatch —
 // a memory with no owner identity cannot be safely attributed.
 final String expectedUserId = compoundUserId(tenantId, entityId);
 if (!expectedUserId.equals(existing.userId())) {
-    throw new SecurityException(
-        "Memory " + memoryId + " does not belong to entity " + entityId
-        + " in tenant " + tenantId);
+    return; // memory exists but belongs to a different entity — silent no-op
 }
 // Proceed to DELETE — 404 guard handles concurrent deletion
 ```
@@ -126,9 +134,9 @@ if (!expectedUserId.equals(existing.userId())) {
 
 ### Other adapters with new entityId parameter
 
-- **`InMemoryMemoryStore.eraseById`**: scope the scan to `BucketKey(tenantId, entityId, *)` buckets. The current implementation scans all tenant entries; adding entity scope makes it precise and faster.
-- **`JpaMemoryStore.eraseById`**: add `AND entityId = :entityId` to the JPQL DELETE WHERE clause.
-- **`SqliteMemoryStore.eraseById`**: add `AND entity_id = ?` to the SQL DELETE WHERE clause.
+- **`InMemoryMemoryStore.eraseById`**: scope the scan to `BucketKey(tenantId, entityId, *)` buckets. If no matching memory is found under that entity, return silently.
+- **`JpaMemoryStore.eraseById`**: add `AND entityId = :entityId` to the JPQL DELETE WHERE clause. Mismatch → 0 rows affected, no error.
+- **`SqliteMemoryStore.eraseById`**: add `AND entity_id = ?` to the SQL DELETE WHERE clause. Mismatch → 0 rows affected, no error.
 - **`GraphitiCaseMemoryStore.eraseById`**: still throws `MemoryCapabilityException` (no `ERASE_BY_ID`); just update the method signature.
 - **`NoOpCaseMemoryStore.eraseById`**: still a true no-op; update signature only.
 
@@ -136,11 +144,27 @@ if (!expectedUserId.equals(existing.userId())) {
 
 Update `Mem0CaseMemoryStoreTest` for new signature and add:
 - `eraseById_preflight_GET_verifies_ownership`: stub GET → matching userId → stub DELETE → verify both called
-- `eraseById_throws_SecurityException_on_userId_mismatch`: stub GET → mismatched userId → SecurityException; verify no DELETE
+- `eraseById_returns_silently_on_userId_mismatch`: stub GET → mismatched userId → no DELETE called, method returns normally
 - `eraseById_returns_on_preflight_404`: stub GET → 404 → no DELETE called
 - `eraseById_tenant_mismatch_throws_before_http`: unchanged semantics, new signature
 
-Update `CaseMemoryStoreContractTest` signature in all `eraseById` call sites. The entityId for the contract test calls is `"entity-1"` (the default input entity).
+Update `CaseMemoryStoreContractTest` — add cross-entity isolation test and update signature in all `eraseById` call sites. The entityId for existing contract test calls is `"entity-1"` (the default input entity).
+
+**New contract test** (primary new invariant of #64):
+
+```java
+@Test
+void eraseById_does_not_erase_other_entity_memory_within_same_tenant() {
+    // entity-2's memory stored within the same tenant
+    String e2MemId = store().store(
+        new MemoryInput("entity-2", DOMAIN, TENANT, null, "other entity's data", Map.of()));
+    // entity-1 caller attempts to erase entity-2's memory — silent no-op
+    store().eraseById(e2MemId, "entity-1", TENANT);
+    // entity-2's memory must survive
+    var remaining = store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
+    assertEquals(1, remaining.size());
+}
+```
 
 ---
 
@@ -224,13 +248,15 @@ private static final int MAX_EPISODES_FOR_COUNT = 10_000;
 public int eraseEntity(final String entityId, final String tenantId) {
     MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
     final String groupId = compoundGroupId(tenantId, entityId);
-    final int count = client.getEpisodes(groupId, MAX_EPISODES_FOR_COUNT).size();
     try {
+        // getEpisodes can return null (MicroProfile REST Client); guard matches existing pattern
+        final List<GraphitiEpisodicNode> episodes = client.getEpisodes(groupId, MAX_EPISODES_FOR_COUNT);
+        final int count = episodes != null ? episodes.size() : 0;
         client.deleteGroup(groupId);
+        return count;
     } catch (final WebApplicationException e) {
         throw GraphitiStoreException.from(e);
     }
-    return count;
 }
 ```
 
@@ -337,22 +363,20 @@ The existing Javadoc has three guidance sections. All three must be updated:
 
 ### `MemoryPermissionsTest` — new tests
 
+`CurrentPrincipal` has multiple abstract methods (`actorId()`, `groups()`, `tenancyId()`, `isCrossTenantAdmin()`) and is not a functional interface. Use the existing `principal(String tenancyId)` anonymous-class helper already defined in `MemoryPermissionsTest`:
+
 ```java
 @Test
 void three_arg_skips_check_when_not_in_request_context() {
-    CurrentPrincipal p = () -> "other-tenant";
-    assertDoesNotThrow(() -> MemoryPermissions.assertTenant("mine", p, false));
+    assertDoesNotThrow(() -> MemoryPermissions.assertTenant("mine", principal("other-tenant"), false));
 }
 
 @Test
 void three_arg_enforces_when_in_request_context() {
-    CurrentPrincipal p = () -> "other-tenant";
     assertThrows(SecurityException.class,
-        () -> MemoryPermissions.assertTenant("mine", p, true));
+        () -> MemoryPermissions.assertTenant("mine", principal("other-tenant"), true));
 }
 ```
-
-(`CurrentPrincipal` is a functional interface — `tenancyId()` is the only method invoked by these tests.)
 
 ### Protocol update
 

@@ -192,13 +192,15 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void eraseById(String memoryId, String tenantId) {
+    public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+        // entity_id in WHERE: mismatch → 0 rows deleted, silent no-op.
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                 "DELETE FROM memory_entry WHERE memory_id = ? AND tenant_id = ?")) {
+                 "DELETE FROM memory_entry WHERE memory_id = ? AND entity_id = ? AND tenant_id = ?")) {
             ps.setString(1, memoryId);
-            ps.setString(2, tenantId);
+            ps.setString(2, entityId);
+            ps.setString(3, tenantId);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("eraseById() failed", e);

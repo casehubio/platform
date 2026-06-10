@@ -101,10 +101,12 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void eraseById(String memoryId, String tenantId) {
+    public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+        // Scope to entity buckets — mismatch means no-op (no information leak).
         store.entrySet().stream()
-            .filter(e -> e.getKey().tenantId().equals(tenantId))
+            .filter(e -> e.getKey().tenantId().equals(tenantId)
+                      && e.getKey().entityId().equals(entityId))
             .forEach(e -> e.getValue().removeIf(m -> m.memoryId().equals(memoryId)));
     }
 

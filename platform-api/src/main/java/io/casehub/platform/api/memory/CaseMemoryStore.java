@@ -90,12 +90,21 @@ public interface CaseMemoryStore {
     /**
      * Erase a specific memory by its assigned memoryId.
      *
+     * <p>The memory must belong to {@code entityId} within {@code tenantId}. If the memory
+     * does not exist, or belongs to a different entity within the same tenant, the method
+     * returns silently — no information is revealed about whether the memory exists
+     * under a different entity (silent no-op, GDPR satisfied).
+     *
      * <p>Default throws {@link MemoryCapabilityException} with {@link MemoryCapability#ERASE_BY_ID}.
      * {@code NoOpCaseMemoryStore} overrides with a true no-op (nothing stored). Real adapters
      * override with actual deletion.
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
+     *
+     * @param memoryId the ID assigned by the store at write time
+     * @param entityId the entity the memory must belong to; mismatch = silent no-op
+     * @param tenantId the tenant the caller is authenticated for
      */
-    default void eraseById(String memoryId, String tenantId) {
+    default void eraseById(String memoryId, String entityId, String tenantId) {
         throw new MemoryCapabilityException(MemoryCapability.ERASE_BY_ID, getClass());
     }
 

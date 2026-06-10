@@ -447,7 +447,7 @@ class GraphitiCaseMemoryStoreTest {
         // Graphiti DELETE /episode/{uuid} only removes the EpisodicNode; derived entity/
         // relationship facts persist. ERASE_BY_ID cannot guarantee GDPR Art.17 completeness.
         final var ex = assertThrows(MemoryCapabilityException.class,
-            () -> store.eraseById("ep-uuid-123", TENANT));
+            () -> store.eraseById("ep-uuid-123", ENTITY, TENANT));
         assertEquals(MemoryCapability.ERASE_BY_ID, ex.required());
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
     }
@@ -455,7 +455,7 @@ class GraphitiCaseMemoryStoreTest {
     @Test
     void eraseById_tenant_mismatch_throws_SecurityException_before_capability_check() {
         assertThrows(SecurityException.class, () ->
-            store.eraseById("any-id", "wrong-tenant"));
+            store.eraseById("any-id", ENTITY, "wrong-tenant"));
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
     }
 

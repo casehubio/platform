@@ -160,13 +160,29 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
 
     @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "eraseById"})
     @Override
-    public void eraseById(String memoryId, String tenantId) {
+    public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+        // Preflight: verify ownership before DELETE.
+        // entityId mismatch → silent no-op (no information leak about cross-entity existence).
+        // null userId on 200 → treat as mismatch (unattributable memory).
+        final Mem0Memory existing;
+        try {
+            existing = client.getById(memoryId);
+        } catch (WebApplicationException e) {
+            if (e.getResponse() != null && e.getResponse().getStatus() == 404) {
+                return; // already absent — erasure satisfied
+            }
+            throw toStoreException(e);
+        }
+        final String expectedUserId = compoundUserId(tenantId, entityId);
+        if (!expectedUserId.equals(existing.userId())) {
+            return; // wrong entity — silent no-op
+        }
         try {
             client.deleteById(memoryId);
         } catch (WebApplicationException e) {
             if (e.getResponse() != null && e.getResponse().getStatus() == 404) {
-                return; // already absent — erasure is satisfied
+                return; // concurrently deleted — erasure satisfied
             }
             throw toStoreException(e);
         }

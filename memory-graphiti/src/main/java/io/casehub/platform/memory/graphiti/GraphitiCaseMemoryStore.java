@@ -268,7 +268,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
      *     cascade support is available upstream (getzep/graphiti, platform#74)
      */
     @Override
-    public void eraseById(final String memoryId, final String tenantId) {
+    public void eraseById(final String memoryId, final String entityId, final String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         requireCapability(MemoryCapability.ERASE_BY_ID);
     }

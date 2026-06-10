@@ -7,6 +7,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.quarkus.arc.Arc;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Priority;
@@ -59,6 +60,11 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     private HikariDataSource dataSource;
 
+    private boolean requestContextActive() {
+        var c = Arc.container();
+        return c == null || c.requestContext().isActive();
+    }
+
     @PostConstruct
     void init() {
         boolean isMemory = ":memory:".equals(path) || path.isBlank();
@@ -98,7 +104,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
     public String store(MemoryInput input) {
-        MemoryPermissions.assertTenant(input.tenantId(), principal);
+        MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
         String memoryId = UUID.randomUUID().toString();
         String createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
         String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at) VALUES (?,?,?,?,?,?,?,?)";
@@ -130,7 +136,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 for (MemoryInput input : inputs) {
                     // guard each item — detects mixed-tenant batches where item 0 passes but a later item has a different tenantId
-                    MemoryPermissions.assertTenant(input.tenantId(), principal);
+                    MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
                     String memoryId = UUID.randomUUID().toString();
                     String createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
                     ps.setString(1, memoryId);
@@ -159,7 +165,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
     public List<Memory> query(MemoryQuery query) {
-        MemoryPermissions.assertTenant(query.tenantId(), principal);
+        MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
         if (ftsEnabled && query.order() == MemoryOrder.RELEVANCE && query.question() != null) {
             return queryFts(query);
         }
@@ -168,7 +174,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
     public void erase(EraseRequest request) {
-        MemoryPermissions.assertTenant(request.tenantId(), principal);
+        MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
         StringBuilder sql = new StringBuilder(
             "DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ? AND domain = ?");
         if (request.caseId() != null) sql.append(" AND case_id = ?");
@@ -187,7 +193,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
     public void eraseById(String memoryId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
                  "DELETE FROM memory_entry WHERE memory_id = ? AND tenant_id = ?")) {
@@ -201,7 +207,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
     public void eraseEntity(String entityId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
                  "DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ?")) {

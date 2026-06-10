@@ -4,6 +4,7 @@ import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
+@ActivateRequestContext
 @TestProfile(SqliteMemoryStoreTest.FtsDisabledProfile.class)
 class SqliteMemoryStoreFtsDisabledTest {
 

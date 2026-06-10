@@ -53,19 +53,7 @@ class CaseMemoryStoreSpiTest {
         assertEquals(MemoryCapability.TEMPORAL_GRAPH, ex.required());
     }
 
-    // Via interface default (proves delegation to MemoryPermissions)
-    @Test
-    void assertTenant_throws_on_mismatch() {
-        assertThrows(SecurityException.class,
-            () -> sut.assertTenant("wrong", principal("real")));
-    }
-
-    @Test
-    void assertTenant_passes_on_match() {
-        assertDoesNotThrow(() -> sut.assertTenant("real", principal("real")));
-    }
-
-    // Via static utility directly (callable by native reactive adapters)
+    // Via static utility directly (callable by all adapters)
     @Test
     void memoryPermissions_throws_on_mismatch() {
         assertThrows(SecurityException.class,

@@ -421,16 +421,27 @@ class Mem0CaseMemoryStoreTest {
     // ── eraseEntity ───────────────────────────────────────────────────────────
 
     @Test
-    void eraseEntity_non_2xx_throws_Mem0StoreException() {
+    void eraseEntity_non_2xx_on_list_throws_Mem0StoreException() {
+        wireMock().stubFor(get(urlPathEqualTo("/memories")).willReturn(serverError()));
+        assertThrows(Mem0StoreException.class, () ->
+            store.eraseEntity("entity-1", TENANT));
+    }
+
+    @Test
+    void eraseEntity_non_2xx_on_delete_throws_Mem0StoreException() {
+        stubListOk(); // list succeeds; delete fails
         wireMock().stubFor(delete(urlPathEqualTo("/memories")).willReturn(serverError()));
         assertThrows(Mem0StoreException.class, () ->
             store.eraseEntity("entity-1", TENANT));
     }
 
     @Test
-    void eraseEntity_sends_delete_with_compound_user_id_no_agent_id() {
+    void eraseEntity_sends_list_then_delete_with_compound_user_id_no_agent_id() {
+        stubListOk();
         stubDeleteAllOk();
         store.eraseEntity("entity-1", TENANT);
+        wireMock().verify(getRequestedFor(urlPathEqualTo("/memories"))
+            .withQueryParam("user_id", equalTo("tenant-1::entity-1")));
         wireMock().verify(deleteRequestedFor(urlPathEqualTo("/memories"))
             .withQueryParam("user_id", equalTo("tenant-1::entity-1"))
             .withoutQueryParam("agent_id")
@@ -438,14 +449,26 @@ class Mem0CaseMemoryStoreTest {
     }
 
     @Test
+    void eraseEntity_returns_count_from_list_response() {
+        stubListOk(
+            "{\"id\":\"m1\",\"memory\":\"a\",\"user_id\":\"tenant-1::entity-1\"}",
+            "{\"id\":\"m2\",\"memory\":\"b\",\"user_id\":\"tenant-1::entity-1\"}"
+        );
+        stubDeleteAllOk();
+        assertEquals(2, store.eraseEntity("entity-1", TENANT));
+    }
+
+    @Test
     void eraseEntity_tenant_mismatch_throws_before_http() {
         assertThrows(SecurityException.class, () ->
             store.eraseEntity("entity-1", OTHER_TENANT));
         wireMock().verify(0, deleteRequestedFor(urlPathEqualTo("/memories")));
+        wireMock().verify(0, getRequestedFor(urlPathEqualTo("/memories")));
     }
 
     @Test
     void eraseEntity_sends_compound_key_for_correct_tenant_only() {
+        stubListOk();
         stubDeleteAllOk();
         store.eraseEntity("entity-1", TENANT);
         wireMock().verify(deleteRequestedFor(urlPathEqualTo("/memories"))

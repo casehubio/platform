@@ -74,10 +74,16 @@ public interface CaseMemoryStore {
      * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
      *
      * <p>Default throws {@link MemoryCapabilityException} with {@link MemoryCapability#ERASE_ENTITY}.
-     * {@code NoOpCaseMemoryStore} overrides with a true no-op (nothing stored → erasure trivially
-     * satisfied). Real adapters must override with actual cross-domain deletion.
+     * {@code NoOpCaseMemoryStore} overrides with {@code return 0} (nothing stored → erasure
+     * trivially satisfied). Real adapters must override with actual cross-domain deletion
+     * and return the count of records deleted.
+     *
+     * <p>For REST-backed adapters (Mem0, Graphiti) where a precise count requires a pre-fetch,
+     * the count is a best-effort estimate — document the race or cap in the adapter's Javadoc.
+     *
+     * @return count of memory records erased (for GDPR Art.5(2) audit logging)
      */
-    default void eraseEntity(String entityId, String tenantId) {
+    default int eraseEntity(String entityId, String tenantId) {
         throw new MemoryCapabilityException(MemoryCapability.ERASE_ENTITY, getClass());
     }
 

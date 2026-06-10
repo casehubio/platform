@@ -252,7 +252,8 @@ public abstract class CaseMemoryStoreContractTest {
     void eraseEntity_removes_all_domains_for_entity() {
         store().store(new MemoryInput("entity-1", DOMAIN,       TENANT, null, "finance", Map.of()));
         store().store(new MemoryInput("entity-1", OTHER_DOMAIN, TENANT, null, "health",  Map.of()));
-        store().eraseEntity("entity-1", TENANT);
+        final int deleted = store().eraseEntity("entity-1", TENANT);
+        assertTrue(deleted > 0, "eraseEntity must return positive count when records existed");
         assertTrue(store().query(query()).isEmpty());
         assertTrue(store().query(MemoryQuery.forEntity("entity-1", OTHER_DOMAIN, TENANT)).isEmpty());
     }
@@ -266,10 +267,24 @@ public abstract class CaseMemoryStoreContractTest {
     void eraseEntity_leaves_other_entities_intact() {
         store().store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "mine",  Map.of()));
         store().store(new MemoryInput("entity-2", DOMAIN, TENANT, null, "other", Map.of()));
-        store().eraseEntity("entity-1", TENANT);
+        final int deleted = store().eraseEntity("entity-1", TENANT);
+        assertTrue(deleted >= 0, "eraseEntity must return non-negative count");
         var e2results = store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
         assertEquals(1, e2results.size());
         assertEquals("other", e2results.get(0).text());
+    }
+
+    @Test
+    void eraseEntity_returns_count_of_deleted_records() {
+        store().store(new MemoryInput("entity-1", DOMAIN,       TENANT, null, "a", Map.of()));
+        store().store(new MemoryInput("entity-1", DOMAIN,       TENANT, null, "b", Map.of()));
+        store().store(new MemoryInput("entity-1", OTHER_DOMAIN, TENANT, null, "c", Map.of()));
+        assertEquals(3, store().eraseEntity("entity-1", TENANT));
+    }
+
+    @Test
+    void eraseEntity_returns_zero_when_nothing_stored() {
+        assertEquals(0, store().eraseEntity("entity-99", TENANT));
     }
 
     // --- storeAll ---

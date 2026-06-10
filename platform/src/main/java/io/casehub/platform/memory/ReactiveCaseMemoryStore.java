@@ -27,9 +27,10 @@ public interface ReactiveCaseMemoryStore {
 
     /**
      * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#eraseEntity}.
+     * Returns count of records erased (see blocking SPI for semantics).
      * Default returns a failed Uni — consistent with the blocking default-throw contract.
      */
-    default Uni<Void> eraseEntity(String entityId, String tenantId) {
+    default Uni<Integer> eraseEntity(String entityId, String tenantId) {
         return Uni.createFrom().failure(
             new UnsupportedOperationException("eraseEntity not supported by this adapter"));
     }

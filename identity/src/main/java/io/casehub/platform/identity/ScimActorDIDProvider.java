@@ -76,7 +76,7 @@ public class ScimActorDIDProvider
         this.scimEndpoint = endpoint;
         this.authToken = authToken;
         this.timeoutMs = timeoutMs;
-        this.requireHttps = true;
+        this.requireHttps = false;
         this.httpClient = buildHttpClient();
     }
 
@@ -89,6 +89,10 @@ public class ScimActorDIDProvider
         if (requireHttps && !scimEndpoint.startsWith("https://")) {
             throw new IllegalArgumentException(
                     "casehub.identity.scim.endpoint must use HTTPS, got: " + scimEndpoint);
+        }
+        if (authToken == null || authToken.isBlank()) {
+            throw new IllegalArgumentException(
+                    "casehub.identity.scim.auth-token must not be blank when endpoint is configured");
         }
     }
 

@@ -4,6 +4,7 @@ import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * setup() sets it to TENANT ("tenant-1") before each test.
  */
 @QuarkusTest
+@ActivateRequestContext
 class JpaMemoryStoreTest extends CaseMemoryStoreContractTest {
 
     @Inject JpaMemoryStore jpaStore;

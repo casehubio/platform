@@ -2,6 +2,7 @@ package io.casehub.platform.memory.inmem;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.quarkus.arc.Arc;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
@@ -41,9 +42,14 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         this.principal = principal;
     }
 
+    private boolean requestContextActive() {
+        var c = Arc.container();
+        return c == null || c.requestContext().isActive();
+    }
+
     @Override
     public String store(MemoryInput input) {
-        MemoryPermissions.assertTenant(input.tenantId(), principal);
+        MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
         String memoryId = UUID.randomUUID().toString();
         Memory memory = new Memory(
             memoryId, input.entityId(), input.domain(), input.tenantId(),
@@ -59,13 +65,13 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     @Override
     public List<String> storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return List.of();
-        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal));
+        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         return List.copyOf(inputs.stream().map(this::store).toList());
     }
 
     @Override
     public List<Memory> query(MemoryQuery query) {
-        MemoryPermissions.assertTenant(query.tenantId(), principal);
+        MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
         // MemoryOrder is ignored — in-mem always sorts chronologically (createdAt DESC).
         return query.entityIds().stream()
             .flatMap(entityId -> store.getOrDefault(
@@ -84,7 +90,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
 
     @Override
     public void erase(EraseRequest request) {
-        MemoryPermissions.assertTenant(request.tenantId(), principal);
+        MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
         var key = new BucketKey(request.tenantId(), request.entityId(), request.domain());
         store.computeIfPresent(key, (k, memories) ->
             new CopyOnWriteArrayList<>(memories.stream()
@@ -95,7 +101,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
 
     @Override
     public void eraseById(String memoryId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         store.entrySet().stream()
             .filter(e -> e.getKey().tenantId().equals(tenantId))
             .forEach(e -> e.getValue().removeIf(m -> m.memoryId().equals(memoryId)));
@@ -103,7 +109,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
 
     @Override
     public void eraseEntity(String entityId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         store.keySet().removeIf(
             k -> k.tenantId().equals(tenantId) && k.entityId().equals(entityId)
         );

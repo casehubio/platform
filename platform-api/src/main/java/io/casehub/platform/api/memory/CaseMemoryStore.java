@@ -19,24 +19,23 @@ public interface CaseMemoryStore {
      * {@code @RequestScoped} implementations, and is consistent with the read API
      * ({@link #query(MemoryQuery)}).
      *
-     * <p>This analysis assumes an active request scope. Callers in non-request contexts
-     * (batch jobs, startup) must activate request scope explicitly before calling any
-     * {@code @RequestScoped} SPI implementation.
+     * <p><b>{@code @ObservesAsync} callers are supported.</b> Adapters use the
+     * async-aware 3-arg {@code MemoryPermissions.assertTenant(tenantId, principal,
+     * requestContextActive())} form, which trusts {@code MemoryInput.tenantId()}
+     * directly when no CDI request scope is active. The data-scoping by
+     * {@code tenantId} is unconditional; only the principal comparison is skipped
+     * in async context.
      *
-     * <p><b>{@code @ObservesAsync} is not safe for memory writes.</b> Async observers
-     * run on a thread pool where the request scope is not propagated by default — a
-     * {@code @RequestScoped CurrentPrincipal} is unavailable, causing
-     * {@link jakarta.enterprise.context.ContextNotActiveException} before
-     * {@code assertTenant()} fires. Exceptions are also invisible to the original caller,
-     * so compliance failures are swallowed silently.
+     * <p><b>{@code @Observes} (synchronous) is still valid</b> — it preserves request
+     * scope and propagates exceptions normally. A synchronous CDI observer that calls
+     * {@code store()} directly keeps the store write atomic with the event-firing
+     * transaction — desirable for compliance writes that must not persist if the
+     * enclosing operation rolls back, but wrong if fire-and-forget is expected.
      *
-     * <p><b>{@code @Observes} (synchronous) is acceptable</b> — it preserves request
-     * context and propagates exceptions normally. A synchronous CDI observer that calls
-     * {@code store()} directly is a valid consumption pattern equivalent to Option A
-     * with an intervening domain event. The tradeoff is that it makes the store write
-     * atomic with the event-firing transaction — desirable for compliance writes that
-     * must not persist if the enclosing operation rolls back, but wrong if the caller
-     * expects a fire-and-forget side effect.
+     * <p><b>Batch jobs and startup contexts</b> — the 3-arg {@code assertTenant} form
+     * handles these too. No request scope active → trust the tenantId from
+     * {@code MemoryInput} directly. Explicit {@code @ActivateRequestContext} is not
+     * required for memory writes from batch or startup code.
      *
      * <p><b>Text field guidance:</b> {@link MemoryInput#text()} must be human-readable
      * natural language when using semantic adapters (Mem0, Graphiti) — it is the field
@@ -130,12 +129,4 @@ public interface CaseMemoryStore {
         return inputs.stream().map(this::store).toList();
     }
 
-    /**
-     * Security guard. Delegates to {@link MemoryPermissions#assertTenant}.
-     *
-     * @throws SecurityException if tenantId does not match principal.tenancyId()
-     */
-    default void assertTenant(String tenantId, CurrentPrincipal principal) {
-        MemoryPermissions.assertTenant(tenantId, principal);
-    }
 }

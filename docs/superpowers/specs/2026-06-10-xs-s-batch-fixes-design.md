@@ -3,7 +3,7 @@
 **Issues:** platform#54, #62, #64, #72, #79  
 **Branch:** `issue-54-xs-s-batch-fixes`  
 **Date:** 2026-06-10  
-**Revised:** 2026-06-10 (post-review rev 4)
+**Revised:** 2026-06-10 (post-review rev 5)
 
 ---
 
@@ -339,9 +339,8 @@ Each adapter (`InMemoryMemoryStore`, `JpaMemoryStore`, `SqliteMemoryStore`, `Mem
 
 ```java
 private boolean requestContextActive() {
-    var container = Arc.container();
-    if (container == null) return true; // no CDI — plain unit test or non-Quarkus; enforce
-    return container.requestContext().isActive();
+    var c = Arc.container();
+    return c == null || c.requestContext().isActive();
 }
 ```
 
@@ -408,7 +407,7 @@ void three_arg_enforces_when_in_request_context() {
 
 `casememorystore-adapter-asserttenant-contract.md` (PP-20260529-57cc3b): add:
 
-> **Async-aware form:** Adapters that support `@ObservesAsync` callers use the 3-arg overload `MemoryPermissions.assertTenant(tenantId, principal, requestContextActive())` where `requestContextActive()` returns `Arc.container().requestContext().isActive()`. When the request context is not active, the principal comparison is skipped and `tenantId` from `MemoryInput` is trusted directly. The security gate before capability gate ordering still applies.
+> **Async-aware form:** Adapters that support `@ObservesAsync` callers use the 3-arg overload `MemoryPermissions.assertTenant(tenantId, principal, requestContextActive())`. `requestContextActive()` returns `true` when either (a) no CDI container is active — plain unit test context, fail-safe enforce — or (b) a CDI container is active and its request context is active. It returns `false` only when a CDI container is present but its request context is not — the precise condition of `@ObservesAsync` handler threads. Canonical implementation: `var c = Arc.container(); return c == null || c.requestContext().isActive();`. All `@QuarkusTest` adapter test classes that call adapter beans directly (not via HTTP) must be annotated `@ActivateRequestContext` to ensure `requestContextActive()` returns `true` during test execution. When the request context is not active, the principal comparison is skipped and `tenantId` from `MemoryInput` is trusted directly. The security gate before capability gate ordering still applies.
 
 ---
 

@@ -1,8 +1,9 @@
-# XS/S Correctness Batch — Design
+# XS/S Correctness Batch — Design (rev 2)
 
 **Issues:** platform#54, #62, #64, #72, #79  
 **Branch:** `issue-54-xs-s-batch-fixes`  
-**Date:** 2026-06-10
+**Date:** 2026-06-10  
+**Revised:** 2026-06-10 (post-review)
 
 ---
 
@@ -24,15 +25,17 @@ Five correctness fixes on the same branch. No migrations. No backward compatibil
 
 ### Fix 1 — Test constructor `requireHttps` field
 
-The package-private test constructor is documented "use with `http://` WireMock endpoints" but sets `this.requireHttps = true`. The field is dead weight in this path (`@PostConstruct` does not run for test constructor callers), and the value contradicts the documented use case.
+The package-private test constructor sets `this.requireHttps = true` and is documented "use with `http://` WireMock endpoints." The field value is **inert** in this path: `requireHttps` is only read inside `validateEndpoint()`, which is a `@PostConstruct` method that never fires for directly-constructed objects. The value `true` is never read and can never cause a failure — it just creates confusion for future maintainers who might assume it is.
 
-Change: `this.requireHttps = true` → `this.requireHttps = false`.
+Change: `this.requireHttps = true` → `this.requireHttps = false` to match the documented contract and prevent confusion if the field ever acquires a second read site.
 
 ### Fix 2 — Blank authToken at `@PostConstruct`
 
-`validateEndpoint()` checks that the endpoint is non-blank and uses HTTPS. It does not check that `authToken` is non-blank. A blank token sends `Authorization: Bearer ` on every request, receives 401s that are not cached (cache is never populated), and causes a retry storm under load.
+`validateEndpoint()` checks that the endpoint is non-blank and uses HTTPS. It does not validate `authToken`. A blank token sends `Authorization: Bearer ` on every request, receives 401s that are never cached (the cache is never populated), and causes retry storms under load.
 
-Add immediately after the HTTPS check:
+Note on timing: `ScimActorDIDProvider` is `@Alternative`. `@PostConstruct` fires only when the bean is activated via `quarkus.arc.selected-alternatives` — not at general Quarkus boot. This means the startup validation is conditional on activation, not guaranteed universally. Any deployment that activates this bean will hit the check.
+
+Add immediately after the HTTPS check in `validateEndpoint()`:
 
 ```java
 if (authToken == null || authToken.isBlank()) {
@@ -41,30 +44,50 @@ if (authToken == null || authToken.isBlank()) {
 }
 ```
 
-**Hard fail, not LOG.warn.** A blank token with a configured endpoint has no valid use case. Fail fast at startup rather than silently degrade under load.
+**Hard fail, not LOG.warn.** A blank token with a configured endpoint has no valid use case. Fail at activation time, not under load.
 
 ---
 
-## #64 — Mem0 `eraseById` preflight ownership check
+## #64 — Mem0 `eraseById` preflight ownership check + SPI `entityId` addition
 
 **Files:**
-- `memory-mem0/src/main/java/io/casehub/platform/memory/mem0/Mem0Client.java`
-- `memory-mem0/src/main/java/io/casehub/platform/memory/mem0/Mem0CaseMemoryStore.java`
-- `memory-mem0/src/test/java/io/casehub/platform/memory/mem0/Mem0CaseMemoryStoreTest.java`
+- `platform-api/.../CaseMemoryStore.java` — `eraseById` signature
+- `platform-api/.../CaseMemoryStoreSpiTest.java` — signature update
+- `platform/.../NoOpCaseMemoryStore.java`, `ReactiveCaseMemoryStore.java`, `BlockingToReactiveBridge.java` — signature updates
+- `memory-inmem/.../InMemoryMemoryStore.java` — signature + entity-scoped search
+- `memory-jpa/.../JpaMemoryStore.java` — signature + `entity_id` in WHERE
+- `memory-sqlite/.../SqliteMemoryStore.java` — signature + `entity_id` in WHERE
+- `memory-mem0/.../Mem0Client.java` — add `getById`
+- `memory-mem0/.../Mem0CaseMemoryStore.java` — eraseById signature + preflight GET
+- `memory-mem0/.../Mem0CaseMemoryStoreTest.java` — updated tests
+- `memory-graphiti/.../GraphitiCaseMemoryStore.java` — signature update (still throws `MemoryCapabilityException`)
+- `memory-graphiti/.../GraphitiCaseMemoryStoreTest.java` — signature update
+- `testing/.../CaseMemoryStoreContractTest.java` — signature updates
+- `platform/.../NoOpCaseMemoryStoreTest.java`, `BlockingToReactiveBridgeThreadingTest.java` — signature updates
 
-### Context
+### Architectural decision: add `entityId` to `eraseById`
 
-`eraseById` calls `assertTenant` (verifying the caller belongs to `tenantId`) then immediately issues `DELETE /memories/{memoryId}`. This prevents cross-tenant IDOR (a tenant-A caller cannot target a tenant-B memoryId because `assertTenant` would reject it). However, intra-tenant IDOR is not prevented: any entity in tenant-A that knows a `memoryId` can delete any other entity-in-tenant-A's memory, even if that memory was stored under a different `entityId`.
+The current SPI is inconsistent:
 
-The compound `user_id = "{tenantId}::{entityId}"` encodes entity scope. The preflight GET verifies the target memory's `user_id` starts with `"{tenantId}::"` before deleting — this is already covered. More precisely, it verifies `"{tenantId}::"` is the tenant prefix, which is the cross-tenant guard already in place.
+| Method | Has entityId? |
+|---|---|
+| `store(MemoryInput)` | ✅ yes |
+| `query(MemoryQuery)` | ✅ yes |
+| `erase(EraseRequest)` | ✅ yes |
+| `eraseEntity(entityId, tenantId)` | ✅ yes |
+| `eraseById(memoryId, tenantId)` | ❌ no — outlier |
 
-The actual intra-tenant entity isolation gap: memory `M` belongs to `entityId="agent-1"` under `tenantId="t1"`. A caller authenticated as `t1` but acting for `entityId="agent-2"` can delete `M` because `assertTenant` only checks `t1 == t1`. The preflight GET fetches `M`'s `user_id` (`t1::agent-1`) and can verify it starts with the right tenant prefix — but it cannot verify entity ownership without knowing the caller's `entityId`.
+`eraseById` is the sole method without entity scope. The counter-argument — that callers always obtain `memoryId` via `query()`, which already enforces entity isolation — is a runtime-behaviour argument, not a design argument. Correctness should be by construction, not by caller discipline.
 
-`eraseById` does not receive an `entityId` parameter (by SPI design). The preflight GET therefore provides **tenant-level ownership verification only** — confirming the memory belongs to this tenant before deleting. This closes the cross-tenant gap robustly and makes the ownership chain explicit in the code.
+**New signature:** `eraseById(String memoryId, String entityId, String tenantId)`
 
-### Design
+With `entityId`, the Mem0 preflight can perform an exact `user_id` equality check (`compoundUserId(tenantId, entityId)`) instead of prefix matching. All JDBC adapters add `entity_id` to the WHERE clause. The migration is fully mechanical.
 
-Add to `Mem0Client`:
+### Preflight GET: endpoint verification required
+
+⚠️ **Implementation blocker:** Add `GET /memories/{memoryId}` to `Mem0Client` — but **confirm this endpoint exists in the target Mem0 OSS version before implementing**. The WireMock stubs in `Mem0CaseMemoryStoreTest` cover only `POST /memories`, `GET /memories`, `POST /search`, `DELETE /memories/{id}`, and `DELETE /memories`. The blog entry explicitly documents `POST /memories`, `GET /memories`, `POST /search` as the OSS API surface. No evidence in the codebase that `GET /memories/{id}` exists in Mem0 OSS. If the endpoint is absent, the preflight strategy must be revised (see alternative below).
+
+Add to `Mem0Client` if confirmed:
 
 ```java
 @GET
@@ -75,10 +98,10 @@ Mem0Memory getById(@PathParam("memoryId") String memoryId);
 
 `Mem0Memory` already has a `userId()` field containing `"{tenantId}::{entityId}"`.
 
-In `Mem0CaseMemoryStore.eraseById()`, before the DELETE:
+### eraseById implementation in Mem0CaseMemoryStore
 
 ```java
-// Preflight ownership check
+// Preflight: verify the memory belongs to this entity within this tenant
 final Mem0Memory existing;
 try {
     existing = client.getById(memoryId);
@@ -86,28 +109,44 @@ try {
     if (e.getResponse() != null && e.getResponse().getStatus() == 404) return;
     throw toStoreException(e);
 }
-final String tenantPrefix = tenantId + SEP;
-if (existing.userId() == null || !existing.userId().startsWith(tenantPrefix)) {
+// A null userId on a 200 response is treated as a violation —
+// a memory with no owner identity cannot be safely attributed.
+final String expectedUserId = compoundUserId(tenantId, entityId);
+if (!expectedUserId.equals(existing.userId())) {
     throw new SecurityException(
-        "Memory " + memoryId + " does not belong to tenant: " + tenantId);
+        "Memory " + memoryId + " does not belong to entity " + entityId
+        + " in tenant " + tenantId);
 }
-// Proceed to DELETE (404 guard below handles concurrent deletion)
+// Proceed to DELETE — 404 guard handles concurrent deletion
 ```
 
-**No config flag.** This is a security invariant. `eraseById` is an infrequent GDPR erasure operation; one extra round-trip is acceptable.
+**If `GET /memories/{id}` does not exist in Mem0 OSS:** the preflight must fall back to `GET /memories?user_id={compoundUserId}` (list for this entity), scanning for `memoryId`. This is O(N) in entity history size. Confirm API surface before choosing strategy.
+
+**No config flag.** This is a security invariant. `eraseById` is infrequent GDPR erasure; one extra round-trip is acceptable.
+
+### Other adapters with new entityId parameter
+
+- **`InMemoryMemoryStore.eraseById`**: scope the scan to `BucketKey(tenantId, entityId, *)` buckets. The current implementation scans all tenant entries; adding entity scope makes it precise and faster.
+- **`JpaMemoryStore.eraseById`**: add `AND entityId = :entityId` to the JPQL DELETE WHERE clause.
+- **`SqliteMemoryStore.eraseById`**: add `AND entity_id = ?` to the SQL DELETE WHERE clause.
+- **`GraphitiCaseMemoryStore.eraseById`**: still throws `MemoryCapabilityException` (no `ERASE_BY_ID`); just update the method signature.
+- **`NoOpCaseMemoryStore.eraseById`**: still a true no-op; update signature only.
 
 ### Tests
 
-Update `Mem0CaseMemoryStoreTest`:
-- `eraseById_sends_delete_after_successful_preflight_GET`: stub GET → matching userId → stub DELETE → verify both called
-- `eraseById_throws_SecurityException_when_userId_tenant_prefix_mismatch`: stub GET → mismatched userId → verify SecurityException, no DELETE
-- `eraseById_skips_when_preflight_returns_404`: stub GET → 404 → verify no DELETE called
+Update `Mem0CaseMemoryStoreTest` for new signature and add:
+- `eraseById_preflight_GET_verifies_ownership`: stub GET → matching userId → stub DELETE → verify both called
+- `eraseById_throws_SecurityException_on_userId_mismatch`: stub GET → mismatched userId → SecurityException; verify no DELETE
+- `eraseById_returns_on_preflight_404`: stub GET → 404 → no DELETE called
+- `eraseById_tenant_mismatch_throws_before_http`: unchanged semantics, new signature
+
+Update `CaseMemoryStoreContractTest` signature in all `eraseById` call sites. The entityId for the contract test calls is `"entity-1"` (the default input entity).
 
 ---
 
 ## #72 — `eraseEntity()` return type `void` → `int`
 
-**Purpose:** GDPR Art.5(2) accountability. Callers need to log how many records were actually erased, not just that erasure was requested.
+**Purpose:** GDPR Art.5(2) accountability. Callers need to log how many records were actually erased.
 
 ### SPI changes
 
@@ -137,22 +176,69 @@ public Uni<Integer> eraseEntity(String entityId, String tenantId) {
 }
 ```
 
-### Implementations
+### Implementations — counts
 
-| Adapter | Count source |
-|---|---|
-| `NoOpCaseMemoryStore` | `return 0` (nothing stored, erasure trivially satisfied) |
-| `InMemoryMemoryStore` | Iterate `ConcurrentHashMap` entries matching `(tenantId, entityId)`, sum list sizes; then `removeIf` to delete |
-| `JpaMemoryStore` | JPQL `DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId` → `int` from `executeUpdate()` |
-| `SqliteMemoryStore` | JDBC `DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ?` → `int` from `executeUpdate()` |
-| `Mem0CaseMemoryStore` | `client.list(userId, null, null)` → `results.size()` → then `client.deleteAll(userId, null, null)` |
-| `GraphitiCaseMemoryStore` | `client.getEpisodes(groupId, Integer.MAX_VALUE).size()` → then `client.deleteGroup(groupId)`. Episode count only — derived entity nodes and edges have no independent count API; document this in Javadoc. |
+**`NoOpCaseMemoryStore`**: `return 0` — nothing stored, erasure trivially satisfied.
 
-For Mem0 and Graphiti, the count-then-delete adds one extra round-trip. Acceptable for infrequent GDPR erasure.
+**`InMemoryMemoryStore`**: single-pass with `AtomicInteger` to avoid the two-pass race window:
+
+```java
+@Override
+public int eraseEntity(String entityId, String tenantId) {
+    MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+    final AtomicInteger count = new AtomicInteger();
+    store.entrySet().removeIf(e -> {
+        if (e.getKey().tenantId().equals(tenantId) && e.getKey().entityId().equals(entityId)) {
+            count.addAndGet(e.getValue().size());
+            return true;
+        }
+        return false;
+    });
+    return count.get();
+}
+```
+
+`ConcurrentHashMap.entrySet().removeIf()` is safe under concurrent access. The count reflects list sizes at iteration time; a concurrent add between iteration and removal may undercount by at most that add. Acceptable for a test adapter.
+
+**`JpaMemoryStore`**: JPQL `DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId` — `executeUpdate()` returns `int` natively.
+
+**`SqliteMemoryStore`**: JDBC `DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ?` — `executeUpdate()` returns `int`.
+
+**`Mem0CaseMemoryStore`**: count-then-delete. `client.list(userId, null, null)` returns all memories for the entity across all domains. Null-safe count:
+
+```java
+final Mem0ListResponse listed = client.list(compoundUserId(tenantId, entityId), null, null);
+final int count = listed.results() != null ? listed.results().size() : 0;
+client.deleteAll(compoundUserId(tenantId, entityId), null, null);
+return count;
+```
+
+**Javadoc on `Mem0CaseMemoryStore.eraseEntity()`:** "The returned count is a best-effort estimate: new writes can arrive between the `list()` call and the `deleteAll()` call, causing the count to understate the actual deletion. Callers must treat this as a lower bound for logging purposes — it is not an exact audit count."
+
+**`GraphitiCaseMemoryStore`**: count episodes first, then cascade-delete the group:
+
+```java
+private static final int MAX_EPISODES_FOR_COUNT = 10_000;
+
+@Override
+public int eraseEntity(final String entityId, final String tenantId) {
+    MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
+    final String groupId = compoundGroupId(tenantId, entityId);
+    final int count = client.getEpisodes(groupId, MAX_EPISODES_FOR_COUNT).size();
+    try {
+        client.deleteGroup(groupId);
+    } catch (final WebApplicationException e) {
+        throw GraphitiStoreException.from(e);
+    }
+    return count;
+}
+```
+
+**Javadoc on `GraphitiCaseMemoryStore.eraseEntity()`:** "Returns the episode count at the time of the call, capped at `MAX_EPISODES_FOR_COUNT` (10,000). The Graphiti server's `last_n` upper bound is not verified; entities with more than 10,000 episodes will report an understated count. Derived entity nodes and relationship edges extracted by the LLM have no independent count API and are not included in the returned value. The actual deletion via `DELETE /group/{groupId}` is complete — the cap is only a count limitation, not an erasure limitation."
 
 ### Contract test additions
 
-In `CaseMemoryStoreContractTest` (abstract; applies to all concrete adapter tests):
+In `CaseMemoryStoreContractTest`:
 
 ```java
 @Test
@@ -169,13 +255,15 @@ void eraseEntity_returns_zero_when_nothing_stored() {
 }
 ```
 
-Update existing `eraseEntity_removes_all_domains_for_entity` and `eraseEntity_leaves_other_entities_intact` to verify return value is `> 0` and `>= 0` respectively (rather than ignoring it).
+Update existing `eraseEntity_removes_all_domains_for_entity` and `eraseEntity_leaves_other_entities_intact` to assert the return value is positive and zero respectively (rather than discarding it).
 
 ### Other files touched
 
-- `platform-api/src/test/java/io/casehub/platform/api/memory/CaseMemoryStoreSpiTest.java` — `eraseEntity_default_throws_MemoryCapabilityException`: return type signature update
-- `platform/src/test/java/io/casehub/platform/memory/NoOpCaseMemoryStoreTest.java` — verify `eraseEntity` returns `0`
-- `platform/src/test/java/io/casehub/platform/memory/BlockingToReactiveBridgeThreadingTest.java` — update inline stub (`void` → `return 0`) and assertion
+- `platform-api/.../CaseMemoryStoreSpiTest.java` — `eraseEntity_default_throws_MemoryCapabilityException`: return type signature update
+- `platform/.../NoOpCaseMemoryStoreTest.java` — assert `eraseEntity` returns `0`
+- `platform/.../BlockingToReactiveBridgeThreadingTest.java` — update inline stub (`void` → `return 0`) and assertion
+- `memory-jpa/src/test/.../JpaMemoryStoreTest.java` — add count assertions for existing `eraseEntity` calls; `eraseEntity` is also called via `CaseMemoryStoreContractTest` which this extends
+- `memory-sqlite/src/test/.../SqliteMemoryStoreTest.java` — update `@AfterEach` calls (lines 31–32) to receive and discard the int, or assert `> 0` as a health check
 
 ---
 
@@ -185,13 +273,11 @@ Update existing `eraseEntity_removes_all_domains_for_entity` and `eraseEntity_le
 
 `MemoryPermissions.assertTenant(tenantId, principal)` checks `principal.tenancyId().equals(tenantId)`. In `@ObservesAsync` handler threads, no CDI request scope is propagated. `CurrentPrincipal` (a `@RequestScoped` or `@ApplicationScoped` mock) returns a sentinel that does not match `input.tenantId()` → `SecurityException` → silent drop.
 
-The check is an **HTTP boundary authentication gate**, not a data filter. In async context the "caller" is trusted application code — the tenantId in `MemoryInput` was set by code that ran in authenticated context. The data-scoping by `tenantId` (which records are touched) is unconditional and always happens via `input.tenantId()` in the adapter. Only the principal comparison is skipped.
-
-### Design decision
-
-`MemoryPermissions` stays CDI-free (pure Java, fully unit-testable). The CDI context check lives in the adapters — they already have Quarkus deps and `Arc` is the right layer for container-awareness. The conditional logic is encapsulated in a named overload to avoid raw inline conditionals.
+`assertTenant()` is an **HTTP boundary authentication gate**, not a data filter. In async context the "caller" is trusted application code — the tenantId in `MemoryInput` was set by code that ran in authenticated context. Data scoping (which records are touched) always happens unconditionally via `input.tenantId()` in the adapter.
 
 ### `MemoryPermissions` — new overload
+
+`MemoryPermissions` stays CDI-free. The CDI context check lives in the adapters.
 
 ```java
 /**
@@ -206,7 +292,20 @@ public static void assertTenant(String tenantId, CurrentPrincipal principal,
 }
 ```
 
-The 2-arg form is unchanged. It remains the correct call for callers that know they are in request scope.
+The 2-arg form is unchanged. It remains correct for callers that know they are in request scope.
+
+### Remove `CaseMemoryStore.assertTenant()` default wrapper
+
+`CaseMemoryStore` has a default wrapper at lines 138–140:
+```java
+default void assertTenant(String tenantId, CurrentPrincipal principal) {
+    MemoryPermissions.assertTenant(tenantId, principal);
+}
+```
+
+No adapter calls `this.assertTenant()` — all call `MemoryPermissions.assertTenant()` directly. The wrapper serves no function but creates a trap: future adapter code that uses `this.assertTenant()` instead of the 3-arg `MemoryPermissions.assertTenant()` will silently bypass async-awareness. **Remove the wrapper entirely.**
+
+`CaseMemoryStoreSpiTest` has two tests (`assertTenant_throws_on_mismatch`, `assertTenant_passes_on_match`) that test only the wrapper delegation. These tests are redundant with `MemoryPermissionsTest` and must be removed along with the wrapper.
 
 ### Adapter changes (5 adapters)
 
@@ -224,13 +323,24 @@ Every `MemoryPermissions.assertTenant(x, principal)` call in every operation (`s
 MemoryPermissions.assertTenant(x, principal, requestContextActive());
 ```
 
+**`SqliteMemoryStore.storeAll()` calls `assertTenant` twice per item** — the pre-flight `forEach` at line 125 (checks all inputs before any JDBC operation) AND the per-item call at line 133 inside the batch loop. Both sites must change to the 3-arg form. The double-check is intentional (pre-flight for atomicity + per-item as defence-in-depth); preserving both is correct.
+
+### `CaseMemoryStore.store()` Javadoc — full replacement
+
+The existing Javadoc has three guidance sections. All three must be updated:
+
+**`@ObservesAsync`** — Previously marked "not safe." Now: `@ObservesAsync` callers are supported. Adapters use the async-aware 3-arg `assertTenant` form, which trusts `MemoryInput.tenantId()` directly when no CDI request scope is active. The data-scoping by `tenantId` is unconditional; only the principal comparison is skipped.
+
+**`@Observes` (synchronous)** — Still valid and unchanged. Synchronous observers preserve request scope and propagate exceptions normally. The transaction-coupling tradeoff remains: a synchronous `store()` call is atomic with the event-firing transaction — desirable for compliance writes, wrong if the caller expects fire-and-forget.
+
+**Batch jobs / startup contexts** — Previously required explicit request scope activation. Now: the 3-arg assertTenant form handles these too — no request scope active → trust the tenantId from `MemoryInput` directly. Explicit `@ActivateRequestContext` is no longer required for memory writes from batch or startup code.
+
 ### `MemoryPermissionsTest` — new tests
 
 ```java
 @Test
 void three_arg_skips_check_when_not_in_request_context() {
-    // requestContextActive=false → no exception even with mismatched tenantId
-    CurrentPrincipal p = () -> "other-tenant"; // anonymous impl
+    CurrentPrincipal p = () -> "other-tenant";
     assertDoesNotThrow(() -> MemoryPermissions.assertTenant("mine", p, false));
 }
 
@@ -242,19 +352,13 @@ void three_arg_enforces_when_in_request_context() {
 }
 ```
 
-(Where `CurrentPrincipal` lambda works because `tenancyId()` is the only method needed for these tests.)
-
-### `CaseMemoryStore` Javadoc update
-
-Remove the `@ObservesAsync is not safe` warning on `store()`. Replace with:
-
-> `@ObservesAsync` callers are supported. Adapters use the async-aware 3-arg `assertTenant` form, which trusts `MemoryInput.tenantId()` directly when no CDI request scope is active. The data-scoping by `tenantId` is unconditional; only the principal comparison is skipped in async context.
+(`CurrentPrincipal` is a functional interface — `tenancyId()` is the only method invoked by these tests.)
 
 ### Protocol update
 
-`casememorystore-adapter-asserttenant-contract.md` (PP-20260529-57cc3b): add to the body:
+`casememorystore-adapter-asserttenant-contract.md` (PP-20260529-57cc3b): add:
 
-> **Async-aware form:** Adapters that support `@ObservesAsync` callers call the 3-arg overload `MemoryPermissions.assertTenant(tenantId, principal, requestContextActive())` where `requestContextActive()` returns `Arc.container().requestContext().isActive()`. When the request context is not active, the principal comparison is skipped and `tenantId` from `MemoryInput` is trusted directly. The security gate before capability gate ordering still applies.
+> **Async-aware form:** Adapters that support `@ObservesAsync` callers use the 3-arg overload `MemoryPermissions.assertTenant(tenantId, principal, requestContextActive())` where `requestContextActive()` returns `Arc.container().requestContext().isActive()`. When the request context is not active, the principal comparison is skipped and `tenantId` from `MemoryInput` is trusted directly. The security gate before capability gate ordering still applies.
 
 ---
 
@@ -264,7 +368,7 @@ Remove the `@ObservesAsync is not safe` warning on `store()`. Replace with:
 fix(platform#62): ScimActorDIDProvider test constructor + authToken hard validation
 fix(platform#79): MemoryPermissions async-aware assertTenant overload + all adapters
 fix(platform#72): eraseEntity() returns int count — all adapters + reactive bridge
-fix(platform#64): Mem0 eraseById preflight ownership GET before DELETE
+fix(platform#64): eraseById gains entityId param + Mem0 preflight ownership GET
 ```
 
 Issue #54 is closed via GitHub (no code commit).
@@ -276,22 +380,24 @@ Issue #54 is closed via GitHub (no code commit).
 | File | Issues |
 |---|---|
 | `platform-api/.../MemoryPermissions.java` | #79 |
-| `platform-api/.../CaseMemoryStore.java` | #72, #79 (Javadoc) |
+| `platform-api/.../CaseMemoryStore.java` | #64 (eraseById sig), #72, #79 (remove wrapper, Javadoc) |
 | `platform-api/.../MemoryPermissionsTest.java` | #79 |
-| `platform-api/.../CaseMemoryStoreSpiTest.java` | #72 |
-| `platform/.../NoOpCaseMemoryStore.java` | #72 |
-| `platform/.../ReactiveCaseMemoryStore.java` | #72 |
-| `platform/.../BlockingToReactiveBridge.java` | #72 |
-| `platform/.../NoOpCaseMemoryStoreTest.java` | #72 |
-| `platform/.../BlockingToReactiveBridgeThreadingTest.java` | #72 |
-| `memory-inmem/.../InMemoryMemoryStore.java` | #72, #79 |
-| `memory-jpa/.../JpaMemoryStore.java` | #72, #79 |
-| `memory-sqlite/.../SqliteMemoryStore.java` | #72, #79 |
+| `platform-api/.../CaseMemoryStoreSpiTest.java` | #64, #72, #79 (remove wrapper tests) |
+| `platform/.../NoOpCaseMemoryStore.java` | #64, #72 |
+| `platform/.../ReactiveCaseMemoryStore.java` | #64, #72 |
+| `platform/.../BlockingToReactiveBridge.java` | #64, #72 |
+| `platform/.../NoOpCaseMemoryStoreTest.java` | #64, #72 |
+| `platform/.../BlockingToReactiveBridgeThreadingTest.java` | #64, #72 |
+| `memory-inmem/.../InMemoryMemoryStore.java` | #64, #72, #79 |
+| `memory-jpa/.../JpaMemoryStore.java` | #64, #72, #79 |
+| `memory-jpa/src/test/.../JpaMemoryStoreTest.java` | #72 |
+| `memory-sqlite/.../SqliteMemoryStore.java` | #64, #72, #79 |
+| `memory-sqlite/src/test/.../SqliteMemoryStoreTest.java` | #72 |
 | `memory-mem0/.../Mem0Client.java` | #64 |
 | `memory-mem0/.../Mem0CaseMemoryStore.java` | #64, #72, #79 |
 | `memory-mem0/.../Mem0CaseMemoryStoreTest.java` | #64, #72 |
-| `memory-graphiti/.../GraphitiCaseMemoryStore.java` | #72, #79 |
-| `memory-graphiti/.../GraphitiCaseMemoryStoreTest.java` | #72 |
+| `memory-graphiti/.../GraphitiCaseMemoryStore.java` | #64, #72, #79 |
+| `memory-graphiti/.../GraphitiCaseMemoryStoreTest.java` | #64, #72 |
 | `identity/.../ScimActorDIDProvider.java` | #62 |
-| `testing/.../CaseMemoryStoreContractTest.java` | #72 |
+| `testing/.../CaseMemoryStoreContractTest.java` | #64, #72 |
 | `garden/docs/protocols/casehub/casememorystore-adapter-asserttenant-contract.md` | #79 |

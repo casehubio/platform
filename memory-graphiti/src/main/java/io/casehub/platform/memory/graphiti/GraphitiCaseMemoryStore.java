@@ -3,6 +3,7 @@ package io.casehub.platform.memory.graphiti;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
 import io.casehub.platform.memory.graphiti.dto.*;
+import io.quarkus.arc.Arc;
 import io.micrometer.core.annotation.Timed;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,6 +29,11 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     @Inject @RestClient GraphitiClient client;
     @Inject CurrentPrincipal principal;
 
+    private boolean requestContextActive() {
+        var c = Arc.container();
+        return c == null || c.requestContext().isActive();
+    }
+
     @Override
     public Set<MemoryCapability> capabilities() {
         // TEMPORAL_GRAPH: server POST /search does not accept valid_at as a request param;
@@ -52,7 +58,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "store"})
     @Override
     public String store(final MemoryInput input) {
-        MemoryPermissions.assertTenant(input.tenantId(), principal);
+        MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
         final String episodeUuid = UUID.randomUUID().toString();
         sendAdd(input, episodeUuid);
         return episodeUuid;
@@ -63,7 +69,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     public List<String> storeAll(final List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return List.of();
         // Pre-flight: verify all tenant assertions before any REST call
-        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal));
+        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         final var ids = new ArrayList<String>(inputs.size());
         for (final MemoryInput input : inputs) {
             final String uuid = UUID.randomUUID().toString();
@@ -99,7 +105,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "query"})
     @Override
     public List<Memory> query(final MemoryQuery query) {
-        MemoryPermissions.assertTenant(query.tenantId(), principal);
+        MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
 
         final boolean relevanceWithQuestion =
             query.order() == MemoryOrder.RELEVANCE && query.question() != null;
@@ -162,7 +168,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "graphQuery"})
     @Override
     public List<Memory> graphQuery(final GraphMemoryQuery query) {
-        MemoryPermissions.assertTenant(query.tenantId(), principal);
+        MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
 
         // Capability checks — always require FACT_SEARCH first
         requireCapability(MemoryCapability.FACT_SEARCH);
@@ -222,14 +228,14 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "erase"})
     @Override
     public void erase(final EraseRequest request) {
-        MemoryPermissions.assertTenant(request.tenantId(), principal);
+        MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
         requireCapability(MemoryCapability.ERASE_DOMAIN_CASE); // throws
     }
 
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
     public void eraseEntity(final String entityId, final String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         try {
             client.deleteGroup(compoundGroupId(tenantId, entityId));
         } catch (final WebApplicationException e) {
@@ -248,7 +254,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
      */
     @Override
     public void eraseById(final String memoryId, final String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         requireCapability(MemoryCapability.ERASE_BY_ID);
     }
 

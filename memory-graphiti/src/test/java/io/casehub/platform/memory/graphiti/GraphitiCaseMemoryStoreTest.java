@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.*;
 
@@ -17,6 +18,7 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMoc
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
+@ActivateRequestContext
 class GraphitiCaseMemoryStoreTest {
 
     static WireMockServer wireMock;

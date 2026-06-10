@@ -29,4 +29,26 @@ class MemoryPermissionsTest {
         assertTrue(ex.getMessage().contains("tenant-b"));
         assertTrue(ex.getMessage().contains("tenant-a"));
     }
+
+    // ── 3-arg async-aware overload ─────────────────────────────────────────────
+
+    @Test
+    void three_arg_skips_check_when_not_in_request_context() {
+        // requestContextActive=false simulates @ObservesAsync thread — trust tenantId
+        assertDoesNotThrow(() ->
+            MemoryPermissions.assertTenant("mine", principal("other-tenant"), false));
+    }
+
+    @Test
+    void three_arg_enforces_when_in_request_context() {
+        // requestContextActive=true simulates normal HTTP request — enforce
+        assertThrows(SecurityException.class, () ->
+            MemoryPermissions.assertTenant("mine", principal("other-tenant"), true));
+    }
+
+    @Test
+    void three_arg_passes_matching_tenant_when_in_request_context() {
+        assertDoesNotThrow(() ->
+            MemoryPermissions.assertTenant("mine", principal("mine"), true));
+    }
 }

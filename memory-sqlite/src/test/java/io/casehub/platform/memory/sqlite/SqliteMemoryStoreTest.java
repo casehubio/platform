@@ -4,6 +4,7 @@ import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
+@ActivateRequestContext
 class SqliteMemoryStoreTest extends CaseMemoryStoreContractTest {
 
     @Inject SqliteMemoryStore sqliteStore;

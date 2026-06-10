@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -38,10 +39,15 @@ public class JpaMemoryStore implements CaseMemoryStore {
     @Inject EntityManager em;
     @Inject ObjectMapper objectMapper;
 
+    private boolean requestContextActive() {
+        var c = Arc.container();
+        return c == null || c.requestContext().isActive();
+    }
+
     @Override
     @Transactional(TxType.REQUIRED)
     public String store(MemoryInput input) {
-        MemoryPermissions.assertTenant(input.tenantId(), principal);
+        MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
 
         MemoryEntry entry = new MemoryEntry();
         entry.memoryId   = UUID.randomUUID().toString();
@@ -62,7 +68,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     public List<String> storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return List.of();
         var entries = inputs.stream().map(input -> {
-            MemoryPermissions.assertTenant(input.tenantId(), principal);
+            MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
             MemoryEntry e = new MemoryEntry();
             e.memoryId   = UUID.randomUUID().toString();
             e.tenantId   = input.tenantId();
@@ -81,7 +87,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     @Override
     @Transactional(TxType.REQUIRED)
     public List<Memory> query(MemoryQuery query) {
-        MemoryPermissions.assertTenant(query.tenantId(), principal);
+        MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
 
         if (config.fts().enabled()
                 && query.order() == MemoryOrder.RELEVANCE
@@ -144,7 +150,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     @Override
     @Transactional(TxType.REQUIRED)
     public void erase(EraseRequest request) {
-        MemoryPermissions.assertTenant(request.tenantId(), principal);
+        MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
 
         var jpql = new StringBuilder(
             "DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId AND domain = :domain");
@@ -163,7 +169,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     @Override
     @Transactional(TxType.REQUIRED)
     public void eraseById(String memoryId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         em.createQuery("DELETE FROM MemoryEntry WHERE memoryId = :id AND tenantId = :tenantId")
             .setParameter("id",       memoryId)
             .setParameter("tenantId", tenantId)
@@ -174,7 +180,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
     @Override
     @Transactional(TxType.REQUIRED)
     public void eraseEntity(String entityId, String tenantId) {
-        MemoryPermissions.assertTenant(tenantId, principal);
+        MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
         em.createQuery("DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId")
             .setParameter("tenantId", tenantId)
             .setParameter("entityId", entityId)

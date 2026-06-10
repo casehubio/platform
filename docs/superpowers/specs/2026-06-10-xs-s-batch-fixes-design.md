@@ -3,7 +3,7 @@
 **Issues:** platform#54, #62, #64, #72, #79  
 **Branch:** `issue-54-xs-s-batch-fixes`  
 **Date:** 2026-06-10  
-**Revised:** 2026-06-10 (post-review rev 3)
+**Revised:** 2026-06-10 (post-review rev 4)
 
 ---
 
@@ -339,9 +339,13 @@ Each adapter (`InMemoryMemoryStore`, `JpaMemoryStore`, `SqliteMemoryStore`, `Mem
 
 ```java
 private boolean requestContextActive() {
-    return Arc.container().requestContext().isActive();
+    var container = Arc.container();
+    if (container == null) return true; // no CDI — plain unit test or non-Quarkus; enforce
+    return container.requestContext().isActive();
 }
 ```
+
+**Why null-safe with `true` as the no-CDI default:** `Arc.container()` returns `null` when no Quarkus container is running (plain JUnit test, e.g. `InMemoryMemoryStoreTest`). Returning `true` in this case means assertTenant enforces normally — the fail-safe direction. Returning `false` would make every plain unit test security assertion a no-op. Only return `false` when we positively know we are inside a CDI container without an active request context — the precise signature of an `@ObservesAsync` handler thread.
 
 Every `MemoryPermissions.assertTenant(x, principal)` call in every operation (`store`, `storeAll`, `query`, `erase`, `eraseById`, `eraseEntity`) becomes:
 
@@ -350,6 +354,28 @@ MemoryPermissions.assertTenant(x, principal, requestContextActive());
 ```
 
 **`SqliteMemoryStore.storeAll()` calls `assertTenant` twice per item** — the pre-flight `forEach` at line 125 (checks all inputs before any JDBC operation) AND the per-item call at line 133 inside the batch loop. Both sites must change to the 3-arg form. The double-check is intentional (pre-flight for atomicity + per-item as defence-in-depth); preserving both is correct.
+
+### `@ActivateRequestContext` required on all `@QuarkusTest` adapter tests — CORRECTNESS REQUIREMENT
+
+**Without this, every cross-tenant security test in every @QuarkusTest adapter class will pass vacuously.**
+
+`@QuarkusTest` test methods do not activate CDI request context by default. When an adapter test method calls `store.store(bad)` directly (not via HTTP), `requestContextActive()` returns `false`, making `assertTenant` a no-op. Every test asserting `SecurityException` for a cross-tenant call silently stops throwing — the test passes, but the security guard is not exercised.
+
+This is distinct from the `@ObservesAsync` bypass case the 3-arg form is designed to enable. The distinguishing mechanism — not the intent — is `@ActivateRequestContext`: applying it to a `@QuarkusTest` class causes `requestContextActive()` to return `true` for test method invocations. An `@ObservesAsync` handler does not carry this annotation, so `requestContextActive()` correctly returns `false` there.
+
+**The following test classes must be annotated `@ActivateRequestContext`:**
+
+| Class | Location | Type |
+|---|---|---|
+| `JpaMemoryStoreTest` | `memory-jpa/src/test/` | `@QuarkusTest`, extends contract test |
+| `SqliteMemoryStoreTest` | `memory-sqlite/src/test/` | `@QuarkusTest`, extends contract test |
+| `SqliteMemoryStoreFtsDisabledTest` | `memory-sqlite/src/test/` | `@QuarkusTest` |
+| `Mem0CaseMemoryStoreTest` | `memory-mem0/src/test/` | `@QuarkusTest` |
+| `GraphitiCaseMemoryStoreTest` | `memory-graphiti/src/test/` | `@QuarkusTest` |
+
+**`InMemoryMemoryStoreTest` does NOT need `@ActivateRequestContext`** — it is a plain JUnit 5 test with no CDI. `Arc.container()` returns `null` → the null-safe helper returns `true` → assertTenant enforces. No annotation needed.
+
+**Verification:** after adding `@ActivateRequestContext`, every existing cross-tenant test that currently asserts `SecurityException` must continue to throw. Run the test suite per adapter to confirm before merging.
 
 ### `CaseMemoryStore.store()` Javadoc — full replacement
 
@@ -414,14 +440,15 @@ Issue #54 is closed via GitHub (no code commit).
 | `platform/.../BlockingToReactiveBridgeThreadingTest.java` | #64, #72 |
 | `memory-inmem/.../InMemoryMemoryStore.java` | #64, #72, #79 |
 | `memory-jpa/.../JpaMemoryStore.java` | #64, #72, #79 |
-| `memory-jpa/src/test/.../JpaMemoryStoreTest.java` | #72 |
+| `memory-jpa/src/test/.../JpaMemoryStoreTest.java` | #72, #79 (@ActivateRequestContext) |
 | `memory-sqlite/.../SqliteMemoryStore.java` | #64, #72, #79 |
-| `memory-sqlite/src/test/.../SqliteMemoryStoreTest.java` | #72 |
+| `memory-sqlite/src/test/.../SqliteMemoryStoreTest.java` | #72, #79 (@ActivateRequestContext) |
+| `memory-sqlite/src/test/.../SqliteMemoryStoreFtsDisabledTest.java` | #79 (@ActivateRequestContext) |
 | `memory-mem0/.../Mem0Client.java` | #64 |
 | `memory-mem0/.../Mem0CaseMemoryStore.java` | #64, #72, #79 |
-| `memory-mem0/.../Mem0CaseMemoryStoreTest.java` | #64, #72 |
+| `memory-mem0/.../Mem0CaseMemoryStoreTest.java` | #64, #72, #79 (@ActivateRequestContext) |
 | `memory-graphiti/.../GraphitiCaseMemoryStore.java` | #64, #72, #79 |
-| `memory-graphiti/.../GraphitiCaseMemoryStoreTest.java` | #64, #72 |
+| `memory-graphiti/.../GraphitiCaseMemoryStoreTest.java` | #64, #72, #79 (@ActivateRequestContext) |
 | `identity/.../ScimActorDIDProvider.java` | #62 |
 | `testing/.../CaseMemoryStoreContractTest.java` | #64, #72 |
 | `garden/docs/protocols/casehub/casememorystore-adapter-asserttenant-contract.md` | #79 |

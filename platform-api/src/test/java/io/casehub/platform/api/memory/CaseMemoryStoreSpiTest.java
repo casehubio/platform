@@ -30,7 +30,7 @@ class CaseMemoryStoreSpiTest {
     @Test
     void eraseById_default_throws_MemoryCapabilityException() {
         final var ex = assertThrows(MemoryCapabilityException.class,
-            () -> sut.eraseById("mem-1", "tenant-1"));
+            () -> sut.eraseById("mem-1", "entity-1", "tenant-1"));
         assertEquals(MemoryCapability.ERASE_BY_ID, ex.required());
     }
 

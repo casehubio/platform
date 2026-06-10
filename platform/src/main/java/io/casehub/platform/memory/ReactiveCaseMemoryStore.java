@@ -37,10 +37,11 @@ public interface ReactiveCaseMemoryStore {
 
     /**
      * Erase a specific memory by its assigned memoryId.
+     * See {@link io.casehub.platform.api.memory.CaseMemoryStore#eraseById} for semantics.
      *
      * <p>Default returns a failed Uni matching the blocking interface's contract.
      */
-    default Uni<Void> eraseById(String memoryId, String tenantId) {
+    default Uni<Void> eraseById(String memoryId, String entityId, String tenantId) {
         return Uni.createFrom().failure(
             new UnsupportedOperationException("eraseById not supported by this adapter"));
     }

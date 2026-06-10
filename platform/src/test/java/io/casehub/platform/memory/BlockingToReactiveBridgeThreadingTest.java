@@ -34,7 +34,7 @@ class BlockingToReactiveBridgeThreadingTest {
             @Override public void erase(EraseRequest r) {
                 capturedThreadId.set(Thread.currentThread().getId());
             }
-            @Override public void eraseById(String id, String tid) {
+            @Override public void eraseById(String id, String eid, String tid) {
                 capturedThreadId.set(Thread.currentThread().getId());
             }
             @Override public int eraseEntity(String eid, String tid) {
@@ -79,7 +79,7 @@ class BlockingToReactiveBridgeThreadingTest {
     @Test
     void eraseById_executes_delegate_on_worker_thread() {
         var capturedId = new AtomicLong(Thread.currentThread().getId());
-        bridgeWith(capturedId).eraseById("mem-1", TENANT).await().indefinitely();
+        bridgeWith(capturedId).eraseById("mem-1", "entity-1", TENANT).await().indefinitely();
         assertNotEquals(Thread.currentThread().getId(), capturedId.get(),
             "eraseById() must offload delegate to a worker thread, not run on the subscribing thread");
     }

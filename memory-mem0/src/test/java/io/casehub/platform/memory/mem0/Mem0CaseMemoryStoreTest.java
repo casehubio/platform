@@ -386,35 +386,58 @@ class Mem0CaseMemoryStoreTest {
 
     // ── eraseById ─────────────────────────────────────────────────────────────
 
+    private void stubGetByIdOk(String memoryId, String userId) {
+        wireMock().stubFor(get(urlEqualTo("/memories/" + memoryId))
+            .willReturn(okJson("""
+                {"id":"%s","memory":"text","user_id":"%s"}
+                """.formatted(memoryId, userId))));
+    }
+
     @Test
-    void eraseById_sends_delete_by_id_path() {
+    void eraseById_preflight_GET_then_DELETE_when_userId_matches() {
+        stubGetByIdOk("mem-xyz", "tenant-1::entity-1");
         stubDeleteByIdOk("mem-xyz");
-        store.eraseById("mem-xyz", TENANT);
+        store.eraseById("mem-xyz", "entity-1", TENANT);
+        wireMock().verify(getRequestedFor(urlEqualTo("/memories/mem-xyz")));
         wireMock().verify(deleteRequestedFor(urlEqualTo("/memories/mem-xyz")));
     }
 
     @Test
-    void eraseById_404_is_swallowed() {
-        wireMock().stubFor(delete(urlEqualTo("/memories/gone"))
-            .willReturn(aResponse().withStatus(404)));
-        assertDoesNotThrow(() -> store.eraseById("gone", TENANT));
+    void eraseById_returns_silently_when_userId_mismatches() {
+        // memory belongs to entity-2, not entity-1 — silent no-op
+        stubGetByIdOk("mem-xyz", "tenant-1::entity-2");
+        store.eraseById("mem-xyz", "entity-1", TENANT);
+        wireMock().verify(0, deleteRequestedFor(urlMatching("/memories/.*")));
     }
 
     @Test
-    void eraseById_non_2xx_non_404_throws_Mem0StoreException() {
+    void eraseById_returns_silently_when_preflight_GET_returns_404() {
+        wireMock().stubFor(get(urlEqualTo("/memories/gone"))
+            .willReturn(aResponse().withStatus(404)));
+        assertDoesNotThrow(() -> store.eraseById("gone", "entity-1", TENANT));
+        wireMock().verify(0, deleteRequestedFor(urlMatching("/memories/.*")));
+    }
+
+    @Test
+    void eraseById_non_2xx_on_preflight_GET_throws_Mem0StoreException() {
+        wireMock().stubFor(get(urlEqualTo("/memories/error"))
+            .willReturn(serverError()));
+        assertThrows(Mem0StoreException.class, () -> store.eraseById("error", "entity-1", TENANT));
+    }
+
+    @Test
+    void eraseById_non_2xx_on_DELETE_throws_Mem0StoreException() {
+        stubGetByIdOk("forbidden", "tenant-1::entity-1");
         wireMock().stubFor(delete(urlEqualTo("/memories/forbidden"))
             .willReturn(aResponse().withStatus(403)));
-        assertThrows(Mem0StoreException.class, () -> store.eraseById("forbidden", TENANT));
-
-        wireMock().stubFor(delete(urlEqualTo("/memories/error"))
-            .willReturn(serverError()));
-        assertThrows(Mem0StoreException.class, () -> store.eraseById("error", TENANT));
+        assertThrows(Mem0StoreException.class, () -> store.eraseById("forbidden", "entity-1", TENANT));
     }
 
     @Test
     void eraseById_tenant_mismatch_throws_before_http() {
         assertThrows(SecurityException.class, () ->
-            store.eraseById("any-id", OTHER_TENANT));
+            store.eraseById("any-id", "entity-1", OTHER_TENANT));
+        wireMock().verify(0, getRequestedFor(urlMatching("/memories/.*")));
         wireMock().verify(0, deleteRequestedFor(urlMatching("/memories/.*")));
     }
 

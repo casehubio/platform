@@ -168,10 +168,13 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
     @Transactional(TxType.REQUIRED)
-    public void eraseById(String memoryId, String tenantId) {
+    public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
-        em.createQuery("DELETE FROM MemoryEntry WHERE memoryId = :id AND tenantId = :tenantId")
+        // entityId in WHERE: mismatch → 0 rows deleted, silent no-op.
+        em.createQuery(
+                "DELETE FROM MemoryEntry WHERE memoryId = :id AND entityId = :entityId AND tenantId = :tenantId")
             .setParameter("id",       memoryId)
+            .setParameter("entityId", entityId)
             .setParameter("tenantId", tenantId)
             .executeUpdate();
         em.clear();

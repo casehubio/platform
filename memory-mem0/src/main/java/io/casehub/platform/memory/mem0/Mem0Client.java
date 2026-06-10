@@ -3,6 +3,7 @@ package io.casehub.platform.memory.mem0;
 import io.casehub.platform.memory.mem0.dto.Mem0AddRequest;
 import io.casehub.platform.memory.mem0.dto.Mem0AddResponse;
 import io.casehub.platform.memory.mem0.dto.Mem0ListResponse;
+import io.casehub.platform.memory.mem0.dto.Mem0Memory;
 import io.casehub.platform.memory.mem0.dto.Mem0SearchRequest;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -36,6 +37,19 @@ public interface Mem0Client {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     Mem0ListResponse search(Mem0SearchRequest request);
+
+    /**
+     * Fetch a single memory by ID.
+     * ⚠️ IMPLEMENTATION BLOCKER: Confirm {@code GET /memories/{id}} exists in the target
+     * Mem0 OSS version before deploying. The endpoint is absent from the documented OSS
+     * API surface ({@code POST /memories}, {@code GET /memories}, {@code POST /search}).
+     * If absent, the preflight in {@code Mem0CaseMemoryStore.eraseById()} will throw on
+     * 404 — adjust the error handling or use the list-scan fallback.
+     */
+    @GET
+    @Path("/memories/{memoryId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    Mem0Memory getById(@PathParam("memoryId") String memoryId);
 
     @DELETE
     @Path("/memories/{memoryId}")

@@ -235,7 +235,7 @@ public abstract class CaseMemoryStoreContractTest {
     void eraseById_removes_specific_memory() {
         String id = store().store(input("to delete"));
         store().store(input("to keep"));
-        store().eraseById(id, TENANT);
+        store().eraseById(id, "entity-1", TENANT);
         var remaining = store().query(query());
         assertEquals(1, remaining.size());
         assertEquals("to keep", remaining.get(0).text());
@@ -243,7 +243,19 @@ public abstract class CaseMemoryStoreContractTest {
 
     @Test
     void eraseById_does_not_cross_tenant_boundary() {
-        assertThrows(SecurityException.class, () -> store().eraseById("any-id", OTHER_TENANT));
+        assertThrows(SecurityException.class, () -> store().eraseById("any-id", "entity-1", OTHER_TENANT));
+    }
+
+    @Test
+    void eraseById_does_not_erase_other_entity_memory_within_same_tenant() {
+        // entity-2's memory stored within the same tenant
+        String e2MemId = store().store(
+            new MemoryInput("entity-2", DOMAIN, TENANT, null, "other entity's data", Map.of()));
+        // entity-1 caller attempts to erase entity-2's memory — silent no-op
+        store().eraseById(e2MemId, "entity-1", TENANT);
+        // entity-2's memory must survive
+        var remaining = store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT));
+        assertEquals(1, remaining.size(), "entity-2's memory must not be erased by entity-1 caller");
     }
 
     // --- eraseEntity ---
@@ -307,7 +319,7 @@ public abstract class CaseMemoryStoreContractTest {
 
         // Verify ordering: ids.get(0) must correspond to input a (entity-1).
         // Erase by the first returned ID — only entity-1's entry must disappear.
-        store().eraseById(ids.get(0), TENANT);
+        store().eraseById(ids.get(0), "entity-1", TENANT);
         assertTrue(store().query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT)).isEmpty(),
             "ids.get(0) must be the ID assigned to the first input (entity-1)");
         assertFalse(store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT)).isEmpty(),

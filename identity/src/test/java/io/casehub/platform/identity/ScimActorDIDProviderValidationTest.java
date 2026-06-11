@@ -60,4 +60,34 @@ class ScimActorDIDProviderValidationTest {
         assertThrows(IllegalArgumentException.class, provider::validateEndpoint,
                 "Blank endpoint must throw regardless of authToken");
     }
+
+    // ── 5-arg constructor: explicit requireHttps control ──────────────────────
+
+    @Test
+    void fiveArgConstructor_enforces_https_when_requireHttps_true() {
+        // 5-arg constructor with requireHttps=true — http:// must be rejected
+        var provider = new ScimActorDIDProvider(
+                "http://scim.example.com", "secret-token", 1000, Duration.ofMinutes(1), true);
+        var ex = assertThrows(IllegalArgumentException.class, provider::validateEndpoint,
+                "requireHttps=true with http:// endpoint must throw");
+        assertTrue(ex.getMessage().contains("HTTPS"),
+                "Exception message must mention HTTPS, got: " + ex.getMessage());
+    }
+
+    @Test
+    void fiveArgConstructor_allows_http_when_requireHttps_false() {
+        // 5-arg constructor with requireHttps=false — http:// must be accepted
+        var provider = new ScimActorDIDProvider(
+                "http://scim.example.com", "secret-token", 1000, Duration.ofMinutes(1), false);
+        assertDoesNotThrow(provider::validateEndpoint,
+                "requireHttps=false with http:// endpoint must not throw");
+    }
+
+    @Test
+    void fiveArgConstructor_passes_https_when_requireHttps_true() {
+        var provider = new ScimActorDIDProvider(
+                "https://scim.example.com", "secret-token", 1000, Duration.ofMinutes(1), true);
+        assertDoesNotThrow(provider::validateEndpoint,
+                "requireHttps=true with https:// endpoint must not throw");
+    }
 }

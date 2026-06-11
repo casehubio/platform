@@ -72,11 +72,18 @@ public class ScimActorDIDProvider
     /** Test constructor — bypasses {@code @PostConstruct}; use with {@code http://} WireMock endpoints. */
     public ScimActorDIDProvider(final String endpoint, final String authToken,
                                 final int timeoutMs, final Duration cacheTtl) {
+        this(endpoint, authToken, timeoutMs, cacheTtl, false);
+    }
+
+    /** Test constructor with explicit HTTPS control. */
+    public ScimActorDIDProvider(final String endpoint, final String authToken,
+                                final int timeoutMs, final Duration cacheTtl,
+                                final boolean requireHttps) {
         super(cacheTtl);
         this.scimEndpoint = endpoint;
         this.authToken = authToken;
         this.timeoutMs = timeoutMs;
-        this.requireHttps = false;
+        this.requireHttps = requireHttps;
         this.httpClient = buildHttpClient();
     }
 

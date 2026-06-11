@@ -202,6 +202,13 @@ public abstract class CaseMemoryStoreContractTest {
     }
 
     @Test
+    void erase_returns_non_negative_count() {
+        store().store(input("to erase"));
+        final int result = store().erase(eraseRequest()); // null caseId — domain-level
+        assertTrue(result >= 0, "erase must return non-negative count");
+    }
+
+    @Test
     void erase_with_caseId_leaves_other_cases() {
         store().store(input("no case"));
         store().store(inputWithCase("case A", "case-1"));

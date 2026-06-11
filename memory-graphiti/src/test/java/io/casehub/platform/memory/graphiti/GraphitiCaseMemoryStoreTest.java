@@ -25,8 +25,8 @@ class GraphitiCaseMemoryStoreTest {
 
     static final String TENANT      = "tenant-1";
     static final String ENTITY      = "actor-1";
-    static final String GROUP_ID    = TENANT + "::" + ENTITY;
     static final MemoryDomain DOMAIN = new MemoryDomain("investigation");
+    static final String GROUP_ID    = TENANT + "::" + ENTITY + "::" + DOMAIN.name();
 
     @Inject GraphCaseMemoryStore store;
     @Inject FixedCurrentPrincipal principal;
@@ -214,7 +214,7 @@ class GraphitiCaseMemoryStoreTest {
         // last_n = 5 * 2 = 10
         wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/" + GROUP_ID))
             .withQueryParam("last_n", equalTo("10")));
-        wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/tenant-1::actor-2"))
+        wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/tenant-1::actor-2::investigation"))
             .withQueryParam("last_n", equalTo("10")));
     }
 
@@ -383,7 +383,7 @@ class GraphitiCaseMemoryStoreTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"facts\":[{\"uuid\":\"f1\",\"fact\":\"e1 fact\",\"created_at\":\"2026-06-01T10:00:00Z\"}]}")));
         wireMock.stubFor(post(urlEqualTo("/search"))
-            .withRequestBody(matchingJsonPath("$.group_ids[0]", equalTo("tenant-1::actor-2")))
+            .withRequestBody(matchingJsonPath("$.group_ids[0]", equalTo("tenant-1::actor-2::investigation")))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"facts\":[{\"uuid\":\"f2\",\"fact\":\"e2 fact\",\"created_at\":\"2026-06-01T09:00:00Z\"}]}")));
@@ -413,31 +413,20 @@ class GraphitiCaseMemoryStoreTest {
     // ── eraseEntity ───────────────────────────────────────────────────────────
 
     @Test
-    void eraseEntity_deletes_group_and_returns_episode_count() {
-        // Stub getEpisodes to return 2 episodes
-        wireMock.stubFor(get(urlPathEqualTo("/episodes/" + GROUP_ID))
-            .willReturn(okJson("""
-                [
-                  {"uuid":"ep-1","content":"a","created_at":"2026-01-01T00:00:00Z","group_id":"%s"},
-                  {"uuid":"ep-2","content":"b","created_at":"2026-01-02T00:00:00Z","group_id":"%s"}
-                ]
-                """.formatted(GROUP_ID, GROUP_ID))));
-        wireMock.stubFor(delete(urlEqualTo("/group/" + GROUP_ID))
-            .willReturn(aResponse().withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("{\"success\":true,\"message\":\"deleted\"}")));
-
-        final int count = store.eraseEntity(ENTITY, TENANT);
-        assertEquals(2, count);
-        wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/" + GROUP_ID)));
-        wireMock.verify(deleteRequestedFor(urlEqualTo("/group/" + GROUP_ID)));
-    }
-
-    @Test
-    void eraseEntity_tenant_mismatch_throws_before_http() {
+    void eraseEntity_tenant_mismatch_throws_SecurityException() {
         assertThrows(SecurityException.class, () -> store.eraseEntity(ENTITY, "wrong-tenant"));
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
         wireMock.verify(0, getRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void eraseEntity_without_known_domains_throws_MemoryCapabilityException() {
+        // No casehub.memory.graphiti.known-domains configured → capability absent → exception.
+        final var ex = assertThrows(MemoryCapabilityException.class,
+            () -> store.eraseEntity(ENTITY, TENANT));
+        assertEquals(MemoryCapability.ERASE_ENTITY, ex.required());
+        wireMock.verify(0, getRequestedFor(anyUrl()));
+        wireMock.verify(0, deleteRequestedFor(anyUrl()));
     }
 
     // ── eraseById ─────────────────────────────────────────────────────────────
@@ -462,17 +451,72 @@ class GraphitiCaseMemoryStoreTest {
     // ── erase(EraseRequest) ───────────────────────────────────────────────────
 
     @Test
-    void erase_EraseRequest_throws_MemoryCapabilityException_no_http_call() {
-        final var req = new EraseRequest(ENTITY, DOMAIN, TENANT, null);
-        final var ex = assertThrows(MemoryCapabilityException.class, () -> store.erase(req));
-        assertEquals(MemoryCapability.ERASE_DOMAIN_CASE, ex.required());
+    void erase_domain_only_deletes_group_and_returns_count() {
+        wireMock.stubFor(get(urlPathEqualTo("/episodes/" + GROUP_ID))
+            .willReturn(okJson("""
+                [
+                  {"uuid":"ep-1","content":"a","created_at":"2026-01-01T00:00:00Z","group_id":"%s"},
+                  {"uuid":"ep-2","content":"b","created_at":"2026-01-02T00:00:00Z","group_id":"%s"},
+                  {"uuid":"ep-3","content":"c","created_at":"2026-01-03T00:00:00Z","group_id":"%s"}
+                ]
+                """.formatted(GROUP_ID, GROUP_ID, GROUP_ID))));
+        wireMock.stubFor(delete(urlEqualTo("/group/" + GROUP_ID))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"success\":true,\"message\":\"deleted\"}")));
+
+        final int count = store.erase(new EraseRequest(ENTITY, DOMAIN, TENANT, null));
+        assertEquals(3, count);
+        wireMock.verify(getRequestedFor(urlPathEqualTo("/episodes/" + GROUP_ID)));
+        wireMock.verify(deleteRequestedFor(urlEqualTo("/group/" + GROUP_ID)));
+    }
+
+    @Test
+    void erase_domain_only_tenant_mismatch_throws_before_http() {
+        assertThrows(SecurityException.class,
+            () -> store.erase(new EraseRequest(ENTITY, DOMAIN, "wrong-tenant", null)));
+        wireMock.verify(0, getRequestedFor(anyUrl()));
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
     }
 
     @Test
-    void erase_tenant_mismatch_throws_before_capability_check() {
-        final var req = new EraseRequest(ENTITY, DOMAIN, "wrong-tenant", null);
-        assertThrows(SecurityException.class, () -> store.erase(req));
+    void erase_with_caseId_deletes_only_matching_episodes() {
+        wireMock.stubFor(get(urlPathEqualTo("/episodes/" + GROUP_ID))
+            .willReturn(okJson("""
+                [
+                  {"uuid":"ep-1","content":"a","created_at":"2026-01-01T00:00:00Z",
+                   "group_id":"%s","source_description":"domain=investigation;caseId=case-99"},
+                  {"uuid":"ep-2","content":"b","created_at":"2026-01-02T00:00:00Z",
+                   "group_id":"%s","source_description":"domain=investigation;caseId=case-99"},
+                  {"uuid":"ep-3","content":"c","created_at":"2026-01-03T00:00:00Z",
+                   "group_id":"%s","source_description":"domain=investigation;caseId=other-case"}
+                ]
+                """.formatted(GROUP_ID, GROUP_ID, GROUP_ID))));
+        wireMock.stubFor(delete(urlMatching("/episode/ep-\\d+"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"success\":true}")));
+
+        final int count = store.erase(new EraseRequest(ENTITY, DOMAIN, TENANT, "case-99"));
+        assertEquals(2, count);
+        wireMock.verify(deleteRequestedFor(urlEqualTo("/episode/ep-1")));
+        wireMock.verify(deleteRequestedFor(urlEqualTo("/episode/ep-2")));
+        wireMock.verify(0, deleteRequestedFor(urlEqualTo("/episode/ep-3")));
+    }
+
+    @Test
+    void erase_with_caseId_no_matches_returns_zero() {
+        wireMock.stubFor(get(urlPathEqualTo("/episodes/" + GROUP_ID))
+            .willReturn(okJson("""
+                [
+                  {"uuid":"ep-1","content":"a","created_at":"2026-01-01T00:00:00Z",
+                   "group_id":"%s","source_description":"domain=investigation;caseId=other-case"}
+                ]
+                """.formatted(GROUP_ID))));
+
+        final int count = store.erase(new EraseRequest(ENTITY, DOMAIN, TENANT, "case-99"));
+        assertEquals(0, count);
+        wireMock.verify(0, deleteRequestedFor(anyUrl()));
     }
 
     // ── capabilities ──────────────────────────────────────────────────────────
@@ -484,13 +528,11 @@ class GraphitiCaseMemoryStoreTest {
         assertTrue(caps.contains(MemoryCapability.SEMANTIC_SEARCH));
         assertTrue(caps.contains(MemoryCapability.TEMPORAL_GRAPH));
         assertTrue(caps.contains(MemoryCapability.FACT_SEARCH));
-        assertTrue(caps.contains(MemoryCapability.ERASE_ENTITY));
-        assertFalse(caps.contains(MemoryCapability.DOMAIN_SCOPED));
+        assertTrue(caps.contains(MemoryCapability.DOMAIN_SCOPED));        // added
+        assertTrue(caps.contains(MemoryCapability.ERASE_DOMAIN_CASE));    // added
+        assertFalse(caps.contains(MemoryCapability.ERASE_ENTITY));        // removed (no known-domains configured)
         assertFalse(caps.contains(MemoryCapability.CASE_SCOPED));
-        assertFalse(caps.contains(MemoryCapability.ERASE_DOMAIN_CASE));
         assertFalse(caps.contains(MemoryCapability.ENTITY_TYPE_FILTER));
-        // ERASE_BY_ID removed: DELETE /episode/{uuid} leaves derived entity/relationship
-        // facts intact — incomplete erasure cannot satisfy GDPR Art.17 (see platform#74)
         assertFalse(caps.contains(MemoryCapability.ERASE_BY_ID));
     }
 }

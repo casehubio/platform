@@ -149,7 +149,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
     @Transactional(TxType.REQUIRED)
-    public void erase(EraseRequest request) {
+    public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
 
         var jpql = new StringBuilder(
@@ -162,8 +162,9 @@ public class JpaMemoryStore implements CaseMemoryStore {
             .setParameter("domain",   request.domain().name());
         if (request.caseId() != null) q.setParameter("caseId", request.caseId());
 
-        q.executeUpdate();
+        final int count = q.executeUpdate();
         em.clear();
+        return count;
     }
 
     @Override

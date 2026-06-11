@@ -15,7 +15,7 @@ class CaseMemoryStoreSpiTest {
     final CaseMemoryStore sut = new CaseMemoryStore() {
         @Override public String store(MemoryInput i) { return "mem-1"; }
         @Override public List<Memory> query(MemoryQuery q) { return List.of(); }
-        @Override public void erase(EraseRequest r) {}
+        @Override public int erase(EraseRequest r) { return 0; }
     };
 
     static final MemoryDomain DOMAIN = new MemoryDomain("d");

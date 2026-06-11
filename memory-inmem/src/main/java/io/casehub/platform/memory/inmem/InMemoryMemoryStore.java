@@ -90,14 +90,18 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void erase(EraseRequest request) {
+    public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
-        var key = new BucketKey(request.tenantId(), request.entityId(), request.domain());
-        store.computeIfPresent(key, (k, memories) ->
-            new CopyOnWriteArrayList<>(memories.stream()
+        final var key = new BucketKey(request.tenantId(), request.entityId(), request.domain());
+        final var removed = new AtomicInteger();
+        store.computeIfPresent(key, (k, memories) -> {
+            final var remaining = new CopyOnWriteArrayList<>(memories.stream()
                 .filter(m -> request.caseId() != null && !request.caseId().equals(m.caseId()))
-                .toList())
-        );
+                .toList());
+            removed.set(memories.size() - remaining.size());
+            return remaining;
+        });
+        return removed.get();
     }
 
     @Override

@@ -26,7 +26,7 @@ public class NoOpCaseMemoryStore implements GraphCaseMemoryStore {
 
     @Override public String store(final MemoryInput input) { return ""; }
     @Override public List<Memory> query(final MemoryQuery query) { return List.of(); }
-    @Override public void erase(final EraseRequest request) {}
+    @Override public int erase(final EraseRequest request) { return 0; }
     @Override public void eraseById(final String memoryId, final String entityId, final String tenantId) {}
     @Override public int eraseEntity(final String entityId, final String tenantId) { return 0; }
     @Override public List<Memory> graphQuery(final GraphMemoryQuery query) { return List.of(); }

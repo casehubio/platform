@@ -145,14 +145,16 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
 
     @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "erase"})
     @Override
-    public void erase(EraseRequest request) {
+    public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
+        // Pre-list for count — same race caveat as eraseEntity(): writes arriving between
+        // list() and deleteAll() may cause the returned count to understate actual deletion.
         try {
-            client.deleteAll(
-                compoundUserId(request.tenantId(), request.entityId()),
-                request.domain().name(),
-                request.caseId()
-            );
+            final String userId = compoundUserId(request.tenantId(), request.entityId());
+            final Mem0ListResponse listed = client.list(userId, request.domain().name(), request.caseId());
+            final int count = listed.results() != null ? listed.results().size() : 0;
+            client.deleteAll(userId, request.domain().name(), request.caseId());
+            return count;
         } catch (WebApplicationException e) {
             throw toStoreException(e);
         }

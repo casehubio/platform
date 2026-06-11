@@ -227,9 +227,9 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
 
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "erase"})
     @Override
-    public void erase(final EraseRequest request) {
+    public int erase(final EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
-        requireCapability(MemoryCapability.ERASE_DOMAIN_CASE); // throws
+        throw new MemoryCapabilityException(MemoryCapability.ERASE_DOMAIN_CASE, getClass());
     }
 
     /** Maximum episodes fetched for count; actual deletion is always complete. */

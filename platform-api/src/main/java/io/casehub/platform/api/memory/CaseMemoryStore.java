@@ -64,8 +64,10 @@ public interface CaseMemoryStore {
      * <p>Adapters that do not declare {@link MemoryCapability#ERASE_DOMAIN_CASE} will throw
      * {@link MemoryCapabilityException}. Check {@link #capabilities()} before calling on
      * adapters that may not support domain+caseId scoped deletion.
+     *
+     * @return count of memory records erased (for GDPR Art.5(2) audit logging)
      */
-    void erase(EraseRequest request);
+    int erase(EraseRequest request);
 
     /**
      * GDPR Art.17 full-entity wipe across ALL domains for this entity within the tenant.

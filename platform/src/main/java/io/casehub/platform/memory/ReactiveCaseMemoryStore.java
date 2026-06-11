@@ -14,7 +14,11 @@ public interface ReactiveCaseMemoryStore {
 
     Uni<List<Memory>> query(MemoryQuery query);
 
-    Uni<Void> erase(EraseRequest request);
+    /**
+     * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#erase}.
+     * Returns count of records erased (see blocking SPI for semantics).
+     */
+    Uni<Integer> erase(EraseRequest request);
 
     /**
      * Reactive mirror of {@link io.casehub.platform.api.memory.CaseMemoryStore#storeAll}.

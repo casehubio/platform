@@ -173,9 +173,9 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public void erase(EraseRequest request) {
+    public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
-        StringBuilder sql = new StringBuilder(
+        final StringBuilder sql = new StringBuilder(
             "DELETE FROM memory_entry WHERE tenant_id = ? AND entity_id = ? AND domain = ?");
         if (request.caseId() != null) sql.append(" AND case_id = ?");
         try (Connection conn = dataSource.getConnection();
@@ -185,7 +185,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             ps.setString(idx++, request.entityId());
             ps.setString(idx++, request.domain().name());
             if (request.caseId() != null) ps.setString(idx, request.caseId());
-            ps.executeUpdate();
+            return ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("erase() failed", e);
         }

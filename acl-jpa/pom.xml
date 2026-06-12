@@ -14,7 +14,8 @@
     <packaging>jar</packaging>
     <name>CaseHub Platform ACL JPA</name>
     <description>JPA-backed AccessControlProvider. @ApplicationScoped — displaces @DefaultBean no-op.
-        Add as compile dep; consumers must add classpath:db/acl/migration to quarkus.flyway.locations.
+        Schema from JPA annotations (no Flyway). Group-based grants via GroupMembershipProvider.groupsOf().
+        Resource parent inheritance with depth guard (20).
         Do NOT add casehub-platform-acl-inmem alongside this in test scope.</description>
 
     <dependencies>

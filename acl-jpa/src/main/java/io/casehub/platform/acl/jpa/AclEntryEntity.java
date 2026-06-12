@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -24,7 +25,8 @@ import java.time.Instant;
 public class AclEntryEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "acl_entry_seq")
+    @SequenceGenerator(name = "acl_entry_seq", sequenceName = "acl_entry_seq", allocationSize = 50)
     private Long id;
 
     @Column(name = "actor_id", nullable = false)

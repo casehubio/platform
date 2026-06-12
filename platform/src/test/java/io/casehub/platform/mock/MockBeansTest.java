@@ -1,5 +1,7 @@
 package io.casehub.platform.mock;
 
+import io.casehub.platform.api.acl.AccessControlProvider;
+import io.casehub.platform.api.acl.AclAction;
 import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
@@ -25,6 +27,7 @@ class MockBeansTest {
     @Inject CurrentPrincipal principal;
     @Inject GroupMembershipProvider groupMembership;
     @Inject PreferenceProvider preferenceProvider;
+    @Inject AccessControlProvider accessControl;
     @Inject EndpointRegistry endpointRegistry;
 
     @Test
@@ -121,6 +124,16 @@ class MockBeansTest {
     @Test
     void currentPrincipal_isCrossTenantAdmin_false_by_default() {
         assertFalse(principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void accessControl_noOp_allows_all() {
+        assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ));
+    }
+
+    @Test
+    void accessControl_noOp_accessibleResources_returns_empty() {
+        assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).isEmpty());
     }
 
     @Test

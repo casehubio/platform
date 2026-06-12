@@ -1,5 +1,7 @@
 package io.casehub.platform.mock;
 
+import io.casehub.platform.api.endpoints.EndpointQuery;
+import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.casehub.platform.api.path.Path;
@@ -23,6 +25,7 @@ class MockBeansTest {
     @Inject CurrentPrincipal principal;
     @Inject GroupMembershipProvider groupMembership;
     @Inject PreferenceProvider preferenceProvider;
+    @Inject EndpointRegistry endpointRegistry;
 
     @Test
     void currentPrincipal_defaults_to_system() {
@@ -118,6 +121,19 @@ class MockBeansTest {
     @Test
     void currentPrincipal_isCrossTenantAdmin_false_by_default() {
         assertFalse(principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void endpointRegistry_noop_resolve_returns_empty() {
+        assertFalse(endpointRegistry.resolve(
+                Path.of("any", "path"), TenancyConstants.DEFAULT_TENANT_ID).isPresent());
+    }
+
+    @Test
+    void endpointRegistry_noop_discover_returns_empty_list() {
+        assertTrue(endpointRegistry.discover(
+                new EndpointQuery(TenancyConstants.DEFAULT_TENANT_ID, null, null, java.util.Set.of()))
+                .isEmpty());
     }
 
     @Test

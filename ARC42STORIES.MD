@@ -138,6 +138,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
 | L8: Agent Infrastructure | `agent-api/`, `agent-claude/` | AgentProvider SPI + Claude subprocess execution |
+| L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
 
 ### Journey and Chapter sequencing rationale
 
@@ -192,6 +193,9 @@ C4Container
     Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentEvent types")
     Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + semaphore")
   }
+  Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
+    Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
+  }
 
   Rel(platform, api, "implements SPIs from")
   Rel(testing, api, "implements SPIs from")
@@ -208,6 +212,7 @@ C4Container
   Rel(scim, api, "implements GroupMembershipProvider from")
   Rel(identity, api, "implements ActorDIDProvider/DIDResolver/AgentCredentialValidator from")
   Rel(agentClaude, agentApi, "implements AgentProvider from")
+  Rel(endpointsMem, api, "implements EndpointRegistry from")
 ```
 
 ---
@@ -276,6 +281,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-identity` | `compile` | Configure `casehub.identity.*` |
 | `casehub-platform-agent-api` | `compile` | SPI only — no-op default active |
 | `casehub-platform-agent-claude` | `compile` | Requires Claude CLI on PATH |
+| `casehub-platform-endpoints-memory` | `test` (isolation) or `compile` (ephemeral installs) | Volatile — data lost on restart. `@Alternative @Priority(100)` beats JPA and NoSQL adapters. Do NOT combine with a JPA endpoints backend in same scope |
 
 ---
 
@@ -348,6 +354,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | J1: Configuration & Identity Foundation | Zero-dep SPI layer: preferences, identity, expression evaluation — all non-memory, non-agent capabilities | C1–C7 | ✅ Complete |
 | J2: Semantic Memory | Queryable, permission-aware cross-case agent memory — blocking + graph-native SPIs, five adapter options, capability self-description | C8–C11, C16 | ✅ C8–C11 complete; C16 ✅ |
 | J3: Group & Agent Identity | SCIM directory membership, DID/VC agent identity binding, Claude subprocess execution | C12–C15 | ✅ Complete |
+| J4: Endpoint Registry | Named endpoint registry — tenant-scoped, multi-protocol connection config for workers and desired-state management | C17 | ✅ C17 complete |
 
 ### §9.2 Chapter Index
 
@@ -368,6 +375,7 @@ flowchart LR
   C12 --> C13["C13: Agent ID\n+L7"]
   C13 --> C14["C14: Agent SPI\n+L8"]
   C14 --> C15["C15: ActorState\nL1"]
+  C15 --> C17["C17: Endpoint Registry\nL1+L2+L9"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -385,6 +393,7 @@ flowchart LR
   style C14 fill:#90EE90,color:#000
   style C15 fill:#90EE90,color:#000
   style C16 fill:#90EE90,color:#000
+  style C17 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -405,19 +414,21 @@ flowchart LR
 | 14 | Agent SPI — Claude | J3 | +L8 | ✅ |
 | 15 | ActorState SPI | J3 | L1 | ✅ |
 | 16 | Graphiti Temporal Memory | J2 | L1, L2, L6 | ✅ |
+| 17 | Endpoint Registry | J4 | L1, L2, L9 | ✅ |
 
 **Layer × Chapter matrix**
 
-| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med |
-| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med |
-| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — |
-| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — |
-| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — |
-| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High |
-| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — |
-| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — |
+| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med | High |
+| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med | Low |
+| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — | — |
+| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — | — |
+| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — | — |
+| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High | — |
+| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — | — |
+| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — |
+| L9: Endpoint Adapt | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High |
 
 **Sequencing rationale:**
 
@@ -748,11 +759,35 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 ---
 
+#### C17 — Endpoint Registry
+
+**Journey:** J4 | **Sequence:** 17 of 17 | **Status:** ✅
+**Delivered:** 2026-06-12 | **Issues:** casehubio/platform#73 | **Blog:** `blog/2026-06-12-mdp02-named-endpoints.md`
+
+**What this delivers**
+Workers can reference external systems by name rather than hard-coding connection details. `EndpointRegistry` SPI (`register`, `resolve`, `discover`, `deregister`) keyed by `(Path, tenancyId)`. `resolve()` two-step priority: tenant-specific wins over platform-global (`PLATFORM_TENANT_ID`) for the same path, enabling per-tenant override of shared service endpoints. `discover()` is exhaustive — both tenant-specific and platform-global results are returned for callers to choose among. `EndpointPropertyKeys` (URL, TOPIC) establishes cross-module interoperability for the properties map. `credentialRef` (nullable) establishes the secrets integration contract without requiring the secrets layer to exist yet. `TenancyConstants.PLATFORM_TENANT_ID` extended with a documented second use: platform-global endpoint visibility.
+
+**Accountability gaps closed**
+- Named external system connection config (previously hardcoded per worker) → L1 (`EndpointRegistry` SPI, `EndpointDescriptor`, `EndpointPropertyKeys`)
+- No-op default when no registry backend installed → L2 (`NoOpEndpointRegistry @DefaultBean`)
+- Volatile in-process registry for single-node installs → L9 (`InMemoryEndpointRegistry @Alternative @Priority(100)`)
+
+**Deferred:** JPA backend (`endpoints-jpa/`), config-backed multi-tenant registrar (`endpoints-config/` — platform#88), write authorization utility for runtime registration (platform#89)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | High — new `io.casehub.platform.api.endpoints` package: `EndpointRegistry`, `EndpointDescriptor`, `EndpointQuery`, `EndpointProtocol`, `EndpointType`, `EndpointCapability`, `EndpointPropertyKeys`. `TenancyConstants.PLATFORM_TENANT_ID` dual-use documented |
+| L2: Default Implementations | Low — `NoOpEndpointRegistry @DefaultBean @ApplicationScoped` |
+| L9: Endpoint Registry Adapters | High — `endpoints-memory/` new module; `InMemoryEndpointRegistry @Alternative @Priority(100)` |
+
+---
+
 ### §9.4 Layer Entries
 
 #### Layer — L1: API Tier
 
-**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16
+**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17
 **Architectural patterns:** SPI (Service Provider Interface), Typed key with colocated parser (Drools OptionKey<T>)
 **Key protocols:** `docs/protocols/universal/module-tier-structure.md`, `docs/protocols/casehub/platform-spi-contract.md`
 **Issues:** #1, #2, #22, #27, #45, #52, casehubio/parent#56
@@ -799,6 +834,9 @@ Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
 - `platform-api/src/main/java/io/casehub/platform/api/memory/MemoryAttributeKeys.java` — reserved cross-domain attribute keys (e.g. `CONFIDENCE`, `SOURCE`) + `formatConfidence(double)` / `parseConfidence(String)` helpers
 - `platform-api/src/main/java/io/casehub/platform/api/actor/ActorStateContributor.java` — SPI: `contribute(actorId, ActorStateAccumulator)` — `@ApplicationScoped`
 - `platform-api/src/main/java/io/casehub/platform/api/actor/ActorStateAccumulator.java` — visitor passed to each contributor; accumulates active-cases, open-WorkItems, open-obligation slices
+- `platform-api/src/main/java/io/casehub/platform/api/endpoints/EndpointRegistry.java` — SPI: `register`, `resolve(Path, tenancyId)`, `discover(EndpointQuery)`, `deregister(Path, tenancyId)`; `resolve()` two-step priority: tenant-specific then PLATFORM_TENANT_ID fallback
+- `platform-api/src/main/java/io/casehub/platform/api/endpoints/EndpointDescriptor.java` — record: `path, tenancyId, type, protocol, properties, credentialRef, capabilities`; key fields lead; `credentialRef` nullable (secrets layer deferred)
+- `platform-api/src/main/java/io/casehub/platform/api/endpoints/EndpointPropertyKeys.java` — `URL="url"`, `TOPIC="topic"` — only keys whose values cross module boundaries; deployment-local keys stay module-defined
 
 #### Key wiring
 
@@ -848,7 +886,7 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 
 #### Layer — L2: Default Implementations
 
-**Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14, C16
+**Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14, C16, C17
 **Architectural patterns:** `@DefaultBean` CDI displacement, Blocking-to-reactive bridge
 **Key protocols:** `docs/protocols/casehub/alternative-extension-patterns.md`
 **Issues:** #1, #27
@@ -1303,6 +1341,38 @@ Not closed here: multi-turn `AgentSession` (#58 — deferred; subprocess-held co
 **Symptom:** `Multi.createFrom().publisher(flux)` fails to compile with a type error.
 **Cause:** Mutiny expects `java.util.concurrent.Flow.Publisher`; Reactor's `Flux` implements `org.reactivestreams.Publisher`.
 **Fix:** Wrap: `Multi.createFrom().publisher(JdkFlowAdapter.publisherToFlowPublisher(flux))`. `JdkFlowAdapter` is in `reactor-core` — no additional dependency required.
+
+---
+
+#### Layer — L9: Endpoint Registry Adapters
+
+**Participates in chapters:** C17
+**Architectural patterns:** `@Alternative @Priority(100)` in-memory adapter (Tier 4 CDI priority — above JPA Tier 2 and NoSQL Tier 3), ConcurrentHashMap keyed by `RegistryKey(pathValue, tenancyId)`
+**Issues:** casehubio/platform#73
+**Blog:** `blog/2026-06-12-mdp02-named-endpoints.md`
+**Completed:** 2026-06-12
+
+#### What it adds
+
+**Before:** No endpoint registry — workers hardcode connection details inline.
+**After:** `endpoints-memory/` provides `InMemoryEndpointRegistry @Alternative @Priority(100)` for single-node and ephemeral deployments. Data is volatile (lost on restart). JPA backend deferred.
+
+What this layer adds:
+- **`InMemoryEndpointRegistry`** — `ConcurrentHashMap<RegistryKey, EndpointDescriptor>`; thread-safe; `register()` is upsert (last write wins, no capability merge); `resolve()` two-step: tenant-specific key first, then `PLATFORM_TENANT_ID` fallback; `discover()` applies the four-condition predicate; `deregister()` is silent no-op if absent
+- **`RegistryKey(String pathValue, String tenancyId)`** — uses `path.value()` (String) not the `Path` record itself: `Path.equals()` depends on segments derived from a configurable separator, making it an unstable map key (GE-20260612-889bd4)
+
+Not closed here: JPA backend (endpoints-jpa/), config-backed multi-tenant registrar (platform#88), write authorization for runtime registration (platform#89).
+
+#### Key files
+
+- `endpoints-memory/src/main/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistry.java` — `@Alternative @Priority(100) @ApplicationScoped`
+- `endpoints-memory/src/main/java/io/casehub/platform/endpoints/memory/RegistryKey.java` — package-private record
+
+#### Key wiring
+
+**`path.value()` as the key component, not `Path` itself.** `Path.equals()` depends on both `value` and `segments`; segments derive from a configurable separator. Two `Path` instances with identical string values but different separator configs are not `equals()`. Using the raw string value is stable and separator-independent. See GE-20260612-889bd4.
+
+**`NoOpEndpointRegistry @DefaultBean` must be in `platform/`, not `endpoints-memory/`.** The `@DefaultBean` annotation is from Quarkus ARC (`io.quarkus.arc.DefaultBean`) — `endpoints-memory/` is pure Java with only `jakarta.enterprise.cdi-api` as provided scope. The noOp requires the full Quarkus module. Pattern mirrors `NoOpCaseMemoryStore` and `NoOpAgentProvider`.
 
 ---
 

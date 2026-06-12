@@ -24,6 +24,7 @@
         <module>memory-sqlite</module>
         <module>memory-mem0</module>
         <module>memory-graphiti</module>
+        <module>endpoints-memory</module>
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>

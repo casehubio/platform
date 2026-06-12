@@ -352,6 +352,8 @@ class Mem0CaseMemoryStoreTest {
 
     @Test
     void erase_non_2xx_throws_Mem0StoreException() {
+        // Pre-list succeeds; DELETE fails — exception must come from the delete path
+        stubListOk();
         wireMock().stubFor(delete(urlPathEqualTo("/memories")).willReturn(serverError()));
         assertThrows(Mem0StoreException.class, () ->
             store.erase(new EraseRequest("entity-1", DOMAIN, TENANT, null)));
@@ -359,8 +361,10 @@ class Mem0CaseMemoryStoreTest {
 
     @Test
     void erase_sends_delete_with_query_params() {
+        stubListOk();       // pre-list for count (returns empty → count = 0)
         stubDeleteAllOk();
-        store.erase(new EraseRequest("entity-1", DOMAIN, TENANT, "case-1"));
+        final int count = store.erase(new EraseRequest("entity-1", DOMAIN, TENANT, "case-1"));
+        assertEquals(0, count);
         wireMock().verify(deleteRequestedFor(urlPathEqualTo("/memories"))
             .withQueryParam("user_id",  equalTo("tenant-1::entity-1"))
             .withQueryParam("agent_id", equalTo("d"))
@@ -369,8 +373,10 @@ class Mem0CaseMemoryStoreTest {
 
     @Test
     void erase_null_caseId_omits_run_id() {
+        stubListOk();       // pre-list for count (returns empty → count = 0)
         stubDeleteAllOk();
-        store.erase(new EraseRequest("entity-1", DOMAIN, TENANT, null));
+        final int count = store.erase(new EraseRequest("entity-1", DOMAIN, TENANT, null));
+        assertEquals(0, count);
         wireMock().verify(deleteRequestedFor(urlPathEqualTo("/memories"))
             .withQueryParam("user_id",  equalTo("tenant-1::entity-1"))
             .withQueryParam("agent_id", equalTo("d"))

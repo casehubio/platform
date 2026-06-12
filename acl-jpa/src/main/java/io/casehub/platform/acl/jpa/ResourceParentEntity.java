@@ -3,10 +3,12 @@ package io.casehub.platform.acl.jpa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "resource_parent")
+@Table(name = "resource_parent",
+        indexes = @Index(name = "idx_rp_parent", columnList = "parent_resource_id"))
 public class ResourceParentEntity {
 
     @Id

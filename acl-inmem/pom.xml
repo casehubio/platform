@@ -10,14 +10,38 @@
         <version>0.2-SNAPSHOT</version>
     </parent>
 
-    <artifactId>casehub-platform-api</artifactId>
+    <artifactId>casehub-platform-acl-inmem</artifactId>
     <packaging>jar</packaging>
-    <name>CaseHub Platform API</name>
-    <description>Zero-dependency foundational SPIs and types shared across all casehub modules.
-        No Quarkus, no JPA, no casehubio deps. Pure Java only.</description>
+    <name>CaseHub Platform ACL In-Memory</name>
+    <description>Volatile in-memory AccessControlProvider adapter. @Alternative @Priority(10) — displaces
+        JPA and no-op when on the classpath. Add as test scope for @QuarkusTest isolation.
+        Do not combine with acl-jpa in production scope.</description>
 
     <dependencies>
-        <!-- Test only — not a production dependency -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-arc</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-api</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -27,15 +51,6 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals><goal>test-jar</goal></goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>
@@ -49,5 +64,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>

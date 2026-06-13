@@ -12,6 +12,8 @@ class GroupMembershipProviderSpiTest {
         return groupName -> members;
     }
 
+    private final GroupMembershipProvider spi = provider(Set.of());
+
     @Test
     void membersOf_returns_set_of_GroupMember_not_strings() {
         var alice = new GroupMember("alice-uuid", "Alice");
@@ -22,8 +24,7 @@ class GroupMembershipProviderSpiTest {
 
     @Test
     void membersOf_returns_empty_set_for_unknown_group() {
-        var provider = provider(Set.of());
-        assertEquals(Set.of(), provider.membersOf("unknown"));
+        assertEquals(Set.of(), spi.membersOf("unknown"));
     }
 
     @Test
@@ -32,5 +33,10 @@ class GroupMembershipProviderSpiTest {
         var provider = provider(Set.of(member));
         var result = provider.membersOf("g").iterator().next();
         assertEquals("uuid-stable", result.actorId());
+    }
+
+    @Test
+    void groupsOf_defaultReturnsEmptyList() {
+        assertTrue(spi.groupsOf("actor1").isEmpty());
     }
 }

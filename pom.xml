@@ -28,6 +28,8 @@
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>
+        <module>acl-inmem</module>
+        <module>acl-jpa</module>
     </modules>
 
     <properties>

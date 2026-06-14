@@ -141,6 +141,7 @@ io.casehub.platform.api
                    AgentIdentityViolationEvent (CDI event record: non-VALID binding)
   .endpoints     — EndpointRegistry (SPI: register/resolve/discover/deregister by (Path, tenancyId)),
                    EndpointDescriptor (record: path, tenancyId, type, protocol, properties, credentialRef, capabilities),
+                   EndpointPermissions (static: assertTenant(tenancyId, principal) — write-auth for runtime registration),
                    EndpointType (enum: SYSTEM/SERVICE/WORKER/AGENT),
                    EndpointProtocol (enum: HTTP/GRPC/KAFKA/MCP/CAMEL/QHORUS),
                    EndpointCapability (enum: SEND/RECEIVE/QUERY/DISPATCH),

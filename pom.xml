@@ -25,6 +25,7 @@
         <module>memory-mem0</module>
         <module>memory-graphiti</module>
         <module>endpoints-memory</module>
+        <module>endpoints-config</module>
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>

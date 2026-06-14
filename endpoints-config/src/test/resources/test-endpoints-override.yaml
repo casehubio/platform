@@ -1,0 +1,9 @@
+endpoints:
+  - path: external/salesforce/prod
+    tenancyId: tenant-a
+    type: WORKER
+    protocol: HTTP
+    properties:
+      url: https://salesforce-v2.example.com/api
+    capabilities:
+      - SEND

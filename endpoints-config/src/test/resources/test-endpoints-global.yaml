@@ -1,0 +1,9 @@
+endpoints:
+  - path: casehubio/platform/health
+    tenancyId: platform
+    type: SYSTEM
+    protocol: HTTP
+    properties:
+      url: https://health.casehub.io/check
+    capabilities:
+      - QUERY

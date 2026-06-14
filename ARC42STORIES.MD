@@ -133,7 +133,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L1: API Tier | `platform-api` | Zero-dep Java SPIs, records, enums, types |
 | L2: Default Implementations | `platform` | `@DefaultBean` CDI mocks + reactive bridge |
 | L3: Testing Infrastructure | `testing` | `@Alternative @Priority(1)` test fixtures |
-| L4: Platform Extensions | `config/`, `oidc/`, `expression/` | Opt-in non-mock implementations |
+| L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/` | Opt-in non-mock implementations |
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
@@ -376,6 +376,7 @@ flowchart LR
   C13 --> C14["C14: Agent SPI\n+L8"]
   C14 --> C15["C15: ActorState\nL1"]
   C15 --> C17["C17: Endpoint Registry\nL1+L2+L9"]
+  C17 --> C18["C18: EndpointPermissions\n+endpoints-config\nL1+L4"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -394,6 +395,7 @@ flowchart LR
   style C15 fill:#90EE90,color:#000
   style C16 fill:#90EE90,color:#000
   style C17 fill:#90EE90,color:#000
+  style C18 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -415,20 +417,21 @@ flowchart LR
 | 15 | ActorState SPI | J3 | L1 | ✅ |
 | 16 | Graphiti Temporal Memory | J2 | L1, L2, L6 | ✅ |
 | 17 | Endpoint Registry | J4 | L1, L2, L9 | ✅ |
+| 18 | EndpointPermissions + endpoints-config | J4 | L1, L4 | ✅ |
 
 **Layer × Chapter matrix**
 
-| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med | High |
-| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med | Low |
-| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — | — |
-| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — | — |
-| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — | — |
-| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High | — |
-| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — | — |
-| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — |
-| L9: Endpoint Adapt | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High |
+| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 | C18 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med | High | Low |
+| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med | Low | — |
+| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — | — | — |
+| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — | — | Med |
+| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — | — | — |
+| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High | — | — |
+| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — | — | — |
+| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — | — |
+| L9: Endpoint Adapt | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — |
 
 **Sequencing rationale:**
 
@@ -761,7 +764,7 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C17 — Endpoint Registry
 
-**Journey:** J4 | **Sequence:** 17 of 17 | **Status:** ✅
+**Journey:** J4 | **Sequence:** 17 of 18 | **Status:** ✅
 **Delivered:** 2026-06-12 | **Issues:** casehubio/platform#73 | **Blog:** `blog/2026-06-12-mdp02-named-endpoints.md`
 
 **What this delivers**
@@ -772,7 +775,7 @@ Workers can reference external systems by name rather than hard-coding connectio
 - No-op default when no registry backend installed → L2 (`NoOpEndpointRegistry @DefaultBean`)
 - Volatile in-process registry for single-node installs → L9 (`InMemoryEndpointRegistry @Alternative @Priority(100)`)
 
-**Deferred:** JPA backend (`endpoints-jpa/`), config-backed multi-tenant registrar (`endpoints-config/` — platform#88), write authorization utility for runtime registration (platform#89)
+**Deferred:** JPA backend (`endpoints-jpa/`). C18 delivers: `endpoints-config/` (platform#88), `EndpointPermissions` (platform#89).
 
 **Layer Impact**
 | Layer | Delta |
@@ -783,11 +786,27 @@ Workers can reference external systems by name rather than hard-coding connectio
 
 ---
 
+#### C18 — EndpointPermissions + endpoints-config
+
+**Journey:** J4 | **Sequence:** 18 of 18 | **Status:** ✅
+**Delivered:** 2026-06-14 | **Issues:** casehubio/platform#89, casehubio/platform#88
+
+**What it is:** `EndpointPermissions` (L1) is a static write-auth utility mirroring `MemoryPermissions` — `assertTenant(String, CurrentPrincipal)` throws `SecurityException` on tenant mismatch; no 3-arg overload (no async endpoint-registration flow exists). `casehub-platform-endpoints-config` (L4) is a YAML-backed startup populator: `YamlEndpointLoader` (pure SnakeYAML extractor) + `EndpointConfigLoader @Startup @ApplicationScoped` (reads `casehub.platform.endpoints.files`, parses descriptors, calls `EndpointRegistry.register()`). Multi-tenant YAML; `${VAR}` interpolation; fail-fast on unresolved vars; multi-file last-write-wins ordering.
+
+**Layer impact:**
+
+| Layer | Change | Significance |
+|-------|--------|--------------|
+| L1: API Tier | `EndpointPermissions` in `io.casehub.platform.api.endpoints` | Low |
+| L4: Platform Extensions | `endpoints-config/` new module — 2 classes, 3 test classes | Medium |
+
+---
+
 ### §9.4 Layer Entries
 
 #### Layer — L1: API Tier
 
-**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17
+**Participates in chapters:** C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18
 **Architectural patterns:** SPI (Service Provider Interface), Typed key with colocated parser (Drools OptionKey<T>)
 **Key protocols:** `docs/protocols/universal/module-tier-structure.md`, `docs/protocols/casehub/platform-spi-contract.md`
 **Issues:** #1, #2, #22, #27, #45, #52, casehubio/parent#56
@@ -996,7 +1015,7 @@ Contract test extraction — abstract `CaseMemoryStoreContractTest` ensures all 
 
 #### Layer — L4: Platform Extensions
 
-**Participates in chapters:** C2, C3, C5
+**Participates in chapters:** C2, C3, C5, C18
 **Architectural patterns:** Optional module activation by classpath presence
 **Key protocols:** `docs/protocols/universal/module-tier-structure.md`
 **ADRs:** ADR-0004
@@ -1008,7 +1027,7 @@ Contract test extraction — abstract `CaseMemoryStoreContractTest` ensures all 
 #### What it adds
 
 **Before:** Only `@DefaultBean` mocks — no YAML-backed preferences, no JWT-backed identity, no JQ evaluation.
-**After:** Three opt-in modules: `config/` (YAML preferences), `oidc/` (OIDC identity), `expression/` (JQ evaluation).
+**After:** Four opt-in modules: `config/` (YAML preferences), `oidc/` (OIDC identity), `expression/` (JQ evaluation), `endpoints-config/` (YAML endpoint population).
 
 What this layer adds:
 - **`ConfigFilePreferenceProvider`** — YAML files at `@PostConstruct`; scope hierarchy merge; SmallRye Config overrides win; `${VAR}` interpolation applied after loading
@@ -1137,7 +1156,7 @@ What this layer adds:
 - **`Mem0CaseMemoryStore`** — REST client; `infer:false` verbatim storage; compound `user_id={tenantId}::{entityId}` for tenant isolation; limit applied client-side (server is unbounded)
 - **`InMemoryMemoryStore`** — `@Alternative @Priority(10)` (not Priority(1)); test-override tier so it beats all production adapters in `@QuarkusTest` with compile-scope production adapter present
 
-Not closed here: multi-turn agent memory sessions (#58), Graphiti adapter (#34), Mem0 `storeAll()` batch (#69 — deferred pending upstream batch endpoint).
+Not closed here: multi-turn agent memory sessions (#58), Graphiti adapter (#34 — later closed in C16), Mem0 `storeAll()` batch (#70 — deferred pending upstream batch endpoint; #69 superseded).
 
 #### Accountability gaps closed
 
@@ -1361,7 +1380,7 @@ What this layer adds:
 - **`InMemoryEndpointRegistry`** — `ConcurrentHashMap<RegistryKey, EndpointDescriptor>`; thread-safe; `register()` is upsert (last write wins, no capability merge); `resolve()` two-step: tenant-specific key first, then `PLATFORM_TENANT_ID` fallback; `discover()` applies the four-condition predicate; `deregister()` is silent no-op if absent
 - **`RegistryKey(String pathValue, String tenancyId)`** — uses `path.value()` (String) not the `Path` record itself: `Path.equals()` depends on segments derived from a configurable separator, making it an unstable map key (GE-20260612-889bd4)
 
-Not closed here: JPA backend (endpoints-jpa/), config-backed multi-tenant registrar (platform#88), write authorization for runtime registration (platform#89).
+Not closed here: JPA backend (endpoints-jpa/). C18 closes: `endpoints-config/` (platform#88), `EndpointPermissions` (platform#89).
 
 #### Key files
 
@@ -1414,7 +1433,7 @@ Cross-cutting decisions not captured in layer entries:
 | `effectiveAt` is ignored in `JpaPreferenceProvider` — time-travel queries silently return current data | Low (no caller uses it today) — misleading API contract | ADR-0006 recorded; mitigate when `preferences-editor` (#8) is built |
 | Memory adapters in `casehub-platform` may need extraction to `casehub-memory` if a non-CaseHub consumer emerges | Low — extraction is mechanical but touches every consumer's pom.xml | ADR-0008 amended; extraction triggers defined |
 | `agent-claude` multi-turn sessions (#58) deferred — subprocess-held conversational state has no crash-recovery | Medium — single-shot only; conversation history lost on crash | Deferred deliberately; single-shot covers current use cases |
-| Mem0 storeAll batch (#69) — N sequential REST calls for a batch | Low — batch infrequent today; deferred pending Mem0 OSS batch endpoint | Workaround: call `store()` in a loop; no atomicity guarantee across REST calls |
+| Mem0 storeAll batch (#70) — N sequential REST calls for a batch | Low — batch infrequent today; deferred pending Mem0 OSS batch endpoint | Workaround: call `store()` in a loop; no atomicity guarantee across REST calls |
 | ACL/authorization model (#68) — 6 open design decisions before implementation can start | High — no cross-module access control until resolved | Spec at `docs/specs/2026-06-01-acl-design.md` §6.9; deliberate pre-work required |
 
 ---

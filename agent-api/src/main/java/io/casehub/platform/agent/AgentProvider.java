@@ -30,4 +30,18 @@ public interface AgentProvider {
      * @throws AgentSessionLimitException via onFailure() if the concurrent session cap is reached
      */
     Multi<AgentEvent> invoke(AgentSessionConfig config);
+
+    /**
+     * Open a multi-turn session.
+     *
+     * <p>The session holds a concurrent-session semaphore slot for its lifetime — it must be
+     * closed by the caller on all paths (use try-with-resources).
+     *
+     * <p>{@code init.systemPrompt} is configured at session-open time and transmitted to the
+     * subprocess on the first {@link AgentSession#query(String)} call.
+     *
+     * @throws AgentSessionLimitException immediately (not via onFailure) if the concurrent-session
+     *         cap is reached
+     */
+    AgentSession openSession(AgentSessionInit init);
 }

@@ -1156,7 +1156,7 @@ What this layer adds:
 - **`Mem0CaseMemoryStore`** — REST client; `infer:false` verbatim storage; compound `user_id={tenantId}::{entityId}` for tenant isolation; limit applied client-side (server is unbounded)
 - **`InMemoryMemoryStore`** — `@Alternative @Priority(10)` (not Priority(1)); test-override tier so it beats all production adapters in `@QuarkusTest` with compile-scope production adapter present
 
-Not closed here: multi-turn agent memory sessions (#58), Graphiti adapter (#34 — later closed in C16), Mem0 `storeAll()` batch (#70 — deferred pending upstream batch endpoint; #69 superseded).
+Not closed here: Graphiti adapter (#34 — later closed in C16), Mem0 `storeAll()` batch (#70 — deferred pending upstream batch endpoint; #69 superseded). Multi-turn `AgentSession` (#58) shipped in C20.
 
 #### Accountability gaps closed
 
@@ -1319,7 +1319,7 @@ What this layer adds:
 - **`ClaudeAgentClient @Startup`** — binary probe at boot (`ProcessBuilder.waitFor()`); `@Startup` forces init on the main thread, avoiding blocking of Vert.x IO threads during first injection
 - **`ClaudeAgentProvider @ApplicationScoped`** — semaphore enforces `maxConcurrentSessions`; `ScheduledExecutorService` fires subprocess close after wall-clock timeout; `AtomicBoolean` prevents double-close race
 
-Not closed here: multi-turn `AgentSession` (#58 — deferred; subprocess-held conversational state has no crash-recovery path).
+C18 shipped #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/`close(Duration)`; `AgentSessionInit` (no userPrompt); `ClaudeAgentSession` (IDLE/ACTIVE/CLOSED state machine, per-turn timeout-to-AgentTimeoutException converter, true-drain close, CAS semaphore guards). `NoOpAgentSession` in `platform/`. Known limitation: no crash recovery — subprocess crash → CLOSED, caller must reopen.
 
 #### Key files
 
@@ -1432,7 +1432,7 @@ Cross-cutting decisions not captured in layer entries:
 | Mem0 `GET /memories` is unbounded — large entity histories degrade performance | Medium — high-memory entities slow to query chronologically | Use `RELEVANCE` + `POST /search` for entities with many memories; limit client-side |
 | `effectiveAt` is ignored in `JpaPreferenceProvider` — time-travel queries silently return current data | Low (no caller uses it today) — misleading API contract | ADR-0006 recorded; mitigate when `preferences-editor` (#8) is built |
 | Memory adapters in `casehub-platform` may need extraction to `casehub-memory` if a non-CaseHub consumer emerges | Low — extraction is mechanical but touches every consumer's pom.xml | ADR-0008 amended; extraction triggers defined |
-| `agent-claude` multi-turn sessions (#58) deferred — subprocess-held conversational state has no crash-recovery | Medium — single-shot only; conversation history lost on crash | Deferred deliberately; single-shot covers current use cases |
+| `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C20; crash-recovery explicitly out of scope |
 | Mem0 storeAll batch (#70) — N sequential REST calls for a batch | Low — batch infrequent today; deferred pending Mem0 OSS batch endpoint | Workaround: call `store()` in a loop; no atomicity guarantee across REST calls |
 | ACL/authorization model (#68) — 6 open design decisions before implementation can start | High — no cross-module access control until resolved | Spec at `docs/specs/2026-06-01-acl-design.md` §6.9; deliberate pre-work required |
 

@@ -3,7 +3,9 @@ package io.casehub.platform.agent.claude;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentMcpServer;
 import io.casehub.platform.agent.AgentProcessException;
+import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
+import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
 import io.smallrye.mutiny.Multi;
@@ -312,6 +314,51 @@ public class ClaudeAgentClient {
             }
         }
         return result;
+    }
+
+    /**
+     * Open a multi-turn {@link AgentSession}.
+     *
+     * <p>Semaphore check runs first (mirrors {@link #run}). The factory check is inside the
+     * try block so test-path sessions also acquire and release the semaphore.
+     *
+     * @throws AgentSessionLimitException immediately if the concurrent-session cap is reached
+     */
+    public AgentSession openSession(final AgentSessionInit init) {
+        // Semaphore check FIRST — mirrors run().
+        if (!semaphore.tryAcquire()) {
+            throw new AgentSessionLimitException(properties.maxConcurrentSessions());
+        }
+        try {
+            if (streamFactory != null) {
+                // Test path — semaphore already acquired; session will release it on close().
+                return new ClaudeAgentSession(properties,
+                    prompt -> Multi.createFrom().empty(),
+                    semaphore, activeSessions, timeoutScheduler);
+            }
+
+            final Duration effectiveTimeout = init.timeout() != null
+                ? init.timeout()
+                : properties.defaultTimeout();
+
+            final ClaudeClient.AsyncSpec builder = ClaudeClient.async()
+                .workingDirectory(Path.of(System.getProperty("user.dir")))
+                .systemPrompt(init.systemPrompt());
+            properties.binaryPath().ifPresent(builder::claudePath);
+            final Map<String, McpServerConfig> sdkMcpServers = toSdkMcpServers(init.mcpServers());
+            if (!sdkMcpServers.isEmpty()) builder.mcpServers(sdkMcpServers);
+
+            final ClaudeAsyncClient sdkClient = builder.build();
+            activeSessions.add(sdkClient);
+            if (init.correlationId() != null) {
+                LOG.infof("Agent session opened [correlationId=%s]", init.correlationId());
+            }
+            return new ClaudeAgentSession(sdkClient, effectiveTimeout, semaphore,
+                activeSessions, timeoutScheduler, init.correlationId());
+        } catch (final Exception e) {
+            semaphore.release();
+            throw e;
+        }
     }
 
     @PreDestroy

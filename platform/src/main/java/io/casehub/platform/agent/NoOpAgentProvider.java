@@ -20,9 +20,16 @@ public class NoOpAgentProvider implements AgentProvider {
     private static final Logger LOG = Logger.getLogger(NoOpAgentProvider.class);
 
     @Override
-    public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+    public Multi<AgentEvent> invoke(final AgentSessionConfig config) {
         LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
                  "to the classpath to get real Claude output");
         return Multi.createFrom().empty();
+    }
+
+    @Override
+    public AgentSession openSession(final AgentSessionInit init) {
+        LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
+                 "to the classpath to get real Claude output");
+        return new NoOpAgentSession();
     }
 }

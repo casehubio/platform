@@ -371,4 +371,22 @@ class AgentSessionChatModelTest {
             })
         ).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void doChat_streaming_agentTimeoutException_routesToHandlerError() {
+        AgentSession session = new AgentSession() {
+            @Override public Multi<AgentEvent> query(String p) {
+                return Multi.createFrom().failure(new AgentTimeoutException(Duration.ofSeconds(1)));
+            }
+            @Override public Uni<Void> interrupt() { return Uni.createFrom().voidItem(); }
+            @Override public void close(Duration d) {}
+        };
+        AtomicReference<Throwable> capturedError = new AtomicReference<>();
+        AgentSessionChatModel.wrap(session).chat(single("q"), new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) {}
+            @Override public void onCompleteResponse(ChatResponse r) {}
+            @Override public void onError(Throwable t) { capturedError.set(t); }
+        });
+        await().untilAsserted(() -> assertThat(capturedError.get()).isInstanceOf(AgentTimeoutException.class));
+    }
 }

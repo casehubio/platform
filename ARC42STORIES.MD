@@ -17,7 +17,7 @@
 
 Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI), `agent-claude/` (Claude SDK integration).
+Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI), `agent-claude/` (Claude SDK integration), `agent-claude-langchain4j/` (LangChain4j ChatModel/StreamingChatModel bridge backed by AgentSession).
 
 ### Artifact Schema
 
@@ -137,7 +137,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
-| L8: Agent Infrastructure | `agent-api/`, `agent-claude/` | AgentProvider SPI + Claude subprocess execution |
+| L8: Agent Infrastructure | `agent-api/`, `agent-claude/`, `agent-claude-langchain4j/` | AgentProvider SPI + Claude subprocess execution + LangChain4j ChatModel/StreamingChatModel bridge |
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
 
 ### Journey and Chapter sequencing rationale
@@ -1303,16 +1303,16 @@ Threshold-triggered pagination — no `totalResults` on the resource; treat `cou
 #### Layer — L8: Agent Infrastructure
 
 **Participates in chapters:** C14
-**Architectural patterns:** Semaphore-bounded subprocess, wall-clock timeout via `ScheduledExecutorService`, `@Startup` eager init for blocking probe
-**Issues:** #55, #58
+**Architectural patterns:** Semaphore-bounded subprocess, wall-clock timeout via `ScheduledExecutorService`, `@Startup` eager init for blocking probe, `@Alternative @Priority(10)` classpath-presence activation for LangChain4j bridge
+**Issues:** #55, #58, #100
 **Navigation:** `git log --grep="#55" --oneline`
 **Blog:** `blog/2026-06-03-mdp01-shipping-platform-agent.md`, `blog/2026-06-03-mdp02-two-ways-to-launch-claude.md`
-**Completed:** 2026-06-03
+**Completed:** 2026-06-03 (initial); 2026-06-17 (LangChain4j bridge, #100)
 
 #### What it adds
 
 **Before:** No agent execution capability — no SPI, no subprocess management, no event stream.
-**After:** `agent-api/` defines `AgentProvider`; `agent-claude/` implements it with Claude CLI subprocess; `NoOpAgentProvider @DefaultBean` in `platform/` logs WARN on every call.
+**After:** `agent-api/` defines `AgentProvider`; `agent-claude/` implements it with Claude CLI subprocess; `NoOpAgentProvider @DefaultBean` in `platform/` logs WARN on every call. `agent-claude-langchain4j/` bridges LangChain4j's `ChatModel`/`StreamingChatModel` interfaces to `AgentSession` — `ClaudeAgentChatModel` (stateless, fresh session per call, `@Alternative @Priority(10)`) and `AgentSessionChatModel` (plain wrapper, caller owns session lifecycle). Not compatible with `engine.Agent` which forces `ResponseFormatType.JSON`.
 
 What this layer adds:
 - **`AgentProvider` SPI** — `execute(prompt, AgentSessionConfig)` returns `Multi<AgentEvent>`; `AgentSessionConfig` carries `maxConcurrentSessions` and `timeoutDuration`; sealed `AgentMcpServer` hierarchy (Stdio/Sse/Http)

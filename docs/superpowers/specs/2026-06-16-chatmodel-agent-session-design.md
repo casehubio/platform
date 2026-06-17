@@ -107,6 +107,7 @@ public interface ClaudeAgentLangchain4jProperties {
 | `langchain4j-core` | compile | `ChatModel`, `StreamingChatModel`, `ChatRequest`, `ChatResponse`, `ModelProvider`, message types |
 | `quarkus-arc` | compile | CDI annotations and `Instance<>` for `ClaudeAgentChatModel` |
 | `quarkus-junit5` | test | |
+| `mockito-core` | test | `mock(Instance.class)`, `mock(ChatModelListener.class)`, `verify()` in `ClaudeAgentChatModelTest` |
 | `assertj-core` | test | |
 | `awaitility` | test | |
 
@@ -118,7 +119,7 @@ No dependency on `casehub-platform-agent-claude`. The adapter injects `AgentProv
 
 ```
 @Alternative @Priority(10) @ApplicationScoped
-class ClaudeAgentChatModel implements ChatModel, StreamingChatModel
+public class ClaudeAgentChatModel implements ChatModel, StreamingChatModel
 ```
 
 **CDI activation:** `@Alternative @Priority(10)` wins over `@DefaultBean` and plain
@@ -138,17 +139,28 @@ protected ClaudeAgentChatModel() {
 ```
 
 Tests construct directly with a fake `AgentProvider`, a stub `Instance<ChatModelListener>` (e.g.
-anonymous class whose `stream()` returns an empty stream), and test properties.
+Mockito mock with `when(stub.stream()).thenReturn(Stream.empty())`), and test properties.
 
 **Required overrides:**
+
+Both `ChatModel` and `StreamingChatModel` declare `listeners()`, `defaultRequestParameters()`,
+`provider()`, and `supportedCapabilities()` as default methods with identical signatures. Java
+requires explicit overrides in any class implementing both to resolve the diamond ambiguity —
+omitting any of these produces a compile error.
+
 ```java
 @Override public ModelProvider provider() { return ModelProvider.ANTHROPIC; }
 
 @Override public Set<Capability> supportedCapabilities() { return Set.of(); }
 
 @Override
+public ChatRequestParameters defaultRequestParameters() {
+    return DefaultChatRequestParameters.EMPTY;
+}
+
+@Override
 public List<ChatModelListener> listeners() {
-    return listeners.stream().toList();
+    return injectedListeners.stream().toList();
     // Without this, provider() is meaningless — ChatModel.chat() calls onRequest/onResponse/onError
     // with an empty listener list, producing no telemetry.
 }
@@ -210,11 +222,14 @@ No CDI. Constructor: `AgentSessionChatModel(AgentSession session)`.
 Static factory: `static AgentSessionChatModel wrap(AgentSession session)` returning
 `AgentSessionChatModel`.
 
-Overrides `provider()` → `ModelProvider.ANTHROPIC`, `supportedCapabilities()` → `Set.of()`.  
+Overrides `provider()` → `ModelProvider.ANTHROPIC`, `supportedCapabilities()` → `Set.of()`,
+`defaultRequestParameters()` → `DefaultChatRequestParameters.EMPTY`, and `listeners()` →
+`List.of()`. All four overrides are required to resolve the `ChatModel`/`StreamingChatModel`
+diamond (see "Required overrides" note in `ClaudeAgentChatModel`).
+
 `listeners()` returns `List.of()` — no CDI injection available. The telemetry infrastructure
-(`onRequest`/`onResponse`/`onError` in `ChatModel.chat()`) runs against an empty listener list,
-producing no output. V1 gap; a future version can accept `List<ChatModelListener>` as a
-constructor parameter.
+runs against an empty listener list, producing no output. V1 gap; a future version can accept
+`List<ChatModelListener>` as a constructor parameter.
 
 **Blocking `doChat(ChatRequest)` → `ChatResponse`:**
 1. `validateNoJsonFormat(request)` (private static)
@@ -319,8 +334,8 @@ Both propagate synchronously from `doChat()` to the caller of `chat()` — not t
 
 ### `ClaudeAgentChatModelTest` (plain JUnit5, no Quarkus)
 
-Use the test constructor with a fake `AgentProvider` (anonymous class), a stub
-`Instance<ChatModelListener>` (anonymous class whose `stream()` returns `Stream.empty()`), and a
+Use the test constructor with a fake `AgentProvider` (anonymous class), a Mockito mock
+`Instance<ChatModelListener>` (`when(stub.stream()).thenReturn(Stream.empty())`), and a
 test `ClaudeAgentLangchain4jProperties`.
 
 Tests:

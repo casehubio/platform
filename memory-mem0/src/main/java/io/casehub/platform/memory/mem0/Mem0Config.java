@@ -30,4 +30,12 @@ public interface Mem0Config {
      */
     @WithDefault("0.1")
     double searchThreshold();
+
+    /**
+     * Maximum number of concurrent HTTP calls during storeAll(). Bounded via Semaphore.
+     * Math.max(1, ...) is applied at the call site — 0 or negative values are treated as 1.
+     * Default 4: balances Mem0 server throughput against connection pool pressure.
+     */
+    @WithDefault("4")
+    int storeAllConcurrency();
 }

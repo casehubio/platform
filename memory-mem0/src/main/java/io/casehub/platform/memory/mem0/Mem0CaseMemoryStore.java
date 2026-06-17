@@ -5,6 +5,8 @@ import io.casehub.platform.api.memory.*;
 import io.casehub.platform.memory.mem0.dto.*;
 import io.quarkus.arc.Arc;
 import io.micrometer.core.annotation.Timed;
+import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
@@ -16,6 +18,7 @@ import org.jboss.logging.Logger;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 @Alternative
@@ -63,11 +66,16 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
     public List<String> storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return List.of();
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
-        final var ids = new ArrayList<String>(inputs.size());
-        for (final var input : inputs) {
-            ids.add(sendAdd(input));
-        }
-        return List.copyOf(ids);
+        final int cap = Math.max(1, Math.min(config.storeAllConcurrency(), inputs.size()));
+        final var sem = new Semaphore(cap);
+        final List<Uni<String>> unis = inputs.stream()
+            .map(i -> Uni.createFrom().<String>item(() -> {
+                sem.acquireUninterruptibly();
+                try { return sendAdd(i); }
+                finally { sem.release(); }
+            }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool()))
+            .collect(Collectors.toList());
+        return Uni.join().all(unis).andFailFast().await().indefinitely();
     }
 
     private String sendAdd(MemoryInput input) {

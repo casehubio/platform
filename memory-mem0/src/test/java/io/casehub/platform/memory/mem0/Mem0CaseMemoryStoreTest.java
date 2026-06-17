@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -510,12 +512,13 @@ class Mem0CaseMemoryStoreTest {
 
     @Test
     void storeAll_returns_all_memory_ids_in_order() {
+        // Stubs matched by message content so parallel calls each get a deterministic response.
+        // Uni.join() guarantees output order matches input position regardless of completion order.
         wireMock().stubFor(post(urlEqualTo("/memories"))
-            .inScenario("storeAll").whenScenarioStateIs("Started")
-            .willReturn(okJson("{\"results\": [{\"id\":\"mem-aaa\",\"memory\":\"a\",\"event\":\"ADD\"}]}"))
-            .willSetStateTo("second"));
+            .withRequestBody(matchingJsonPath("$.messages[0].content", equalTo("a")))
+            .willReturn(okJson("{\"results\": [{\"id\":\"mem-aaa\",\"memory\":\"a\",\"event\":\"ADD\"}]}")));
         wireMock().stubFor(post(urlEqualTo("/memories"))
-            .inScenario("storeAll").whenScenarioStateIs("second")
+            .withRequestBody(matchingJsonPath("$.messages[0].content", equalTo("b")))
             .willReturn(okJson("{\"results\": [{\"id\":\"mem-bbb\",\"memory\":\"b\",\"event\":\"ADD\"}]}")));
 
         final var ids = store.storeAll(List.of(
@@ -544,13 +547,75 @@ class Mem0CaseMemoryStoreTest {
     }
 
     @Test
-    void storeAll_http_failure_stops_remaining_items() {
+    void storeAll_http_failure_propagates_exception() {
+        // With parallel execution in-flight calls may complete before the error lands.
+        // Assert that the exception propagates and at least one HTTP call was made.
         wireMock().stubFor(post(urlEqualTo("/memories")).willReturn(serverError()));
         assertThrows(Mem0StoreException.class, () ->
             store.storeAll(List.of(
                 new MemoryInput("entity-1", DOMAIN, TENANT, null, "a", Map.of()),
                 new MemoryInput("entity-1", DOMAIN, TENANT, null, "b", Map.of())
             )));
-        wireMock().verify(1, postRequestedFor(urlEqualTo("/memories")));
+        wireMock().verify(moreThanOrExactly(1), postRequestedFor(urlEqualTo("/memories")));
+    }
+
+    // ── storeAll parallel ──────────────────────────────────────────────────────
+
+    @Test
+    void storeAll_fires_requests_concurrently() {
+        // 8 requests with 300ms delay each. cap=4 (default) → ceil(8/4)*300 = 600ms.
+        // Sequential would be 8*300 = 2400ms. Assert elapsed < 1200ms (2x headroom).
+        wireMock().stubFor(post(urlEqualTo("/memories"))
+            .willReturn(okJson("{\"results\":[{\"id\":\"x\",\"memory\":\"t\",\"event\":\"ADD\"}]}")
+                .withFixedDelay(300)));
+        principal.setTenancyId(TENANT);
+        var inputs = IntStream.range(0, 8)
+            .mapToObj(i -> new MemoryInput("e" + i, DOMAIN, TENANT, null, "text", Map.of()))
+            .collect(Collectors.toList());
+
+        long start = System.currentTimeMillis();
+        var ids = store.storeAll(inputs);
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertEquals(8, ids.size());
+        assertTrue(elapsed < 1200,
+            "storeAll must execute in parallel; elapsed=" + elapsed + "ms (expected < 1200ms)");
+    }
+
+    @Test
+    void storeAll_preserves_output_size_and_non_empty_ids() {
+        wireMock().stubFor(post(urlEqualTo("/memories"))
+            .willReturn(okJson("{\"results\":[{\"id\":\"mem-x\",\"memory\":\"t\",\"event\":\"ADD\"}]}")));
+        principal.setTenancyId(TENANT);
+        var inputs = List.of(
+            new MemoryInput("e1", DOMAIN, TENANT, null, "a", Map.of()),
+            new MemoryInput("e2", DOMAIN, TENANT, null, "b", Map.of()),
+            new MemoryInput("e3", DOMAIN, TENANT, null, "c", Map.of())
+        );
+        var ids = store.storeAll(inputs);
+        assertEquals(3, ids.size());
+        ids.forEach(id -> assertFalse(id.isEmpty(), "ID must not be empty"));
+    }
+
+    @Test
+    void storeAll_first_error_propagates() {
+        wireMock().stubFor(post(urlEqualTo("/memories"))
+            .willReturn(serverError().withBody("{\"detail\":\"server error\"}")));
+        principal.setTenancyId(TENANT);
+        var inputs = List.of(
+            new MemoryInput("e1", DOMAIN, TENANT, null, "a", Map.of()),
+            new MemoryInput("e2", DOMAIN, TENANT, null, "b", Map.of())
+        );
+        assertThrows(Mem0StoreException.class,
+            () -> store.storeAll(inputs));
+    }
+
+    @Test
+    void storeAll_single_item_uses_cap_of_one() {
+        // With 1 input and config=4: Math.max(1, Math.min(4,1)) = 1. Semaphore(1) — no deadlock.
+        stubAddOk("safe-id");
+        principal.setTenancyId(TENANT);
+        var ids = store.storeAll(List.of(new MemoryInput("e1", DOMAIN, TENANT, null, "x", Map.of())));
+        assertEquals(List.of("safe-id"), ids);
     }
 }

@@ -62,7 +62,7 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
     @Override
     public List<String> storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return List.of();
-        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal));
+        inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         final var ids = new ArrayList<String>(inputs.size());
         for (final var input : inputs) {
             ids.add(sendAdd(input));

@@ -29,6 +29,7 @@
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>
+        <module>agent-claude-langchain4j</module>
         <module>acl-inmem</module>
         <module>acl-jpa</module>
     </modules>
@@ -40,6 +41,7 @@
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <jandex-maven-plugin.version>3.3.1</jandex-maven-plugin.version>
         <assertj.version>3.27.3</assertj.version>
+        <langchain4j.version>1.14.1</langchain4j.version>
     </properties>
 
     <dependencyManagement>
@@ -73,6 +75,11 @@
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-core</artifactId>
+                <version>${langchain4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

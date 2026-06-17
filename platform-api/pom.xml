@@ -17,6 +17,11 @@
         No Quarkus, no JPA, no casehubio deps. Pure Java only.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>mutiny</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- Test only — not a production dependency -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

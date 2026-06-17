@@ -101,7 +101,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | Module | Artifact | Purpose |
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
-| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `ReactiveCaseMemoryStore` interface + `BlockingToReactiveBridge` |
+| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `BlockingToReactiveBridge` |
 | `testing/` | `casehub-platform-testing` | @Alternative @Priority(1) identity fixtures — no Quarkus runtime |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @RequestScoped OIDC-backed CurrentPrincipal — reads actorId/groups from SecurityIdentity |
@@ -150,6 +150,7 @@ io.casehub.platform.api
                    EndpointQuery (record: tenancyId, type, protocol, requiredCapabilities),
                    EndpointPropertyKeys (reserved cross-protocol property keys: URL, TOPIC)
   .memory        — CaseMemoryStore (blocking SPI) + GraphCaseMemoryStore (graph-native extension: graphQuery(GraphMemoryQuery)),
+                   ReactiveCaseMemoryStore (Mutiny SPI),
                    MemoryCapability (enum: declared adapter capabilities), MemoryCapabilityException,
                    MemoryResultType (DEFAULT/FACTS), GraphMemoryQuery (graph-native query: tenantId, entityIds, domain,
                    question, limit, since, validAt, entityTypes, resultType),
@@ -163,8 +164,7 @@ io.casehub.platform.api
                    open-WorkItems, and open-obligation slices of the actor state view)
 ```
 
-`platform/` also exposes `ReactiveCaseMemoryStore` (Mutiny SPI) and `BlockingToReactiveBridge @DefaultBean`
-at `io.casehub.platform.memory`.
+`platform/` exposes `BlockingToReactiveBridge @DefaultBean` at `io.casehub.platform.memory`.
 
 ## Writing Style Guide
 

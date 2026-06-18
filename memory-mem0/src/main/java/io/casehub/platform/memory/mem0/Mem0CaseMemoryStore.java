@@ -37,7 +37,8 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
             MemoryCapability.SEMANTIC_SEARCH,
             MemoryCapability.ERASE_BY_ID,
             MemoryCapability.ERASE_ENTITY,
-            MemoryCapability.ERASE_DOMAIN_CASE
+            MemoryCapability.ERASE_DOMAIN_CASE,
+            MemoryCapability.CROSS_TENANT_ERASE
         );
     }
 
@@ -214,6 +215,26 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
         } catch (WebApplicationException e) {
             throw toStoreException(e);
         }
+    }
+
+    @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "eraseEntityAcrossTenants"})
+    @Override
+    public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        MemoryPermissions.assertCrossTenantAdmin(principal);
+        // Sequential: simplicity + retry-is-safe. deleteAll is idempotent — already-erased
+        // tenants return an empty list on retry, so re-invoking after partial failure converges.
+        int total = 0;
+        for (String tenantId : tenantIds) {
+            final String userId = compoundUserId(tenantId, entityId);
+            try {
+                final Mem0ListResponse listed = client.list(userId, null, null);
+                total += listed.results() != null ? listed.results().size() : 0;
+                client.deleteAll(userId, null, null);
+            } catch (WebApplicationException e) {
+                throw toStoreException(e);
+            }
+        }
+        return total;
     }
 
     // ── shared helpers ────────────────────────────────────────────────────────

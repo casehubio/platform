@@ -47,6 +47,7 @@ class GraphitiCaseMemoryStoreTest {
     void setUp() {
         wireMock.resetAll();
         principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(false);
     }
 
     private MemoryInput input(final String text) {
@@ -427,6 +428,13 @@ class GraphitiCaseMemoryStoreTest {
         assertEquals(MemoryCapability.ERASE_ENTITY, ex.required());
         wireMock.verify(0, getRequestedFor(anyUrl()));
         wireMock.verify(0, deleteRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_without_known_domains_throws_MemoryCapabilityException() {
+        principal.setCrossTenantAdmin(true);
+        assertThrows(MemoryCapabilityException.class,
+            () -> store.eraseEntityAcrossTenants(ENTITY, java.util.Set.of(TENANT)));
     }
 
     // ── eraseById ─────────────────────────────────────────────────────────────

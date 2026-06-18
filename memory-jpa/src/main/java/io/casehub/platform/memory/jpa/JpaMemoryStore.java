@@ -14,14 +14,15 @@ import jakarta.transaction.Transactional.TxType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @ApplicationScoped
 public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
-    public java.util.Set<MemoryCapability> capabilities() {
-        return java.util.Set.of(
+    public Set<MemoryCapability> capabilities() {
+        return Set.of(
             MemoryCapability.CHRONOLOGICAL_ORDER,
             MemoryCapability.DOMAIN_SCOPED,
             MemoryCapability.CASE_SCOPED,
@@ -30,7 +31,8 @@ public class JpaMemoryStore implements CaseMemoryStore {
             MemoryCapability.FULL_TEXT_SEARCH,
             MemoryCapability.ERASE_BY_ID,
             MemoryCapability.ERASE_ENTITY,
-            MemoryCapability.ERASE_DOMAIN_CASE
+            MemoryCapability.ERASE_DOMAIN_CASE,
+            MemoryCapability.CROSS_TENANT_ERASE
         );
     }
 
@@ -189,6 +191,20 @@ public class JpaMemoryStore implements CaseMemoryStore {
                 "DELETE FROM MemoryEntry WHERE tenantId = :tenantId AND entityId = :entityId")
             .setParameter("tenantId", tenantId)
             .setParameter("entityId", entityId)
+            .executeUpdate();
+        em.clear();
+        return count;
+    }
+
+    @Override
+    @Transactional(TxType.REQUIRED)
+    public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        MemoryPermissions.assertCrossTenantAdmin(principal);
+        if (tenantIds.isEmpty()) return 0;
+        int count = em.createQuery(
+                "DELETE FROM MemoryEntry WHERE entityId = :entityId AND tenantId IN :tenantIds")
+            .setParameter("entityId", entityId)
+            .setParameter("tenantIds", List.copyOf(tenantIds))
             .executeUpdate();
         em.clear();
         return count;

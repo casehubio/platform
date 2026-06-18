@@ -23,4 +23,5 @@ public enum MemoryCapability {
     ERASE_BY_ID,         // eraseById() — per-episode deletion
     ERASE_ENTITY,        // eraseEntity() — GDPR full-entity wipe
     ERASE_DOMAIN_CASE,   // erase(EraseRequest) — domain+caseId scoped
+    CROSS_TENANT_ERASE,  // eraseEntityAcrossTenants() — GDPR Art.17 across all supplied tenantIds
 }

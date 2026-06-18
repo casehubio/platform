@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
@@ -64,5 +65,13 @@ class NoOpCaseMemoryStoreTest {
     }
     @Test void bridge_eraseEntity_returns_zero() {
         assertEquals(0, reactiveStore.eraseEntity("entity-1", "tenant-1").await().indefinitely());
+    }
+
+    @Test void eraseEntityAcrossTenants_returns_zero() {
+        assertEquals(0, store.eraseEntityAcrossTenants("entity-1", Set.of("tenant-1")));
+    }
+    @Test void bridge_eraseEntityAcrossTenants_returns_zero() {
+        assertEquals(0, reactiveStore.eraseEntityAcrossTenants("entity-1", Set.of("tenant-1"))
+            .await().indefinitely());
     }
 }

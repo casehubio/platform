@@ -2,6 +2,7 @@ package io.casehub.platform.api.memory;
 
 import io.smallrye.mutiny.Uni;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public interface ReactiveCaseMemoryStore {
@@ -41,5 +42,14 @@ public interface ReactiveCaseMemoryStore {
     default Uni<Void> eraseById(String memoryId, String entityId, String tenantId) {
         return Uni.createFrom().failure(
             new MemoryCapabilityException(MemoryCapability.ERASE_BY_ID, getClass()));
+    }
+
+    /**
+     * Reactive mirror of {@link CaseMemoryStore#eraseEntityAcrossTenants}.
+     * Default fails with MemoryCapabilityException — consistent with blocking SPI contract.
+     */
+    default Uni<Integer> eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        return Uni.createFrom().failure(
+            new MemoryCapabilityException(MemoryCapability.CROSS_TENANT_ERASE, getClass()));
     }
 }

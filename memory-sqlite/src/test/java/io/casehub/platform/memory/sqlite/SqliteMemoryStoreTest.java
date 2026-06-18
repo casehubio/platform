@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,18 +26,46 @@ class SqliteMemoryStoreTest extends CaseMemoryStoreContractTest {
     @BeforeEach
     void setup() {
         principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(false);
     }
 
     @AfterEach
     void cleanUp() {
         // No @TestTransaction (no JTA). Clean known entity IDs after each test.
+        principal.setTenancyId(TENANT);
         sqliteStore.eraseEntity("entity-1", TENANT);
         sqliteStore.eraseEntity("entity-2", TENANT);
+        // Clean OTHER_TENANT data written by cross-tenant tests
+        principal.setTenancyId(OTHER_TENANT);
+        sqliteStore.eraseEntity("entity-1", OTHER_TENANT);
+        principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(false);
     }
 
     @Override
     protected CaseMemoryStore store() {
         return sqliteStore;
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_deletes_across_tenants() {
+        // Seed under TENANT
+        store().store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "data-a", Map.of()));
+        // Seed under OTHER_TENANT
+        principal.setTenancyId(OTHER_TENANT);
+        store().store(new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "data-b", Map.of()));
+        // Erase as cross-tenant admin
+        principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(true);
+        int count = sqliteStore.eraseEntityAcrossTenants("entity-1", Set.of(TENANT, OTHER_TENANT));
+        assertEquals(2, count);
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_requires_cross_tenant_admin() {
+        principal.setCrossTenantAdmin(false);
+        assertThrows(SecurityException.class,
+            () -> sqliteStore.eraseEntityAcrossTenants("entity-1", Set.of(TENANT)));
     }
 
     // --- SQLite-specific tests ---

@@ -56,6 +56,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
         ));
         if (!config.knownDomains().orElse(List.of()).isEmpty()) {
             caps.add(MemoryCapability.ERASE_ENTITY);
+            caps.add(MemoryCapability.CROSS_TENANT_ERASE);
         }
         return Set.copyOf(caps);
     }
@@ -351,6 +352,21 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
         for (final String domain : domains) {
             total += eraseGroup(compoundGroupId(tenantId, entityId, domain));
         }
+        return total;
+    }
+
+    @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "eraseEntityAcrossTenants"})
+    @Override
+    public int eraseEntityAcrossTenants(final String entityId, final Set<String> tenantIds) {
+        MemoryPermissions.assertCrossTenantAdmin(principal);
+        final List<String> domains = config.knownDomains().orElse(List.of());
+        if (domains.isEmpty())
+            throw new MemoryCapabilityException(MemoryCapability.CROSS_TENANT_ERASE, getClass());
+        // Sequential: simplicity + retry-is-safe. eraseGroup handles 404 as no-op.
+        int total = 0;
+        for (final String tenantId : tenantIds)
+            for (final String domain : domains)
+                total += eraseGroup(compoundGroupId(tenantId, entityId, domain));
         return total;
     }
 

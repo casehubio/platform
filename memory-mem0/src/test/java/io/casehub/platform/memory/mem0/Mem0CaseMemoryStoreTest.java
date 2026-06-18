@@ -35,6 +35,7 @@ class Mem0CaseMemoryStoreTest {
     void setup() {
         wireMock().resetAll();
         principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(false);
     }
 
     private WireMockServer wireMock() {
@@ -506,6 +507,25 @@ class Mem0CaseMemoryStoreTest {
             .withQueryParam("user_id", equalTo("tenant-1::entity-1")));
         wireMock().verify(0, deleteRequestedFor(urlPathEqualTo("/memories"))
             .withQueryParam("user_id", equalTo("tenant-2::entity-1")));
+    }
+
+    // ── eraseEntityAcrossTenants ───────────────────────────────────────────────
+
+    @Test
+    void eraseEntityAcrossTenants_requires_cross_tenant_admin() {
+        // principal.isCrossTenantAdmin() is false (set in @BeforeEach)
+        assertThrows(SecurityException.class,
+            () -> store.eraseEntityAcrossTenants("entity-1", java.util.Set.of(TENANT)));
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_calls_list_and_deleteAll_per_tenant() {
+        stubListOk(mem0Json("id-1", "data", "2026-01-01T00:00:00Z"));
+        stubDeleteAllOk();
+        principal.setCrossTenantAdmin(true);
+        int count = store.eraseEntityAcrossTenants("entity-1", java.util.Set.of(TENANT, "tenant-b"));
+        // list returns 1 item per tenant call, so total = 2 (one per tenant)
+        assertEquals(2, count);
     }
 
     // ── storeAll ──────────────────────────────────────────────────────────────

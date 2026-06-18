@@ -36,4 +36,10 @@ class ReactiveCaseMemoryStoreSpiTest {
             () -> sut.eraseById("id", "e", "t").await().indefinitely());
         assertEquals(MemoryCapability.ERASE_BY_ID, ex.required());
     }
+
+    @Test void eraseEntityAcrossTenants_default_fails_with_MemoryCapabilityException() {
+        final var ex = assertThrows(MemoryCapabilityException.class,
+            () -> sut.eraseEntityAcrossTenants("e", Set.of("t")).await().indefinitely());
+        assertEquals(MemoryCapability.CROSS_TENANT_ERASE, ex.required());
+    }
 }

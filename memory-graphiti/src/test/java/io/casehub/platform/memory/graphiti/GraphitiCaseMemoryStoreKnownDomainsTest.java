@@ -45,6 +45,7 @@ class GraphitiCaseMemoryStoreKnownDomainsTest {
     void setUp() {
         wireMock.resetAll();
         principal.setTenancyId(TENANT);
+        principal.setCrossTenantAdmin(false);
     }
 
     @Test
@@ -102,5 +103,31 @@ class GraphitiCaseMemoryStoreKnownDomainsTest {
     @Test
     void capabilities_includes_ERASE_ENTITY_when_known_domains_configured() {
         assertTrue(store.capabilities().contains(MemoryCapability.ERASE_ENTITY));
+    }
+
+    // ── eraseEntityAcrossTenants ──────────────────────────────────────────────
+
+    @Test
+    void eraseEntityAcrossTenants_requires_cross_tenant_admin() {
+        // principal.isCrossTenantAdmin() is false (set in @BeforeEach)
+        assertThrows(SecurityException.class,
+            () -> store.eraseEntityAcrossTenants(ENTITY, java.util.Set.of(TENANT)));
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_with_known_domains_does_not_throw() {
+        // Stub: GET /episodes returns empty list, DELETE /group returns 200
+        wireMock.stubFor(WireMock.get(WireMock.urlPathMatching("/episodes/.*"))
+            .willReturn(WireMock.okJson("[]")));
+        wireMock.stubFor(WireMock.delete(WireMock.urlMatching("/group/.*"))
+            .willReturn(WireMock.aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"success\":true,\"message\":\"deleted\"}")));
+
+        principal.setCrossTenantAdmin(true);
+        // The method will call eraseGroup for each domain × tenant combination
+        int count = store.eraseEntityAcrossTenants(ENTITY, java.util.Set.of(TENANT));
+        assertTrue(count >= 0);
+        assertTrue(store.capabilities().contains(MemoryCapability.CROSS_TENANT_ERASE));
     }
 }

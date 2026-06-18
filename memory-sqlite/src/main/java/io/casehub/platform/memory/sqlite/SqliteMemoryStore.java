@@ -22,6 +22,7 @@ import java.sql.*;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Alternative
 @Priority(1)
@@ -29,8 +30,8 @@ import java.util.*;
 public class SqliteMemoryStore implements CaseMemoryStore {
 
     @Override
-    public java.util.Set<MemoryCapability> capabilities() {
-        return java.util.Set.of(
+    public Set<MemoryCapability> capabilities() {
+        return Set.of(
             MemoryCapability.CHRONOLOGICAL_ORDER,
             MemoryCapability.DOMAIN_SCOPED,
             MemoryCapability.CASE_SCOPED,
@@ -39,7 +40,8 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             MemoryCapability.FULL_TEXT_SEARCH,
             MemoryCapability.ERASE_BY_ID,
             MemoryCapability.ERASE_ENTITY,
-            MemoryCapability.ERASE_DOMAIN_CASE
+            MemoryCapability.ERASE_DOMAIN_CASE,
+            MemoryCapability.CROSS_TENANT_ERASE
         );
     }
 
@@ -218,6 +220,36 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             return ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("eraseEntity() failed", e);
+        }
+    }
+
+    private static final int SQLITE_IN_CHUNK = 500;
+
+    @Override
+    public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        MemoryPermissions.assertCrossTenantAdmin(principal);
+        if (tenantIds.isEmpty()) return 0;
+        // ArrayList needed for subList() chunking
+        var tenantList = new ArrayList<>(tenantIds);
+        int total = 0;
+        for (int offset = 0; offset < tenantList.size(); offset += SQLITE_IN_CHUNK) {
+            var chunk = tenantList.subList(offset, Math.min(offset + SQLITE_IN_CHUNK, tenantList.size()));
+            total += deleteChunk(entityId, chunk);
+        }
+        return total;
+    }
+
+    private int deleteChunk(String entityId, List<String> tenantChunk) {
+        String placeholders = tenantChunk.stream().map(t -> "?").collect(Collectors.joining(", "));
+        String sql = "DELETE FROM memory_entry WHERE entity_id = ? AND tenant_id IN (" + placeholders + ")";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, entityId);
+            int idx = 2;
+            for (String t : tenantChunk) ps.setString(idx++, t);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("eraseEntityAcrossTenants() failed", e);
         }
     }
 

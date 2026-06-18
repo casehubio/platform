@@ -40,4 +40,10 @@ public class NoOpCaseMemoryStore implements GraphCaseMemoryStore {
     public List<String> storeAll(final List<MemoryInput> inputs) {
         return Collections.nCopies(inputs.size(), "");
     }
+
+    // No assertCrossTenantAdmin call — NoOpCaseMemoryStore has no CurrentPrincipal injection
+    // and guards no real data, matching the same omission in eraseEntity().
+    // capabilities() stays Set.of() — NoOp invariant is preserved.
+    @Override
+    public int eraseEntityAcrossTenants(final String entityId, final Set<String> tenantIds) { return 0; }
 }

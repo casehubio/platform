@@ -51,4 +51,28 @@ class MemoryPermissionsTest {
         assertDoesNotThrow(() ->
             MemoryPermissions.assertTenant("mine", principal("mine"), true));
     }
+
+    // ── Cross-tenant admin checks ──────────────────────────────────────────────
+
+    private static CurrentPrincipal crossTenantAdminPrincipal() {
+        return new CurrentPrincipal() {
+            @Override public String actorId()             { return "admin"; }
+            @Override public Set<String> groups()         { return Set.of(); }
+            @Override public String tenancyId()           { return "platform"; }
+            @Override public boolean isCrossTenantAdmin() { return true; }
+        };
+    }
+
+    @Test
+    void assertCrossTenantAdmin_throws_SecurityException_when_not_admin() {
+        SecurityException ex = assertThrows(SecurityException.class,
+            () -> MemoryPermissions.assertCrossTenantAdmin(principal("t")));
+        assertTrue(ex.getMessage().contains("actor"));
+    }
+
+    @Test
+    void assertCrossTenantAdmin_passes_when_is_cross_tenant_admin() {
+        assertDoesNotThrow(() ->
+            MemoryPermissions.assertCrossTenantAdmin(crossTenantAdminPrincipal()));
+    }
 }

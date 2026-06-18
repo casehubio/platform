@@ -65,6 +65,13 @@ class CaseMemoryStoreSpiTest {
         assertDoesNotThrow(() -> MemoryPermissions.assertTenant("real", principal("real")));
     }
 
+    @Test
+    void eraseEntityAcrossTenants_default_throws_MemoryCapabilityException() {
+        final var ex = assertThrows(MemoryCapabilityException.class,
+            () -> sut.eraseEntityAcrossTenants("entity-1", Set.of("tenant-1")));
+        assertEquals(MemoryCapability.CROSS_TENANT_ERASE, ex.required());
+    }
+
     private static CurrentPrincipal principal(String tenancyId) {
         return new CurrentPrincipal() {
             @Override public String actorId() { return "actor"; }

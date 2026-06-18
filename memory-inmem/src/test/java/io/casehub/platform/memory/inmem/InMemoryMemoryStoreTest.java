@@ -48,4 +48,28 @@ class InMemoryMemoryStoreTest extends CaseMemoryStoreContractTest {
         assertDoesNotThrow(() ->
             sut.query(query().withOrder(MemoryOrder.RELEVANCE).withQuestion("some")));
     }
+
+    @Test
+    void eraseEntityAcrossTenants_removes_entity_from_admin_store() {
+        // Admin store shares no backing map with sut — tests security gate + return value
+        // using a store where the principal IS the admin.
+        var adminPrincipal = new CurrentPrincipal() {
+            @Override public String actorId()             { return "admin"; }
+            @Override public Set<String> groups()         { return Set.of(); }
+            @Override public String tenancyId()           { return TENANT; }
+            @Override public boolean isCrossTenantAdmin() { return true; }
+        };
+        var adminStore = new InMemoryMemoryStore(adminPrincipal);
+        adminStore.store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "data", Map.of()));
+        int count = adminStore.eraseEntityAcrossTenants("entity-1", Set.of(TENANT));
+        assertEquals(1, count);
+        assertTrue(adminStore.query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT)).isEmpty());
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_requires_cross_tenant_admin() {
+        // sut uses the default non-admin principal (isCrossTenantAdmin=false)
+        assertThrows(SecurityException.class,
+            () -> sut.eraseEntityAcrossTenants("entity-1", Set.of(TENANT)));
+    }
 }

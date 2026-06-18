@@ -12,6 +12,7 @@ import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
+import java.util.Set;
 
 @DefaultBean
 @ApplicationScoped
@@ -52,6 +53,12 @@ public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
     @Override
     public Uni<Integer> eraseEntity(String entityId, String tenantId) {
         return Uni.createFrom().item(() -> delegate.eraseEntity(entityId, tenantId))
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    public Uni<Integer> eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        return Uni.createFrom().item(() -> delegate.eraseEntityAcrossTenants(entityId, tenantIds))
             .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }

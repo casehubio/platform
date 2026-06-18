@@ -4,6 +4,7 @@ import io.casehub.platform.api.memory.*;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -45,6 +46,10 @@ class BlockingToReactiveBridgeThreadingTest {
             @Override public List<String> storeAll(List<MemoryInput> inputs) {
                 capturedThreadId.set(Thread.currentThread().getId());
                 return inputs.stream().map(i -> "mem-batch").toList();
+            }
+            @Override public int eraseEntityAcrossTenants(String eid, Set<String> tids) {
+                capturedThreadId.set(Thread.currentThread().getId());
+                return 0;
             }
         };
         var bridge = new BlockingToReactiveBridge();
@@ -101,5 +106,14 @@ class BlockingToReactiveBridgeThreadingTest {
         assertNotEquals(Thread.currentThread().getId(), capturedId.get(),
             "storeAll() must offload delegate to a worker thread, not run on the subscribing thread");
         assertEquals(2, ids.size());
+    }
+
+    @Test
+    void eraseEntityAcrossTenants_executes_delegate_on_worker_thread() {
+        var capturedId = new AtomicLong(Thread.currentThread().getId());
+        bridgeWith(capturedId).eraseEntityAcrossTenants("entity-1", Set.of(TENANT))
+            .await().indefinitely();
+        assertNotEquals(Thread.currentThread().getId(), capturedId.get(),
+            "eraseEntityAcrossTenants() must offload delegate to a worker thread, not run on the subscribing thread");
     }
 }

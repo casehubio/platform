@@ -111,6 +111,27 @@ public interface CaseMemoryStore {
     }
 
     /**
+     * GDPR Art.17 full-entity wipe across all supplied tenantIds.
+     * Caller must be a cross-tenant admin. Supply the complete set of tenantIds
+     * for the data subject from the tenant management system.
+     *
+     * <p>Adapters MUST call {@link MemoryPermissions#assertCrossTenantAdmin} before
+     * delegating to the backend. Do NOT call eraseEntity() internally — assertTenant()
+     * rejects cross-tenant access. Implement deletion directly against the backend.
+     *
+     * <p>Default throws {@link MemoryCapabilityException}. {@code NoOpCaseMemoryStore}
+     * overrides with {@code return 0} but does NOT declare
+     * {@link MemoryCapability#CROSS_TENANT_ERASE} in capabilities().
+     *
+     * @param tenantIds the set of tenantIds to erase from; caller supplies from tenant management.
+     *                  Set semantics enforced at the type level — duplicates are impossible.
+     * @return total count of records erased across all tenantIds (best-effort for REST adapters)
+     */
+    default int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        throw new MemoryCapabilityException(MemoryCapability.CROSS_TENANT_ERASE, getClass());
+    }
+
+    /**
      * Returns the set of capabilities this adapter declares.
      * Callers should check capabilities before invoking optional operations.
      * The returned set is immutable.

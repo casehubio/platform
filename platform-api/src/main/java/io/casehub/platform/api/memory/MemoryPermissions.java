@@ -36,4 +36,17 @@ public final class MemoryPermissions {
                                     boolean requestContextActive) {
         if (requestContextActive) assertTenant(tenantId, principal);
     }
+
+    /**
+     * Requires cross-tenant admin privilege. No async bypass form — this check must always
+     * enforce. Cross-tenant GDPR erasure is a deliberate administrative operation never
+     * initiated from @ObservesAsync context; unconditional enforcement is correct and required.
+     * Capturing the principal before entering any reactive pipeline is the caller's
+     * responsibility, as with all @RequestScoped beans.
+     */
+    public static void assertCrossTenantAdmin(CurrentPrincipal principal) {
+        if (!principal.isCrossTenantAdmin())
+            throw new SecurityException(
+                "Cross-tenant erasure requires cross-tenant admin privilege; actor=" + principal.actorId());
+    }
 }

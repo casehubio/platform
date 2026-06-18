@@ -29,7 +29,8 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
             MemoryCapability.BATCH_STORE,
             MemoryCapability.ERASE_BY_ID,
             MemoryCapability.ERASE_ENTITY,
-            MemoryCapability.ERASE_DOMAIN_CASE
+            MemoryCapability.ERASE_DOMAIN_CASE,
+            MemoryCapability.CROSS_TENANT_ERASE
         );
     }
 
@@ -120,6 +121,20 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         final var count = new AtomicInteger();
         store.entrySet().removeIf(e -> {
             if (e.getKey().tenantId().equals(tenantId) && e.getKey().entityId().equals(entityId)) {
+                count.addAndGet(e.getValue().size());
+                return true;
+            }
+            return false;
+        });
+        return count.get();
+    }
+
+    @Override
+    public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
+        MemoryPermissions.assertCrossTenantAdmin(principal);
+        var count = new AtomicInteger();
+        store.entrySet().removeIf(e -> {
+            if (tenantIds.contains(e.getKey().tenantId()) && e.getKey().entityId().equals(entityId)) {
                 count.addAndGet(e.getValue().size());
                 return true;
             }

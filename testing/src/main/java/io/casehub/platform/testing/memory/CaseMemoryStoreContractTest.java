@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -304,6 +305,16 @@ public abstract class CaseMemoryStoreContractTest {
     @Test
     void eraseEntity_returns_zero_when_nothing_stored() {
         assertEquals(0, store().eraseEntity("entity-99", TENANT));
+    }
+
+    // --- eraseEntityAcrossTenants ---
+
+    @Test
+    void eraseEntityAcrossTenants_throws_SecurityException_when_not_cross_tenant_admin() {
+        // Default principal in all contract test subclasses has isCrossTenantAdmin()=false.
+        // assertCrossTenantAdmin must reject any non-admin caller.
+        assertThrows(SecurityException.class,
+            () -> store().eraseEntityAcrossTenants("entity-1", Set.of(TENANT)));
     }
 
     // --- storeAll ---

@@ -67,6 +67,9 @@ git push --force mdproctor main   # --force on first push after fork creation
 
 **Blog directory:** `/Users/mdproctor/claude/public/casehub/platform/blog/`
 
+Living docs — check for drift after significant changes:
+- `ARC42STORIES.MD` — primary architecture record; check §4 (layer taxonomy), §5 (building block view), §8 (new layers), §13 (glossary) after module, SPI, or structural changes
+
 ## Rules
 
 - `platform-api/` must remain zero-dependency — no Quarkus, no JPA, no casehubio imports. Pure Java only.

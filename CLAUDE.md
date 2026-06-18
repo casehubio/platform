@@ -21,6 +21,7 @@ Run `add-dir /Users/mdproctor/claude/casehub/platform` and `add-dir /Users/mdpro
 | handover | `HANDOFF.md` |
 | idea-log | `IDEAS.md` |
 | design-snapshot | `snapshots/` |
+| java-update-design / update-primary-doc | `design/JOURNAL.md` (created by `epic`) |
 | adr | `adr/` |
 | write-blog | `blog/` |
 
@@ -60,7 +61,7 @@ git push --force mdproctor main   # --force on first push after fork creation
 | specs      | project     | lands in `docs/` |
 | blog       | workspace   | staged; published to mdproctor.github.io via publish-blog |
 | plans      | workspace   | stay in workspace permanently |
-| design     | workspace   | |
+| design     | workspace   | epic journal stays in workspace |
 | snapshots  | workspace   | |
 | handover   | workspace   | |
 

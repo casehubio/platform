@@ -1138,7 +1138,7 @@ CDI priority ladder — `@DefaultBean` (lowest) → `@ApplicationScoped` (middle
 **Participates in chapters:** C8, C9, C10, C11, C16
 **Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
 **ADRs:** ADR-0008
-**Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #69
+**Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #69, #70, #90, #99
 **Navigation:** `git log --grep="#32\|#33\|#36\|#37\|#39\|#48\|#49" --oneline`
 **Blog:** `blog/2026-05-28-mdp01-teaching-platform-to-remember.md`, `blog/2026-05-31-mdp01-durable-memory-no-server.md`, `blog/2026-06-04-mdp01-mem0-adapter.md`, `blog/2026-06-05-mdp01-storeall-contract.md`
 **Completed:** 2026-06-05
@@ -1156,7 +1156,9 @@ What this layer adds:
 - **`Mem0CaseMemoryStore`** — REST client; `infer:false` verbatim storage; compound `user_id={tenantId}::{entityId}` for tenant isolation; limit applied client-side (server is unbounded)
 - **`InMemoryMemoryStore`** — `@Alternative @Priority(10)` (not Priority(1)); test-override tier so it beats all production adapters in `@QuarkusTest` with compile-scope production adapter present
 
-Not closed here: Graphiti adapter (#34 — later closed in C16), Mem0 `storeAll()` batch (#70 — deferred pending upstream batch endpoint; #69 superseded). Multi-turn `AgentSession` (#58) shipped in C20.
+Not closed here: Graphiti adapter (#34 — later closed in C16). Multi-turn `AgentSession` (#58) shipped in C20.
+
+**#70** (`Mem0CaseMemoryStore.storeAll()` bounded-parallel): Semaphore-gated Mutiny parallel HTTP, configurable cap (default 4). 2-arg `assertTenant` pre-flight fixed in Mem0 + SQLite. **#90** (`ReactiveCaseMemoryStore` moved to `platform-api`): Mutiny SPI now in Tier 1; engine#466 can downgrade `casehub-platform` to test scope. Two `UnsupportedOperationException` defaults fixed to `MemoryCapabilityException`. **#99** (`eraseEntityAcrossTenants`): GDPR Art.17 cross-tenant entity erasure across all six adapters. `assertCrossTenantAdmin` in `MemoryPermissions` — no async bypass by design.
 
 #### Accountability gaps closed
 
@@ -1433,7 +1435,6 @@ Cross-cutting decisions not captured in layer entries:
 | `effectiveAt` is ignored in `JpaPreferenceProvider` — time-travel queries silently return current data | Low (no caller uses it today) — misleading API contract | ADR-0006 recorded; mitigate when `preferences-editor` (#8) is built |
 | Memory adapters in `casehub-platform` may need extraction to `casehub-memory` if a non-CaseHub consumer emerges | Low — extraction is mechanical but touches every consumer's pom.xml | ADR-0008 amended; extraction triggers defined |
 | `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C20; crash-recovery explicitly out of scope |
-| Mem0 storeAll batch (#70) — N sequential REST calls for a batch | Low — batch infrequent today; deferred pending Mem0 OSS batch endpoint | Workaround: call `store()` in a loop; no atomicity guarantee across REST calls |
 | ACL/authorization model (#68) — 6 open design decisions before implementation can start | High — no cross-module access control until resolved | Spec at `docs/specs/2026-06-01-acl-design.md` §6.9; deliberate pre-work required |
 
 ---
@@ -1450,7 +1451,7 @@ Cross-cutting decisions not captured in layer entries:
 | `GroupMember` | Record: `actorId` (SCIM `value` = OIDC `sub` = stable identity key) + `displayName` (human label — never use as a routing key). |
 | `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking; wrapped by `BlockingToReactiveBridge` for reactive callers. `store()` is append-only. |
 | `MemoryQuery` | Query builder for `CaseMemoryStore.query()` — multi-entity fan-out, `MemoryOrder` (CHRONOLOGICAL / RELEVANCE), `since` filter, domain filter. |
-| `MemoryPermissions` | Static utility — `assertTenant(tenantId, CurrentPrincipal)` throws `SecurityException` if the current principal's tenancy does not match. Static so callable from both blocking and reactive adapters. |
+| `MemoryPermissions` | Static utility — `assertTenant(tenantId, CurrentPrincipal)` throws `SecurityException` if the current principal's tenancy does not match. Static so callable from both blocking and reactive adapters; `assertCrossTenantAdmin(principal)` — requires `isCrossTenantAdmin()=true`, no async bypass form. |
 | `BlockingToReactiveBridge` | `@DefaultBean` `ReactiveCaseMemoryStore` implementation that wraps whichever blocking `CaseMemoryStore` is active. Thread dispatch is the entrypoint's responsibility. |
 | `AgentProvider` | SPI for agent execution — `execute(prompt, AgentSessionConfig)` returns `Multi<AgentEvent>`. `NoOpAgentProvider @DefaultBean` active when no implementation is on the classpath. |
 | `ActorStateContributor` | SPI: `contribute(actorId, ActorStateAccumulator)` — each contributor adds its slice of actor workload data (active cases, open WorkItems, open obligations). |
@@ -1461,6 +1462,7 @@ Cross-cutting decisions not captured in layer entries:
 | `Memory` | Output from `store()` and `query()` — adds `memoryId` (assigned by adapter), `createdAt` (assigned by adapter), and a defensive copy of `attributes`. |
 | `EraseRequest` | Input to `CaseMemoryStore.erase()` — carries `entityId`, `domain` (required, operational deletion), `tenantId`, `caseId` (nullable). Distinct from `eraseEntity()` which wipes all domains for GDPR Art.17. |
 | `eraseEntity()` | GDPR Art.17 cross-domain wipe for an entity within a tenant. Default throws — adapters must override with hard deletion. Distinct from `erase(EraseRequest)` which is domain-scoped operational deletion. |
+| `eraseEntityAcrossTenants()` | GDPR Art.17 full-entity wipe across all supplied tenantIds. Requires `isCrossTenantAdmin()`. Caller supplies the complete set of tenantIds from the tenant management system. Distinct from `eraseEntity()` which is per-tenant. Default throws `MemoryCapabilityException(CROSS_TENANT_ERASE)`. |
 | `MemoryAttributeKeys` | Reserved cross-domain attribute key constants (e.g. `CONFIDENCE`, `SOURCE`) + `formatConfidence(double)` / `parseConfidence(String)` helpers. Always use `Locale.ROOT` in format calls. |
 | `AgentSessionConfig` | Carries `maxConcurrentSessions` (semaphore bound) and `timeoutDuration` (wall-clock subprocess timeout) for `AgentProvider.execute()`. |
 | `AgentEvent` | Sealed event hierarchy produced by `AgentProvider.execute()`. `TextDelta` is the primary streaming subtype carrying partial text output. |

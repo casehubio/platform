@@ -37,6 +37,7 @@
         <module>streams-webhook</module>
         <module>streams-poll</module>
         <module>streams-camel</module>
+        <module>governance</module>
     </modules>
 
     <properties>

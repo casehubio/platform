@@ -2,6 +2,7 @@ package io.casehub.platform.agent.langchain4j;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.ModelProvider;
@@ -107,6 +108,12 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
                     "AgentSession-backed ChatModel adapters do not accept AiMessage — " +
                     "session history lives in the subprocess. " +
                     "Each call must supply only a single new UserMessage.");
+            }
+            if (m instanceof SystemMessage) {
+                throw new IllegalArgumentException(
+                    "AgentSession-backed ChatModel adapters do not accept SystemMessage — " +
+                    "the session system prompt is fixed at open time via AgentSessionInit. " +
+                    "Per-call system prompts are not supported.");
             }
         }
         List<UserMessage> userMessages = messages.stream()

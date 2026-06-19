@@ -184,6 +184,35 @@ class AgentSessionChatModelTest {
     }
 
     @Test
+    void doChat_systemMessageWithUserMessage_throwsIllegalArgument() {
+        AgentSessionChatModel model = AgentSessionChatModel.wrap(
+            fakeSession(__ -> Multi.createFrom().empty()));
+        ChatRequest request = ChatRequest.builder()
+            .messages(List.of(SystemMessage.from("be helpful"), UserMessage.from("hi")))
+            .build();
+        assertThatThrownBy(() -> model.doChat(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("SystemMessage");
+    }
+
+    @Test
+    void doChat_streaming_systemMessageWithUserMessage_throwsSynchronously() {
+        AgentSessionChatModel model = AgentSessionChatModel.wrap(
+            fakeSession(__ -> Multi.createFrom().empty()));
+        ChatRequest request = ChatRequest.builder()
+            .messages(List.of(SystemMessage.from("be helpful"), UserMessage.from("hi")))
+            .build();
+        assertThatThrownBy(() ->
+            model.doChat(request, new StreamingChatResponseHandler() {
+                @Override public void onPartialResponse(String t) {}
+                @Override public void onCompleteResponse(ChatResponse r) {}
+                @Override public void onError(Throwable t) {}
+            })
+        ).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("SystemMessage");
+    }
+
+    @Test
     void doChat_aiMessagePresent_throwsIllegalArgument() {
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
             fakeSession(__ -> Multi.createFrom().empty()));

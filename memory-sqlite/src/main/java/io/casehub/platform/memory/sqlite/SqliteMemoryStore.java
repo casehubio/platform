@@ -128,8 +128,8 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public List<String> storeAll(List<MemoryInput> inputs) {
-        if (inputs.isEmpty()) return List.of();
+    public StoreAllResult storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at) VALUES (?,?,?,?,?,?,?,?)";
         List<String> ids = new ArrayList<>(inputs.size());
@@ -162,7 +162,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         } catch (SQLException e) {
             throw new IllegalStateException("storeAll() failed", e);
         }
-        return ids;
+        return new StoreAllResult(ids, List.of());
     }
 
     @Override

@@ -74,8 +74,8 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
 
     @Timed(value = "casehub.memory.graphiti", histogram = true, extraTags = {"operation", "storeAll"})
     @Override
-    public List<String> storeAll(final List<MemoryInput> inputs) {
-        if (inputs.isEmpty()) return List.of();
+    public StoreAllResult storeAll(final List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
         // Pre-flight: verify all tenant assertions before any REST call
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         final var ids = new ArrayList<String>(inputs.size());
@@ -84,7 +84,7 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
             sendAdd(input, uuid);
             ids.add(uuid);
         }
-        return List.copyOf(ids);
+        return new StoreAllResult(List.copyOf(ids), List.of());
     }
 
     private void sendAdd(final MemoryInput input, final String episodeUuid) {

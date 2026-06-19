@@ -8,6 +8,7 @@ import io.casehub.platform.api.memory.Memory;
 import io.casehub.platform.api.memory.MemoryCapability;
 import io.casehub.platform.api.memory.MemoryInput;
 import io.casehub.platform.api.memory.MemoryQuery;
+import io.casehub.platform.api.memory.StoreAllResult;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.Collections;
@@ -37,8 +38,8 @@ public class NoOpCaseMemoryStore implements GraphCaseMemoryStore {
     }
 
     @Override
-    public List<String> storeAll(final List<MemoryInput> inputs) {
-        return Collections.nCopies(inputs.size(), "");
+    public StoreAllResult storeAll(final List<MemoryInput> inputs) {
+        return new StoreAllResult(Collections.nCopies(inputs.size(), ""), List.of());
     }
 
     // No assertCrossTenantAdmin call — NoOpCaseMemoryStore has no CurrentPrincipal injection

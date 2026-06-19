@@ -34,7 +34,9 @@ class NoOpCaseMemoryStoreTest {
     @Test void eraseById_does_not_throw()    { assertDoesNotThrow(() -> store.eraseById("mem-1", "entity-1", "tenant-1")); }
     @Test void eraseEntity_returns_zero()    { assertEquals(0, store.eraseEntity("entity-1", "tenant-1")); }
     @Test void storeAll_returns_empty_ids() {
-        assertEquals(List.of("", ""), store.storeAll(List.of(SAMPLE, SAMPLE_WITH_CASE)));
+        var result = store.storeAll(List.of(SAMPLE, SAMPLE_WITH_CASE));
+        assertEquals(List.of("", ""), result.stored());
+        assertTrue(result.allSucceeded());
     }
 
     // --- GraphCaseMemoryStore injection ---

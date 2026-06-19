@@ -24,7 +24,48 @@ class CaseMemoryStoreSpiTest {
     void storeAll_delegates_to_store() {
         var a = new MemoryInput("e1", DOMAIN, "t1", null, "a", Map.of());
         var b = new MemoryInput("e1", DOMAIN, "t1", null, "b", Map.of());
-        assertEquals(List.of("mem-1", "mem-1"), sut.storeAll(List.of(a, b)));
+        var result = sut.storeAll(List.of(a, b));
+        assertEquals(List.of("mem-1", "mem-1"), result.stored());
+        assertTrue(result.allSucceeded());
+    }
+
+    @Test
+    void storeAll_collects_backend_failure_instead_of_throwing() {
+        CaseMemoryStore failingStore = new CaseMemoryStore() {
+            int call = 0;
+            @Override public String store(MemoryInput i) {
+                if (call++ == 1) throw new IllegalStateException("backend error");
+                return "mem-ok";
+            }
+            @Override public List<Memory> query(MemoryQuery q) { return List.of(); }
+            @Override public int erase(EraseRequest r) { return 0; }
+        };
+        var inputs = List.of(
+            new MemoryInput("e1", DOMAIN, "t1", null, "a", Map.of()),
+            new MemoryInput("e1", DOMAIN, "t1", null, "b", Map.of()),
+            new MemoryInput("e1", DOMAIN, "t1", null, "c", Map.of())
+        );
+        var result = failingStore.storeAll(inputs);
+        assertEquals(List.of("mem-ok", "mem-ok"), result.stored());
+        assertEquals(1, result.failures().size());
+        assertEquals(1, result.failures().get(0).inputIndex());
+    }
+
+    @Test
+    void storeAll_propagates_security_exception_immediately() {
+        CaseMemoryStore tenantCheckStore = new CaseMemoryStore() {
+            @Override public String store(MemoryInput i) {
+                if ("bad".equals(i.tenantId())) throw new SecurityException("tenant mismatch");
+                return "mem-ok";
+            }
+            @Override public List<Memory> query(MemoryQuery q) { return List.of(); }
+            @Override public int erase(EraseRequest r) { return 0; }
+        };
+        var inputs = List.of(
+            new MemoryInput("e1", DOMAIN, "t1", null, "a", Map.of()),
+            new MemoryInput("e1", DOMAIN, "bad", null, "b", Map.of())
+        );
+        assertThrows(SecurityException.class, () -> tenantCheckStore.storeAll(inputs));
     }
 
     @Test

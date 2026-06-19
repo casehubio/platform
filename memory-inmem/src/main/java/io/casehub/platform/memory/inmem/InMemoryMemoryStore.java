@@ -65,10 +65,10 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
     }
 
     @Override
-    public List<String> storeAll(List<MemoryInput> inputs) {
-        if (inputs.isEmpty()) return List.of();
+    public StoreAllResult storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
-        return List.copyOf(inputs.stream().map(this::store).toList());
+        return new StoreAllResult(List.copyOf(inputs.stream().map(this::store).toList()), List.of());
     }
 
     @Override

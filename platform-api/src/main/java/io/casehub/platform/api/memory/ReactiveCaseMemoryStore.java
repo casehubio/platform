@@ -19,11 +19,15 @@ public interface ReactiveCaseMemoryStore {
 
     /**
      * Reactive mirror of {@link CaseMemoryStore#storeAll}.
-     * Default delegates to store() in parallel via Uni.join. Adapters may override.
+     * Default delegates to store() in parallel via Uni.join, collecting results into a
+     * {@link StoreAllResult}. Backend failures are collected; SecurityException propagates.
+     * Adapters may override.
      */
-    default Uni<List<String>> storeAll(List<MemoryInput> inputs) {
+    default Uni<StoreAllResult> storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return Uni.createFrom().item(StoreAllResult.empty());
         return Uni.join().all(inputs.stream().map(this::store).collect(Collectors.toList()))
-            .andFailFast();
+            .andFailFast()
+            .map(ids -> new StoreAllResult(ids, java.util.List.of()));
     }
 
     /**

@@ -109,9 +109,10 @@ class SqliteMemoryStoreTest extends CaseMemoryStoreContractTest {
             new MemoryInput("entity-1", DOMAIN, TENANT, null, "batch-b", Map.of()),
             new MemoryInput("entity-1", DOMAIN, TENANT, null, "batch-c", Map.of())
         );
-        var ids = store().storeAll(inputs);
+        var result = store().storeAll(inputs);
 
-        assertEquals(3, ids.size());
+        assertTrue(result.allSucceeded());
+        assertEquals(3, result.stored().size());
         var stored = store().query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT));
         assertEquals(3, stored.size());
         assertTrue(stored.stream().anyMatch(m -> "batch-a".equals(m.text())));

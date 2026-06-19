@@ -151,20 +151,38 @@ public interface CaseMemoryStore {
     }
 
     /**
-     * Convenience bulk store. Returns assigned memoryIds in input order.
+     * Convenience bulk store. Returns a {@link StoreAllResult} carrying the IDs of
+     * successfully stored inputs and any backend failures.
+     *
+     * <p><strong>Security exceptions always propagate immediately</strong> — a
+     * {@link SecurityException} thrown by any tenant-check aborts the call and no
+     * {@link StoreAllResult} is returned.
      *
      * <p>Adapters that override this method MUST: (1) call
-     * {@link MemoryPermissions#assertTenant} for every input; (2) return IDs in input
-     * order; (3) ensure no items are durably written if any tenant check fails — via
-     * pre-flight for REST-backed adapters, or single-transaction rollback for
-     * JDBC-backed adapters. See {@code memory-storeall-transactional-contract.md}
-     * for the full contract.
+     * {@link MemoryPermissions#assertTenant} for every input; (2) return stored IDs in
+     * input order in {@link StoreAllResult#stored()}; (3) ensure no items are durably
+     * written if any tenant check fails — via pre-flight for REST-backed adapters, or
+     * single-transaction rollback for JDBC-backed adapters.
      *
-     * <p>The default implementation is not safe for mixed-tenant batches where
-     * partial-write prevention is required — override in production adapters.
+     * <p>The default implementation iterates sequentially. It collects backend failures
+     * in the result but re-throws {@link SecurityException} immediately. It is not safe
+     * for mixed-tenant batches where partial-write prevention is required — override in
+     * production adapters.
      */
-    default List<String> storeAll(List<MemoryInput> inputs) {
-        return inputs.stream().map(this::store).toList();
+    default StoreAllResult storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
+        var stored = new java.util.ArrayList<String>();
+        var failures = new java.util.ArrayList<StoreFailure>();
+        for (int i = 0; i < inputs.size(); i++) {
+            try {
+                stored.add(store(inputs.get(i)));
+            } catch (SecurityException e) {
+                throw e; // always propagate — not a backend failure
+            } catch (RuntimeException e) {
+                failures.add(new StoreFailure(i, inputs.get(i), e));
+            }
+        }
+        return new StoreAllResult(stored, failures);
     }
 
 }

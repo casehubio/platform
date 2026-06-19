@@ -67,8 +67,8 @@ public class JpaMemoryStore implements CaseMemoryStore {
 
     @Override
     @Transactional(TxType.REQUIRED)
-    public List<String> storeAll(List<MemoryInput> inputs) {
-        if (inputs.isEmpty()) return List.of();
+    public StoreAllResult storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
         var entries = inputs.stream().map(input -> {
             MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
             MemoryEntry e = new MemoryEntry();
@@ -83,7 +83,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
             return e;
         }).toList();
         MemoryEntry.persist(entries);
-        return entries.stream().map(e -> e.memoryId).toList();
+        return new StoreAllResult(entries.stream().map(e -> e.memoryId).toList(), List.of());
     }
 
     @Override

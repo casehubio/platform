@@ -21,8 +21,9 @@ class ReactiveCaseMemoryStoreSpiTest {
     @Test void storeAll_delegates_to_store() {
         var a = new MemoryInput("e1", DOMAIN, "t1", null, "a", Map.of());
         var b = new MemoryInput("e1", DOMAIN, "t1", null, "b", Map.of());
-        assertEquals(List.of("mem-1", "mem-1"),
-            sut.storeAll(List.of(a, b)).await().indefinitely());
+        var result = sut.storeAll(List.of(a, b)).await().indefinitely();
+        assertEquals(List.of("mem-1", "mem-1"), result.stored());
+        assertTrue(result.allSucceeded());
     }
 
     @Test void eraseEntity_default_fails_with_MemoryCapabilityException() {

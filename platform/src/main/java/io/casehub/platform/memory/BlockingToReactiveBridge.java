@@ -6,6 +6,7 @@ import io.casehub.platform.api.memory.ReactiveCaseMemoryStore;
 import io.casehub.platform.api.memory.Memory;
 import io.casehub.platform.api.memory.MemoryInput;
 import io.casehub.platform.api.memory.MemoryQuery;
+import io.casehub.platform.api.memory.StoreAllResult;
 import io.quarkus.arc.DefaultBean;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
@@ -33,7 +34,7 @@ public class BlockingToReactiveBridge implements ReactiveCaseMemoryStore {
     }
 
     @Override
-    public Uni<List<String>> storeAll(List<MemoryInput> inputs) {
+    public Uni<StoreAllResult> storeAll(List<MemoryInput> inputs) {
         return Uni.createFrom().item(() -> delegate.storeAll(inputs))
             .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }

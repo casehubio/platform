@@ -153,12 +153,13 @@ class GraphitiCaseMemoryStoreTest {
 
         final var a = input("fact a");
         final var b = new MemoryInput("actor-2", DOMAIN, TENANT, null, "fact b", Map.of());
-        final List<String> ids = store.storeAll(List.of(a, b));
+        final var result = store.storeAll(List.of(a, b));
 
-        assertEquals(2, ids.size());
-        assertFalse(ids.get(0).isEmpty());
-        assertFalse(ids.get(1).isEmpty());
-        assertNotEquals(ids.get(0), ids.get(1));
+        assertTrue(result.allSucceeded());
+        assertEquals(2, result.stored().size());
+        assertFalse(result.stored().get(0).isEmpty());
+        assertFalse(result.stored().get(1).isEmpty());
+        assertNotEquals(result.stored().get(0), result.stored().get(1));
         wireMock.verify(2, postRequestedFor(urlEqualTo("/messages")));
     }
 

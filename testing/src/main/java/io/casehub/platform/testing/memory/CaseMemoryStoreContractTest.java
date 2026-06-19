@@ -320,8 +320,10 @@ public abstract class CaseMemoryStoreContractTest {
     // --- storeAll ---
 
     @Test
-    void storeAll_empty_returns_empty_list() {
-        assertEquals(List.of(), store().storeAll(List.of()));
+    void storeAll_empty_returns_empty_result() {
+        var result = store().storeAll(List.of());
+        assertTrue(result.stored().isEmpty());
+        assertTrue(result.allSucceeded());
     }
 
     @Test
@@ -329,19 +331,20 @@ public abstract class CaseMemoryStoreContractTest {
         var a = input("entity-1", "fact-a");
         var b = input("entity-2", "fact-b");
 
-        List<String> ids = store().storeAll(List.of(a, b));
+        var result = store().storeAll(List.of(a, b));
 
-        assertEquals(2, ids.size());
-        ids.forEach(id -> assertFalse(id.isEmpty(), "each returned ID must be non-empty"));
-        assertNotEquals(ids.get(0), ids.get(1));
+        assertTrue(result.allSucceeded());
+        assertEquals(2, result.stored().size());
+        result.stored().forEach(id -> assertFalse(id.isEmpty(), "each returned ID must be non-empty"));
+        assertNotEquals(result.stored().get(0), result.stored().get(1));
 
-        // Verify ordering: ids.get(0) must correspond to input a (entity-1).
+        // Verify ordering: stored().get(0) must correspond to input a (entity-1).
         // Erase by the first returned ID — only entity-1's entry must disappear.
-        store().eraseById(ids.get(0), "entity-1", TENANT);
+        store().eraseById(result.stored().get(0), "entity-1", TENANT);
         assertTrue(store().query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT)).isEmpty(),
-            "ids.get(0) must be the ID assigned to the first input (entity-1)");
+            "stored().get(0) must be the ID assigned to the first input (entity-1)");
         assertFalse(store().query(MemoryQuery.forEntity("entity-2", DOMAIN, TENANT)).isEmpty(),
-            "erasing ids.get(0) must not affect the second input (entity-2)");
+            "erasing stored().get(0) must not affect the second input (entity-2)");
     }
 
     @Test

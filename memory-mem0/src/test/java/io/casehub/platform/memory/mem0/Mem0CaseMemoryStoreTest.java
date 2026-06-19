@@ -541,18 +541,19 @@ class Mem0CaseMemoryStoreTest {
             .withRequestBody(matchingJsonPath("$.messages[0].content", equalTo("b")))
             .willReturn(okJson("{\"results\": [{\"id\":\"mem-bbb\",\"memory\":\"b\",\"event\":\"ADD\"}]}")));
 
-        final var ids = store.storeAll(List.of(
+        final var result = store.storeAll(List.of(
             new MemoryInput("entity-1", DOMAIN, TENANT, null, "a", Map.of()),
             new MemoryInput("entity-1", DOMAIN, TENANT, null, "b", Map.of())
         ));
 
-        assertEquals(List.of("mem-aaa", "mem-bbb"), ids);
+        assertTrue(result.allSucceeded());
+        assertEquals(List.of("mem-aaa", "mem-bbb"), result.stored());
         wireMock().verify(2, postRequestedFor(urlEqualTo("/memories")));
     }
 
     @Test
     void storeAll_empty_returns_empty_no_http() {
-        assertEquals(List.of(), store.storeAll(List.of()));
+        assertTrue(store.storeAll(List.of()).stored().isEmpty());
         wireMock().verify(0, postRequestedFor(urlEqualTo("/memories")));
     }
 
@@ -567,16 +568,21 @@ class Mem0CaseMemoryStoreTest {
     }
 
     @Test
-    void storeAll_http_failure_propagates_exception() {
-        // With parallel execution in-flight calls may complete before the error lands.
-        // Assert that the exception propagates and at least one HTTP call was made.
+    void storeAll_http_failure_collected_in_result() {
+        // Backend failures are now collected in StoreAllResult.failures() instead of thrown.
+        // All HTTP calls are still made; failures carry Mem0StoreException as cause.
         wireMock().stubFor(post(urlEqualTo("/memories")).willReturn(serverError()));
-        assertThrows(Mem0StoreException.class, () ->
-            store.storeAll(List.of(
-                new MemoryInput("entity-1", DOMAIN, TENANT, null, "a", Map.of()),
-                new MemoryInput("entity-1", DOMAIN, TENANT, null, "b", Map.of())
-            )));
+        var result = store.storeAll(List.of(
+            new MemoryInput("entity-1", DOMAIN, TENANT, null, "a", Map.of()),
+            new MemoryInput("entity-1", DOMAIN, TENANT, null, "b", Map.of())
+        ));
         wireMock().verify(moreThanOrExactly(1), postRequestedFor(urlEqualTo("/memories")));
+        assertFalse(result.allSucceeded(), "all stores failed — result must not be all-succeeded");
+        assertTrue(result.stored().isEmpty(), "no successful stores");
+        assertFalse(result.failures().isEmpty(), "at least one failure must be recorded");
+        result.failures().forEach(f ->
+            assertInstanceOf(Mem0StoreException.class, f.cause(),
+                "failure cause must be Mem0StoreException"));
     }
 
     // ── storeAll parallel ──────────────────────────────────────────────────────
@@ -594,10 +600,10 @@ class Mem0CaseMemoryStoreTest {
             .collect(Collectors.toList());
 
         long start = System.currentTimeMillis();
-        var ids = store.storeAll(inputs);
+        var result = store.storeAll(inputs);
         long elapsed = System.currentTimeMillis() - start;
 
-        assertEquals(8, ids.size());
+        assertEquals(8, result.stored().size());
         assertTrue(elapsed < 1200,
             "storeAll must execute in parallel; elapsed=" + elapsed + "ms (expected < 1200ms)");
     }
@@ -612,13 +618,14 @@ class Mem0CaseMemoryStoreTest {
             new MemoryInput("e2", DOMAIN, TENANT, null, "b", Map.of()),
             new MemoryInput("e3", DOMAIN, TENANT, null, "c", Map.of())
         );
-        var ids = store.storeAll(inputs);
-        assertEquals(3, ids.size());
-        ids.forEach(id -> assertFalse(id.isEmpty(), "ID must not be empty"));
+        var result = store.storeAll(inputs);
+        assertTrue(result.allSucceeded());
+        assertEquals(3, result.stored().size());
+        result.stored().forEach(id -> assertFalse(id.isEmpty(), "ID must not be empty"));
     }
 
     @Test
-    void storeAll_first_error_propagates() {
+    void storeAll_backend_failures_collected_per_item() {
         wireMock().stubFor(post(urlEqualTo("/memories"))
             .willReturn(serverError().withBody("{\"detail\":\"server error\"}")));
         principal.setTenancyId(TENANT);
@@ -626,8 +633,15 @@ class Mem0CaseMemoryStoreTest {
             new MemoryInput("e1", DOMAIN, TENANT, null, "a", Map.of()),
             new MemoryInput("e2", DOMAIN, TENANT, null, "b", Map.of())
         );
-        assertThrows(Mem0StoreException.class,
-            () -> store.storeAll(inputs));
+        var result = store.storeAll(inputs);
+        assertFalse(result.allSucceeded());
+        assertTrue(result.stored().isEmpty());
+        assertEquals(2, result.failures().size());
+        result.failures().forEach(f ->
+            assertInstanceOf(Mem0StoreException.class, f.cause()));
+        // Verify inputIndex is populated for retry correlation
+        var indexes = result.failures().stream().map(f -> f.inputIndex()).sorted().toList();
+        assertEquals(List.of(0, 1), indexes);
     }
 
     @Test
@@ -635,7 +649,8 @@ class Mem0CaseMemoryStoreTest {
         // With 1 input and config=4: Math.max(1, Math.min(4,1)) = 1. Semaphore(1) — no deadlock.
         stubAddOk("safe-id");
         principal.setTenancyId(TENANT);
-        var ids = store.storeAll(List.of(new MemoryInput("e1", DOMAIN, TENANT, null, "x", Map.of())));
-        assertEquals(List.of("safe-id"), ids);
+        var result = store.storeAll(List.of(new MemoryInput("e1", DOMAIN, TENANT, null, "x", Map.of())));
+        assertTrue(result.allSucceeded());
+        assertEquals(List.of("safe-id"), result.stored());
     }
 }

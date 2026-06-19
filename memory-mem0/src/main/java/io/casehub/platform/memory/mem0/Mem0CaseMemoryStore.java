@@ -18,6 +18,7 @@ import org.jboss.logging.Logger;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
@@ -64,19 +65,34 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
 
     @Timed(value = "casehub.memory.mem0", histogram = true, extraTags = {"operation", "storeAll"})
     @Override
-    public List<String> storeAll(List<MemoryInput> inputs) {
-        if (inputs.isEmpty()) return List.of();
+    public StoreAllResult storeAll(List<MemoryInput> inputs) {
+        if (inputs.isEmpty()) return StoreAllResult.empty();
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
         final int cap = Math.max(1, Math.min(config.storeAllConcurrency(), inputs.size()));
         final var sem = new Semaphore(cap);
-        final List<Uni<String>> unis = inputs.stream()
-            .map(i -> Uni.createFrom().<String>item(() -> {
+        // Each Uni produces either the stored ID (success) or null (failure captured in failureSlots).
+        // We can't throw inside the Uni and still get ordered results, so failures are tracked via
+        // a concurrent list; each StoreFailure carries its inputIndex for caller ordering.
+        final var failureSlots = new CopyOnWriteArrayList<StoreFailure>();
+        final List<Uni<String>> unis = new ArrayList<>();
+        for (int i = 0; i < inputs.size(); i++) {
+            final int idx = i;
+            final MemoryInput input = inputs.get(i);
+            unis.add(Uni.createFrom().<String>item(() -> {
                 sem.acquireUninterruptibly();
-                try { return sendAdd(i); }
+                try { return sendAdd(input); }
+                catch (RuntimeException e) {
+                    failureSlots.add(new StoreFailure(idx, input, e));
+                    return null; // slot will be null in the ordered result list
+                }
                 finally { sem.release(); }
-            }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool()))
-            .collect(Collectors.toList());
-        return Uni.join().all(unis).andFailFast().await().indefinitely();
+            }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool()));
+        }
+        // andFailFast() will not throw because all RuntimeExceptions are caught above.
+        // Mutiny guarantees output order matches input order.
+        List<String> rawIds = Uni.join().all(unis).andFailFast().await().indefinitely();
+        List<String> stored = rawIds.stream().filter(id -> id != null).collect(Collectors.toList());
+        return new StoreAllResult(stored, List.copyOf(failureSlots));
     }
 
     private String sendAdd(MemoryInput input) {

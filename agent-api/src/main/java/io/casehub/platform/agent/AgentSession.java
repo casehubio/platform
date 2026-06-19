@@ -52,11 +52,20 @@ public interface AgentSession extends AutoCloseable {
     /**
      * Close the session with a best-effort drain.
      *
-     * <p>Sets state to CLOSED immediately (no new turns). If a turn is active, waits up to
-     * {@code maxWait} for it to complete naturally. Then terminates the subprocess and releases
-     * the semaphore slot. Idempotent — second call is a no-op.
+     * <p>Sets state to CLOSED immediately (no new turns). If a turn is active, this method
+     * <strong>blocks</strong> the calling thread for up to {@code maxWait}, waiting for the
+     * active turn's Mutiny pipeline to drain. The drain signal arrives on the Mutiny worker
+     * pool thread (the pipeline runs via {@code runSubscriptionOn}); blocking is safe because
+     * the signal does not need the caller's thread to fire.
      *
-     * <p>The semaphore is released before subprocess termination completes (teardown is async).
+     * <p><strong>Do not call from a Mutiny/Vert.x event-loop thread.</strong> The blocking
+     * wait will starve the event loop and the drain signal will never arrive.
+     *
+     * <p>After the drain (or timeout), subprocess teardown is fired asynchronously —
+     * {@code close()} returns before teardown finishes. The semaphore slot is released on
+     * the calling thread as the final step.
+     *
+     * <p>Idempotent — second call is a no-op.
      *
      * <p><strong>Sessions not closed leak a semaphore slot permanently.</strong>
      */

@@ -208,6 +208,10 @@ class ClaudeAgentSession implements AgentSession {
             final CompletableFuture<Void> turnFuture = currentTurnFuture;
             if (turnFuture != null) {
                 try {
+                    // Blocks the caller thread. The drain signal (pendingFuture.complete)
+                    // fires on the Mutiny worker pool thread from onCompletion/onFailure/
+                    // onCancellation.invoke() — it never needs this thread to proceed.
+                    // Do NOT call close() from a Vert.x event-loop thread.
                     turnFuture.get(maxWait.toMillis(), TimeUnit.MILLISECONDS);
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();  // restore interrupt status

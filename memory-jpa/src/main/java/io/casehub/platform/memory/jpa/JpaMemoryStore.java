@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -46,6 +47,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return c == null || c.requestContext().isActive();
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "store"})
     @Override
     @Transactional(TxType.REQUIRED)
     public String store(MemoryInput input) {
@@ -65,6 +67,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return entry.memoryId;
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "storeAll"})
     @Override
     @Transactional(TxType.REQUIRED)
     public StoreAllResult storeAll(List<MemoryInput> inputs) {
@@ -86,6 +89,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return new StoreAllResult(entries.stream().map(e -> e.memoryId).toList(), List.of());
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "query"})
     @Override
     @Transactional(TxType.REQUIRED)
     public List<Memory> query(MemoryQuery query) {
@@ -149,6 +153,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return ((List<MemoryEntry>) nq.getResultList()).stream().map(this::toMemory).toList();
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "erase"})
     @Override
     @Transactional(TxType.REQUIRED)
     public int erase(EraseRequest request) {
@@ -169,6 +174,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return count;
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "eraseById"})
     @Override
     @Transactional(TxType.REQUIRED)
     public void eraseById(String memoryId, String entityId, String tenantId) {
@@ -183,6 +189,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         em.clear();
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
     @Transactional(TxType.REQUIRED)
     public int eraseEntity(String entityId, String tenantId) {
@@ -196,6 +203,7 @@ public class JpaMemoryStore implements CaseMemoryStore {
         return count;
     }
 
+    @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "eraseEntityAcrossTenants"})
     @Override
     @Transactional(TxType.REQUIRED)
     public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {

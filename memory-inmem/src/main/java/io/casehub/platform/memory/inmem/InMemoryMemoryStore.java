@@ -2,6 +2,7 @@ package io.casehub.platform.memory.inmem;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -49,6 +50,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         return c == null || c.requestContext().isActive();
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "store"})
     @Override
     public String store(MemoryInput input) {
         MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
@@ -64,6 +66,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         return memoryId;
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "storeAll"})
     @Override
     public StoreAllResult storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return StoreAllResult.empty();
@@ -71,6 +74,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         return new StoreAllResult(List.copyOf(inputs.stream().map(this::store).toList()), List.of());
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "query"})
     @Override
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
@@ -90,6 +94,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
             .toList();
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "erase"})
     @Override
     public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
@@ -105,6 +110,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         return removed.get();
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "eraseById"})
     @Override
     public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
@@ -115,6 +121,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
             .forEach(e -> e.getValue().removeIf(m -> m.memoryId().equals(memoryId)));
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
     public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
@@ -129,6 +136,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         return count.get();
     }
 
+    @Timed(value = "casehub.memory.inmem", histogram = true, extraTags = {"operation", "eraseEntityAcrossTenants"})
     @Override
     public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
         MemoryPermissions.assertCrossTenantAdmin(principal);

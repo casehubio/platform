@@ -7,6 +7,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.memory.*;
+import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -104,6 +105,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         if (dataSource != null) dataSource.close();
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "store"})
     @Override
     public String store(MemoryInput input) {
         MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
@@ -127,6 +129,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         return memoryId;
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "storeAll"})
     @Override
     public StoreAllResult storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return StoreAllResult.empty();
@@ -165,6 +168,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         return new StoreAllResult(ids, List.of());
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "query"})
     @Override
     public List<Memory> query(MemoryQuery query) {
         MemoryPermissions.assertTenant(query.tenantId(), principal, requestContextActive());
@@ -174,6 +178,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         return queryChronological(query);
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "erase"})
     @Override
     public int erase(EraseRequest request) {
         MemoryPermissions.assertTenant(request.tenantId(), principal, requestContextActive());
@@ -193,6 +198,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         }
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "eraseById"})
     @Override
     public void eraseById(String memoryId, String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
@@ -209,6 +215,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         }
     }
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "eraseEntity"})
     @Override
     public int eraseEntity(String entityId, String tenantId) {
         MemoryPermissions.assertTenant(tenantId, principal, requestContextActive());
@@ -225,6 +232,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
 
     private static final int SQLITE_IN_CHUNK = 500;
 
+    @Timed(value = "casehub.memory.sqlite", histogram = true, extraTags = {"operation", "eraseEntityAcrossTenants"})
     @Override
     public int eraseEntityAcrossTenants(String entityId, Set<String> tenantIds) {
         MemoryPermissions.assertCrossTenantAdmin(principal);

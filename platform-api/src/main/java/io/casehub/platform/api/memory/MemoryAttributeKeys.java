@@ -36,6 +36,12 @@ public final class MemoryAttributeKeys {
     public static final String OUTCOME = "outcome";
 
     /**
+     * Natural language description of the solution (action taken) for a CBR case entry.
+     * Written by {@link CbrCaseEntry#toMemoryInput}; read by {@link CbrCaseEntry#from}.
+     */
+    public static final String SOLUTION = "solution";
+
+    /**
      * Confidence score as a decimal string formatted to 4 decimal places.
      * Always use {@link #formatConfidence} to write and {@link #parseConfidence}
      * to read — do not format manually to avoid encoding variance.

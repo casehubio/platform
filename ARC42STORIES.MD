@@ -831,7 +831,7 @@ Workers can reference external systems by name rather than hard-coding connectio
 What this layer adds:
 - **Typed preference keys** — `PreferenceKey<T>` carries `defaultValue` and `Function<String,T> parser`; `getOrDefault(key)` is null-free at every call site
 - **Identity primitives** — `CurrentPrincipal` abstracts actorId, groups, tenancyId, actorType; `ActorType` classifies HUMAN/AGENT/SYSTEM without a ledger dependency
-- **Memory SPI** — `CaseMemoryStore` defines `store`, `query`, `eraseById`, `eraseEntity`, `storeAll`; `MemoryPermissions.assertTenant` is a static utility callable from both blocking and reactive paths
+- **Memory SPI** — `CaseMemoryStore` defines `store`, `query`, `eraseById`, `eraseEntity`, `storeAll` (returns `StoreAllResult` — collected backend failures + stored IDs; `SecurityException` always propagates); `MemoryPermissions.assertTenant` is a static utility callable from both blocking and reactive paths; `CbrCaseEntry` encodes the CBR Retain step schema (problem→text, solution/outcome/confidence→attributes)
 - **Agent SPI** — `AgentProvider` returns a `Multi<AgentEvent>` stream; `AgentSessionConfig` carries concurrency and timeout constraints
 
 Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
@@ -1167,7 +1167,7 @@ What this layer adds:
 
 Not closed here: Graphiti adapter (#34 — later closed in C16). Multi-turn `AgentSession` (#58) shipped in C20.
 
-**#70** (`Mem0CaseMemoryStore.storeAll()` bounded-parallel): Semaphore-gated Mutiny parallel HTTP, configurable cap (default 4). 2-arg `assertTenant` pre-flight fixed in Mem0 + SQLite. **#90** (`ReactiveCaseMemoryStore` moved to `platform-api`): Mutiny SPI now in Tier 1; engine#466 can downgrade `casehub-platform` to test scope. Two `UnsupportedOperationException` defaults fixed to `MemoryCapabilityException`. **#99** (`eraseEntityAcrossTenants`): GDPR Art.17 cross-tenant entity erasure across all six adapters. `assertCrossTenantAdmin` in `MemoryPermissions` — no async bypass by design.
+**#70** (`Mem0CaseMemoryStore.storeAll()` bounded-parallel): Semaphore-gated Mutiny parallel HTTP, configurable cap (default 4). 2-arg `assertTenant` pre-flight fixed in Mem0 + SQLite. **#90** (`ReactiveCaseMemoryStore` moved to `platform-api`): Mutiny SPI now in Tier 1; engine#466 can downgrade `casehub-platform` to test scope. Two `UnsupportedOperationException` defaults fixed to `MemoryCapabilityException`. **#99** (`eraseEntityAcrossTenants`): GDPR Art.17 cross-tenant entity erasure across all six adapters. `assertCrossTenantAdmin` in `MemoryPermissions` — no async bypass by design. **#67** (`storeAll()` return type): `List<String>` → `StoreAllResult(stored, failures)`; backend `RuntimeException` collected per input, `SecurityException` propagates immediately; null-slot parallel pattern in Mem0 preserves output order while collecting partial failures. **#66** (`@Timed` observability): Micrometer histogram on all 7 public methods in inmem, jpa, sqlite adapters — consistent with pre-existing coverage in mem0 and graphiti. **#65** (Testcontainers IT scaffold): `CaseMemoryStoreContractIT` + `Mem0ContainerResource` (Ollama + Mem0 OSS); `@Disabled` pending CI Ollama support; `*IT.java` excluded from surefire, wired into failsafe.
 
 #### Accountability gaps closed
 

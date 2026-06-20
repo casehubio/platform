@@ -62,6 +62,9 @@ public record CbrCaseEntry(
      * Extracts a {@link CbrCaseEntry} from a {@link Memory} previously stored via
      * {@link #toMemoryInput}. Returns null for {@link #outcome()} and {@link #confidence()}
      * if the corresponding attributes are absent.
+     *
+     * @throws NullPointerException if the memory is missing the {@link MemoryAttributeKeys#SOLUTION}
+     *     attribute — i.e. the memory was not stored via {@link #toMemoryInput}
      */
     public static CbrCaseEntry from(Memory memory) {
         Map<String, String> attrs = memory.attributes();

@@ -91,7 +91,7 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
         // andFailFast() will not throw because all RuntimeExceptions are caught above.
         // Mutiny guarantees output order matches input order.
         List<String> rawIds = Uni.join().all(unis).andFailFast().await().indefinitely();
-        List<String> stored = rawIds.stream().filter(id -> id != null).collect(Collectors.toList());
+        List<String> stored = rawIds.stream().filter(Objects::nonNull).collect(Collectors.toList());
         return new StoreAllResult(stored, List.copyOf(failureSlots));
     }
 

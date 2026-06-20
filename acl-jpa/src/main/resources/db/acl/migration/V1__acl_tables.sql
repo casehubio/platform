@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS acl_entry (
     actor_id    VARCHAR(255) NOT NULL,
     resource_id VARCHAR(255) NOT NULL,
     action      VARCHAR(50)  NOT NULL,
+    condition   TEXT,
     granted_at  TIMESTAMP    NOT NULL,
     expires_at  TIMESTAMP,
     tenancy_id  VARCHAR(64)  NOT NULL,
@@ -26,3 +27,25 @@ CREATE TABLE IF NOT EXISTS resource_parent (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rp_parent ON resource_parent (parent_resource_id);
+
+-- ACL audit log — tracks GRANT/REVOKE operations
+CREATE SEQUENCE IF NOT EXISTS acl_audit_log_seq START WITH 1 INCREMENT BY 50;
+
+CREATE TABLE IF NOT EXISTS acl_audit_log (
+    id            BIGINT        NOT NULL DEFAULT nextval('acl_audit_log_seq'),
+    actor_id      VARCHAR(255)  NOT NULL,
+    resource_id   VARCHAR(255)  NOT NULL,
+    action        VARCHAR(50)   NOT NULL,
+    operation     VARCHAR(20)   NOT NULL,
+    performed_by  VARCHAR(255)  NOT NULL,
+    performed_at  TIMESTAMP     NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMP,
+    metadata      JSONB,
+    tenancy_id    VARCHAR(64)   NOT NULL,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_resource    ON acl_audit_log (resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_actor       ON acl_audit_log (actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_performed   ON acl_audit_log (performed_by);
+CREATE INDEX IF NOT EXISTS idx_audit_tenancy     ON acl_audit_log (tenancy_id);

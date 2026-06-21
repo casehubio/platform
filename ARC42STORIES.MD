@@ -15,9 +15,9 @@
 
 `casehub-platform` is the zero-dependency foundational SPI layer for the CaseHub ecosystem. It defines shared interfaces and default implementations that all foundation modules and application-tier repos depend on without creating circular dependencies.
 
-Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
+Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI), `agent-claude/` (Claude SDK integration), `agent-claude-langchain4j/` (LangChain4j ChatModel/StreamingChatModel bridge backed by AgentSession).
+Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI + AgentSession multi-turn), `agent-claude/` (Claude subprocess + ClaudeAgentSession), `agent-claude-langchain4j/` (LangChain4j ChatModel/StreamingChatModel bridge backed by AgentSession), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered).
 
 ### Artifact Schema
 
@@ -94,9 +94,12 @@ C4Context
 
   System_Ext(keycloak, "Keycloak / OIDC provider", "JWT source for OidcCurrentPrincipal")
   System_Ext(scimServer, "SCIM 2.0 server", "Group membership directory for ScimGroupMembershipProvider")
-  System_Ext(postgres, "PostgreSQL", "Backing store for memory-jpa, persistence-jpa")
+  System_Ext(postgres, "PostgreSQL", "Backing store for memory-jpa, persistence-jpa, acl-jpa")
   System_Ext(mem0, "Mem0 OSS (REST)", "Vector memory backend for memory-mem0")
   System_Ext(claudeCli, "Claude CLI", "Subprocess for agent-claude")
+  System_Ext(graphiti, "Graphiti OSS (REST)", "Temporal knowledge graph (Neo4j/FalkorDB/Kuzu) for memory-graphiti")
+  System_Ext(kafka, "Kafka broker", "Event source for streams-kafka — raw byte[] @Incoming channel")
+  System_Ext(amqp, "AMQP broker", "Event source for streams-amqp — raw byte[] @Incoming channel")
 
   Rel(ledger, platformApi, "depends on")
   Rel(work, platformApi, "depends on")
@@ -108,6 +111,9 @@ C4Context
   Rel(platformImpl, postgres, "JDBC")
   Rel(platformImpl, mem0, "REST")
   Rel(platformImpl, claudeCli, "subprocess")
+  Rel(platformImpl, graphiti, "REST")
+  Rel(platformImpl, kafka, "Kafka consumer")
+  Rel(platformImpl, amqp, "AMQP consumer")
 ```
 
 **Boundary rules:** `casehub-platform` owns only the concerns described in §1. Domain logic, business rules, and application-specific workflows belong in application-tier repos. A type or SPI belongs in `platform-api` only if multiple peer repos need it and cannot share it by depending on a single domain `api/` module (`ActorType`, `CurrentPrincipal`, `Path` qualify; `WorkItem`, `LedgerEntry` do not).
@@ -140,6 +146,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L8: Agent Infrastructure | `agent-api/`, `agent-claude/`, `agent-claude-langchain4j/` | AgentProvider SPI + Claude subprocess execution + LangChain4j ChatModel/StreamingChatModel bridge |
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
 | L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
+| L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
 
 ### Journey and Chapter sequencing rationale
 
@@ -152,6 +159,9 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 - C11 after C8/C9/C14: Contract hardening requires the adapter implementations to be complete
 - C13 after C12: Agent identity module uses SCIM-backed `ActorDIDProvider` — C12's SCIM module must be on the classpath
 - C15 independent: `ActorStateContributor` adds types to `platform-api`; no runtime dependency on any prior chapter
+- C19 after C14: `AgentSession` extends `AgentProvider` — the SPI and `ClaudeAgentClient` must exist first; LangChain4j bridge depends on `AgentSession`
+- C20 after C17/C18: `streams-camel` observes `EndpointRegistered` (fired by `InMemoryEndpointRegistry` from C17); all stream modules require `cloudevents-core` declared in parent BOM
+- C21 after C12: `AccessControlProvider` SPI is independent of memory; `groupsOf()` inverse lookup added to `GroupMembershipProvider` in C12 is a prerequisite for role-based ACL resolution
 
 ---
 
@@ -192,11 +202,16 @@ C4Container
     Container(identity, "casehub-platform-identity", "Quarkus", "DID/VC: ActorDIDProvider, DIDResolver, AgentCredentialValidator")
   }
   Container_Boundary(l8, "L8: Agent Infrastructure") {
-    Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentEvent types")
-    Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + semaphore")
+    Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentSession multi-turn + AgentEvent types")
+    Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + ClaudeAgentSession (IDLE/ACTIVE/CLOSED)")
+    Container(agentLangchain4j, "casehub-platform-agent-claude-langchain4j", "LangChain4j", "@Alternative @Priority(10) ClaudeAgentChatModel (stateless) + AgentSessionChatModel (caller-owned session)")
   }
   Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
     Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
+  }
+  Container_Boundary(l11, "L11: Access Control") {
+    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(1) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaAccessControlProvider — Flyway V2000, parent-resource hierarchy")
   }
   Container_Boundary(l10, "L10: Stream Ingestion") {
     Container(streamsKafka, "casehub-platform-streams-kafka", "SmallRye Reactive Messaging", "@Startup static Kafka @Incoming channel — raw byte[], builds CloudEvent")
@@ -220,8 +235,16 @@ C4Container
   Rel(memGraphiti, api, "implements GraphCaseMemoryStore from")
   Rel(scim, api, "implements GroupMembershipProvider from")
   Rel(identity, api, "implements ActorDIDProvider/DIDResolver/AgentCredentialValidator from")
-  Rel(agentClaude, agentApi, "implements AgentProvider from")
+  Rel(agentClaude, agentApi, "implements AgentProvider + AgentSession from")
+  Rel(agentLangchain4j, agentApi, "wraps AgentSession from")
   Rel(endpointsMem, api, "implements EndpointRegistry from")
+  Rel(aclInmem, api, "implements AccessControlProvider from")
+  Rel(aclJpa, api, "implements AccessControlProvider from")
+  Rel(streamsKafka, api, "fires Event<CloudEvent> via")
+  Rel(streamsAmqp, api, "fires Event<CloudEvent> via")
+  Rel(streamsWebhook, api, "fires Event<CloudEvent> via")
+  Rel(streamsPoll, api, "fires Event<CloudEvent> via")
+  Rel(streamsCamel, api, "observes EndpointRegistered, fires Event<CloudEvent> via")
 ```
 
 ---
@@ -290,7 +313,16 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-identity` | `compile` | Configure `casehub.identity.*` |
 | `casehub-platform-agent-api` | `compile` | SPI only — no-op default active |
 | `casehub-platform-agent-claude` | `compile` | Requires Claude CLI on PATH |
+| `casehub-platform-agent-claude-langchain4j` | `compile` | `@Alternative @Priority(10)` — activates `ClaudeAgentChatModel`; requires `agent-claude` on classpath. Not compatible with `engine.Agent` (forces `ResponseFormatType.JSON`) |
 | `casehub-platform-endpoints-memory` | `test` (isolation) or `compile` (ephemeral installs) | Volatile — data lost on restart. `@Alternative @Priority(100)` beats JPA and NoSQL adapters. Do NOT combine with a JPA endpoints backend in same scope |
+| `casehub-platform-endpoints-config` | `compile` | YAML-backed startup populator; requires a registry backend (e.g. `endpoints-memory`) to be meaningful |
+| `casehub-platform-acl-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(1)` volatile ACL store. Do NOT combine with `acl-jpa` in same scope |
+| `casehub-platform-acl-jpa` | `compile` + Flyway location | `classpath:db/acl/migration` required; Flyway `V2000` schema |
+| `casehub-platform-streams-kafka` | `compile` | Configure `casehub.streams.kafka.*`; CAMEL and KAFKA mutually exclusive for same topic |
+| `casehub-platform-streams-amqp` | `compile` | Configure `casehub.streams.amqp.*`; single address per channel |
+| `casehub-platform-streams-webhook` | `compile` | Configure `casehub.streams.webhook.public-url`; POST `/streams/webhook/{tenancyId}/{streamId}` |
+| `casehub-platform-streams-poll` | `compile` | Configure poll descriptor endpoints; explicit 4xx/5xx status check (HttpClient does not throw) |
+| `casehub-platform-streams-camel` | `compile` | Requires `quarkus-camel` extension; routes built from CAMEL-protocol `EndpointDescriptor` records |
 
 ---
 
@@ -307,6 +339,8 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | SPI adapter placement | `docs/protocols/universal/spi-adapter-module-placement.md` |
 | SPI return type change propagation | Protocol `PP-20260530-88cdf9` |
 | CurrentPrincipal boolean delegation | Protocol `PP-20260522-359dfc` |
+| `@Timed` on `CaseMemoryStore` adapters | Protocol `PP-20260620-e9355b` |
+| `SecurityException` propagation in `storeAll()` | Protocol `PP-20260620-d9675c` |
 | Capability ownership | `../parent/docs/PLATFORM.md` Capability Ownership table |
 | Architectural patterns | `../parent/docs/ARCHITECTURE.md` |
 
@@ -362,8 +396,10 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 |---|---|---|---|
 | J1: Configuration & Identity Foundation | Zero-dep SPI layer: preferences, identity, expression evaluation — all non-memory, non-agent capabilities | C1–C7 | ✅ Complete |
 | J2: Semantic Memory | Queryable, permission-aware cross-case agent memory — blocking + graph-native SPIs, five adapter options, capability self-description | C8–C11, C16 | ✅ C8–C11 complete; C16 ✅ |
-| J3: Group & Agent Identity | SCIM directory membership, DID/VC agent identity binding, Claude subprocess execution | C12–C15 | ✅ Complete |
-| J4: Endpoint Registry | Named endpoint registry — tenant-scoped, multi-protocol connection config for workers and desired-state management | C17 | ✅ C17 complete |
+| J3: Group & Agent Identity | SCIM directory membership, DID/VC agent identity binding, Claude subprocess execution, multi-turn AgentSession, LangChain4j bridge | C12–C15, C19 | ✅ Complete |
+| J4: Endpoint Registry | Named endpoint registry — tenant-scoped, multi-protocol connection config for workers and desired-state management | C17, C18 | ✅ C17–C18 complete |
+| J5: Stream Ingestion | CloudEvent-envelope transports — five classpath-activated stream adapters firing CDI events | C20 | ✅ Complete |
+| J6: Access Control | Flat-grant ACL SPI — resource-level `canAccess` / `grant` / `revoke`, parent-resource hierarchy, JPA and in-memory adapters | C21 | ✅ Complete |
 
 ### §9.2 Chapter Index
 
@@ -386,6 +422,9 @@ flowchart LR
   C14 --> C15["C15: ActorState\nL1"]
   C15 --> C17["C17: Endpoint Registry\nL1+L2+L9"]
   C17 --> C18["C18: EndpointPermissions\n+endpoints-config\nL1+L4"]
+  C14 --> C19["C19: AgentSession\n+LangChain4j\nL8"]
+  C18 --> C20["C20: Stream Ingestion\nL10"]
+  C12 --> C21["C21: ACL Phase 1\nL1+L2+L11"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -405,6 +444,9 @@ flowchart LR
   style C16 fill:#90EE90,color:#000
   style C17 fill:#90EE90,color:#000
   style C18 fill:#90EE90,color:#000
+  style C19 fill:#90EE90,color:#000
+  style C20 fill:#90EE90,color:#000
+  style C21 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -427,20 +469,25 @@ flowchart LR
 | 16 | Graphiti Temporal Memory | J2 | L1, L2, L6 | ✅ |
 | 17 | Endpoint Registry | J4 | L1, L2, L9 | ✅ |
 | 18 | EndpointPermissions + endpoints-config | J4 | L1, L4 | ✅ |
+| 19 | AgentSession Multi-turn + LangChain4j | J3 | L8 | ✅ |
+| 20 | Stream Ingestion | J5 | L10 | ✅ |
+| 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
 
 **Layer × Chapter matrix**
 
-| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 | C18 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med | High | Low |
-| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med | Low | — |
-| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — | — | — |
-| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — | — | Med |
-| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — | — | — |
-| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High | — | — |
-| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — | — | — |
-| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — | — |
-| L9: Endpoint Adapt | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — |
+| Layer | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 | C18 | C19 | C20 | C21 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L1: API Tier | High | — | Med | Med | Low | Low | Low | High | Low | Low | Low | Low | Med | Low | Low | Med | High | Low | Low | Low | High |
+| L2: Default Impls | High | Low | Low | Low | Low | — | — | Med | — | — | Low | Low | — | Low | — | Med | Low | — | Low | — | Low |
+| L3: Testing | High | — | — | — | — | — | — | Med | Med | Med | Low | Low | — | — | — | — | — | — | — | — | — |
+| L4: Platform Ext | — | High | High | — | High | — | — | — | — | — | — | — | — | — | — | — | — | Med | — | — | — |
+| L5: Pref Persist | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| L6: Memory Adapt | — | — | — | — | — | — | — | High | High | High | Med | — | — | — | — | High | — | — | — | — | — |
+| L7: Identity Ext | — | — | — | — | — | — | — | — | — | — | — | High | High | — | — | — | — | — | — | — | — |
+| L8: Agent Infra | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — | — | High | — | — |
+| L9: Endpoint Adapt | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — | — | — | — |
+| L10: Stream Ingest | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High | — |
+| L11: Access Control | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | High |
 
 **Sequencing rationale:**
 
@@ -751,8 +798,8 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C16 — Graphiti Temporal Memory
 
-**Journey:** J2 | **Sequence:** 16 of 16 | **Status:** ✅
-**Delivered:** 2026-06-08 | **Issues:** casehubio/platform#34 | **Blog:** —
+**Journey:** J2 | **Sequence:** 16 of 21 | **Status:** ✅
+**Delivered:** 2026-06-08 | **Issues:** casehubio/platform#34 | **Blog:** `blog/2026-06-08-mdp01-graphiti-temporal-memory-adapter.md`
 
 **What this delivers**
 `GraphCaseMemoryStore extends CaseMemoryStore` adds graph-native memory queries (`graphQuery(GraphMemoryQuery)`) as a first-class SPI extension. `MemoryCapability` enum + `capabilities()` default on `CaseMemoryStore` gives every adapter a self-description mechanism; callers use `requireCapability()` for typed exceptions instead of `UnsupportedOperationException`. `memory-graphiti/` provides the `@Alternative @Priority(2)` Graphiti REST adapter: temporal knowledge graph backed by Neo4j/FalkorDB/Kuzu, LLM entity extraction, bi-temporal fact validity (`valid_at`/`invalid_at`). `NoOpCaseMemoryStore` now implements `GraphCaseMemoryStore` so no `UnsatisfiedResolutionException` occurs when the graph injection type is used without a deployed adapter.
@@ -773,7 +820,7 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C17 — Endpoint Registry
 
-**Journey:** J4 | **Sequence:** 17 of 18 | **Status:** ✅
+**Journey:** J4 | **Sequence:** 17 of 21 | **Status:** ✅
 **Delivered:** 2026-06-12 | **Issues:** casehubio/platform#73 | **Blog:** `blog/2026-06-12-mdp02-named-endpoints.md`
 
 **What this delivers**
@@ -797,7 +844,7 @@ Workers can reference external systems by name rather than hard-coding connectio
 
 #### C18 — EndpointPermissions + endpoints-config
 
-**Journey:** J4 | **Sequence:** 18 of 18 | **Status:** ✅
+**Journey:** J4 | **Sequence:** 18 of 21 | **Status:** ✅
 **Delivered:** 2026-06-14 | **Issues:** casehubio/platform#89, casehubio/platform#88
 
 **What it is:** `EndpointPermissions` (L1) is a static write-auth utility mirroring `MemoryPermissions` — `assertTenant(String, CurrentPrincipal)` throws `SecurityException` on tenant mismatch; no 3-arg overload (no async endpoint-registration flow exists). `casehub-platform-endpoints-config` (L4) is a YAML-backed startup populator: `YamlEndpointLoader` (pure SnakeYAML extractor) + `EndpointConfigLoader @Startup @ApplicationScoped` (reads `casehub.platform.endpoints.files`, parses descriptors, calls `EndpointRegistry.register()`). Multi-tenant YAML; `${VAR}` interpolation; fail-fast on unresolved vars; multi-file last-write-wins ordering.
@@ -808,6 +855,73 @@ Workers can reference external systems by name rather than hard-coding connectio
 |-------|--------|--------------|
 | L1: API Tier | `EndpointPermissions` in `io.casehub.platform.api.endpoints` | Low |
 | L4: Platform Extensions | `endpoints-config/` new module — 2 classes, 3 test classes | Medium |
+
+---
+
+#### C19 — AgentSession Multi-turn + LangChain4j Bridge
+
+**Journey:** J3 | **Sequence:** 19 of 21 | **Status:** ✅
+**Delivered:** #58 closed 2026-06-16, #100 closed 2026-06-17, #101–#102 closed 2026-06-20
+**Issues:** platform#58, platform#100, platform#101, platform#102
+**Blog:** `blog/2026-06-16-mdp01-multi-turn-arrives.md`, `blog/2026-06-17-mdp01-langchain4j-session-bridge.md`
+
+**What this delivers**
+Callers can open a persistent session with a Claude subprocess and issue multiple sequential turns without re-establishing the process. `AgentProvider.openSession(AgentSessionInit)` returns an `AgentSession` that holds a semaphore slot until closed — callers must use try-with-resources. Serial model: one active turn at a time; `interrupt()` sends a best-effort signal mid-turn. `ClaudeAgentSession` implements a three-state machine (IDLE → ACTIVE → CLOSED) with per-turn timeout enforced by `AgentTimeoutException`. `NoOpAgentSession` ships in `platform/` as the `@DefaultBean` fallback. The `agent-claude-langchain4j/` module bridges the multi-turn API to LangChain4j: `ClaudeAgentChatModel` (`@Alternative @Priority(10)`) creates a fresh session per `chat()` call (stateless, system prompt cached at the Anthropic layer); `AgentSessionChatModel` is a plain wrapper for caller-managed sessions. `SystemMessage` is explicitly rejected in `AgentSessionChatModel` — not silently ignored (#102). Session `close()` on the Mutiny callback thread blocks for drain on the calling thread; callers must not close from within the response `Multi` pipeline (#101).
+
+**Accountability gaps closed**
+- Multi-turn conversational agent sessions — persistent subprocess context across queries → L8 (`AgentSession` SPI, `ClaudeAgentSession`, `NoOpAgentSession`)
+- LangChain4j integration without owning session lifecycle → L8 (`ClaudeAgentChatModel @Alternative @Priority(10)`)
+- LangChain4j integration with caller-owned session → L8 (`AgentSessionChatModel`)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L8: Agent Infrastructure | High — `AgentSession`, `AgentSessionInit`, `AgentSessionLimitException`, `AgentTimeoutException` in `agent-api/`; `ClaudeAgentSession` + `ClaudeAgentClient.openSession()` in `agent-claude/`; `NoOpAgentSession` in `platform/`; `agent-claude-langchain4j/` new module |
+
+---
+
+#### C20 — Stream Ingestion
+
+**Journey:** J5 | **Sequence:** 20 of 21 | **Status:** ✅
+**Delivered:** 2026-06-18 | **Issues:** platform#98
+**Blog:** `blog/2026-06-18-mdp02-platform-gets-ears-cloudEvent-streams.md`
+
+**What this delivers**
+Five classpath-activated transports that each receive external events and fire `Event<CloudEvent>.fireAsync()` on the CDI event bus — no application code required beyond adding the module. `streams-kafka` and `streams-amqp` use static SmallRye Reactive Messaging `@Incoming` channels; raw `byte[]` payloads are wrapped with a `CloudEvent` envelope using `STREAM_EVENT_TYPE`. `streams-webhook` exposes `POST /streams/webhook/{tenancyId}/{streamId}` accepting structured CloudEvents HTTP binding (`application/cloudevents+json`); enriches `tenancyId` from the descriptor. `streams-poll` uses `java.net.http.HttpClient` with a `@Scheduled` trigger and explicit status code checking (`HttpClient.send()` does not throw for 4xx/5xx — manual check required per endpoint). `streams-camel` uses `@ObservesAsync EndpointRegistered` for runtime route additions (idempotent via `routedUris` set) plus `@Observes StartupEvent` to discover pre-startup CAMEL endpoints; route URI changes require restart. CAMEL and KAFKA are mutually exclusive for the same topic.
+
+**Accountability gaps closed**
+- Standardized CloudEvent envelope across all transport types → L10 (all five modules, `EndpointPropertyKeys.STREAM_EVENT_TYPE`)
+- Dynamic route builder without restart for new CAMEL endpoints → L10 (`CamelStreamProcessor @ObservesAsync EndpointRegistered`)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L10: Stream Ingestion | High — five new modules: `KafkaStreamProcessor`, `AmqpStreamProcessor`, `WebhookResource`, `PollStreamProcessor`, `CamelStreamProcessor` |
+
+---
+
+#### C21 — ACL Phase 1
+
+**Journey:** J6 | **Sequence:** 21 of 21 | **Status:** ✅
+**Delivered:** 2026-06-13 | **Issues:** platform#68 (epic), platform#91–#96
+**Blog:** —
+
+**What this delivers**
+`AccessControlProvider` SPI defines flat-grant resource-level access control: `canAccess(actorId, resourceId, AclAction)` (default true — allow-all when no adapter active), `grant()`, `revoke()`, `revokeAll()`, `registerParent()` (resource hierarchy for inherited grants), `accessibleResources()`. `AclAction`, `AclResourceType`, `AclEntry`, `AccessDeniedException` live in `platform-api`. `NoOpAccessControlProvider @DefaultBean` in `platform/` is the silent allow-all default. `acl-inmem/` provides `InMemoryAccessControlProvider @Alternative @Priority(1)` backed by a `ConcurrentHashMap` — volatile, no restart survival, for test isolation and ephemeral deployments. `acl-jpa/` provides `JpaAccessControlProvider @ApplicationScoped` with Flyway V2000 schema (`AclEntryEntity`, `ResourceParentEntity` for hierarchy). `GroupMembershipProvider.groupsOf(actorId)` inverse lookup (#93) enables role-based grant resolution — "which groups is this actor in?" — a prerequisite for group-based ACL policies.
+
+**Accountability gaps closed**
+- Resource-level access control without hardcoded checks → L1 (`AccessControlProvider` SPI, `AclAction`, `AclEntry`, `AccessDeniedException`)
+- Allow-all default without configuration — before: no ACL, every check was implicit → L2 (`NoOpAccessControlProvider @DefaultBean`)
+- Inverse group membership — "groups of actor X" previously unavailable → L1 (`GroupMembershipProvider.groupsOf(actorId)`)
+- Durable ACL storage → L11 (`JpaAccessControlProvider`)
+- Test-isolated volatile ACL → L11 (`InMemoryAccessControlProvider @Alternative @Priority(1)`)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | High — new `io.casehub.platform.api.acl` package: `AccessControlProvider`, `AclAction`, `AclResourceType`, `AclEntry`, `AccessDeniedException`; `GroupMembershipProvider.groupsOf()` added |
+| L2: Default Implementations | Low — `NoOpAccessControlProvider @DefaultBean @ApplicationScoped` |
+| L11: Access Control | High — `acl-inmem/` and `acl-jpa/` new modules |
 
 ---
 
@@ -1147,10 +1261,10 @@ CDI priority ladder — `@DefaultBean` (lowest) → `@ApplicationScoped` (middle
 **Participates in chapters:** C8, C9, C10, C11, C16
 **Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
 **ADRs:** ADR-0008
-**Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #69, #70, #90, #99
+**Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #65, #66, #67, #69, #70, #87, #90, #99
 **Navigation:** `git log --grep="#32\|#33\|#36\|#37\|#39\|#48\|#49" --oneline`
-**Blog:** `blog/2026-05-28-mdp01-teaching-platform-to-remember.md`, `blog/2026-05-31-mdp01-durable-memory-no-server.md`, `blog/2026-06-04-mdp01-mem0-adapter.md`, `blog/2026-06-05-mdp01-storeall-contract.md`
-**Completed:** 2026-06-05
+**Blog:** `blog/2026-05-28-mdp01-teaching-platform-to-remember.md`, `blog/2026-05-31-mdp01-durable-memory-no-server.md`, `blog/2026-06-04-mdp01-mem0-adapter.md`, `blog/2026-06-05-mdp01-storeall-contract.md`, `blog/2026-06-18-mdp01-parallel-batch-cross-tenant-erasure.md`
+**Completed:** 2026-06-20
 
 #### What it adds
 
@@ -1165,7 +1279,7 @@ What this layer adds:
 - **`Mem0CaseMemoryStore`** — REST client; `infer:false` verbatim storage; compound `user_id={tenantId}::{entityId}` for tenant isolation; limit applied client-side (server is unbounded)
 - **`InMemoryMemoryStore`** — `@Alternative @Priority(10)` (not Priority(1)); test-override tier so it beats all production adapters in `@QuarkusTest` with compile-scope production adapter present
 
-Not closed here: Graphiti adapter (#34 — later closed in C16). Multi-turn `AgentSession` (#58) shipped in C20.
+Not closed here: Graphiti adapter (#34 — later closed in C16). Multi-turn `AgentSession` (#58) shipped in C19.
 
 **#70** (`Mem0CaseMemoryStore.storeAll()` bounded-parallel): Semaphore-gated Mutiny parallel HTTP, configurable cap (default 4). 2-arg `assertTenant` pre-flight fixed in Mem0 + SQLite. **#90** (`ReactiveCaseMemoryStore` moved to `platform-api`): Mutiny SPI now in Tier 1; engine#466 can downgrade `casehub-platform` to test scope. Two `UnsupportedOperationException` defaults fixed to `MemoryCapabilityException`. **#99** (`eraseEntityAcrossTenants`): GDPR Art.17 cross-tenant entity erasure across all six adapters. `assertCrossTenantAdmin` in `MemoryPermissions` — no async bypass by design. **#67** (`storeAll()` return type): `List<String>` → `StoreAllResult(stored, failures)`; backend `RuntimeException` collected per input, `SecurityException` propagates immediately; null-slot parallel pattern in Mem0 preserves output order while collecting partial failures. **#66** (`@Timed` observability): Micrometer histogram on all 7 public methods in inmem, jpa, sqlite adapters — consistent with pre-existing coverage in mem0 and graphiti. **#65** (Testcontainers IT scaffold): `CaseMemoryStoreContractIT` + `Mem0ContainerResource` (Ollama + Mem0 OSS); `@Disabled` pending CI Ollama support; `*IT.java` excluded from surefire, wired into failsafe.
 
@@ -1313,12 +1427,12 @@ Threshold-triggered pagination — no `totalResults` on the resource; treat `cou
 
 #### Layer — L8: Agent Infrastructure
 
-**Participates in chapters:** C14
-**Architectural patterns:** Semaphore-bounded subprocess, wall-clock timeout via `ScheduledExecutorService`, `@Startup` eager init for blocking probe, `@Alternative @Priority(10)` classpath-presence activation for LangChain4j bridge
-**Issues:** #55, #58, #100
-**Navigation:** `git log --grep="#55" --oneline`
-**Blog:** `blog/2026-06-03-mdp01-shipping-platform-agent.md`, `blog/2026-06-03-mdp02-two-ways-to-launch-claude.md`
-**Completed:** 2026-06-03 (initial); 2026-06-17 (LangChain4j bridge, #100)
+**Participates in chapters:** C14, C19
+**Architectural patterns:** Semaphore-bounded subprocess, wall-clock timeout via `ScheduledExecutorService`, `@Startup` eager init for blocking probe, three-state session machine (IDLE/ACTIVE/CLOSED), `@Alternative @Priority(10)` classpath-presence activation for LangChain4j bridge
+**Issues:** #55, #58, #100, #101, #102
+**Navigation:** `git log --grep="#55\|#58\|#100" --oneline`
+**Blog:** `blog/2026-06-03-mdp01-shipping-platform-agent.md`, `blog/2026-06-03-mdp02-two-ways-to-launch-claude.md`, `blog/2026-06-16-mdp01-multi-turn-arrives.md`, `blog/2026-06-17-mdp01-langchain4j-session-bridge.md`
+**Completed:** 2026-06-20
 
 #### What it adds
 
@@ -1330,7 +1444,7 @@ What this layer adds:
 - **`ClaudeAgentClient @Startup`** — binary probe at boot (`ProcessBuilder.waitFor()`); `@Startup` forces init on the main thread, avoiding blocking of Vert.x IO threads during first injection
 - **`ClaudeAgentProvider @ApplicationScoped`** — semaphore enforces `maxConcurrentSessions`; `ScheduledExecutorService` fires subprocess close after wall-clock timeout; `AtomicBoolean` prevents double-close race
 
-C18 shipped #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/`close(Duration)`; `AgentSessionInit` (no userPrompt); `ClaudeAgentSession` (IDLE/ACTIVE/CLOSED state machine, per-turn timeout-to-AgentTimeoutException converter, true-drain close, CAS semaphore guards). `NoOpAgentSession` in `platform/`. Known limitation: no crash recovery — subprocess crash → CLOSED, caller must reopen.
+C19 delivered #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/`close(Duration)`; `AgentSessionInit` (no userPrompt — first prompt supplied via `query()`); `ClaudeAgentSession` (IDLE/ACTIVE/CLOSED state machine, per-turn timeout converted to `AgentTimeoutException` via `onFailure()`, true-drain close, CAS semaphore guards). `NoOpAgentSession` in `platform/`. Known limitation: no crash recovery — subprocess crash → CLOSED, caller must reopen. `ClaudeAgentChatModel` and `AgentSessionChatModel` deliver #100; `SystemMessage` rejection hardened in #102; `close()` thread-ordering documented in #101.
 
 #### Key files
 
@@ -1338,9 +1452,16 @@ C18 shipped #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/`c
 - `agent-api/src/main/java/io/casehub/platform/agent/AgentSessionConfig.java` — carries `maxConcurrentSessions`, `timeoutDuration`
 - `agent-api/src/main/java/io/casehub/platform/agent/AgentEvent.java` — sealed event hierarchy; `TextDelta` is the primary streaming event type
 - `agent-api/src/main/java/io/casehub/platform/agent/AgentMcpServer.java` — sealed hierarchy: Stdio / Sse / Http variants
-- `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentClient.java` — `@Startup @ApplicationScoped`; subprocess lifecycle; semaphore; timeout scheduler
+- `agent-api/src/main/java/io/casehub/platform/agent/AgentSession.java` — multi-turn SPI: `query(String)` → `Multi<AgentEvent>`, `interrupt()` → `Uni<Void>`, `close(Duration)` — `AutoCloseable`, serial model
+- `agent-api/src/main/java/io/casehub/platform/agent/AgentSessionInit.java` — session config without `userPrompt`; first prompt is the first `query()` call
+- `agent-api/src/main/java/io/casehub/platform/agent/AgentSessionLimitException.java` — thrown when semaphore is exhausted (concurrent session cap reached)
+- `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentClient.java` — `@Startup @ApplicationScoped`; subprocess lifecycle; semaphore; timeout scheduler; `openSession()` → `ClaudeAgentSession`
+- `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentSession.java` — IDLE/ACTIVE/CLOSED state machine; per-turn timeout; true-drain close; CAS semaphore guard
 - `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProvider.java` — `@ApplicationScoped`; delegates to `ClaudeAgentClient`
 - `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProperties.java` — config mapping for CLI path, default session config
+- `platform/src/main/java/io/casehub/platform/agent/NoOpAgentSession.java` — `@DefaultBean`; `query()` emits empty stream; `close()` is no-op
+- `agent-claude-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/ClaudeAgentChatModel.java` — `@Alternative @Priority(10) @ApplicationScoped`; fresh session per `chat()` call; `listeners()` injects CDI `ChatModelListener` beans
+- `agent-claude-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModel.java` — plain wrapper; caller supplies and owns the `AgentSession`; no CDI scope
 
 #### Key wiring
 
@@ -1406,6 +1527,139 @@ Not closed here: JPA backend (endpoints-jpa/). C18 closes: `endpoints-config/` (
 
 ---
 
+#### Layer — L10: Stream Ingestion
+
+**Participates in chapters:** C20
+**Architectural patterns:** Classpath-activated transport, CloudEvent envelope, CDI async event bus, `@Startup` eager subscription, `@ObservesAsync EndpointRegistered` for runtime route addition
+**Issues:** platform#98
+**Blog:** `blog/2026-06-18-mdp02-platform-gets-ears-cloudEvent-streams.md`
+**Completed:** 2026-06-18
+
+#### What it adds
+
+**Before:** No event ingestion — external systems had no standard way to push events into the CaseHub platform; consumers had to wire their own transport code.
+**After:** Five classpath-activated transports, each receiving external events and firing `Event<CloudEvent>.fireAsync()` on the CDI event bus. Application code only needs to `@ObservesAsync CloudEvent` — transport choice is deployment config.
+
+What this layer adds:
+- **`KafkaStreamProcessor`** — `@Startup @ApplicationScoped`; `@Incoming("casehub-kafka-stream")`; always raw `byte[]`; builds `CloudEvent` from `STREAM_EVENT_TYPE`. Does NOT observe `EndpointRegistered` — channel is static
+- **`AmqpStreamProcessor`** — `@Startup @ApplicationScoped`; single address per channel; no multi-address fan-in (use Camel for multi-queue). Does NOT observe `EndpointRegistered`
+- **`WebhookResource`** — `@Startup @ApplicationScoped` JAX-RS; `POST /streams/webhook/{tenancyId}/{streamId}`; structured CloudEvents HTTP binding (`application/cloudevents+json`); enriches `tenancyId` from descriptor; preserves incoming CloudEvent fields; requires `casehub.streams.webhook.public-url`
+- **`PollStreamProcessor`** — `@Startup @ApplicationScoped @Scheduled`; `java.net.http.HttpClient` field; explicit status code check (HttpClient.send() does NOT throw for 4xx/5xx — manual check mandatory); per-endpoint exception handling isolates failures
+- **`CamelStreamProcessor`** — `@ApplicationScoped`; `@Observes StartupEvent` discovers pre-startup CAMEL endpoints; `@ObservesAsync EndpointRegistered` for runtime additions (idempotent via `routedUris` set); URI change requires restart (P0 limitation)
+
+Not closed here: JPA-backed stream registry (no persistent channel config storage — channels are statically configured or dynamically registered in-process via `EndpointRegistry`).
+
+#### Accountability gaps closed
+
+| Gap | What breaks without it | Closed by |
+|---|---|---|
+| Standardized inbound event envelope | Each transport produces ad hoc payloads — consumers re-parse per source | CloudEvent wrapper across all five transports |
+| Dynamic route creation without restart | New CAMEL endpoint registered at runtime is not picked up | `CamelStreamProcessor @ObservesAsync EndpointRegistered` |
+
+#### Key files
+
+- `streams-kafka/src/main/java/io/casehub/platform/streams/kafka/KafkaStreamProcessor.java` — `@Startup @ApplicationScoped @Incoming`
+- `streams-amqp/src/main/java/io/casehub/platform/streams/amqp/AmqpStreamProcessor.java` — `@Startup @ApplicationScoped @Incoming`
+- `streams-webhook/src/main/java/io/casehub/platform/streams/webhook/WebhookResource.java` — `@Startup @ApplicationScoped`; JAX-RS POST
+- `streams-poll/src/main/java/io/casehub/platform/streams/poll/PollStreamProcessor.java` — `@Startup @ApplicationScoped @Scheduled`
+- `streams-camel/src/main/java/io/casehub/platform/streams/camel/CamelStreamProcessor.java` — `@ApplicationScoped`; dynamic route builder
+
+#### Key wiring
+
+**`HttpClient.send()` does not throw for 4xx/5xx.** `PollStreamProcessor` must check `response.statusCode()` explicitly after every call. A 404 or 503 from a polled endpoint returns normally with a non-2xx status code — no exception is raised. Per-endpoint exception handling ensures one failed poll does not suppress subsequent endpoints in the same tick.
+
+**CAMEL and KAFKA are mutually exclusive for the same topic.** `CamelStreamProcessor` and `KafkaStreamProcessor` both target the same `casehub-kafka-stream` channel if misconfigured. Using both for the same topic produces duplicate events. Deployment must declare exactly one.
+
+**`@ObservesAsync EndpointRegistered` for runtime Camel routes is idempotent.** `CamelStreamProcessor` maintains a `routedUris` set. Receiving the same `EndpointRegistered` event twice (e.g. from a re-registration) does not add a duplicate route. URI change is not supported at runtime — deregister and re-register with the new URI after a restart.
+
+**`casehub.streams.webhook.public-url` is required for `WebhookResource`.** The URL is embedded in the `EndpointDescriptor` registered for the webhook endpoint so callers know where to POST. Without it, the descriptor is registered with a null source URL.
+
+#### Anti-pattern
+
+**Symptom:** CAMEL and KAFKA both receive events from the same Kafka topic — duplicate events processed.
+**Cause:** Both `streams-camel` and `streams-kafka` on the classpath with overlapping topic config.
+**Fix:** Choose one transport per topic. CAMEL is preferred when dynamic route management or multi-source fan-in is needed; KAFKA for simple static single-topic ingestion.
+
+#### Pattern introduced
+
+Classpath-activated CDI event bus transport — each transport module subscribes to an external source and fires `Event<CloudEvent>.fireAsync()`; application code observes `CloudEvent` with `@ObservesAsync` regardless of which transport is active.
+
+#### Gotchas
+
+**Symptom:** `PollStreamProcessor` silently skips 404 and 503 responses — no log, no error.
+**Cause:** `java.net.http.HttpClient.send()` does not throw for non-2xx status codes.
+**Fix:** Always check `response.statusCode() >= 200 && response.statusCode() < 300` after `send()`. Log and/or fire an error event on non-2xx.
+
+---
+
+#### Layer — L11: Access Control
+
+**Participates in chapters:** C21
+**Architectural patterns:** `@DefaultBean` CDI displacement, `@Alternative @Priority(1)` ladder, contract test inheritance
+**Issues:** platform#68, platform#91, platform#92, platform#93, platform#94, platform#95, platform#96
+**Blog:** —
+**Completed:** 2026-06-13
+
+#### What it adds
+
+**Before:** No access control — every `AccessControlProvider` call implicitly allowed. No SPI existed; consumers had no standard way to gate resource access.
+**After:** `AccessControlProvider` SPI with flat-grant semantics and a parent-resource hierarchy. `NoOpAccessControlProvider @DefaultBean` allows all — safe default for deployments that have not yet configured ACL. Two adapters: in-memory (volatile, test isolation) and JPA (durable, Flyway V2000).
+
+What this layer adds:
+- **`AccessControlProvider` SPI** — `canAccess(actorId, resourceId, AclAction)` (default `true`); `grant()`, `revoke()`, `revokeAll()`; `registerParent(child, parent)` for hierarchy traversal; `accessibleResources(actorId, resourceType, AclAction)` for discovery
+- **`AclAction`** — enum of permitted actions (e.g. `READ`, `WRITE`, `EXECUTE`)
+- **`AclResourceType`** — enum classifying resource kinds for `accessibleResources` filtering
+- **`AclEntry`** — record: `actorId`, `resourceId`, `action`, `expires`
+- **`AccessDeniedException`** — unchecked; thrown by consumers after `canAccess()` returns false
+- **`NoOpAccessControlProvider @DefaultBean`** — `canAccess()` always returns `true`; `grant()`/`revoke()` are no-ops; safe allow-all default
+- **`InMemoryAccessControlProvider @Alternative @Priority(1)`** — `ConcurrentHashMap`; volatile; for `@QuarkusTest` isolation and ephemeral deployments
+- **`JpaAccessControlProvider @ApplicationScoped`** — Flyway V2000; `AclEntryEntity` + `ResourceParentEntity` (for `registerParent`/hierarchy traversal); parent walks up the hierarchy checking for inherited grants
+- **`GroupMembershipProvider.groupsOf(actorId)`** — inverse lookup added to `platform-api` SPI (#93): "which groups is actorId a member of?" — enables group-based ACL grant queries
+
+Not closed here: ACL Phase 2 (identity propagation from DID/VC assertions into ACL context), ACL Phase 3 (worker rights roadmap).
+
+#### Accountability gaps closed
+
+| Gap | What breaks without it | Closed by |
+|---|---|---|
+| Resource-level access gating | Consumers check membership or roles inline — no standard — every module re-implements | `AccessControlProvider.canAccess()` |
+| Inverse group membership | "Who is actor X a member of?" unanswerable — only "who is in group G?" existed | `GroupMembershipProvider.groupsOf(actorId)` |
+| Test-isolated ACL state | ACL grants leak between tests when using JPA | `InMemoryAccessControlProvider @Alternative @Priority(1)` |
+
+#### Key files
+
+- `platform-api/src/main/java/io/casehub/platform/api/acl/AccessControlProvider.java` — SPI; all methods have safe defaults
+- `platform-api/src/main/java/io/casehub/platform/api/acl/AclAction.java` — enum
+- `platform-api/src/main/java/io/casehub/platform/api/acl/AclResourceType.java` — enum
+- `platform-api/src/main/java/io/casehub/platform/api/acl/AclEntry.java` — record: actorId, resourceId, action, expires
+- `platform-api/src/main/java/io/casehub/platform/api/acl/AccessDeniedException.java` — unchecked
+- `platform-api/src/main/java/io/casehub/platform/api/identity/GroupMembershipProvider.java` — `groupsOf(actorId)` added (#93)
+- `platform/src/main/java/io/casehub/platform/acl/NoOpAccessControlProvider.java` — `@DefaultBean @ApplicationScoped`
+- `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java` — `@Alternative @Priority(1) @ApplicationScoped`
+- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` — `@ApplicationScoped`; Flyway V2000
+- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
+- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)
+
+#### Key wiring
+
+**`AccessControlProvider` default implementations return true / no-op.** Every method has a permissive default — this is intentional. The SPI is opt-in; consumers that add the module get enforcement. Those that don't get silent allow-all. Callers must still call `canAccess()` and throw `AccessDeniedException` on false — the `@DefaultBean` does not throw.
+
+**`acl-jpa` consumers must add `classpath:db/acl/migration` to Flyway locations.** The V2000 migration is bundled in the JAR. Without this entry, the `acl_entry` and `resource_parent` tables are never created.
+
+**`groupsOf(actorId)` is the inverse of `membersOf(groupName)`.** `membersOf()` answers "who is in group G?" (used by routing). `groupsOf()` answers "which groups is actor X in?" (used by ACL grant checks). Both are on `GroupMembershipProvider` — `ScimGroupMembershipProvider` implements both. The in-memory test fixture `InMemoryGroupMembershipProvider` also implements both via the same backing store.
+
+#### Pattern introduced
+
+Flat-grant ACL with parent-resource hierarchy — grant propagates from parent to child resources; `registerParent()` is idempotent; hierarchy depth is unbounded (use sparingly in JPA to avoid N+1 parent-walk queries).
+
+#### Gotchas
+
+**Symptom:** `canAccess()` returns `true` despite no grant having been issued.
+**Cause:** `NoOpAccessControlProvider @DefaultBean` is active — no `acl-inmem` or `acl-jpa` on the classpath.
+**Fix:** Add `acl-inmem` (test) or `acl-jpa` (production) to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+---
+
 ## §10 Architectural Decisions
 
 Cross-cutting decisions not captured in layer entries:
@@ -1443,8 +1697,8 @@ Cross-cutting decisions not captured in layer entries:
 | Mem0 `GET /memories` is unbounded — large entity histories degrade performance | Medium — high-memory entities slow to query chronologically | Use `RELEVANCE` + `POST /search` for entities with many memories; limit client-side |
 | `effectiveAt` is ignored in `JpaPreferenceProvider` — time-travel queries silently return current data | Low (no caller uses it today) — misleading API contract | ADR-0006 recorded; mitigate when `preferences-editor` (#8) is built |
 | Memory adapters in `casehub-platform` may need extraction to `casehub-memory` if a non-CaseHub consumer emerges | Low — extraction is mechanical but touches every consumer's pom.xml | ADR-0008 amended; extraction triggers defined |
-| `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C20; crash-recovery explicitly out of scope |
-| ACL/authorization model (#68) — 6 open design decisions before implementation can start | High — no cross-module access control until resolved | Spec at `docs/specs/2026-06-01-acl-design.md` §6.9; deliberate pre-work required |
+| `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C19; crash-recovery explicitly out of scope |
+| ACL authorization — Phase 2 (identity propagation from DID/VC into ACL context) and Phase 3 (worker rights roadmap) not yet started | Medium — Phase 1 (C21) shipped; cross-cutting grant checks require callers to wire `canAccess()` explicitly | Phase 1 complete (#68 closed 2026-06-13); Phases 2–3 tracked as future issues |
 
 ---
 
@@ -1479,3 +1733,18 @@ Cross-cutting decisions not captured in layer entries:
 | Foundation tier | The zero-casehubio-dependency layer: `casehub-platform`, `casehub-ledger`, `casehub-work`, `casehub-qhorus`, `casehub-eidos`, `casehub-engine`. Must publish before application-tier harness apps. |
 | did:key | DID method encoding a public key directly in the DID — self-contained, no registry lookup required. |
 | did:web | DID method resolving via HTTP at a well-known URL on the actor's domain. |
+| `AgentSession` | Multi-turn serial agent session — `query(String)` streams `AgentEvent`s, `interrupt()` signals mid-turn cancellation, `close(Duration)` drains and closes. Serial: only one turn active at a time. Holds a semaphore slot until closed — always use try-with-resources. |
+| `AgentSessionInit` | Session initialisation config without `userPrompt` — MCP servers, system prompt, concurrency settings. The first prompt arrives via the first `query()` call. |
+| `CbrCaseEntry` | Standard schema for the CBR Retain step: `problem` → `MemoryInput.text`, `solution` → `SOLUTION` attribute, `outcome` → `OUTCOME` attribute, `confidence` → `CONFIDENCE` attribute. `toMemoryInput()` converts to store input; `CbrCaseEntry.from(Memory)` reconstructs from a recalled memory. |
+| `StoreAllResult` | Return type of `CaseMemoryStore.storeAll()` — carries `stored()` (IDs of successfully persisted inputs) and `failures()` (list of `StoreFailure`). Backend `RuntimeException`s are collected per input; `SecurityException` always propagates immediately and terminates the batch. |
+| `StoreFailure` | Record inside `StoreAllResult` — `inputIndex`, `input`, `cause`. Allows callers to correlate partial-write failures back to the original `MemoryInput` list for retry. |
+| `ReactiveCaseMemoryStore` | Mutiny SPI mirror of `CaseMemoryStore` — `Uni`/`Multi` return types. Lives in `platform-api` (L1). `BlockingToReactiveBridge @DefaultBean` in `platform/` wraps the active blocking adapter so reactive callers need no adapter-specific code. |
+| `GraphCaseMemoryStore` | Extension of `CaseMemoryStore` adding `graphQuery(GraphMemoryQuery)` for temporal knowledge graph adapters. `NoOpCaseMemoryStore` implements this interface so injection of the graph type does not fail when no graph adapter is deployed. |
+| `GraphMemoryQuery` | Query record for graph-native adapters — `tenantId`, `entityIds`, `domain`, `question`, `limit`, `since`, `validAt`, `entityTypes`, `resultType`. |
+| `MemoryCapability` | Enum declaring what a `CaseMemoryStore` adapter supports (e.g. `GRAPH_QUERY`, `CROSS_TENANT_ERASE`). `capabilities()` default on `CaseMemoryStore` returns `EnumSet.noneOf(MemoryCapability.class)`; adapters override. `requireCapability()` throws `MemoryCapabilityException` if not supported. |
+| `AccessControlProvider` | SPI for flat-grant resource-level access control — `canAccess(actorId, resourceId, AclAction)`, `grant()`, `revoke()`, `registerParent()`, `accessibleResources()`. `NoOpAccessControlProvider @DefaultBean` allows all. |
+| `AclAction` | Enum of permitted actions on a resource (e.g. `READ`, `WRITE`, `EXECUTE`). Used in `grant()`, `canAccess()`, and `accessibleResources()`. |
+| `AclResourceType` | Enum classifying resource kinds for `accessibleResources()` filtering — lets callers ask "which resources of type X can actor Y perform action Z on?". |
+| `AclEntry` | Record: `actorId`, `resourceId`, `action`, `expires` (nullable — null means no expiry). Stored by `JpaAccessControlProvider` as `AclEntryEntity`. |
+| `CloudEvent` | Standard event envelope (CNCF CloudEvents spec) used across all L10 stream transports. Fields: `id`, `type`, `source`, `time`, `data`. All five transport modules fire `Event<CloudEvent>.fireAsync()` on the CDI event bus. |
+| `EndpointRegistered` | CDI event record fired by `EndpointRegistry.register()` — carries the registered `EndpointDescriptor`. `CamelStreamProcessor` observes this asynchronously (`@ObservesAsync`) to add routes at runtime without restart. |

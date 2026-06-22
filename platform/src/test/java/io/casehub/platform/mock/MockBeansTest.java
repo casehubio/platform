@@ -128,12 +128,12 @@ class MockBeansTest {
 
     @Test
     void accessControl_noOp_allows_all() {
-        assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ));
+        assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ).toCompletableFuture().join());
     }
 
     @Test
     void accessControl_noOp_accessibleResources_returns_empty() {
-        assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).isEmpty());
+        assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).toCompletableFuture().join().isEmpty());
     }
 
     @Test

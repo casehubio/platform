@@ -220,6 +220,10 @@ C4Container
     Container(streamsPoll, "casehub-platform-streams-poll", "Quarkus Scheduler", "@Startup @Scheduled HTTP GET — java.net.http.HttpClient field, explicit status check")
     Container(streamsCamel, "casehub-platform-streams-camel", "Apache Camel Quarkus", "@ApplicationScoped dynamic route builder via @ObservesAsync EndpointRegistered")
   }
+  Container_Boundary(l11, "L11: ACL Adapters — mutually exclusive per priority tier") {
+    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate Reactive + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
+  }
 
   Rel(platform, api, "implements SPIs from")
   Rel(testing, api, "implements SPIs from")
@@ -385,6 +389,12 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 **Symptom:** Boot fails with `SRCFG00050: does not map to any root` for a config key that another bean reads via `@ConfigProperty`.
 **Cause:** A `@ConfigMapping(prefix = "casehub.platform.scim")` interface claims exclusive ownership of its prefix. Any key under that prefix not declared as a method in the interface is rejected in strict mode — even if another bean reads it via `@ConfigProperty`. The two mechanisms conflict on the same prefix.
 **Fix:** Move ALL config keys under the prefix into the `@ConfigMapping` interface. Remove any `@ConfigProperty` injections for keys under that prefix from other beans. One interface owns one prefix.
+
+---
+
+**Symptom:** `AmbiguousResolutionException` in `@QuarkusTest` — CDI cannot choose between two `AccessControlProvider` beans.
+**Cause:** Two ACL adapter modules declared on the same classpath scope (e.g. `acl-jpa` compile + `acl-inmem` test). Both have equal or ambiguous CDI priority.
+**Fix:** `acl-inmem` is at `@Alternative @Priority(10)` — the test-override tier. `acl-jpa` is `@ApplicationScoped` (no priority — displaces `@DefaultBean`). Never combine `acl-inmem` with `acl-jpa` in the same scope.
 
 ---
 
@@ -1697,8 +1707,9 @@ Cross-cutting decisions not captured in layer entries:
 | Mem0 `GET /memories` is unbounded — large entity histories degrade performance | Medium — high-memory entities slow to query chronologically | Use `RELEVANCE` + `POST /search` for entities with many memories; limit client-side |
 | `effectiveAt` is ignored in `JpaPreferenceProvider` — time-travel queries silently return current data | Low (no caller uses it today) — misleading API contract | ADR-0006 recorded; mitigate when `preferences-editor` (#8) is built |
 | Memory adapters in `casehub-platform` may need extraction to `casehub-memory` if a non-CaseHub consumer emerges | Low — extraction is mechanical but touches every consumer's pom.xml | ADR-0008 amended; extraction triggers defined |
-| `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C19; crash-recovery explicitly out of scope |
-| ACL authorization — Phase 2 (identity propagation from DID/VC into ACL context) and Phase 3 (worker rights roadmap) not yet started | Medium — Phase 1 (C21) shipped; cross-cutting grant checks require callers to wire `canAccess()` explicitly | Phase 1 complete (#68 closed 2026-06-13); Phases 2–3 tracked as future issues |
+| `agent-claude` multi-turn sessions (#58) — crash during session → CLOSED; caller must reopen (no resume) | Low — known limitation documented in `AgentSession` Javadoc | Shipped in C20; crash-recovery explicitly out of scope |
+| ACL Phase 1 (#91) — `condition` field on `AclEntryEntity` not yet exposed through `AccessControlProvider` SPI | Low — column exists, grant() does not accept condition parameter | Phase 2 scope; condition-based evaluation requires expression engine integration |
+| ACL adapters are mutually exclusive — miscombination gives silent misbehaviour | Medium — wrong adapter active | Anti-pattern in §8; same pattern as CaseMemoryStore adapters |
 
 ---
 
@@ -1730,6 +1741,11 @@ Cross-cutting decisions not captured in layer entries:
 | `AgentSessionConfig` | Carries `maxConcurrentSessions` (semaphore bound) and `timeoutDuration` (wall-clock subprocess timeout) for `AgentProvider.execute()`. |
 | `AgentEvent` | Sealed event hierarchy produced by `AgentProvider.execute()`. `TextDelta` is the primary streaming subtype carrying partial text output. |
 | `@DefaultBean` | Quarkus CDI qualifier: yields to any non-default `@ApplicationScoped` bean on the classpath. The mechanism for all optional-module activation in `casehub-platform`. |
+| `AccessControlProvider` | SPI for async ACL — `CompletionStage`-based grant/revoke/canAccess/revokeAll/registerParent/accessibleResources. `@DefaultBean` no-op allows all. Group-based access via `GroupMembershipProvider.groupsOf()`. Resource hierarchy inheritance with depth guard (20). |
+| `AclAction` | Enum: `READ \| WRITE \| ADMIN \| CLAIM`. Defines the permission granularity for ACL checks. |
+| `AclEntry` | Record: `actorId`, `resourceId`, `action`, `grantedAt`, `expiresAt`, `tenancyId`. `isExpired()` checks `expiresAt` against current time. |
+| `AclResourceType` | String constants for resource type prefixes — `CASE`, `PLAN_ITEM`, `WORK_ITEM`, `EVENT_LOG`, `CASE_DEFINITION`. Used in `accessibleResources()` to filter by resource type via prefix matching. |
+| `AccessDeniedException` | Extends `SecurityException` — carries `actorId`, `resourceId`, `action` for structured error handling in ACL enforcement. |
 | Foundation tier | The zero-casehubio-dependency layer: `casehub-platform`, `casehub-ledger`, `casehub-work`, `casehub-qhorus`, `casehub-eidos`, `casehub-engine`. Must publish before application-tier harness apps. |
 | did:key | DID method encoding a public key directly in the DID — self-contained, no registry lookup required. |
 | did:web | DID method resolving via HTTP at a well-known URL on the actor's domain. |

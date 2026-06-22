@@ -21,6 +21,7 @@ import java.time.Instant;
                 @Index(name = "idx_audit_resource", columnList = "resource_id"),
                 @Index(name = "idx_audit_actor", columnList = "actor_id"),
                 @Index(name = "idx_audit_performed", columnList = "performed_by"),
+                @Index(name = "idx_audit_performed_at", columnList = "performed_at"),
                 @Index(name = "idx_audit_tenancy", columnList = "tenancy_id")
         })
 public class AclAuditLogEntity extends PanacheEntityBase {

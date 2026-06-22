@@ -48,4 +48,5 @@ CREATE TABLE IF NOT EXISTS acl_audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_resource    ON acl_audit_log (resource_id);
 CREATE INDEX IF NOT EXISTS idx_audit_actor       ON acl_audit_log (actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_performed   ON acl_audit_log (performed_by);
-CREATE INDEX IF NOT EXISTS idx_audit_tenancy     ON acl_audit_log (tenancy_id);
+CREATE INDEX IF NOT EXISTS idx_audit_performed_at ON acl_audit_log (performed_at);
+CREATE INDEX IF NOT EXISTS idx_audit_tenancy      ON acl_audit_log (tenancy_id);

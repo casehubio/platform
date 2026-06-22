@@ -186,12 +186,11 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                 .chain(count -> {
                     if (count > 0) return Uni.createFrom().item(true);
 
-                    return ResourceParentEntity.<ResourceParentEntity>list(
-                                    "childResourceId", resourceId)
-                            .chain(parentList -> {
-                                if (!parentList.isEmpty()) {
+                    return ResourceParentEntity.<ResourceParentEntity>findById(resourceId)
+                            .chain(parent -> {
+                                if (parent != null) {
                                     return canAccessWithCandidates(candidates,
-                                            parentList.getFirst().parentResourceId,
+                                            parent.parentResourceId,
                                             action, depth + 1);
                                 }
                                 return Uni.createFrom().item(false);

@@ -109,6 +109,14 @@ public abstract class AccessControlProviderContractTest {
     }
 
     @Test
+    void registerParent_reparenting_updatesParent() {
+        await(provider().grant("actor1", "case:newParent", AclAction.READ, null));
+        await(provider().registerParent("planitem:child", "case:oldParent"));
+        await(provider().registerParent("planitem:child", "case:newParent"));
+        assertTrue(await(provider().canAccess("actor1", "planitem:child", AclAction.READ)));
+    }
+
+    @Test
     void registerParent_noGrantOnParent_returnsFalse() {
         await(provider().registerParent("planitem:child", "case:parent"));
         assertFalse(await(provider().canAccess("actor1", "planitem:child", AclAction.READ)));

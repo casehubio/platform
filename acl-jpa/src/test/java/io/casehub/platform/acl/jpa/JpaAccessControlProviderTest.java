@@ -115,6 +115,33 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     }
 
     @Test
+    void revokeAll_createsAuditLogEntryPerAction() {
+        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null).toCompletableFuture().join();
+        jpaProvider.grant("actor1", "case:abc", AclAction.WRITE, null).toCompletableFuture().join();
+        jpaProvider.revokeAll("actor1", "case:abc").toCompletableFuture().join();
+
+        List<AclAuditLogEntity> revokeLogs = reactive(() -> Panache.withSession(() ->
+                AclAuditLogEntity.<AclAuditLogEntity>list(
+                        "actorId = ?1 and operation = ?2", "actor1", "REVOKE")
+        ));
+
+        assertEquals(2, revokeLogs.size());
+        List<String> actions = revokeLogs.stream().map(l -> l.action).sorted().toList();
+        assertEquals(List.of("READ", "WRITE"), actions);
+    }
+
+    @Test
+    void revokeAll_noGrants_createsNoAuditLog() {
+        jpaProvider.revokeAll("actor1", "case:abc").toCompletableFuture().join();
+
+        long count = reactive(() -> Panache.withSession(() ->
+                AclAuditLogEntity.count("actorId", "actor1")
+        ));
+
+        assertEquals(0, count);
+    }
+
+    @Test
     void grant_duplicate_createsTwoAuditLogEntries() {
         jpaProvider.grant("actor1", "case:abc", AclAction.READ, null).toCompletableFuture().join();
         jpaProvider.grant("actor1", "case:abc", AclAction.READ, null).toCompletableFuture().join();

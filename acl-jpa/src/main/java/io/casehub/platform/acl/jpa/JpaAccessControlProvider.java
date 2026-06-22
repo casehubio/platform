@@ -61,7 +61,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                 entry.action = action.name();
                                 entry.grantedAt = now;
                                 entry.expiresAt = expires;
-                                entry.tenancyId = "";
+                                entry.tenancyId = principal.tenancyId();
                                 return entry.persist();
                             }
                         })
@@ -104,8 +104,27 @@ public class JpaAccessControlProvider implements AccessControlProvider {
 
     @Override
     public CompletionStage<Void> revokeAll(String actorId, String resourceId) {
+        Instant now = Instant.now();
         return execute(() -> Panache.withTransaction(() ->
-                AclEntryEntity.delete("actorId = ?1 and resourceId = ?2", actorId, resourceId)
+                AclEntryEntity.<AclEntryEntity>list("actorId = ?1 and resourceId = ?2", actorId, resourceId)
+                        .chain(entries -> {
+                            Uni<?> chain = Uni.createFrom().voidItem();
+                            for (AclEntryEntity entry : entries) {
+                                chain = chain.chain(() -> {
+                                    AclAuditLogEntity log = new AclAuditLogEntity();
+                                    log.actorId = actorId;
+                                    log.resourceId = resourceId;
+                                    log.action = entry.action;
+                                    log.operation = "REVOKE";
+                                    log.performedBy = principal.actorId();
+                                    log.performedAt = now;
+                                    log.tenancyId = principal.tenancyId();
+                                    return log.persist();
+                                });
+                            }
+                            return chain;
+                        })
+                        .chain(() -> AclEntryEntity.delete("actorId = ?1 and resourceId = ?2", actorId, resourceId))
                         .replaceWithVoid()
         ));
     }
@@ -119,7 +138,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                 ResourceParentEntity rp = new ResourceParentEntity();
                                 rp.childResourceId = childResourceId;
                                 rp.parentResourceId = parentResourceId;
-                                rp.tenancyId = "";
+                                rp.tenancyId = principal.tenancyId();
                                 return rp.persist();
                             }
                             return Uni.createFrom().item(existing);

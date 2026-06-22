@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS acl_entry (
     resource_id VARCHAR(255) NOT NULL,
     action      VARCHAR(50)  NOT NULL,
     condition   TEXT,
-    granted_at  TIMESTAMP    NOT NULL,
-    expires_at  TIMESTAMP,
+    granted_at  TIMESTAMP WITH TIME ZONE    NOT NULL,
+    expires_at  TIMESTAMP WITH TIME ZONE,
     tenancy_id  VARCHAR(64)  NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uq_acl_entry UNIQUE (actor_id, resource_id, action)
@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS acl_audit_log (
     action        VARCHAR(50)   NOT NULL,
     operation     VARCHAR(20)   NOT NULL,
     performed_by  VARCHAR(255)  NOT NULL,
-    performed_at  TIMESTAMP     NOT NULL DEFAULT now(),
-    expires_at    TIMESTAMP,
+    performed_at  TIMESTAMP WITH TIME ZONE     NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMP WITH TIME ZONE,
     metadata      JSONB,
     tenancy_id    VARCHAR(64)   NOT NULL,
     PRIMARY KEY (id)

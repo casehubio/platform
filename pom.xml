@@ -66,22 +66,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-api</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-core</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-json-jackson</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
+<dependency>
                 <groupId>org.xerial</groupId>
                 <artifactId>sqlite-jdbc</artifactId>
                 <version>3.53.1.0</version>

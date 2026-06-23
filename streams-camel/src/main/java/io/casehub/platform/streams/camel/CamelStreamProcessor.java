@@ -120,10 +120,9 @@ public class CamelStreamProcessor {
                         byte[] body = exchange.getIn().getBody(byte[].class);
                         CloudEvent ce = buildCloudEvent(body, d);
                         cloudEventBus.fireAsync(ce)
-                            .whenComplete((e, t) -> {
-                                if (t != null) {
-                                    LOG.warnf(t, "CloudEvent observer failed for Camel route %s", uri);
-                                }
+                            .exceptionally(t -> {
+                                LOG.warnf(t, "CloudEvent observer failed for Camel route %s", uri);
+                                return null;
                             });
                     });
                 }

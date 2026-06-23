@@ -108,7 +108,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `BlockingToReactiveBridge` |
 | `testing/` | `casehub-platform-testing` | @Alternative @Priority(1) identity fixtures — no Quarkus runtime |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
-| `oidc/` | `casehub-platform-oidc` | @RequestScoped OIDC-backed CurrentPrincipal — reads actorId/groups from SecurityIdentity |
+| `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
 | `expression/` | `casehub-platform-expression` | JQ expression evaluation (JQEvaluator) |
 | `persistence-jpa/` | `casehub-platform-persistence-jpa` | JPA-backed PreferenceProvider — scope-aware, hierarchy-resolved, current-only. Add as compile dep; consumers must add `classpath:db/platform/migration` to Flyway locations |
 | `persistence-mongodb/` | `casehub-platform-persistence-mongodb` | MongoDB-backed PreferenceProvider — @Alternative @Priority(1), beats JPA when co-deployed. No Flyway; startup bean creates scope index |
@@ -146,7 +146,7 @@ io.casehub.platform.api
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
-  .identity      — CurrentPrincipal, GroupMembershipProvider,
+  .identity      — CurrentPrincipal, GroupMembershipProvider, MissingTenancyException (thrown by tenancyId() when tenancy unresolvable),
                    ActorDIDProvider (SPI: didFor(actorId) → Optional<String>),
                    DIDResolver (SPI: resolve(did) → Optional<DIDDocument>),
                    AgentCredentialValidator (SPI: validate(actorId, did) → Optional<CredentialValidationResult>),

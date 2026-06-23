@@ -1,6 +1,7 @@
 package io.casehub.platform.oidc;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.MissingTenancyException;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.quarkus.arc.Arc;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -64,11 +65,13 @@ class OidcCurrentPrincipalTest {
     }
 
     @Test
-    void authenticated_tenancyId_absent_throws() {
+    void authenticated_tenancyId_absent_throws_MissingTenancyException() {
         when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(() -> "alice");
         doReturn(Optional.empty()).when(jwt).claim("tenancyId");
 
-        assertThrows(IllegalStateException.class, () -> principal.tenancyId());
+        var ex = assertThrows(MissingTenancyException.class, () -> principal.tenancyId());
+        assertEquals("alice", ex.actorId());
     }
 
     @Test

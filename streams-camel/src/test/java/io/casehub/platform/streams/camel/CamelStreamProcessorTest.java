@@ -50,6 +50,32 @@ class CamelStreamProcessorTest {
     }
 
     @Test
+    void buildCloudEvent_withContentType_setsDataContentType() {
+        EndpointDescriptor desc = new EndpointDescriptor(
+            Path.of("streams", "camel-data"),
+            TenancyConstants.DEFAULT_TENANT_ID,
+            EndpointType.WORKER,
+            EndpointProtocol.CAMEL,
+            Map.of(EndpointPropertyKeys.URL, "direct:test",
+                   EndpointPropertyKeys.STREAM_EVENT_TYPE, "io.casehub.camel.event",
+                   EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE, "application/json"),
+            null,
+            Set.of(EndpointCapability.RECEIVE));
+
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], desc);
+
+        assertThat(ce.getDataContentType()).isEqualTo("application/json");
+    }
+
+    @Test
+    void buildCloudEvent_withoutContentType_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0],
+            descriptor("direct:test", "io.casehub.camel.event"));
+
+        assertThat(ce.getDataContentType()).isNull();
+    }
+
+    @Test
     void buildCloudEvent_data_is_raw_bytes() {
         byte[] payload = "payload".getBytes();
         CloudEvent ce = processor.buildCloudEvent(payload, descriptor("direct:test", "io.casehub.camel.event"));

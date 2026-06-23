@@ -127,13 +127,21 @@ public class AmqpStreamProcessor {
             ? tenancyId
             : (descriptor != null ? descriptor.tenancyId() : TenancyConstants.DEFAULT_TENANT_ID);
 
-        return CloudEventBuilder.v1()
+        CloudEventBuilder builder = CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withType(type)
             .withSource(URI.create("/platform/streams/amqp/" + address))
             .withTime(OffsetDateTime.now())
             .withData(body)
-            .withExtension("tenancyid", effectiveTenancyId)
-            .build();
+            .withExtension("tenancyid", effectiveTenancyId);
+
+        final String contentType = descriptor != null
+            ? descriptor.properties().get(EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE)
+            : null;
+        if (contentType != null) {
+            builder = builder.withDataContentType(contentType);
+        }
+
+        return builder.build();
     }
 }

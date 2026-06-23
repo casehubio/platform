@@ -119,13 +119,20 @@ public class PollStreamProcessor {
             descriptor.properties().getOrDefault(EndpointPropertyKeys.URL, "unknown"),
             StandardCharsets.UTF_8);
 
-        return CloudEventBuilder.v1()
+        CloudEventBuilder builder = CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withType(type)
             .withSource(URI.create("/platform/streams/poll/" + urlEncoded))
             .withTime(OffsetDateTime.now())
             .withData(body)
-            .withExtension("tenancyid", descriptor.tenancyId())
-            .build();
+            .withExtension("tenancyid", descriptor.tenancyId());
+
+        final String contentType = descriptor.properties()
+            .get(EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE);
+        if (contentType != null) {
+            builder = builder.withDataContentType(contentType);
+        }
+
+        return builder.build();
     }
 }

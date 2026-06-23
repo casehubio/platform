@@ -74,6 +74,39 @@ class KafkaStreamProcessorTest {
     }
 
     @Test
+    void buildCloudEvent_withContentType_setsDataContentType() {
+        EndpointDescriptor desc = new EndpointDescriptor(
+            Path.of("streams", "iot-events"),
+            TenancyConstants.DEFAULT_TENANT_ID,
+            EndpointType.SYSTEM,
+            EndpointProtocol.KAFKA,
+            Map.of(EndpointPropertyKeys.TOPIC, "iot-temperature",
+                   EndpointPropertyKeys.STREAM_EVENT_TYPE, "io.casehub.iot.temperature",
+                   EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE, "application/avro"),
+            null,
+            Set.of(EndpointCapability.RECEIVE));
+
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], "iot-temperature", desc, null);
+
+        assertThat(ce.getDataContentType()).isEqualTo("application/avro");
+    }
+
+    @Test
+    void buildCloudEvent_withoutContentType_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], "iot-temperature",
+            descriptor("io.casehub.iot.temperature"), null);
+
+        assertThat(ce.getDataContentType()).isNull();
+    }
+
+    @Test
+    void buildCloudEvent_nullDescriptor_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], "unknown-topic", null, null);
+
+        assertThat(ce.getDataContentType()).isNull();
+    }
+
+    @Test
     void buildCloudEvent_unregistered_type_used_when_no_descriptor() {
         byte[] payload = new byte[0];
         CloudEvent ce = processor.buildCloudEvent(payload, "unknown-topic", null, null);

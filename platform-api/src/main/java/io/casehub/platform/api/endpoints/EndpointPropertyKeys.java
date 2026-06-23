@@ -63,5 +63,35 @@ public final class EndpointPropertyKeys {
      */
     public static final String STREAM_EVENT_TYPE = "stream-event-type";
 
+    /**
+     * Content type of the raw stream payload declared by the endpoint operator,
+     * e.g. {@code "application/json"}, {@code "application/avro"},
+     * {@code "application/octet-stream"}.
+     *
+     * <p>When present on an {@link EndpointDescriptor}, stream modules set
+     * {@link io.cloudevents.core.builder.CloudEventBuilder#withDataContentType(String)}
+     * to this value. When absent, {@code datacontenttype} is omitted from the CloudEvent —
+     * the format is undeclared and consumers must determine it themselves.
+     *
+     * <p>GE rule 7 states "set {@code application/json} when data is ObjectMapper-serialised."
+     * Stream processors do not serialise — they receive pre-serialised opaque bytes from
+     * external systems. The format is operator-declared, not derivable from serialisation.
+     * This key is the mechanism by which operators make that declaration explicit.
+     *
+     * <p><b>Scope:</b> applies to {@link EndpointProtocol#KAFKA},
+     * {@link EndpointProtocol#AMQP}, {@link EndpointProtocol#HTTP}
+     * ({@code streams-poll} only), and {@link EndpointProtocol#CAMEL}.
+     *
+     * <p><b>Not used by {@code streams-webhook}.</b> Webhook requests are structured
+     * CloudEvents; their {@code datacontenttype} is preserved from the incoming event.
+     *
+     * <p><b>Note on naming:</b> this is an {@link EndpointDescriptor#properties()} key,
+     * not a CloudEvent extension attribute name. CloudEvent extension names must be
+     * lowercase letters and digits only (no hyphens). This key is scoped to
+     * {@code EndpointDescriptor.properties()} exclusively and is never used as a
+     * CloudEvent extension attribute.
+     */
+    public static final String STREAM_DATA_CONTENT_TYPE = "stream-data-content-type";
+
     private EndpointPropertyKeys() {}
 }

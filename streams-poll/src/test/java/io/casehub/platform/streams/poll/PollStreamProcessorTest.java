@@ -53,7 +53,7 @@ class PollStreamProcessorTest {
     }
 
     @Test
-    void buildCloudEvent_type_from_descriptor() throws IOException {
+    void buildCloudEvent_type_from_descriptor() {
         byte[] body = "{\"temp\":22}".getBytes();
         EndpointDescriptor desc = descriptor("http://localhost/data", "io.casehub.sensor.temperature");
 
@@ -63,7 +63,7 @@ class PollStreamProcessorTest {
     }
 
     @Test
-    void buildCloudEvent_tenancyid_from_descriptor() throws IOException {
+    void buildCloudEvent_tenancyid_from_descriptor() {
         CloudEvent ce = processor.buildCloudEvent(new byte[0],
             descriptor("http://localhost/data", "io.casehub.sensor.temperature"));
 
@@ -71,11 +71,37 @@ class PollStreamProcessorTest {
     }
 
     @Test
-    void buildCloudEvent_source_is_poll_prefixed() throws IOException {
+    void buildCloudEvent_source_is_poll_prefixed() {
         CloudEvent ce = processor.buildCloudEvent(new byte[0],
             descriptor("http://example.com/api", "io.casehub.test"));
 
         assertThat(ce.getSource().toString()).startsWith("/platform/streams/poll/");
+    }
+
+    @Test
+    void buildCloudEvent_withContentType_setsDataContentType() {
+        EndpointDescriptor desc = new EndpointDescriptor(
+            Path.of("streams", "sensor-data"),
+            TenancyConstants.DEFAULT_TENANT_ID,
+            EndpointType.SYSTEM,
+            EndpointProtocol.HTTP,
+            Map.of(EndpointPropertyKeys.URL, "http://localhost/data",
+                   EndpointPropertyKeys.STREAM_EVENT_TYPE, "io.casehub.sensor.temperature",
+                   EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE, "application/json"),
+            null,
+            Set.of(EndpointCapability.QUERY));
+
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], desc);
+
+        assertThat(ce.getDataContentType()).isEqualTo("application/json");
+    }
+
+    @Test
+    void buildCloudEvent_withoutContentType_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0],
+            descriptor("http://localhost/data", "io.casehub.sensor.temperature"));
+
+        assertThat(ce.getDataContentType()).isNull();
     }
 
     @Test

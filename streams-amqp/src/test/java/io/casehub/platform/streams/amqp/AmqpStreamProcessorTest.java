@@ -57,6 +57,39 @@ class AmqpStreamProcessorTest {
     }
 
     @Test
+    void buildCloudEvent_withContentType_setsDataContentType() {
+        EndpointDescriptor desc = new EndpointDescriptor(
+            Path.of("streams", "amqp-events"),
+            TenancyConstants.DEFAULT_TENANT_ID,
+            EndpointType.SYSTEM,
+            EndpointProtocol.AMQP,
+            Map.of(EndpointPropertyKeys.TOPIC, "orders",
+                   EndpointPropertyKeys.STREAM_EVENT_TYPE, "io.casehub.orders.placed",
+                   EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE, "application/json"),
+            null,
+            Set.of(EndpointCapability.RECEIVE));
+
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], desc, null);
+
+        assertThat(ce.getDataContentType()).isEqualTo("application/json");
+    }
+
+    @Test
+    void buildCloudEvent_withoutContentType_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0],
+            descriptor("orders", "io.casehub.orders.placed"), null);
+
+        assertThat(ce.getDataContentType()).isNull();
+    }
+
+    @Test
+    void buildCloudEvent_nullDescriptor_omitsDataContentType() {
+        CloudEvent ce = processor.buildCloudEvent(new byte[0], null, null);
+
+        assertThat(ce.getDataContentType()).isNull();
+    }
+
+    @Test
     void buildCloudEvent_data_contains_raw_bytes() {
         byte[] payload = "test".getBytes(StandardCharsets.UTF_8);
         CloudEvent ce = processor.buildCloudEvent(payload, descriptor("orders", "io.casehub.orders.placed"), null);

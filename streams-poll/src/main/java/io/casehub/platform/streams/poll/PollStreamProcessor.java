@@ -101,8 +101,9 @@ public class PollStreamProcessor {
         byte[] body = fetchBytes(url);
         CloudEvent ce = buildCloudEvent(body, descriptor);
         cloudEventBus.fireAsync(ce)
-            .whenComplete((e, t) -> {
-                if (t != null) LOG.warnf(t, "CloudEvent observer failed for poll endpoint %s", url);
+            .exceptionally(t -> {
+                LOG.warnf(t, "CloudEvent observer failed for poll endpoint %s", url);
+                return null;
             });
     }
 

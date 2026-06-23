@@ -50,10 +50,13 @@ public interface CurrentPrincipal {
      * The tenant this principal belongs to.
      *
      * <p>Single-tenant deployments return {@link TenancyConstants#DEFAULT_TENANT_ID}.
-     * Real implementations read from the JWT {@code tenancyId} claim.
+     * Real implementations derive this from the authenticated security context.
      *
      * <p>This value must never be sourced from user-supplied input — always derived
      * from the authenticated security context.
+     *
+     * @throws MissingTenancyException if the principal is authenticated but tenancy
+     *         cannot be resolved from the security context
      */
     String tenancyId();
 

@@ -28,6 +28,17 @@ public interface IdentityConfig {
     @WithDefault("1048576")
     int webResolverMaxResponseBytes();
 
+    /**
+     * Maps actorId → file path of a W3C VC JWT credential.
+     * Quote keys with colons in application.properties:
+     * {@code casehub.identity.credentials."claude:reviewer@v1"=/etc/casehub/creds/reviewer.jwt}
+     */
+    Map<String, String> credentials();
+
+    /** Cache TTL for credential validation results in minutes (default 1440 = 24h). */
+    @WithDefault("1440")
+    int credentialCacheTtlMinutes();
+
     /** SCIM2-based agent DID resolution configuration. */
     ScimConfig scim();
 

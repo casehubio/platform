@@ -12,6 +12,10 @@ import java.util.Set;
 /**
  * Configurable test implementation of {@link CurrentPrincipal}.
  *
+ * <p>{@code @Alternative @Priority(200)} — test fixtures must beat all production
+ * {@code @Alternative} implementations ({@code OidcCurrentPrincipal @Priority(100)}).
+ * This bean is test-scope only; its priority has no effect in production.
+ *
  * <p>Defaults to {@code actorId="system"} with empty groups, matching
  * {@code MockCurrentPrincipal} defaults so switching providers has no surprises.
  *
@@ -23,7 +27,7 @@ import java.util.Set;
  */
 @ApplicationScoped
 @Alternative
-@Priority(1)
+@Priority(200)
 public class FixedCurrentPrincipal implements CurrentPrincipal {
 
     private String actorId = "system";

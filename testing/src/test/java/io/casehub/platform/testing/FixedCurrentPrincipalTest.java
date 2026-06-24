@@ -1,6 +1,8 @@
 package io.casehub.platform.testing;
 
 import io.casehub.platform.api.identity.TenancyConstants;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.inject.Alternative;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +17,15 @@ class FixedCurrentPrincipalTest {
     @BeforeEach
     void setUp() {
         principal = new FixedCurrentPrincipal();
+    }
+
+    @Test
+    void is_alternative_with_priority_above_production_alternatives() {
+        assertNotNull(FixedCurrentPrincipal.class.getAnnotation(Alternative.class));
+        Priority priority = FixedCurrentPrincipal.class.getAnnotation(Priority.class);
+        assertNotNull(priority, "must have @Priority");
+        assertTrue(priority.value() > 100,
+                "test fixture priority (" + priority.value() + ") must beat production @Alternative OidcCurrentPrincipal (100)");
     }
 
     @Test

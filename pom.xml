@@ -38,6 +38,7 @@
         <module>streams-poll</module>
         <module>streams-camel</module>
         <module>governance</module>
+        <module>credentials-quarkus</module>
     </modules>
 
     <properties>

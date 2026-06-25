@@ -182,6 +182,8 @@ io.casehub.platform.api
   .actor         — ActorStateContributor (SPI: contribute actor workload data to an ActorStateAccumulator),
                    ActorStateAccumulator (visitor passed to each contributor to accumulate active-cases,
                    open-WorkItems, and open-obligation slices of the actor state view)
+  .credentials   — CredentialResolver (SPI: resolve(credentialRef) → Map<String, String>),
+                   CredentialPropertyKeys (reserved keys: USER, PASSWORD, BEARER_TOKEN, API_KEY, EXPIRES_AT)
 ```
 
 `platform/` exposes `BlockingToReactiveBridge @DefaultBean` at `io.casehub.platform.memory`.

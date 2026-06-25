@@ -2,6 +2,7 @@ package io.casehub.platform.mock;
 
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
+import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
@@ -29,6 +30,7 @@ class MockBeansTest {
     @Inject PreferenceProvider preferenceProvider;
     @Inject AccessControlProvider accessControl;
     @Inject EndpointRegistry endpointRegistry;
+    @Inject CredentialResolver credentialResolver;
 
     @Test
     void currentPrincipal_defaults_to_system() {
@@ -154,5 +156,10 @@ class MockBeansTest {
         // PathParserConfigurator sets / as default at startup
         Path p = Path.parse("acme/backend/pr-review");
         assertEquals(List.of("acme", "backend", "pr-review"), p.segments());
+    }
+
+    @Test
+    void credentialResolver_defaultBean_returns_empty_for_unconfigured_ref() {
+        assertTrue(credentialResolver.resolve("unconfigured-ref").isEmpty());
     }
 }

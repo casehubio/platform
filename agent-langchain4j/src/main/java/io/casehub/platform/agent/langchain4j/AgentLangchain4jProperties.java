@@ -5,8 +5,11 @@ import io.smallrye.config.WithDefault;
 import java.time.Duration;
 
 @ConfigMapping(prefix = "casehub.platform.agent.langchain4j")
-public interface ClaudeAgentLangchain4jProperties {
+public interface AgentLangchain4jProperties {
 
     @WithDefault("PT30S")
     Duration closeTimeout();
+
+    @WithDefault("20")
+    int sessionMemoryWindowSize();
 }

@@ -17,7 +17,7 @@
 
 Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI + AgentSession multi-turn), `agent-claude/` (Claude subprocess + ClaudeAgentSession), `agent-claude-langchain4j/` (LangChain4j ChatModel/StreamingChatModel bridge backed by AgentSession), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
+Module structure: `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks + reactive bridges), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI + AgentSession multi-turn), `agent-claude/` (Claude subprocess + ClaudeAgentSession), `agent-langchain4j/` (bidirectional LangChain4j interop), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
 
 ### Artifact Schema
 
@@ -143,7 +143,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
-| L8: Agent Infrastructure | `agent-api/`, `agent-claude/`, `agent-claude-langchain4j/` | AgentProvider SPI + Claude subprocess execution + LangChain4j ChatModel/StreamingChatModel bridge |
+| L8: Agent Infrastructure | `agent-api/`, `agent-claude/`, `agent-langchain4j/` | AgentProvider SPI + Claude subprocess execution + bidirectional LangChain4j interop |
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
 | L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
 | L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
@@ -204,7 +204,7 @@ C4Container
   Container_Boundary(l8, "L8: Agent Infrastructure") {
     Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentSession multi-turn + AgentEvent types")
     Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + ClaudeAgentSession (IDLE/ACTIVE/CLOSED)")
-    Container(agentLangchain4j, "casehub-platform-agent-claude-langchain4j", "LangChain4j", "@Alternative @Priority(10) ClaudeAgentChatModel (stateless) + AgentSessionChatModel (caller-owned session)")
+    Container(agentLangchain4j, "casehub-platform-agent-langchain4j", "LangChain4j", "Bidirectional: ChatModelAgentProvider (@Alternative @Priority(1)) + AgentProviderChatModel (@DefaultBean @Priority(10))")
   }
   Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
     Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
@@ -317,7 +317,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-identity` | `compile` | Configure `casehub.identity.*` |
 | `casehub-platform-agent-api` | `compile` | SPI only — no-op default active |
 | `casehub-platform-agent-claude` | `compile` | Requires Claude CLI on PATH |
-| `casehub-platform-agent-claude-langchain4j` | `compile` | `@Alternative @Priority(10)` — activates `ClaudeAgentChatModel`; requires `agent-claude` on classpath. Not compatible with `engine.Agent` (forces `ResponseFormatType.JSON`) |
+| `casehub-platform-agent-langchain4j` | `compile` | Bidirectional: `ChatModelAgentProvider` (@Alternative @Priority(1)) wraps any ChatModel as AgentProvider; `AgentProviderChatModel` (@DefaultBean @Priority(10)) wraps any AgentProvider as ChatModel. Not compatible with `engine.Agent` (forces `ResponseFormatType.JSON`) |
 | `casehub-platform-endpoints-memory` | `test` (isolation) or `compile` (ephemeral installs) | Volatile — data lost on restart. `@Alternative @Priority(100)` beats JPA and NoSQL adapters. Do NOT combine with a JPA endpoints backend in same scope |
 | `casehub-platform-endpoints-config` | `compile` | YAML-backed startup populator; requires a registry backend (e.g. `endpoints-memory`) to be meaningful |
 | `casehub-platform-acl-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(1)` volatile ACL store. Do NOT combine with `acl-jpa` in same scope |
@@ -876,7 +876,7 @@ Workers can reference external systems by name rather than hard-coding connectio
 **Blog:** `blog/2026-06-16-mdp01-multi-turn-arrives.md`, `blog/2026-06-17-mdp01-langchain4j-session-bridge.md`
 
 **What this delivers**
-Callers can open a persistent session with a Claude subprocess and issue multiple sequential turns without re-establishing the process. `AgentProvider.openSession(AgentSessionInit)` returns an `AgentSession` that holds a semaphore slot until closed — callers must use try-with-resources. Serial model: one active turn at a time; `interrupt()` sends a best-effort signal mid-turn. `ClaudeAgentSession` implements a three-state machine (IDLE → ACTIVE → CLOSED) with per-turn timeout enforced by `AgentTimeoutException`. `NoOpAgentSession` ships in `platform/` as the `@DefaultBean` fallback. The `agent-claude-langchain4j/` module bridges the multi-turn API to LangChain4j: `ClaudeAgentChatModel` (`@Alternative @Priority(10)`) creates a fresh session per `chat()` call (stateless, system prompt cached at the Anthropic layer); `AgentSessionChatModel` is a plain wrapper for caller-managed sessions. `SystemMessage` is explicitly rejected in `AgentSessionChatModel` — not silently ignored (#102). Session `close()` on the Mutiny callback thread blocks for drain on the calling thread; callers must not close from within the response `Multi` pipeline (#101).
+Callers can open a persistent session with a Claude subprocess and issue multiple sequential turns without re-establishing the process. `AgentProvider.openSession(AgentSessionInit)` returns an `AgentSession` that holds a semaphore slot until closed — callers must use try-with-resources. Serial model: one active turn at a time; `interrupt()` sends a best-effort signal mid-turn. `ClaudeAgentSession` implements a three-state machine (IDLE → ACTIVE → CLOSED) with per-turn timeout enforced by `AgentTimeoutException`. `NoOpAgentSession` ships in `platform/` as the `@DefaultBean` fallback. The `agent-langchain4j/` module provides bidirectional LangChain4j interop: `ChatModelAgentProvider` wraps any ChatModel as AgentProvider (`@Alternative @Priority(1)`); `AgentProviderChatModel` wraps any AgentProvider as ChatModel (`@DefaultBean @Priority(10)`); `AgentSessionChatModel` is a plain wrapper for caller-managed sessions. `SystemMessage` is explicitly rejected in `AgentSessionChatModel` — not silently ignored (#102). Session `close()` on the Mutiny callback thread blocks for drain on the calling thread; callers must not close from within the response `Multi` pipeline (#101).
 
 **Accountability gaps closed**
 - Multi-turn conversational agent sessions — persistent subprocess context across queries → L8 (`AgentSession` SPI, `ClaudeAgentSession`, `NoOpAgentSession`)
@@ -886,7 +886,7 @@ Callers can open a persistent session with a Claude subprocess and issue multipl
 **Layer Impact**
 | Layer | Delta |
 |---|---|
-| L8: Agent Infrastructure | High — `AgentSession`, `AgentSessionInit`, `AgentSessionLimitException`, `AgentTimeoutException` in `agent-api/`; `ClaudeAgentSession` + `ClaudeAgentClient.openSession()` in `agent-claude/`; `NoOpAgentSession` in `platform/`; `agent-claude-langchain4j/` new module |
+| L8: Agent Infrastructure | High — `AgentSession`, `AgentSessionInit`, `AgentSessionLimitException`, `AgentTimeoutException` in `agent-api/`; `ClaudeAgentSession` + `ClaudeAgentClient.openSession()` in `agent-claude/`; `NoOpAgentSession` in `platform/`; `agent-langchain4j/` new module |
 
 ---
 
@@ -1447,7 +1447,7 @@ Threshold-triggered pagination — no `totalResults` on the resource; treat `cou
 #### What it adds
 
 **Before:** No agent execution capability — no SPI, no subprocess management, no event stream.
-**After:** `agent-api/` defines `AgentProvider`; `agent-claude/` implements it with Claude CLI subprocess; `NoOpAgentProvider @DefaultBean` in `platform/` logs WARN on every call. `agent-claude-langchain4j/` bridges LangChain4j's `ChatModel`/`StreamingChatModel` interfaces to `AgentSession` — `ClaudeAgentChatModel` (stateless, fresh session per call, `@Alternative @Priority(10)`) and `AgentSessionChatModel` (plain wrapper, caller owns session lifecycle). Not compatible with `engine.Agent` which forces `ResponseFormatType.JSON`.
+**After:** `agent-api/` defines `AgentProvider`; `agent-claude/` implements it with Claude CLI subprocess; `NoOpAgentProvider @DefaultBean` in `platform/` logs WARN on every call. `agent-langchain4j/` provides bidirectional LangChain4j interop: `ChatModelAgentProvider` wraps any ChatModel as AgentProvider (`@Alternative @Priority(1)`); `AgentProviderChatModel` wraps any AgentProvider as ChatModel (`@DefaultBean @Priority(10)`); `AgentSessionChatModel` is a plain wrapper for caller-managed sessions. Not compatible with `engine.Agent` which forces `ResponseFormatType.JSON`.
 
 What this layer adds:
 - **`AgentProvider` SPI** — `execute(prompt, AgentSessionConfig)` returns `Multi<AgentEvent>`; `AgentSessionConfig` carries `maxConcurrentSessions` and `timeoutDuration`; sealed `AgentMcpServer` hierarchy (Stdio/Sse/Http)
@@ -1470,8 +1470,9 @@ C19 delivered #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/
 - `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProvider.java` — `@ApplicationScoped`; delegates to `ClaudeAgentClient`
 - `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProperties.java` — config mapping for CLI path, default session config
 - `platform/src/main/java/io/casehub/platform/agent/NoOpAgentSession.java` — `@DefaultBean`; `query()` emits empty stream; `close()` is no-op
-- `agent-claude-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/ClaudeAgentChatModel.java` — `@Alternative @Priority(10) @ApplicationScoped`; fresh session per `chat()` call; `listeners()` injects CDI `ChatModelListener` beans
-- `agent-claude-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModel.java` — plain wrapper; caller supplies and owns the `AgentSession`; no CDI scope
+- `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/ChatModelAgentProvider.java` — `@Alternative @Priority(1) @ApplicationScoped`; wraps any ChatModel as AgentProvider; converts LangChain4j messages to agent prompt
+- `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModel.java` — `@DefaultBean @Priority(10)`; wraps any AgentProvider as ChatModel/StreamingChatModel
+- `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModel.java` — plain wrapper; caller supplies and owns the `AgentSession`; no CDI scope
 
 #### Key wiring
 

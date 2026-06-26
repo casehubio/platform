@@ -4,7 +4,6 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.ModelProvider;
 import dev.langchain4j.model.chat.Capability;
 import dev.langchain4j.model.chat.ChatModel;
@@ -13,7 +12,6 @@ import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.request.DefaultChatRequestParameters;
-import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
@@ -39,7 +37,7 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
 
     @Override
     public ModelProvider provider() {
-        return ModelProvider.ANTHROPIC;
+        return ModelProvider.OTHER;
     }
 
     @Override
@@ -62,8 +60,8 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
 
     @Override
     public ChatResponse doChat(ChatRequest request) {
-        validateNoJsonFormat(request);
         String userMessage = extractLastUserText(request.messages());
+        userMessage = AgentProviderChatModel.prependSchema(request, userMessage);
         // session.query() throws IllegalStateException synchronously for CLOSED/ACTIVE state.
         // The filter is always true today (sealed interface, only TextDelta) — retained as
         // a forward-compatibility guard if AgentEvent is extended.
@@ -80,8 +78,8 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
 
     @Override
     public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
-        validateNoJsonFormat(request);  // throws synchronously
-        String userMessage = extractLastUserText(request.messages());  // throws synchronously
+        String userMessage = extractLastUserText(request.messages());
+        userMessage = AgentProviderChatModel.prependSchema(request, userMessage);
         // session.query() throws synchronously if CLOSED or ACTIVE.
         StringBuilder buffer = new StringBuilder();
         session.query(userMessage)
@@ -134,15 +132,6 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
             throw new IllegalArgumentException(
                 "This adapter supports text-only UserMessage; " +
                 "multimodal content is not supported by the subprocess.", e);
-        }
-    }
-
-    private static void validateNoJsonFormat(ChatRequest request) {
-        var fmt = request.responseFormat();
-        if (fmt != null && fmt.type() == ResponseFormatType.JSON) {
-            throw new UnsupportedFeatureException(
-                "ResponseFormat.JSON is not supported — Claude subprocess has no JSON mode; " +
-                "use prompt engineering for structured output.");
         }
     }
 }

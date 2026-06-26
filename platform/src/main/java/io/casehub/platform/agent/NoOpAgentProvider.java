@@ -22,14 +22,16 @@ public class NoOpAgentProvider implements AgentProvider {
     @Override
     public Multi<AgentEvent> invoke(final AgentSessionConfig config) {
         LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
-                 "to the classpath to get real Claude output");
+                 "(native Claude) or casehub-platform-agent-langchain4j " +
+                 "(any LangChain4j model) to the classpath");
         return Multi.createFrom().empty();
     }
 
     @Override
     public AgentSession openSession(final AgentSessionInit init) {
         LOG.warn("NoOpAgentProvider is active — add casehub-platform-agent-claude " +
-                 "to the classpath to get real Claude output");
+                 "(native Claude) or casehub-platform-agent-langchain4j " +
+                 "(any LangChain4j model) to the classpath");
         return new NoOpAgentSession();
     }
 }

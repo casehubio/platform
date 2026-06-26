@@ -29,7 +29,7 @@
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>
-        <module>agent-claude-langchain4j</module>
+        <module>agent-langchain4j</module>
         <module>acl-inmem</module>
         <module>acl-jpa</module>
         <module>streams-kafka</module>
@@ -86,6 +86,11 @@
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-core</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
         </dependencies>

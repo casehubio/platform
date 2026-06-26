@@ -10,13 +10,12 @@
         <version>0.2-SNAPSHOT</version>
     </parent>
 
-    <artifactId>casehub-platform-agent-claude-langchain4j</artifactId>
+    <artifactId>casehub-platform-agent-langchain4j</artifactId>
     <packaging>jar</packaging>
-    <name>CaseHub Platform Agent Claude LangChain4j</name>
-    <description>ChatModel + StreamingChatModel adapters backed by AgentSession.
-        ClaudeAgentChatModel: @Alternative @Priority(10) @ApplicationScoped, fresh session per call.
-        AgentSessionChatModel: plain wrapper around a caller-supplied AgentSession.
-        No quarkus:build goal — library module.</description>
+    <name>CaseHub Platform Agent LangChain4j</name>
+    <description>Bidirectional LangChain4j interop: ChatModelAgentProvider wraps any ChatModel as
+        AgentProvider; AgentProviderChatModel wraps any AgentProvider as ChatModel.
+        Replaces agent-claude-langchain4j. No quarkus:build goal — library module.</description>
 
     <dependencies>
         <dependency>
@@ -27,6 +26,10 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -68,7 +71,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- generate-code and generate-code-tests only — no build goal (library module) -->
             <plugin>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>

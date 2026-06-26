@@ -3,11 +3,12 @@ package io.casehub.platform.agent.langchain4j;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.ModelProvider;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -81,10 +83,10 @@ class AgentSessionChatModelTest {
     }
 
     @Test
-    void provider_returnsANTHROPIC() {
+    void provider_returnsOTHER() {
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
             fakeSession(__ -> Multi.createFrom().empty()));
-        assertThat(model.provider()).isEqualTo(ModelProvider.ANTHROPIC);
+        assertThat(model.provider()).isEqualTo(ModelProvider.OTHER);
     }
 
     @Test
@@ -172,15 +174,29 @@ class AgentSessionChatModelTest {
     // ── Validation ─────────────────────────────────────────────────────────────
 
     @Test
-    void doChat_jsonFormat_throwsUnsupportedFeature() {
+    void doChat_jsonFormat_prependsSchemaToUserMessage() {
+        List<String> receivedPrompts = new ArrayList<>();
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
-            fakeSession(__ -> Multi.createFrom().empty()));
+            fakeSession(p -> { receivedPrompts.add(p); return textDeltas("{}"); }));
         ChatRequest request = ChatRequest.builder()
             .messages(List.of(UserMessage.from("hi")))
-            .responseFormat(ResponseFormat.builder().type(ResponseFormatType.JSON).build())
+            .responseFormat(ResponseFormat.builder()
+                .type(ResponseFormatType.JSON)
+                .jsonSchema(JsonSchema.builder()
+                    .name("TestSchema")
+                    .rootElement(JsonObjectSchema.builder()
+                        .addStringProperty("field", "a field")
+                        .required("field")
+                        .build())
+                    .build())
+                .build())
             .build();
-        assertThatThrownBy(() -> model.doChat(request))
-            .isInstanceOf(UnsupportedFeatureException.class);
+        model.doChat(request);
+        assertThat(receivedPrompts).hasSize(1);
+        String prompt = receivedPrompts.get(0);
+        assertThat(prompt).startsWith("Respond with JSON matching schema \"TestSchema\":");
+        assertThat(prompt).contains("\"field\": string (required)");
+        assertThat(prompt).endsWith("\n\nhi");
     }
 
     @Test
@@ -352,20 +368,35 @@ class AgentSessionChatModelTest {
     }
 
     @Test
-    void doChat_streaming_jsonFormat_throwsSynchronously() {
+    void doChat_streaming_jsonFormat_prependsSchemaToUserMessage() {
+        List<String> receivedPrompts = new ArrayList<>();
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
-            fakeSession(__ -> Multi.createFrom().empty()));
+            fakeSession(p -> { receivedPrompts.add(p); return textDeltas("{}"); }));
         ChatRequest request = ChatRequest.builder()
             .messages(List.of(UserMessage.from("hi")))
-            .responseFormat(ResponseFormat.builder().type(ResponseFormatType.JSON).build())
+            .responseFormat(ResponseFormat.builder()
+                .type(ResponseFormatType.JSON)
+                .jsonSchema(JsonSchema.builder()
+                    .name("TestSchema")
+                    .rootElement(JsonObjectSchema.builder()
+                        .addStringProperty("field", "a field")
+                        .required("field")
+                        .build())
+                    .build())
+                .build())
             .build();
-        assertThatThrownBy(() ->
-            model.doChat(request, new StreamingChatResponseHandler() {
-                @Override public void onPartialResponse(String t) {}
-                @Override public void onCompleteResponse(ChatResponse r) {}
-                @Override public void onError(Throwable t) {}
-            })
-        ).isInstanceOf(UnsupportedFeatureException.class);
+        AtomicBoolean done = new AtomicBoolean(false);
+        model.doChat(request, new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) {}
+            @Override public void onCompleteResponse(ChatResponse r) { done.set(true); }
+            @Override public void onError(Throwable t) {}
+        });
+        await().until(done::get);
+        assertThat(receivedPrompts).hasSize(1);
+        String prompt = receivedPrompts.get(0);
+        assertThat(prompt).startsWith("Respond with JSON matching schema \"TestSchema\":");
+        assertThat(prompt).contains("\"field\": string (required)");
+        assertThat(prompt).endsWith("\n\nhi");
     }
 
     @Test

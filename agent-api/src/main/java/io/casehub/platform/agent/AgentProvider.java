@@ -3,7 +3,14 @@ package io.casehub.platform.agent;
 import io.smallrye.mutiny.Multi;
 
 /**
- * Platform SPI for single-shot AI agent invocation.
+ * Platform SPI for AI agent invocation.
+ *
+ * <p>This is the platform's own abstraction for AI agent interaction — not tied to
+ * any single LLM backend or SDK. Implementations may use native SDKs (Claude Agent SDK,
+ * Anthropic API, Google Gemini, etc.) or bridge through LangChain4j. The SPI exists
+ * because LangChain4j's abstractions sometimes impose overhead — particularly around
+ * caching and token cost — that native SDK access avoids. LangChain4j is one adapter
+ * path, not the ceiling.
  *
  * <p>Implementations should be {@code @ApplicationScoped} — agent infrastructure
  * is shared across requests.
@@ -24,7 +31,7 @@ public interface AgentProvider {
      * <p>The returned {@code Multi} is cold — the agent session starts on subscription.
      *
      * @param config invocation configuration — systemPrompt and userPrompt are required
-     * @return a cold {@code Multi} that streams {@link AgentEvent.TextDelta} items
+     * @return a cold {@code Multi} that streams {@link AgentEvent} items
      * @throws AgentTimeoutException via onFailure() if the wall-clock timeout is exceeded
      * @throws AgentProcessException via onFailure() if the subprocess errors
      * @throws AgentSessionLimitException via onFailure() if the concurrent session cap is reached

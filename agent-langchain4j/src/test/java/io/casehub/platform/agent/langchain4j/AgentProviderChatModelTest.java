@@ -1,5 +1,6 @@
 package io.casehub.platform.agent.langchain4j;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -14,6 +15,9 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.CompleteToolCall;
+import dev.langchain4j.model.chat.response.PartialThinking;
+import dev.langchain4j.model.chat.response.PartialToolCall;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
 import io.casehub.platform.agent.AgentEvent;
@@ -382,5 +386,96 @@ class AgentProviderChatModelTest {
         verify(listener).onRequest(any(ChatModelRequestContext.class));
         verify(listener).onResponse(any(ChatModelResponseContext.class));
         verifyNoMoreInteractions(listener);
+    }
+
+    @Test
+    void doChat_streaming_forwardsThinkingDelta() {
+        AgentProviderChatModel m = model(fakeProvider(
+            Multi.createFrom().items(
+                new AgentEvent.ThinkingDelta("step 1"),
+                new AgentEvent.TextDelta("answer")
+            )));
+        List<String> thinkings = new ArrayList<>();
+        ChatResponse[] completed = {null};
+
+        m.chat(single("q"), new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) {}
+            @Override public void onPartialThinking(PartialThinking t) { thinkings.add(t.text()); }
+            @Override public void onCompleteResponse(ChatResponse r) { completed[0] = r; }
+            @Override public void onError(Throwable t) { throw new RuntimeException(t); }
+        });
+
+        await().untilAsserted(() -> assertThat(completed[0]).isNotNull());
+        assertThat(thinkings).containsExactly("step 1");
+    }
+
+    @Test
+    void doChat_streaming_forwardsToolCallDelta() {
+        AgentProviderChatModel m = model(fakeProvider(
+            Multi.createFrom().items(
+                new AgentEvent.ToolCallDelta(0, "call_1", "search", "{\"q"),
+                new AgentEvent.TextDelta("done")
+            )));
+        List<PartialToolCall> partials = new ArrayList<>();
+        ChatResponse[] completed = {null};
+
+        m.chat(single("q"), new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) {}
+            @Override public void onPartialToolCall(PartialToolCall p) { partials.add(p); }
+            @Override public void onCompleteResponse(ChatResponse r) { completed[0] = r; }
+            @Override public void onError(Throwable t) { throw new RuntimeException(t); }
+        });
+
+        await().untilAsserted(() -> assertThat(completed[0]).isNotNull());
+        assertThat(partials).hasSize(1);
+        assertThat(partials.get(0).index()).isZero();
+        assertThat(partials.get(0).id()).isEqualTo("call_1");
+        assertThat(partials.get(0).name()).isEqualTo("search");
+        assertThat(partials.get(0).partialArguments()).isEqualTo("{\"q");
+    }
+
+    @Test
+    void doChat_streaming_forwardsToolCallComplete() {
+        AgentProviderChatModel m = model(fakeProvider(
+            Multi.createFrom().items(
+                new AgentEvent.ToolCallComplete(0, "call_1", "search", "{\"query\":\"test\"}"),
+                new AgentEvent.TextDelta("done")
+            )));
+        List<CompleteToolCall> completes = new ArrayList<>();
+        ChatResponse[] completed = {null};
+
+        m.chat(single("q"), new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) {}
+            @Override public void onCompleteToolCall(CompleteToolCall c) { completes.add(c); }
+            @Override public void onCompleteResponse(ChatResponse r) { completed[0] = r; }
+            @Override public void onError(Throwable t) { throw new RuntimeException(t); }
+        });
+
+        await().untilAsserted(() -> assertThat(completed[0]).isNotNull());
+        assertThat(completes).hasSize(1);
+        assertThat(completes.get(0).index()).isZero();
+        assertThat(completes.get(0).toolExecutionRequest().id()).isEqualTo("call_1");
+        assertThat(completes.get(0).toolExecutionRequest().name()).isEqualTo("search");
+        assertThat(completes.get(0).toolExecutionRequest().arguments()).isEqualTo("{\"query\":\"test\"}");
+    }
+
+    @Test
+    void doChat_streaming_toolResultSilentlyIgnored() {
+        AgentProviderChatModel m = model(fakeProvider(
+            Multi.createFrom().items(
+                new AgentEvent.ToolResult("call_1", "output", false),
+                new AgentEvent.TextDelta("text")
+            )));
+        List<String> partials = new ArrayList<>();
+        ChatResponse[] completed = {null};
+
+        m.chat(single("q"), new StreamingChatResponseHandler() {
+            @Override public void onPartialResponse(String t) { partials.add(t); }
+            @Override public void onCompleteResponse(ChatResponse r) { completed[0] = r; }
+            @Override public void onError(Throwable t) { throw new RuntimeException(t); }
+        });
+
+        await().untilAsserted(() -> assertThat(completed[0]).isNotNull());
+        assertThat(partials).containsExactly("text");
     }
 }

@@ -60,6 +60,6 @@ The adapter throws `IllegalArgumentException` on `AiMessage` with a message expl
 - `AgentSession` — serial multi-turn: `query()`, `interrupt()`, `close()`
 - `AgentSessionConfig` — single-shot config: systemPrompt, userPrompt, mcpServers, timeout, correlationId
 - `AgentSessionInit` — session-open config: systemPrompt, mcpServers, timeout, correlationId
-- `AgentEvent` — sealed: `TextDelta` only (tool calls are opaque)
+- `AgentEvent` — sealed: `TextDelta`, `ThinkingDelta`, `ToolCallDelta`, `ToolCallComplete`, `ToolResult`
 - `AgentMcpServer` — sealed: `Stdio`, `Sse`, `Http`
 - Exceptions: `AgentTimeoutException`, `AgentProcessException`, `AgentSessionLimitException`

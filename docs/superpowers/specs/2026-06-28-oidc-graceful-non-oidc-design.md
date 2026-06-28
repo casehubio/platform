@@ -57,9 +57,19 @@ available via the attribute.
 
 ## Changes
 
-### OidcCurrentPrincipal.java
+### SecurityIdentityCurrentPrincipal.java (renamed from OidcCurrentPrincipal)
 
 **Remove:** `@Inject JsonWebToken jwt` field
+
+JWT claims are read via `getClaim(String)` which returns raw `Object` (or `null`),
+then type-checked with `instanceof` pattern matching — matching the attribute path
+exactly. This avoids `jwt.claim()` which returns `Optional<T>` with an unchecked
+generic cast that would produce `ClassCastException` on wrong-type claims instead
+of the diagnostic `IllegalStateException` we provide.
+
+Blank/empty tenancyId values (from either JWT claims or attributes) are treated as
+missing and fall through to the next resolution tier, consistent with the SPI
+contract tested by `CurrentPrincipalSpiTest.tenancyId_returns_non_blank_string()`.
 
 **`tenancyId()`:**
 ```java
@@ -67,16 +77,22 @@ public String tenancyId() {
     if (identity.isAnonymous()) return TenancyConstants.DEFAULT_TENANT_ID;
 
     if (identity.getPrincipal() instanceof JsonWebToken jwt) {
-        Optional<String> claim = jwt.claim("tenancyId");
-        if (claim.isPresent()) return claim.get();
+        final Object raw = jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID);
+        if (raw instanceof String s && !s.isBlank()) return s;
+        if (raw != null && !(raw instanceof String)) throw new IllegalStateException(
+            "JWT claim '" + SecurityIdentityAttributes.TENANCY_ID
+                + "' must be String, got: " + raw.getClass().getName());
     }
 
-    Object attr = identity.getAttribute("tenancyId");
-    if (attr instanceof String s) return s;
-    if (attr != null) throw new IllegalStateException(
-        "SecurityIdentity attribute 'tenancyId' must be String, got: " + attr.getClass().getName());
+    final Object attr = identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID);
+    if (attr instanceof String s && !s.isBlank()) return s;
+    if (attr != null && !(attr instanceof String)) throw new IllegalStateException(
+        "SecurityIdentity attribute '" + SecurityIdentityAttributes.TENANCY_ID
+            + "' must be String, got: " + attr.getClass().getName());
 
-    throw new MissingTenancyException(identity.getPrincipal().getName());
+    throw new MissingTenancyException(identity.getPrincipal().getName(),
+        "Checked JWT claims and SecurityIdentity attribute '"
+            + SecurityIdentityAttributes.TENANCY_ID + "'");
 }
 ```
 
@@ -86,14 +102,18 @@ public boolean isCrossTenantAdmin() {
     if (identity.isAnonymous()) return false;
 
     if (identity.getPrincipal() instanceof JsonWebToken jwt) {
-        Optional<Boolean> claim = jwt.claim("crossTenantAdmin");
-        if (claim.isPresent()) return claim.get();
+        final Object raw = jwt.getClaim(SecurityIdentityAttributes.CROSS_TENANT_ADMIN);
+        if (raw instanceof Boolean b) return b;
+        if (raw != null) throw new IllegalStateException(
+            "JWT claim '" + SecurityIdentityAttributes.CROSS_TENANT_ADMIN
+                + "' must be Boolean, got: " + raw.getClass().getName());
     }
 
-    Object attr = identity.getAttribute("crossTenantAdmin");
+    final Object attr = identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN);
     if (attr instanceof Boolean b) return b;
     if (attr != null) throw new IllegalStateException(
-        "SecurityIdentity attribute 'crossTenantAdmin' must be Boolean, got: " + attr.getClass().getName());
+        "SecurityIdentity attribute '" + SecurityIdentityAttributes.CROSS_TENANT_ADMIN
+            + "' must be Boolean, got: " + attr.getClass().getName());
 
     return false;
 }
@@ -106,7 +126,7 @@ public boolean isCrossTenantAdmin() {
 and the attribute key convention (attribute names match CurrentPrincipal method names:
 `tenancyId`, `crossTenantAdmin`).
 
-### OidcCurrentPrincipalTest.java
+### SecurityIdentityCurrentPrincipalTest.java (renamed from OidcCurrentPrincipalTest)
 
 Replace `@InjectMock JsonWebToken jwt` with mock principal setup on `SecurityIdentity`.
 
@@ -132,8 +152,8 @@ Test scenarios:
 - `CurrentPrincipal` interface (platform-api) — SPI unchanged
 - `MockCurrentPrincipal` (platform/) — config-driven, no SecurityIdentity
 - `FixedCurrentPrincipal` (testing/) — test fixture, no SecurityIdentity
-- `MissingTenancyException` — semantics unchanged
-- Module name / class name — `oidc/OidcCurrentPrincipal` remains accurate
+- `MissingTenancyException` — semantics unchanged (two-arg constructor added)
+- Module name — `casehub-platform-oidc` remains (module rename deferred)
 
 ## Attribute key convention
 
@@ -145,8 +165,8 @@ Non-OIDC `HttpAuthenticationMechanism` implementations stamp these attributes on
 | `tenancyId` | String | Yes | Tenant identifier. Matches `CurrentPrincipal.tenancyId()` |
 | `crossTenantAdmin` | Boolean | No | Defaults to false. Matches `CurrentPrincipal.isCrossTenantAdmin()` |
 
-Convention: attribute key names match `CurrentPrincipal` method names. No constants class
-needed — the convention is self-documenting.
+Convention: attribute key names match `CurrentPrincipal` method names. Constants
+defined in `SecurityIdentityAttributes` (platform-api) for compile-time safety.
 
 ### Principal naming convention
 
@@ -156,16 +176,24 @@ mechanisms, this returns whatever name was passed to `QuarkusPrincipal(name)` or
 custom `Principal` implementation.
 
 The principal name feeds directly into `ActorTypeResolver.resolve()`, which classifies
-the actor type. Non-OIDC mechanisms must set the principal name to match these patterns:
+the actor type. All 7 resolution rules (in priority order):
 
-| Intent | Principal name | ActorTypeResolver result |
-|--------|---------------|-------------------------|
-| System service | `"system"` or `"system:<qualifier>"` | SYSTEM |
-| Agent persona | `"<name>:<persona>@<version>"` | AGENT |
-| Human user | any other string | HUMAN |
+| # | Principal name | ActorTypeResolver result | Notes |
+|---|---------------|-------------------------|-------|
+| 1 | `null` or blank | SYSTEM | See pitfall below |
+| 2 | `"system"` or `"system:<qualifier>"` | SYSTEM | e.g. `"system:scheduler"` |
+| 3 | `"agent:<name>"` prefix | AGENT | e.g. `"agent:bridgebot"` |
+| 4 | `"<word>:<word>@<version>"` | AGENT | Versioned persona, e.g. `"claude:analyst@v1"` |
+| 5 | `"user"` (bare A2A role) | HUMAN | |
+| 6 | `"agent"` (bare A2A role) | AGENT | Not the same as rule 3 (no colon) |
+| 7 | Everything else | HUMAN | Fallback |
 
-**Pitfall:** email addresses (e.g., `"system@internal.corp.com"`) resolve to HUMAN,
-not SYSTEM. Use `"system"` or `"system:scheduler"` for system-level service accounts.
+**Pitfall:** `QuarkusPrincipal(null)` causes `actorId()` to return `null`, which
+resolves to SYSTEM (rule 1). Principal names must be non-null.
+
+**Pitfall:** email addresses (e.g., `"system@internal.corp.com"`) resolve to HUMAN
+(rule 7), not SYSTEM. Use `"system"` or `"system:scheduler"` for system-level
+service accounts.
 
 ## Deferred items (GitHub issues to create)
 

@@ -9,6 +9,11 @@ public class MissingTenancyException extends RuntimeException {
         this.actorId = actorId;
     }
 
+    public MissingTenancyException(String actorId, String detail) {
+        super("No tenancy identifier for authenticated principal: " + actorId + ". " + detail);
+        this.actorId = actorId;
+    }
+
     public String actorId() {
         return actorId;
     }

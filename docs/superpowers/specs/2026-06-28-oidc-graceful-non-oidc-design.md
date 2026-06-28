@@ -22,8 +22,11 @@ this: `@Inject JsonWebToken` returns `NullJsonWebToken` for non-OIDC auth, while
 ### Approach: Principal instanceof + JWT-first with attribute fallback
 
 Remove the `@Inject JsonWebToken jwt` field. Use `identity.getPrincipal() instanceof JsonWebToken`
-to detect OIDC flows — this is the same pattern Quarkus uses internally in
-`OidcJsonWebTokenProducer` (line 61).
+to detect JWT-bearing principals. This is deliberately broader than Quarkus's internal
+`instanceof OidcJwtCallerPrincipal` check in `OidcJsonWebTokenProducer` — our check reads
+claims from any `JsonWebToken` principal, including SmallRye JWT direct authentication
+(`DefaultJWTCallerPrincipal`), not just OIDC-issued tokens. Narrowing to
+`OidcJwtCallerPrincipal` would exclude valid JWT auth paths.
 
 Resolution order for `tenancyId()` and `isCrossTenantAdmin()`:
 
@@ -68,8 +71,10 @@ public String tenancyId() {
         if (claim.isPresent()) return claim.get();
     }
 
-    String attr = identity.getAttribute("tenancyId");
-    if (attr != null) return attr;
+    Object attr = identity.getAttribute("tenancyId");
+    if (attr instanceof String s) return s;
+    if (attr != null) throw new IllegalStateException(
+        "SecurityIdentity attribute 'tenancyId' must be String, got: " + attr.getClass().getName());
 
     throw new MissingTenancyException(identity.getPrincipal().getName());
 }
@@ -85,8 +90,12 @@ public boolean isCrossTenantAdmin() {
         if (claim.isPresent()) return claim.get();
     }
 
-    Boolean attr = identity.getAttribute("crossTenantAdmin");
-    return attr != null && attr;
+    Object attr = identity.getAttribute("crossTenantAdmin");
+    if (attr instanceof Boolean b) return b;
+    if (attr != null) throw new IllegalStateException(
+        "SecurityIdentity attribute 'crossTenantAdmin' must be Boolean, got: " + attr.getClass().getName());
+
+    return false;
 }
 ```
 
@@ -109,8 +118,12 @@ Test scenarios:
 | OIDC, crossTenantAdmin absent | mock JsonWebToken | empty | — | false |
 | OIDC, tenancyId absent, throws | mock JsonWebToken | empty | null | MissingTenancyException |
 | OIDC, claim absent, attribute present (augmentor) | mock JsonWebToken | empty | present | read from attribute |
+| OIDC, both claim and attribute present (tenancyId) | mock JsonWebToken | `"tenant-jwt"` | `"tenant-attr"` | `"tenant-jwt"` (claim wins) |
+| OIDC, both claim and attribute present (crossTenantAdmin) | mock JsonWebToken | `true` | `false` | `true` (claim wins) |
 | Non-OIDC, attribute present | plain Principal | — | present | read from attribute |
 | Non-OIDC, no attribute, throws | plain Principal | — | null | MissingTenancyException |
+| Non-OIDC, tenancyId wrong type | plain Principal | — | Integer `42` | IllegalStateException |
+| Non-OIDC, crossTenantAdmin wrong type | plain Principal | — | String `"true"` | IllegalStateException |
 | Anonymous | — | — | — | sentinels |
 | System actorId via OIDC | mock JsonWebToken | present | — | isSystem() true |
 
@@ -134,6 +147,25 @@ Non-OIDC `HttpAuthenticationMechanism` implementations stamp these attributes on
 
 Convention: attribute key names match `CurrentPrincipal` method names. No constants class
 needed — the convention is self-documenting.
+
+### Principal naming convention
+
+`actorId()` delegates to `identity.getPrincipal().getName()`. For OIDC, this returns
+the JWT `upn` or `preferred_username` claim (per MicroProfile JWT spec). For non-OIDC
+mechanisms, this returns whatever name was passed to `QuarkusPrincipal(name)` or the
+custom `Principal` implementation.
+
+The principal name feeds directly into `ActorTypeResolver.resolve()`, which classifies
+the actor type. Non-OIDC mechanisms must set the principal name to match these patterns:
+
+| Intent | Principal name | ActorTypeResolver result |
+|--------|---------------|-------------------------|
+| System service | `"system"` or `"system:<qualifier>"` | SYSTEM |
+| Agent persona | `"<name>:<persona>@<version>"` | AGENT |
+| Human user | any other string | HUMAN |
+
+**Pitfall:** email addresses (e.g., `"system@internal.corp.com"`) resolve to HUMAN,
+not SYSTEM. Use `"system"` or `"system:scheduler"` for system-level service accounts.
 
 ## Deferred items (GitHub issues to create)
 

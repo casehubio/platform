@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="casehub-engine-codegen" />
+        <module name="casehub-platform-governance" />
+        <module name="casehub-engine-api" />
+        <module name="casehub-platform-credentials-quarkus" />
+        <module name="casehub-platform-memory-graphiti" />
+        <module name="casehub-platform" />
+        <module name="casehub-platform-agent-api" />
+        <module name="casehub-platform-scim" />
+        <module name="casehub-engine-work-adapter" />
+        <module name="casehub-platform-endpoints-config" />
+        <module name="casehub-platform-acl-inmem" />
+        <module name="casehub-engine-persistence-hibernate" />
+        <module name="casehub-platform-endpoints-memory" />
+        <module name="casehub-engine-common" />
+        <module name="casehub-platform-api" />
+        <module name="casehub-platform-memory-mem0" />
+        <module name="casehub-engine-flow" />
+        <module name="casehub-engine" />
+        <module name="casehub-engine-testing" />
+        <module name="casehub-platform-agent-langchain4j" />
+        <module name="casehub-platform-streams-poll" />
+        <module name="casehub-platform-streams-amqp" />
+        <module name="casehub-platform-identity" />
+        <module name="casehub-platform-persistence-jpa" />
+        <module name="casehub-platform-config" />
+        <module name="casehub-platform-memory-inmem" />
+        <module name="casehub-engine-persistence-memory" />
+        <module name="casehub-platform-oidc" />
+        <module name="casehub-platform-streams-webhook" />
+        <module name="casehub-platform-agent-claude" />
+        <module name="casehub-platform-streams-kafka" />
+        <module name="casehub-engine-resilience" />
+        <module name="casehub-platform-streams-camel" />
+        <module name="casehub-engine-inbound" />
+        <module name="casehub-engine-ledger" />
+        <module name="casehub-platform-persistence-mongodb" />
+        <module name="casehub-platform-memory-sqlite" />
+        <module name="casehub-engine-actor-state" />
+        <module name="casehub-platform-memory-jpa" />
+        <module name="casehub-platform-acl-jpa" />
+        <module name="casehub-engine-scheduler-quartz" />
+        <module name="casehub-platform-testing" />
+        <module name="casehub-engine-blackboard" />
+        <module name="casehub-engine-schema" />
+        <module name="casehub-platform-expression" />
+        <module name="casehub-engine-ai" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="casehub-platform-agent-claude-langchain4j" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="casehub-engine" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-actor-state" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-ai" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-api" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-blackboard" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-codegen" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-common" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-flow" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-inbound" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-ledger" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-parent" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-persistence-hibernate" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-persistence-memory" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-resilience" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-scheduler-quartz" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-schema" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-testing" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-engine-work-adapter" options="-parameters -Xlint:unchecked" />
+      <module name="casehub-platform" options="-parameters" />
+      <module name="casehub-platform-acl-inmem" options="-parameters" />
+      <module name="casehub-platform-acl-jpa" options="-parameters" />
+      <module name="casehub-platform-agent-api" options="-parameters" />
+      <module name="casehub-platform-agent-claude" options="-parameters" />
+      <module name="casehub-platform-agent-claude-langchain4j" options="-parameters" />
+      <module name="casehub-platform-agent-langchain4j" options="-parameters" />
+      <module name="casehub-platform-api" options="-parameters" />
+      <module name="casehub-platform-config" options="-parameters" />
+      <module name="casehub-platform-credentials-quarkus" options="-parameters" />
+      <module name="casehub-platform-endpoints-config" options="-parameters" />
+      <module name="casehub-platform-endpoints-memory" options="-parameters" />
+      <module name="casehub-platform-expression" options="-parameters" />
+      <module name="casehub-platform-governance" options="-parameters" />
+      <module name="casehub-platform-identity" options="-parameters" />
+      <module name="casehub-platform-memory-graphiti" options="-parameters" />
+      <module name="casehub-platform-memory-inmem" options="-parameters" />
+      <module name="casehub-platform-memory-jpa" options="-parameters" />
+      <module name="casehub-platform-memory-mem0" options="-parameters" />
+      <module name="casehub-platform-memory-sqlite" options="-parameters" />
+      <module name="casehub-platform-oidc" options="-parameters" />
+      <module name="casehub-platform-parent" options="-parameters" />
+      <module name="casehub-platform-persistence-jpa" options="-parameters" />
+      <module name="casehub-platform-persistence-mongodb" options="-parameters" />
+      <module name="casehub-platform-scim" options="-parameters" />
+      <module name="casehub-platform-streams-amqp" options="-parameters" />
+      <module name="casehub-platform-streams-camel" options="-parameters" />
+      <module name="casehub-platform-streams-kafka" options="-parameters" />
+      <module name="casehub-platform-streams-poll" options="-parameters" />
+      <module name="casehub-platform-streams-webhook" options="-parameters" />
+      <module name="casehub-platform-testing" options="-parameters" />
+    </option>
+  </component>
+</project>

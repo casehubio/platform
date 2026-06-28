@@ -12,7 +12,7 @@ public class MissingTenancyExceptionMapper implements ExceptionMapper<MissingTen
     @Override
     public Response toResponse(MissingTenancyException exception) {
         String body = "{\"error\":\"missing_tenancy\","
-            + "\"message\":\"JWT does not contain a tenancyId claim\","
+            + "\"message\":\"No tenancy identifier found — checked JWT claims and SecurityIdentity attributes\","
             + "\"actorId\":\"" + exception.actorId().replace("\"", "\\\"") + "\"}";
         return Response.status(Response.Status.FORBIDDEN)
             .type(MediaType.APPLICATION_JSON_TYPE)

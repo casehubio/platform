@@ -38,7 +38,7 @@ class MissingTenancyExceptionMapperTest {
     void toResponse_bodyContainsMessage() {
         Response response = mapper.toResponse(new MissingTenancyException("alice"));
         JsonObject body = Json.createReader(new StringReader((String) response.getEntity())).readObject();
-        assertThat(body.getString("message")).isEqualTo("JWT does not contain a tenancyId claim");
+        assertThat(body.getString("message")).isEqualTo("No tenancy identifier found — checked JWT claims and SecurityIdentity attributes");
     }
 
     @Test

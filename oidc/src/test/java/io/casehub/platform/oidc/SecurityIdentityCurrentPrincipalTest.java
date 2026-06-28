@@ -1,7 +1,9 @@
 package io.casehub.platform.oidc;
 
+import io.casehub.platform.api.identity.ActorType;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.MissingTenancyException;
+import io.casehub.platform.api.identity.SecurityIdentityAttributes;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.quarkus.arc.Arc;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -14,14 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.security.Principal;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @QuarkusTest
-class OidcCurrentPrincipalTest {
+class SecurityIdentityCurrentPrincipalTest {
 
     @Inject CurrentPrincipal principal;
 
@@ -46,8 +47,8 @@ class OidcCurrentPrincipalTest {
         when(identity.getPrincipal()).thenReturn(jwt);
         when(jwt.getName()).thenReturn("alice");
         when(identity.getRoles()).thenReturn(Set.of("admin", "reviewer"));
-        doReturn(Optional.of("tenant-abc")).when(jwt).claim("tenancyId");
-        doReturn(Optional.of(true)).when(jwt).claim("crossTenantAdmin");
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-abc");
+        when(jwt.getClaim(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(true);
 
         assertEquals("alice", principal.actorId());
         assertEquals(Set.of("admin", "reviewer"), principal.groups());
@@ -62,9 +63,8 @@ class OidcCurrentPrincipalTest {
         final JsonWebToken jwt = mock(JsonWebToken.class);
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
-        doReturn(Optional.of("tenant-abc")).when(jwt).claim("tenancyId");
-        doReturn(Optional.empty()).when(jwt).claim("crossTenantAdmin");
-        when(identity.getAttribute("crossTenantAdmin")).thenReturn(null);
+        when(jwt.getClaim(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(null);
+        when(identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(null);
 
         assertFalse(principal.isCrossTenantAdmin());
     }
@@ -75,8 +75,8 @@ class OidcCurrentPrincipalTest {
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
         when(jwt.getName()).thenReturn("alice");
-        doReturn(Optional.empty()).when(jwt).claim("tenancyId");
-        when(identity.getAttribute("tenancyId")).thenReturn(null);
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(null);
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(null);
 
         final var ex = assertThrows(MissingTenancyException.class, () -> principal.tenancyId());
         assertEquals("alice", ex.actorId());
@@ -87,8 +87,8 @@ class OidcCurrentPrincipalTest {
         final JsonWebToken jwt = mock(JsonWebToken.class);
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
-        doReturn(Optional.empty()).when(jwt).claim("tenancyId");
-        when(identity.getAttribute("tenancyId")).thenReturn("tenant-from-augmentor");
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(null);
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-from-augmentor");
 
         assertEquals("tenant-from-augmentor", principal.tenancyId());
     }
@@ -98,8 +98,8 @@ class OidcCurrentPrincipalTest {
         final JsonWebToken jwt = mock(JsonWebToken.class);
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
-        doReturn(Optional.of("tenant-jwt")).when(jwt).claim("tenancyId");
-        when(identity.getAttribute("tenancyId")).thenReturn("tenant-attr");
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-jwt");
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-attr");
 
         assertEquals("tenant-jwt", principal.tenancyId());
     }
@@ -109,10 +109,53 @@ class OidcCurrentPrincipalTest {
         final JsonWebToken jwt = mock(JsonWebToken.class);
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
-        doReturn(Optional.of(true)).when(jwt).claim("crossTenantAdmin");
-        when(identity.getAttribute("crossTenantAdmin")).thenReturn(false);
+        when(jwt.getClaim(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(true);
+        when(identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(false);
 
         assertTrue(principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void oidc_tenancyId_claim_wrong_type_throws() {
+        final JsonWebToken jwt = mock(JsonWebToken.class);
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(jwt);
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(42);
+
+        assertThrows(IllegalStateException.class, () -> principal.tenancyId());
+    }
+
+    @Test
+    void oidc_crossTenantAdmin_claim_wrong_type_throws() {
+        final JsonWebToken jwt = mock(JsonWebToken.class);
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(jwt);
+        when(jwt.getClaim(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn("true");
+
+        assertThrows(IllegalStateException.class, () -> principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void oidc_tenancyId_blank_claim_falls_back_to_attribute() {
+        final JsonWebToken jwt = mock(JsonWebToken.class);
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(jwt);
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("  ");
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-from-attr");
+
+        assertEquals("tenant-from-attr", principal.tenancyId());
+    }
+
+    @Test
+    void oidc_tenancyId_empty_claim_no_attribute_throws() {
+        final JsonWebToken jwt = mock(JsonWebToken.class);
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(jwt);
+        when(jwt.getName()).thenReturn("alice");
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("");
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(null);
+
+        assertThrows(MissingTenancyException.class, () -> principal.tenancyId());
     }
 
     // --- Non-OIDC path: principal is plain Principal ---
@@ -122,7 +165,7 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "bridge-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("tenancyId")).thenReturn("tenant-xyz");
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-xyz");
 
         assertEquals("tenant-xyz", principal.tenancyId());
     }
@@ -132,7 +175,7 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "bridge-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("crossTenantAdmin")).thenReturn(true);
+        when(identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(true);
 
         assertTrue(principal.isCrossTenantAdmin());
     }
@@ -142,7 +185,7 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "unknown-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("tenancyId")).thenReturn(null);
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(null);
 
         final var ex = assertThrows(MissingTenancyException.class, () -> principal.tenancyId());
         assertEquals("unknown-service", ex.actorId());
@@ -153,7 +196,7 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "bridge-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("crossTenantAdmin")).thenReturn(null);
+        when(identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn(null);
 
         assertFalse(principal.isCrossTenantAdmin());
     }
@@ -163,7 +206,7 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "bridge-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("tenancyId")).thenReturn(42);
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn(42);
 
         assertThrows(IllegalStateException.class, () -> principal.tenancyId());
     }
@@ -173,9 +216,48 @@ class OidcCurrentPrincipalTest {
         final Principal p = () -> "bridge-service";
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(p);
-        when(identity.getAttribute("crossTenantAdmin")).thenReturn("true");
+        when(identity.getAttribute(SecurityIdentityAttributes.CROSS_TENANT_ADMIN)).thenReturn("true");
 
         assertThrows(IllegalStateException.class, () -> principal.isCrossTenantAdmin());
+    }
+
+    @Test
+    void non_oidc_tenancyId_blank_attribute_throws() {
+        final Principal p = () -> "bridge-service";
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(p);
+        when(identity.getAttribute(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("");
+
+        assertThrows(MissingTenancyException.class, () -> principal.tenancyId());
+    }
+
+    @Test
+    void non_oidc_actorId_from_principal_name() {
+        final Principal p = () -> "bridge-service";
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(p);
+
+        assertEquals("bridge-service", principal.actorId());
+    }
+
+    @Test
+    void non_oidc_groups_from_identity_roles() {
+        final Principal p = () -> "bridge-service";
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(p);
+        when(identity.getRoles()).thenReturn(Set.of("service", "internal"));
+
+        assertEquals(Set.of("service", "internal"), principal.groups());
+    }
+
+    @Test
+    void non_oidc_system_principal_resolves_correctly() {
+        final Principal p = () -> "system:scheduler";
+        when(identity.isAnonymous()).thenReturn(false);
+        when(identity.getPrincipal()).thenReturn(p);
+
+        assertTrue(principal.isSystem());
+        assertEquals(ActorType.SYSTEM, principal.actorType());
     }
 
     // --- Anonymous path ---
@@ -199,7 +281,7 @@ class OidcCurrentPrincipalTest {
         when(identity.isAnonymous()).thenReturn(false);
         when(identity.getPrincipal()).thenReturn(jwt);
         when(jwt.getName()).thenReturn("system");
-        doReturn(Optional.of("tenant-abc")).when(jwt).claim("tenancyId");
+        when(jwt.getClaim(SecurityIdentityAttributes.TENANCY_ID)).thenReturn("tenant-abc");
 
         assertTrue(principal.isSystem());
     }

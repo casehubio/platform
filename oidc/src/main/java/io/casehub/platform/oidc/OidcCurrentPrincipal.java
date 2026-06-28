@@ -10,10 +10,11 @@ import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * OIDC-backed {@link CurrentPrincipal}, {@code @RequestScoped}.
+ * SecurityIdentity-backed {@link CurrentPrincipal}, {@code @RequestScoped}.
  *
  * <p>{@code @Alternative @Priority(100)} — when this module is on the classpath,
  * this bean automatically displaces all non-alternative {@code CurrentPrincipal}
@@ -22,12 +23,31 @@ import java.util.Set;
  * {@code TenantScopedPrincipal @RequestScoped} (work). No {@code exclude-types}
  * configuration required.
  *
- * <p>Claim names are fixed platform contract: {@code tenancyId} (required String),
- * {@code crossTenantAdmin} (optional Boolean, defaults false).
+ * <h3>Resolution order for {@code tenancyId()} and {@code isCrossTenantAdmin()}</h3>
+ * <ol>
+ *   <li><b>Anonymous</b> — return sentinel ({@link TenancyConstants#DEFAULT_TENANT_ID} / false)</li>
+ *   <li><b>JWT claim</b> — if the principal is a {@link JsonWebToken}, read the claim.
+ *       Authoritative when present (cryptographically verified by the OIDC infrastructure).</li>
+ *   <li><b>SecurityIdentity attribute</b> — fallback for non-OIDC
+ *       {@code HttpAuthenticationMechanism} implementations or OIDC with
+ *       {@code SecurityIdentityAugmentor}-provided attributes.</li>
+ *   <li><b>Neither</b> — throw {@link MissingTenancyException} / return false</li>
+ * </ol>
  *
- * <p>When the identity is anonymous (unauthenticated request to a public endpoint),
- * returns sentinel values matching MockCurrentPrincipal defaults. The JWT is never
- * accessed in the anonymous path.
+ * <p>The {@code instanceof JsonWebToken} check on the principal is deliberately broader
+ * than Quarkus's internal {@code instanceof OidcJwtCallerPrincipal} — it reads claims
+ * from any JWT-bearing principal, including SmallRye JWT direct authentication
+ * ({@code DefaultJWTCallerPrincipal}), not just OIDC-issued tokens.
+ *
+ * <h3>Attribute convention for non-OIDC mechanisms</h3>
+ * <p>Non-OIDC {@code HttpAuthenticationMechanism} implementations stamp these attributes
+ * on the {@code SecurityIdentity} via {@code QuarkusSecurityIdentity.Builder.addAttribute()}:
+ * <ul>
+ *   <li>{@code "tenancyId"} (String, required) — tenant identifier</li>
+ *   <li>{@code "crossTenantAdmin"} (Boolean, optional) — defaults to false</li>
+ * </ul>
+ * Attribute key names match {@link CurrentPrincipal} method names by convention.
+ * Wrong-type attributes produce {@link IllegalStateException} with a diagnostic message.
  */
 @RequestScoped
 @Alternative
@@ -35,7 +55,6 @@ import java.util.Set;
 public class OidcCurrentPrincipal implements CurrentPrincipal {
 
     @Inject SecurityIdentity identity;
-    @Inject JsonWebToken jwt;
 
     @Override
     public String actorId() {
@@ -50,12 +69,34 @@ public class OidcCurrentPrincipal implements CurrentPrincipal {
     @Override
     public String tenancyId() {
         if (identity.isAnonymous()) return TenancyConstants.DEFAULT_TENANT_ID;
-        return jwt.<String>claim("tenancyId")
-            .orElseThrow(() -> new MissingTenancyException(identity.getPrincipal().getName()));
+
+        if (identity.getPrincipal() instanceof JsonWebToken jwt) {
+            final Optional<String> claim = jwt.claim("tenancyId");
+            if (claim.isPresent()) return claim.get();
+        }
+
+        final Object attr = identity.getAttribute("tenancyId");
+        if (attr instanceof String s) return s;
+        if (attr != null) throw new IllegalStateException(
+            "SecurityIdentity attribute 'tenancyId' must be String, got: " + attr.getClass().getName());
+
+        throw new MissingTenancyException(identity.getPrincipal().getName());
     }
 
     @Override
     public boolean isCrossTenantAdmin() {
-        return !identity.isAnonymous() && jwt.<Boolean>claim("crossTenantAdmin").orElse(false);
+        if (identity.isAnonymous()) return false;
+
+        if (identity.getPrincipal() instanceof JsonWebToken jwt) {
+            final Optional<Boolean> claim = jwt.claim("crossTenantAdmin");
+            if (claim.isPresent()) return claim.get();
+        }
+
+        final Object attr = identity.getAttribute("crossTenantAdmin");
+        if (attr instanceof Boolean b) return b;
+        if (attr != null) throw new IllegalStateException(
+            "SecurityIdentity attribute 'crossTenantAdmin' must be Boolean, got: " + attr.getClass().getName());
+
+        return false;
     }
 }

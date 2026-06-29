@@ -30,9 +30,23 @@ the `Message → List<AgentEvent>` mapping to a shared package-private utility c
 | `TextBlock.text()` | `TextDelta(text)` | Skip if empty |
 | `ThinkingBlock.thinking()` | `ThinkingDelta(thinking)` | Skip if null/empty |
 | `ToolUseBlock(id, name, input)` | `ToolCallComplete(index, id, name, jsonArgs)` | `input` Map serialized via static ObjectMapper |
-| `ToolResultBlock(toolUseId, content, isError)` | `ToolResult(toolUseId, contentStr, isError)` | String content direct; non-String via toString(); null → "" |
-| `ResultMessage` | — | Cost/usage metadata; no AgentEvent counterpart |
-| Other `Message` types | — | Silently skipped |
+| — | `ToolCallDelta` | Not emitted — Claude SDK delivers complete tool calls, not streaming fragments (#118) |
+| — | `ToolResult` | Not emitted — CLI manages tool execution internally; tool results not surfaced to SDK consumer |
+| `ResultMessage` | — | Cost/usage metadata; deferred (#123) |
+| Other `ContentBlock` subtypes | — | Silently skipped via `default` branch (debug-logged) |
+| Non-`AssistantMessage` types | — | Silently skipped (guard clause) |
+
+**ToolResult rationale:** `ToolResultBlock` appears in `UserMessage` content (per the
+Anthropic API model), not in `AssistantMessage.content()`. The mapper filters to
+`AssistantMessage` only — `ToolResultBlock` would be unreachable even if mapped. More
+fundamentally, the Claude Code CLI manages tool execution as an internal conversation
+loop; tool results are not surfaced to the SDK consumer's `messages()` stream. A future
+backend (e.g., raw Anthropic API with external tool dispatch) that exposes tool results
+would add this mapping.
+
+**ToolCallDelta rationale:** documented in #118 — "Backends that deliver complete tool
+calls (e.g. Claude SDK via `messages()`) emit only `ToolCallComplete`, never
+`ToolCallDelta`."
 
 ### Tool call indexing
 
@@ -46,6 +60,16 @@ sequential across all messages within a single invocation (single-shot) or turn
 SDK). `ToolCallComplete.arguments` expects a JSON `String`. A module-local static
 `ObjectMapper` (default config) round-trips the map back to JSON. No CDI injection
 needed — default config is correct by definition for values Jackson itself produced.
+A static `Logger` provides diagnostic visibility: WARN on serialization failure (should
+never fire, but makes the failure mode observable), DEBUG on unrecognized content block
+types (forward-compatibility with future SDK `ContentBlock` subtypes).
+
+### Non-sealed ContentBlock
+
+`ContentBlock` is a non-sealed interface (Jackson `@JsonSubTypes` polymorphism, not
+Java `sealed`). Per JEP 441 (Java 21), the pattern-matching switch requires a `default`
+branch for exhaustiveness. The `default` branch debug-logs the unrecognized type and
+skips it — forward-compatible with future SDK content block types.
 
 ## Changes
 
@@ -53,6 +77,7 @@ needed — default config is correct by definition for values Jackson itself pro
 
 ```java
 class MessageEventMapper {
+    private static final Logger LOG = Logger.getLogger(MessageEventMapper.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     static List<AgentEvent> toEvents(Message message, AtomicInteger toolIndex) {
@@ -73,13 +98,8 @@ class MessageEventMapper {
                     events.add(new AgentEvent.ToolCallComplete(
                         toolIndex.getAndIncrement(), tu.id(), tu.name(), args));
                 }
-                case ToolResultBlock tr -> {
-                    String content = tr.getContentAsString();
-                    if (content == null)
-                        content = tr.content() != null ? tr.content().toString() : "";
-                    events.add(new AgentEvent.ToolResult(
-                        tr.toolUseId(), content, Boolean.TRUE.equals(tr.isError())));
-                }
+                default -> LOG.debugf("Skipping unrecognized ContentBlock type: %s",
+                    block.getType());
             }
         }
         return events;
@@ -90,6 +110,8 @@ class MessageEventMapper {
         try {
             return MAPPER.writeValueAsString(input);
         } catch (Exception e) {
+            LOG.warnf("Failed to serialize tool input, defaulting to {}: %s",
+                e.getMessage());
             return "{}";
         }
     }
@@ -144,6 +166,32 @@ return Multi.createFrom()
 
 `toolIndex` is per-turn — indices reset between turns in multi-turn sessions.
 
+### Javadoc updates
+
+| Method | Current | Updated |
+|--------|---------|---------|
+| `ClaudeAgentClient.run()` | "Stream {@link AgentEvent.TextDelta} events until the agent completes or the wall-clock timeout fires." | "Stream {@link AgentEvent} events (text, thinking, tool calls) until the agent completes or the wall-clock timeout fires." |
+| `ClaudeAgentClient.buildEventStream()` | "bridges {@code Flux<String>} to {@code Multi<AgentEvent>}" | "bridges {@code Flux<Message>} to {@code Multi<AgentEvent>} via {@link MessageEventMapper}" |
+
+### ClaudeAgentClientIT update
+
+Update `invoke_returnsAtLeastOneTextDelta` assertion. The current
+`allSatisfy(isInstanceOf(TextDelta))` will fail when the CLI emits `ThinkingDelta` or
+`ToolCallComplete` events (which it may, depending on Claude's response). Change to:
+
+```java
+assertThat(events).isNotEmpty();
+assertThat(events).anyMatch(e -> e instanceof AgentEvent.TextDelta);
+
+String fullText = events.stream()
+        .filter(AgentEvent.TextDelta.class::isInstance)
+        .map(e -> ((AgentEvent.TextDelta) e).text())
+        .collect(Collectors.joining());
+assertThat(fullText.toLowerCase()).contains("hello");
+```
+
+The text content verification is unchanged — it filters for `TextDelta` events only.
+
 ### MessageEventMapperTest.java (new)
 
 Pure JUnit 5 unit tests — no CDI, no Quarkus. Tests `MessageEventMapper.toEvents()` directly.
@@ -154,12 +202,12 @@ Pure JUnit 5 unit tests — no CDI, no Quarkus. Tests `MessageEventMapper.toEven
 | Empty TextBlock skipped | `AssistantMessage([TextBlock("")])` | `[]` |
 | ThinkingBlock → ThinkingDelta | `AssistantMessage([ThinkingBlock("reasoning", null)])` | `[ThinkingDelta("reasoning")]` |
 | ToolUseBlock → ToolCallComplete | `AssistantMessage([ToolUseBlock("tu1", "Read", {path: "f.java"})])` | `[ToolCallComplete(0, "tu1", "Read", "{\"path\":\"f.java\"}")]` |
-| ToolResultBlock → ToolResult | `AssistantMessage([ToolResultBlock("tu1", "file content", false)])` | `[ToolResult("tu1", "file content", false)]` |
-| ToolResultBlock error flag | `AssistantMessage([ToolResultBlock("tu1", "not found", true)])` | `[ToolResult("tu1", "not found", true)]` |
-| ToolResultBlock null content | `AssistantMessage([ToolResultBlock("tu1", null, false)])` | `[ToolResult("tu1", "", false)]` |
 | Mixed blocks in one message | `AssistantMessage([ThinkingBlock, TextBlock, ToolUseBlock])` | `[ThinkingDelta, TextDelta, ToolCallComplete]` — order preserved |
 | Tool index increments across messages | Two messages each with ToolUseBlock | indices 0, 1 (shared counter) |
+| Unknown ContentBlock type skipped | `AssistantMessage([custom ContentBlock impl])` | `[]` |
 | ResultMessage skipped | `ResultMessage(...)` | `[]` |
+| UserMessage skipped | `UserMessage("hello")` | `[]` |
+| SystemMessage skipped | `SystemMessage("init", Map.of())` | `[]` |
 
 ### No changes to
 
@@ -169,3 +217,16 @@ Pure JUnit 5 unit tests — no CDI, no Quarkus. Tests `MessageEventMapper.toEven
 - `ClaudeAgentProvider` — delegates to `ClaudeAgentClient`, unaffected
 - Existing `ClaudeAgentClientTest` — tests semaphore/timeout/lifecycle via streamFactory, not event mapping
 - Existing `ClaudeAgentSessionTest` — tests state machine/close/interrupt, not event mapping
+
+## Backward compatibility
+
+All downstream consumers of `AgentEvent` filter for specific event types via `instanceof`
+or `.filter()`. New event types in the stream are silently ignored:
+
+| Consumer | Filter pattern | Safe? |
+|----------|---------------|-------|
+| `PipelineProvisioner.provisionAiReview()` | `.filter(AgentEvent.TextDelta.class::isInstance)` | Yes |
+| `OpenClawChatModel.doChat()` | `.filter(AgentEvent.TextDelta.class::isInstance)` | Yes |
+| `AgentProviderChatModel.doChat()` (blocking) | `.filter(e -> e instanceof AgentEvent.TextDelta)` | Yes |
+| `AgentSessionChatModel.doChat()` (blocking) | `.filter(e -> e instanceof AgentEvent.TextDelta)` | Yes |
+| `AgentSessionChatModel.doChat(req, handler)` (streaming) | `instanceof` cascade for all event types | Yes — already forwards ThinkingDelta, ToolCallDelta, ToolCallComplete (#118) |

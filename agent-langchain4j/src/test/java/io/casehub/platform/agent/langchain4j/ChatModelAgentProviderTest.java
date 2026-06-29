@@ -2,8 +2,17 @@ package io.casehub.platform.agent.langchain4j;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.ModelProvider;
+import dev.langchain4j.model.chat.Capability;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
+import dev.langchain4j.model.chat.request.DefaultChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.PartialThinking;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.output.FinishReason;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentMcpServer;
 import io.casehub.platform.agent.AgentSession;
@@ -170,6 +179,108 @@ class ChatModelAgentProviderTest {
 
         // Warning is logged, but we don't assert on log output (fragile)
         // The implementation is sufficient — this test verifies no exceptions thrown
+    }
+
+    @Test
+    void init_withStreamingChatModel_storesStreamingReference() {
+        ChatModel dualModel = dualModel((request, handler) -> {
+            handler.onCompleteResponse(ChatResponse.builder()
+                .aiMessage(AiMessage.from("")).finishReason(FinishReason.STOP).build());
+        });
+        injectFields(dualModel);
+
+        assertThat(provider.streamingChatModel).isSameAs(dualModel);
+    }
+
+    @Test
+    void init_withChatModelOnly_streamingIsNull() {
+        ChatModel chatModel = mock(ChatModel.class);
+        injectFields(chatModel);
+
+        assertThat(provider.streamingChatModel).isNull();
+    }
+
+    @Test
+    void invoke_withStreamingModel_emitsMultipleTextDeltas() {
+        ChatModel dualModel = dualModel((request, handler) -> {
+            handler.onPartialResponse("Hello");
+            handler.onPartialResponse(" World");
+            handler.onCompleteResponse(ChatResponse.builder()
+                .aiMessage(AiMessage.from("Hello World"))
+                .finishReason(FinishReason.STOP).build());
+        });
+
+        injectFields(dualModel);
+
+        AgentSessionConfig config = AgentSessionConfig.of("", "test prompt");
+        List<AgentEvent> events = provider.invoke(config)
+            .collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        assertThat(events).hasSize(2);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("Hello");
+        assertThat(((AgentEvent.TextDelta) events.get(1)).text()).isEqualTo(" World");
+    }
+
+    @Test
+    void invoke_withStreamingModel_emitsThinkingDelta() {
+        ChatModel dualModel = dualModel((request, handler) -> {
+            handler.onPartialThinking(new PartialThinking("thinking..."));
+            handler.onPartialResponse("answer");
+            handler.onCompleteResponse(ChatResponse.builder()
+                .aiMessage(AiMessage.from("answer"))
+                .finishReason(FinishReason.STOP).build());
+        });
+
+        injectFields(dualModel);
+
+        AgentSessionConfig config = AgentSessionConfig.of("", "test");
+        List<AgentEvent> events = provider.invoke(config)
+            .collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0)).isInstanceOf(AgentEvent.ThinkingDelta.class);
+        assertThat(events.get(1)).isInstanceOf(AgentEvent.TextDelta.class);
+    }
+
+    @Test
+    void invoke_withChatModelOnly_emitsSingleTextDelta() {
+        ChatModel chatModel = mock(ChatModel.class);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(
+            ChatResponse.builder().aiMessage(AiMessage.from("complete response")).build());
+
+        injectFields(chatModel);
+
+        AgentSessionConfig config = AgentSessionConfig.of("", "test");
+        List<AgentEvent> events = provider.invoke(config)
+            .collect().asList().await().indefinitely();
+
+        assertThat(events).hasSize(1);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("complete response");
+    }
+
+    @FunctionalInterface
+    interface StreamingDoChat {
+        void accept(ChatRequest request, StreamingChatResponseHandler handler);
+    }
+
+    private static ChatModel dualModel(StreamingDoChat streaming) {
+        return new DualModelImpl(streaming);
+    }
+
+    private static class DualModelImpl implements ChatModel, StreamingChatModel {
+        private final StreamingDoChat streaming;
+        DualModelImpl(StreamingDoChat streaming) { this.streaming = streaming; }
+
+        @Override public ChatResponse doChat(ChatRequest request) {
+            return ChatResponse.builder().aiMessage(AiMessage.from("")).build();
+        }
+        @Override public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
+            streaming.accept(request, handler);
+        }
+        @Override public ModelProvider provider() { return ModelProvider.OTHER; }
+        @Override public java.util.Set<Capability> supportedCapabilities() { return java.util.Set.of(); }
+        @Override public ChatRequestParameters defaultRequestParameters() { return DefaultChatRequestParameters.EMPTY; }
+        @Override public java.util.List<ChatModelListener> listeners() { return java.util.List.of(); }
     }
 
     // Helper methods

@@ -1,6 +1,5 @@
 package io.casehub.platform.agent.langchain4j;
 
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -19,9 +18,6 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.chat.response.CompleteToolCall;
-import dev.langchain4j.model.chat.response.PartialThinking;
-import dev.langchain4j.model.chat.response.PartialToolCall;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
 import io.casehub.platform.agent.AgentEvent;
@@ -107,33 +103,7 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
         String userMessage = extractUserText(request.messages());
         String userWithSchema = prependSchema(request, userMessage);
         AgentSessionConfig config = AgentSessionConfig.of(systemPrompt, userWithSchema);
-        StringBuilder buffer = new StringBuilder();
-        agentProvider.invoke(config)
-            .subscribe().with(
-                event -> {
-                    if (event instanceof AgentEvent.TextDelta delta) {
-                        handler.onPartialResponse(delta.text());
-                        buffer.append(delta.text());
-                    } else if (event instanceof AgentEvent.ThinkingDelta thinking) {
-                        handler.onPartialThinking(new PartialThinking(thinking.text()));
-                    } else if (event instanceof AgentEvent.ToolCallDelta d) {
-                        handler.onPartialToolCall(PartialToolCall.builder()
-                            .index(d.index()).id(d.id()).name(d.name())
-                            .partialArguments(d.partialArguments()).build());
-                    } else if (event instanceof AgentEvent.ToolCallComplete c) {
-                        handler.onCompleteToolCall(new CompleteToolCall(c.index(),
-                            ToolExecutionRequest.builder()
-                                .id(c.id()).name(c.name()).arguments(c.arguments())
-                                .build()));
-                    }
-                    // ToolResult — no StreamingChatResponseHandler callback; silently ignored
-                },
-                handler::onError,
-                () -> handler.onCompleteResponse(ChatResponse.builder()
-                    .aiMessage(AiMessage.from(buffer.toString()))
-                    .finishReason(FinishReason.STOP)
-                    .build())
-            );
+        AgentEventBridge.dispatch(agentProvider.invoke(config), handler);
     }
 
     private static String extractSystemPrompt(List<ChatMessage> messages) {

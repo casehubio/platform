@@ -3,6 +3,7 @@ package io.casehub.platform.agent.langchain4j;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import io.casehub.platform.agent.AgentEvent;
@@ -35,6 +36,7 @@ public class ChatModelAgentProvider implements AgentProvider {
     @Inject AgentLangchain4jProperties properties;
 
     ChatModel chatModel;
+    StreamingChatModel streamingChatModel;
     boolean disabled;
 
     protected ChatModelAgentProvider() {}
@@ -52,6 +54,7 @@ public class ChatModelAgentProvider implements AgentProvider {
             return;
         }
         chatModel = candidates.get(0);
+        streamingChatModel = (chatModel instanceof StreamingChatModel s) ? s : null;
     }
 
     @Override
@@ -67,17 +70,25 @@ public class ChatModelAgentProvider implements AgentProvider {
                       "do not support MCP. %d server(s) configured but unused.",
                       config.mcpServers().size());
         }
-        Multi<AgentEvent> result = Multi.createFrom().item(() -> {
-            ChatRequest request = ChatRequest.builder()
-                .messages(config.systemPrompt().isEmpty()
-                    ? List.of(UserMessage.from(config.userPrompt()))
-                    : List.of(SystemMessage.from(config.systemPrompt()),
-                              UserMessage.from(config.userPrompt())))
-                .build();
-            ChatResponse response = chatModel.chat(request);
-            String text = response.aiMessage().text();
-            return (AgentEvent) new AgentEvent.TextDelta(text != null ? text : "");
-        });
+
+        ChatRequest request = ChatRequest.builder()
+            .messages(config.systemPrompt().isEmpty()
+                ? List.of(UserMessage.from(config.userPrompt()))
+                : List.of(SystemMessage.from(config.systemPrompt()),
+                          UserMessage.from(config.userPrompt())))
+            .build();
+
+        Multi<AgentEvent> result;
+        if (streamingChatModel != null) {
+            result = AgentEventBridge.stream(streamingChatModel, request);
+        } else {
+            result = Multi.createFrom().item(() -> {
+                ChatResponse response = chatModel.chat(request);
+                String text = response.aiMessage().text();
+                return (AgentEvent) new AgentEvent.TextDelta(text != null ? text : "");
+            });
+        }
+
         if (config.timeout() != null) {
             result = result.ifNoItem().after(config.timeout()).failWith(
                 () -> new AgentTimeoutException(config.timeout()));
@@ -91,6 +102,6 @@ public class ChatModelAgentProvider implements AgentProvider {
             throw new IllegalStateException(
                 "ChatModelAgentProvider is inactive — no ChatModel bean available.");
         }
-        return new ChatModelAgentSession(chatModel, init, properties);
+        return new ChatModelAgentSession(chatModel, streamingChatModel, init, properties);
     }
 }

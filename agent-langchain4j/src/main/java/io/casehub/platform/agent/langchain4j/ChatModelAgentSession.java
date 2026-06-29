@@ -19,6 +19,7 @@ import io.smallrye.mutiny.Uni;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 class ChatModelAgentSession implements AgentSession {
@@ -30,13 +31,16 @@ class ChatModelAgentSession implements AgentSession {
     private final String systemPrompt;
     private final ChatMemory memory;
     private final AtomicReference<State> state = new AtomicReference<>(State.IDLE);
+    private final Semaphore semaphore;
 
     ChatModelAgentSession(ChatModel chatModel, StreamingChatModel streamingChatModel,
-                          AgentSessionInit init, AgentLangchain4jProperties properties) {
+                          AgentSessionInit init, AgentLangchain4jProperties properties,
+                          Semaphore semaphore) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
         this.systemPrompt = init.systemPrompt();
         this.memory = MessageWindowChatMemory.withMaxMessages(properties.sessionMemoryWindowSize());
+        this.semaphore = semaphore;
     }
 
     @Override
@@ -86,6 +90,9 @@ class ChatModelAgentSession implements AgentSession {
 
     @Override
     public void close(Duration maxWait) {
-        state.set(State.CLOSED);
+        State prev = state.getAndSet(State.CLOSED);
+        if (prev != State.CLOSED) {
+            semaphore.release();
+        }
     }
 }

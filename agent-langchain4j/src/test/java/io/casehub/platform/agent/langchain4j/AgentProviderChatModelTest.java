@@ -63,6 +63,7 @@ class AgentProviderChatModelTest {
         return new AgentLangchain4jProperties() {
             @Override public Duration closeTimeout() { return Duration.ofSeconds(5); }
             @Override public int sessionMemoryWindowSize() { return 20; }
+            @Override public int maxConcurrentSessions() { return 10; }
         };
     }
 

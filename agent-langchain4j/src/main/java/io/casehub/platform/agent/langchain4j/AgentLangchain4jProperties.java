@@ -12,4 +12,7 @@ public interface AgentLangchain4jProperties {
 
     @WithDefault("20")
     int sessionMemoryWindowSize();
+
+    @WithDefault("10")
+    int maxConcurrentSessions();
 }

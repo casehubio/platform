@@ -18,6 +18,7 @@ import io.casehub.platform.agent.AgentMcpServer;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
 import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.inject.Default;
@@ -27,6 +28,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +50,7 @@ class ChatModelAgentProviderTest {
         properties = mock(AgentLangchain4jProperties.class);
         when(properties.closeTimeout()).thenReturn(Duration.ofSeconds(30));
         when(properties.sessionMemoryWindowSize()).thenReturn(20);
+        when(properties.maxConcurrentSessions()).thenReturn(10);
         provider = new ChatModelAgentProvider();
     }
 
@@ -297,6 +302,220 @@ class ChatModelAgentProviderTest {
         provider.chatModels = instance;
         provider.properties = properties;
         provider.init();
+    }
+
+    @Test
+    void init_withZeroMaxConcurrentSessions_throws() {
+        when(properties.maxConcurrentSessions()).thenReturn(0);
+        ChatModel chatModel = mock(ChatModel.class);
+        Instance<ChatModel> instance = instanceOf(chatModel);
+        provider.chatModels = instance;
+        provider.properties = properties;
+
+        assertThatThrownBy(() -> provider.init())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-concurrent-sessions must be >= 1");
+    }
+
+    @Test
+    void init_withNegativeMaxConcurrentSessions_throws() {
+        when(properties.maxConcurrentSessions()).thenReturn(-1);
+        ChatModel chatModel = mock(ChatModel.class);
+        Instance<ChatModel> instance = instanceOf(chatModel);
+        provider.chatModels = instance;
+        provider.properties = properties;
+
+        assertThatThrownBy(() -> provider.init())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-concurrent-sessions must be >= 1");
+    }
+
+    @Test
+    void invoke_atCapacity_returnsAgentSessionLimitException() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(
+            ChatResponse.builder().aiMessage(AiMessage.from("response")).build());
+        injectFields(chatModel);
+
+        // Exhaust the single permit
+        semaphoreAcquire();
+
+        AgentSessionConfig config = AgentSessionConfig.of("", "test");
+        Multi<AgentEvent> result = provider.invoke(config);
+
+        assertThatThrownBy(() -> result.collect().asList().await().indefinitely())
+            .isInstanceOf(AgentSessionLimitException.class)
+            .hasMessageContaining("1 active sessions");
+
+        // Release the manually acquired permit
+        provider.semaphore.release();
+    }
+
+    @Test
+    void invoke_releasesPermitOnCompletion() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(
+            ChatResponse.builder().aiMessage(AiMessage.from("response")).build());
+        injectFields(chatModel);
+
+        assertThat(provider.availablePermits()).isEqualTo(1);
+
+        provider.invoke(AgentSessionConfig.of("", "test"))
+            .collect().asList().await().indefinitely();
+
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void invoke_releasesPermitOnFailure() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        when(chatModel.chat(any(ChatRequest.class)))
+            .thenThrow(new RuntimeException("model error"));
+        injectFields(chatModel);
+
+        assertThatThrownBy(() ->
+            provider.invoke(AgentSessionConfig.of("", "test"))
+                .collect().asList().await().indefinitely())
+            .hasMessageContaining("model error");
+
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void invoke_releasesPermitOnCancellation() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        CountDownLatch modelBlocked = new CountDownLatch(1);
+        CountDownLatch modelReached = new CountDownLatch(1);
+        ChatModel slowModel = mock(ChatModel.class);
+        when(slowModel.chat(any(ChatRequest.class))).thenAnswer(inv -> {
+            modelReached.countDown();
+            modelBlocked.await(5, TimeUnit.SECONDS);
+            return ChatResponse.builder().aiMessage(AiMessage.from("late")).build();
+        });
+        injectFields(slowModel);
+
+        var cancellable = provider.invoke(AgentSessionConfig.of("", "test"))
+            .subscribe().withSubscriber(io.smallrye.mutiny.helpers.test.AssertSubscriber.create(10));
+
+        // Wait for the model call to start, then cancel
+        try { modelReached.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        cancellable.cancel();
+        modelBlocked.countDown();
+
+        // Permit must be released after cancellation
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void invoke_syncExceptionReleasesPermit() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        injectFields(chatModel);
+
+        // Force NPE in try block: systemPrompt() returns null → .isEmpty() throws NPE
+        AgentSessionConfig config = mock(AgentSessionConfig.class);
+        when(config.systemPrompt()).thenReturn(null);
+
+        Multi<AgentEvent> result = provider.invoke(config);
+        assertThatThrownBy(() -> result.collect().asList().await().indefinitely())
+            .isInstanceOf(NullPointerException.class);
+
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void invoke_streaming_holdsPermitUntilStreamCompletes() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        CountDownLatch streamStarted = new CountDownLatch(1);
+        CountDownLatch completeStream = new CountDownLatch(1);
+        ChatModel dualModel = dualModel((request, handler) -> {
+            streamStarted.countDown();
+            handler.onPartialResponse("chunk");
+            try { completeStream.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            handler.onCompleteResponse(ChatResponse.builder()
+                .aiMessage(AiMessage.from("chunk")).finishReason(FinishReason.STOP).build());
+        });
+        injectFields(dualModel);
+
+        Thread streamThread = new Thread(() ->
+            provider.invoke(AgentSessionConfig.of("", "test"))
+                .collect().asList().await().atMost(Duration.ofSeconds(10)));
+        streamThread.start();
+
+        try { streamStarted.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+        // Permit held while stream is active
+        assertThat(provider.availablePermits()).isEqualTo(0);
+
+        // Second invoke fails while first stream is active
+        AgentSessionConfig config2 = AgentSessionConfig.of("", "test2");
+        assertThatThrownBy(() ->
+            provider.invoke(config2).collect().asList().await().indefinitely())
+            .isInstanceOf(AgentSessionLimitException.class);
+
+        completeStream.countDown();
+        try { streamThread.join(5000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+        // Permit released after stream completes
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    private void semaphoreAcquire() {
+        try {
+            provider.semaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void openSession_atCapacity_throwsAgentSessionLimitException() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        injectFields(chatModel);
+
+        semaphoreAcquire();
+
+        AgentSessionInit init = AgentSessionInit.of("system");
+
+        assertThatThrownBy(() -> provider.openSession(init))
+            .isInstanceOf(AgentSessionLimitException.class)
+            .hasMessageContaining("1 active sessions");
+
+        provider.semaphore.release();
+    }
+
+    @Test
+    void openSession_constructionFailure_releasesPermit() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        injectFields(chatModel);
+
+        assertThatThrownBy(() -> provider.openSession(null))
+            .isInstanceOf(NullPointerException.class);
+
+        assertThat(provider.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void openSession_close_releasesPermit() {
+        when(properties.maxConcurrentSessions()).thenReturn(1);
+        ChatModel chatModel = mock(ChatModel.class);
+        injectFields(chatModel);
+
+        AgentSession session = provider.openSession(AgentSessionInit.of("system"));
+        assertThat(provider.availablePermits()).isEqualTo(0);
+
+        session.close(Duration.ofSeconds(1));
+        assertThat(provider.availablePermits()).isEqualTo(1);
+
+        // Can open another session now
+        AgentSession session2 = provider.openSession(AgentSessionInit.of("system"));
+        session2.close(Duration.ofSeconds(1));
     }
 
     @SuppressWarnings("unchecked")

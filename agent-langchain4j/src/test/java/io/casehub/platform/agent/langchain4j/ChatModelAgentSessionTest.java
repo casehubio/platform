@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -46,13 +47,20 @@ class ChatModelAgentSessionTest {
         };
     }
 
+    /** Creates a semaphore with one acquired permit for tests that need to call close(). */
+    private static Semaphore acquiredSemaphore() throws InterruptedException {
+        Semaphore s = new Semaphore(1);
+        s.acquire();
+        return s;
+    }
+
     @Test
-    void query_happyPath_emitsTextDelta() {
+    void query_happyPath_emitsTextDelta() throws InterruptedException {
         ChatModel model = simpleChatModel("Hello from AI");
         AgentSessionInit init = AgentSessionInit.of("system prompt");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
 
         List<String> events = session.query("user prompt")
             .onItem().transform(event -> ((AgentEvent.TextDelta) event).text())
@@ -63,7 +71,7 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void query_multiTurn_includesHistory() {
+    void query_multiTurn_includesHistory() throws InterruptedException {
         AtomicInteger callCount = new AtomicInteger(0);
         ChatModel model = new ChatModel() {
             @Override
@@ -79,9 +87,9 @@ class ChatModelAgentSessionTest {
             }
         };
         AgentSessionInit init = AgentSessionInit.of("system prompt");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
 
         session.query("prompt 1").collect().asList().await().atMost(Duration.ofSeconds(5));
         List<String> secondResponse = session.query("prompt 2")
@@ -94,12 +102,12 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void query_onClosed_throws() {
+    void query_onClosed_throws() throws InterruptedException {
         ChatModel model = simpleChatModel("response");
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
         session.close(Duration.ofSeconds(1));
 
         assertThatThrownBy(() -> session.query("prompt").collect().asList().await().indefinitely())
@@ -124,9 +132,9 @@ class ChatModelAgentSessionTest {
             }
         };
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
 
         // Start first query in background
         Thread firstThread = new Thread(() ->
@@ -145,24 +153,24 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void interrupt_isNoOp() {
+    void interrupt_isNoOp() throws InterruptedException {
         ChatModel model = simpleChatModel("response");
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
 
         session.interrupt().await().atMost(Duration.ofSeconds(1));
         // Should not throw
     }
 
     @Test
-    void close_setsClosedState() {
+    void close_setsClosedState() throws InterruptedException {
         ChatModel model = simpleChatModel("response");
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
         session.close(Duration.ofSeconds(1));
 
         assertThatThrownBy(() -> session.query("prompt").collect().asList().await().indefinitely())
@@ -170,18 +178,18 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void close_idempotent() {
+    void close_idempotent() throws InterruptedException {
         ChatModel model = simpleChatModel("response");
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
-        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties);
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
         session.close(Duration.ofSeconds(1));
         session.close(Duration.ofSeconds(1)); // Should not throw
     }
 
     @Test
-    void query_streaming_emitsMultipleTextDeltas() {
+    void query_streaming_emitsMultipleTextDeltas() throws InterruptedException {
         StreamingChatModel model = streamingChatModel((request, handler) -> {
             handler.onPartialResponse("Hello");
             handler.onPartialResponse(" World");
@@ -190,10 +198,10 @@ class ChatModelAgentSessionTest {
                 .finishReason(FinishReason.STOP).build());
         });
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
         ChatModelAgentSession session = new ChatModelAgentSession(
-            null, model, init, properties);
+            null, model, init, properties, acquiredSemaphore());
 
         List<String> texts = session.query("prompt")
             .filter(e -> e instanceof AgentEvent.TextDelta)
@@ -204,7 +212,7 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void query_streaming_updatesMemoryOnCompletion() {
+    void query_streaming_updatesMemoryOnCompletion() throws InterruptedException {
         StreamingChatModel model = streamingChatModel((request, handler) -> {
             handler.onPartialResponse("Response 1");
             handler.onCompleteResponse(ChatResponse.builder()
@@ -212,11 +220,11 @@ class ChatModelAgentSessionTest {
                 .finishReason(FinishReason.STOP).build());
         });
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
         // First turn: streaming
         ChatModelAgentSession streamSession = new ChatModelAgentSession(
-            null, model, init, properties);
+            null, model, init, properties, acquiredSemaphore());
         streamSession.query("prompt 1").collect().asList()
             .await().atMost(Duration.ofSeconds(5));
 
@@ -226,16 +234,16 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void query_streaming_doesNotUpdateMemoryOnFailure() {
+    void query_streaming_doesNotUpdateMemoryOnFailure() throws InterruptedException {
         StreamingChatModel model = streamingChatModel((request, handler) -> {
             handler.onPartialResponse("partial");
             handler.onError(new RuntimeException("model error"));
         });
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
         ChatModelAgentSession session = new ChatModelAgentSession(
-            null, model, init, properties);
+            null, model, init, properties, acquiredSemaphore());
 
         assertThatThrownBy(() -> session.query("prompt")
             .collect().asList().await().atMost(Duration.ofSeconds(5)))
@@ -254,7 +262,7 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
-    void query_streaming_multiTurnPreservesHistory() {
+    void query_streaming_multiTurnPreservesHistory() throws InterruptedException {
         AtomicInteger turnCount = new AtomicInteger(0);
         StreamingChatModel model = streamingChatModel((request, handler) -> {
             int turn = turnCount.incrementAndGet();
@@ -268,10 +276,10 @@ class ChatModelAgentSessionTest {
                 .finishReason(FinishReason.STOP).build());
         });
         AgentSessionInit init = AgentSessionInit.of("system");
-        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20);
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
 
         ChatModelAgentSession session = new ChatModelAgentSession(
-            null, model, init, properties);
+            null, model, init, properties, acquiredSemaphore());
 
         session.query("turn 1").collect().asList().await().atMost(Duration.ofSeconds(5));
         session.query("turn 2").collect().asList().await().atMost(Duration.ofSeconds(5));
@@ -279,6 +287,73 @@ class ChatModelAgentSessionTest {
         assertThat(turnCount.get()).isEqualTo(2);
     }
 
-    private record TestProperties(Duration closeTimeout, int sessionMemoryWindowSize)
+    @Test
+    void close_releasesSemaphorePermit() throws InterruptedException {
+        Semaphore semaphore = new Semaphore(1);
+        semaphore.acquire();
+        ChatModel model = simpleChatModel("response");
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
+
+        ChatModelAgentSession session = new ChatModelAgentSession(
+            model, null, AgentSessionInit.of("system"), properties, semaphore);
+
+        assertThat(semaphore.availablePermits()).isEqualTo(0);
+        session.close(Duration.ofSeconds(1));
+        assertThat(semaphore.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void close_idempotent_noDoubleRelease() throws InterruptedException {
+        Semaphore semaphore = new Semaphore(1);
+        semaphore.acquire();
+        ChatModel model = simpleChatModel("response");
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
+
+        ChatModelAgentSession session = new ChatModelAgentSession(
+            model, null, AgentSessionInit.of("system"), properties, semaphore);
+
+        session.close(Duration.ofSeconds(1));
+        session.close(Duration.ofSeconds(1));
+        assertThat(semaphore.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void query_completion_doesNotReleasePermit() throws InterruptedException {
+        Semaphore semaphore = new Semaphore(1);
+        semaphore.acquire();
+        ChatModel model = simpleChatModel("response");
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
+
+        ChatModelAgentSession session = new ChatModelAgentSession(
+            model, null, AgentSessionInit.of("system"), properties, semaphore);
+
+        session.query("prompt").collect().asList().await().atMost(Duration.ofSeconds(5));
+        assertThat(semaphore.availablePermits()).isEqualTo(0);
+
+        session.close(Duration.ofSeconds(1));
+    }
+
+    @Test
+    void query_failure_doesNotReleasePermit() throws InterruptedException {
+        Semaphore semaphore = new Semaphore(1);
+        semaphore.acquire();
+        StreamingChatModel model = streamingChatModel((request, handler) -> {
+            handler.onError(new RuntimeException("model error"));
+        });
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
+
+        ChatModelAgentSession session = new ChatModelAgentSession(
+            null, model, AgentSessionInit.of("system"), properties, semaphore);
+
+        assertThatThrownBy(() -> session.query("prompt")
+            .collect().asList().await().atMost(Duration.ofSeconds(5)))
+            .hasMessageContaining("model error");
+
+        assertThat(semaphore.availablePermits()).isEqualTo(0);
+
+        session.close(Duration.ofSeconds(1));
+    }
+
+    private record TestProperties(Duration closeTimeout, int sessionMemoryWindowSize, int maxConcurrentSessions)
         implements AgentLangchain4jProperties {}
 }

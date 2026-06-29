@@ -12,8 +12,8 @@ deltas only. After #118 extended `AgentEvent` with `ThinkingDelta`, `ToolCallDel
 `ToolCallComplete`, and `ToolResult`, the Claude backend emits none of them.
 
 The SDK's `messages()` API returns `Flux<Message>` with access to `AssistantMessage`
-(containing `TextBlock`, `ThinkingBlock`, `ToolUseBlock` content blocks) and
-`ToolResultBlock`. This richer data maps directly to the new `AgentEvent` types.
+containing `TextBlock`, `ThinkingBlock`, and `ToolUseBlock` content blocks. This
+richer data maps directly to the new `AgentEvent` types.
 
 ## Design
 
@@ -27,7 +27,7 @@ the `Message → List<AgentEvent>` mapping to a shared package-private utility c
 
 | SDK type | AgentEvent | Notes |
 |----------|-----------|-------|
-| `TextBlock.text()` | `TextDelta(text)` | Skip if empty |
+| `TextBlock.text()` | `TextDelta(text)` | Skip if null/empty |
 | `ThinkingBlock.thinking()` | `ThinkingDelta(thinking)` | Skip if null/empty |
 | `ToolUseBlock(id, name, input)` | `ToolCallComplete(index, id, name, jsonArgs)` | `input` Map serialized via static ObjectMapper |
 | — | `ToolCallDelta` | Not emitted — Claude SDK delivers complete tool calls, not streaming fragments (#118) |
@@ -86,7 +86,7 @@ class MessageEventMapper {
         for (ContentBlock block : am.content()) {
             switch (block) {
                 case TextBlock tb -> {
-                    if (!tb.text().isEmpty())
+                    if (tb.text() != null && !tb.text().isEmpty())
                         events.add(new AgentEvent.TextDelta(tb.text()));
                 }
                 case ThinkingBlock tb -> {
@@ -200,6 +200,7 @@ Pure JUnit 5 unit tests — no CDI, no Quarkus. Tests `MessageEventMapper.toEven
 |----------|-------|----------|
 | TextBlock → TextDelta | `AssistantMessage([TextBlock("hello")])` | `[TextDelta("hello")]` |
 | Empty TextBlock skipped | `AssistantMessage([TextBlock("")])` | `[]` |
+| Null TextBlock text skipped | `AssistantMessage([TextBlock(null)])` | `[]` |
 | ThinkingBlock → ThinkingDelta | `AssistantMessage([ThinkingBlock("reasoning", null)])` | `[ThinkingDelta("reasoning")]` |
 | ToolUseBlock → ToolCallComplete | `AssistantMessage([ToolUseBlock("tu1", "Read", {path: "f.java"})])` | `[ToolCallComplete(0, "tu1", "Read", "{\"path\":\"f.java\"}")]` |
 | Mixed blocks in one message | `AssistantMessage([ThinkingBlock, TextBlock, ToolUseBlock])` | `[ThinkingDelta, TextDelta, ToolCallComplete]` — order preserved |

@@ -230,4 +230,5 @@ or `.filter()`. New event types in the stream are silently ignored:
 | `OpenClawChatModel.doChat()` | `.filter(AgentEvent.TextDelta.class::isInstance)` | Yes |
 | `AgentProviderChatModel.doChat()` (blocking) | `.filter(e -> e instanceof AgentEvent.TextDelta)` | Yes |
 | `AgentSessionChatModel.doChat()` (blocking) | `.filter(e -> e instanceof AgentEvent.TextDelta)` | Yes |
+| `AgentProviderChatModel.doChat(req, handler)` (streaming) | `instanceof` cascade for all event types | Yes — already forwards ThinkingDelta, ToolCallDelta, ToolCallComplete (#118) |
 | `AgentSessionChatModel.doChat(req, handler)` (streaming) | `instanceof` cascade for all event types | Yes — already forwards ThinkingDelta, ToolCallDelta, ToolCallComplete (#118) |

@@ -38,10 +38,10 @@ class ClaudeAgentClientIT {
                 .await().atMost(Duration.ofMinutes(2));
 
         assertThat(events).isNotEmpty();
-        assertThat(events).allSatisfy(e ->
-                assertThat(e).isInstanceOf(AgentEvent.TextDelta.class));
+        assertThat(events).anyMatch(e -> e instanceof AgentEvent.TextDelta);
 
         String fullText = events.stream()
+                .filter(AgentEvent.TextDelta.class::isInstance)
                 .map(e -> ((AgentEvent.TextDelta) e).text())
                 .collect(Collectors.joining());
         assertThat(fullText.toLowerCase()).contains("hello");

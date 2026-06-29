@@ -9,7 +9,9 @@ import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import org.jboss.logging.Logger;
 import org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient;
+import org.springaicommunity.claude.agent.sdk.types.Message;
 import reactor.adapter.JdkFlowAdapter;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -239,13 +241,15 @@ class ClaudeAgentSession implements AgentSession {
             return turnFactory.apply(prompt);
         }
         // Production: first turn uses connect(), subsequent use query().
-        final var textFlux = sessionStarted.compareAndSet(false, true)
-            ? sdkClient.connect(prompt).textStream()
-            : sdkClient.query(prompt).textStream();
+        final Flux<Message> messageFlux = sessionStarted.compareAndSet(false, true)
+            ? sdkClient.connect(prompt).messages()
+            : sdkClient.query(prompt).messages();
+        final AtomicInteger toolIndex = new AtomicInteger(0);
 
         return Multi.createFrom()
-            .publisher(JdkFlowAdapter.publisherToFlowPublisher(textFlux))
-            .map(text -> (AgentEvent) new AgentEvent.TextDelta(text));
+            .publisher(JdkFlowAdapter.publisherToFlowPublisher(messageFlux))
+            .onItem().transformToMultiAndConcatenate(
+                msg -> Multi.createFrom().iterable(MessageEventMapper.toEvents(msg, toolIndex)));
     }
 
     private void closeSubprocess() {

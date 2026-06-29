@@ -19,6 +19,7 @@ import org.jboss.logging.Logger;
 import org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient;
 import org.springaicommunity.claude.agent.sdk.ClaudeClient;
 import org.springaicommunity.claude.agent.sdk.mcp.McpServerConfig;
+import org.springaicommunity.claude.agent.sdk.types.Message;
 import reactor.adapter.JdkFlowAdapter;
 import reactor.core.publisher.Flux;
 
@@ -36,6 +37,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /**
@@ -146,9 +148,9 @@ public class ClaudeAgentClient {
     }
 
     /**
-     * Stream {@link AgentEvent.TextDelta} events until the agent completes or the
-     * wall-clock timeout fires. All error cases are surfaced via {@code onFailure()} on the
-     * returned Multi — {@code run()} never throws.
+     * Stream {@link AgentEvent} events (text, thinking, tool calls) until the agent
+     * completes or the wall-clock timeout fires. All error cases are surfaced via
+     * {@code onFailure()} on the returned Multi — {@code run()} never throws.
      *
      * <p>Responsibility split:
      * <ul>
@@ -184,7 +186,8 @@ public class ClaudeAgentClient {
     /**
      * Build the event stream. If {@code streamFactory} is non-null (test path), delegates
      * to it. Otherwise creates a {@link ClaudeAsyncClient} per call, schedules a wall-clock
-     * timeout, and bridges {@code Flux<String>} to {@code Multi<AgentEvent>}.
+     * timeout, and bridges {@code Flux<Message>} to {@code Multi<AgentEvent>} via
+     * {@link MessageEventMapper}.
      */
     /* package-private */ Multi<AgentEvent> buildEventStream(AgentSessionConfig config) {
         if (streamFactory != null) {
@@ -223,13 +226,13 @@ public class ClaudeAgentClient {
         }, effectiveTimeout.toMillis(), TimeUnit.MILLISECONDS);
 
         try {
-            // Obtain Flux<String> via textStream() — token-level text deltas
-            Flux<String> textFlux = sdkClient.connect(config.userPrompt()).textStream();
+            Flux<Message> messageFlux = sdkClient.connect(config.userPrompt()).messages();
+            final AtomicInteger toolIndex = new AtomicInteger(0);
 
-            // Bridge Flux<String> → Flow.Publisher<String> → Multi<AgentEvent>
             Multi<AgentEvent> eventStream = Multi.createFrom()
-                .publisher(JdkFlowAdapter.publisherToFlowPublisher(textFlux))
-                .map(text -> (AgentEvent) new AgentEvent.TextDelta(text))
+                .publisher(JdkFlowAdapter.publisherToFlowPublisher(messageFlux))
+                .onItem().transformToMultiAndConcatenate(
+                    msg -> Multi.createFrom().iterable(MessageEventMapper.toEvents(msg, toolIndex)))
                 .onFailure().transform(e ->
                     timedOut.get()
                         ? new AgentTimeoutException(effectiveTimeout)

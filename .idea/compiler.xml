@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="casehub-engine" target="21" />
+      <module name="casehub-engine-actor-state" target="21" />
+      <module name="casehub-engine-ai" target="21" />
+      <module name="casehub-engine-api" target="21" />
+      <module name="casehub-engine-blackboard" target="21" />
+      <module name="casehub-engine-codegen" target="21" />
+      <module name="casehub-engine-common" target="21" />
+      <module name="casehub-engine-flow" target="21" />
+      <module name="casehub-engine-inbound" target="21" />
+      <module name="casehub-engine-ledger" target="21" />
+      <module name="casehub-engine-parent" target="21" />
+      <module name="casehub-engine-persistence-hibernate" target="21" />
+      <module name="casehub-engine-persistence-memory" target="21" />
+      <module name="casehub-engine-resilience" target="21" />
+      <module name="casehub-engine-scheduler-quartz" target="21" />
+      <module name="casehub-engine-schema" target="21" />
+      <module name="casehub-engine-testing" target="21" />
+      <module name="casehub-engine-work-adapter" target="21" />
+      <module name="casehub-platform" target="21" />
+      <module name="casehub-platform-acl-inmem" target="21" />
+      <module name="casehub-platform-acl-jpa" target="21" />
+      <module name="casehub-platform-agent-api" target="21" />
+      <module name="casehub-platform-agent-claude" target="21" />
+      <module name="casehub-platform-agent-langchain4j" target="21" />
+      <module name="casehub-platform-api" target="21" />
+      <module name="casehub-platform-config" target="21" />
+      <module name="casehub-platform-credentials-quarkus" target="21" />
+      <module name="casehub-platform-endpoints-config" target="21" />
+      <module name="casehub-platform-endpoints-memory" target="21" />
+      <module name="casehub-platform-expression" target="21" />
+      <module name="casehub-platform-governance" target="21" />
+      <module name="casehub-platform-identity" target="21" />
+      <module name="casehub-platform-memory-graphiti" target="21" />
+      <module name="casehub-platform-memory-inmem" target="21" />
+      <module name="casehub-platform-memory-jpa" target="21" />
+      <module name="casehub-platform-memory-mem0" target="21" />
+      <module name="casehub-platform-memory-sqlite" target="21" />
+      <module name="casehub-platform-oidc" target="21" />
+      <module name="casehub-platform-parent" target="21" />
+      <module name="casehub-platform-persistence-jpa" target="21" />
+      <module name="casehub-platform-persistence-mongodb" target="21" />
+      <module name="casehub-platform-scim" target="21" />
+      <module name="casehub-platform-streams-amqp" target="21" />
+      <module name="casehub-platform-streams-camel" target="21" />
+      <module name="casehub-platform-streams-kafka" target="21" />
+      <module name="casehub-platform-streams-poll" target="21" />
+      <module name="casehub-platform-streams-webhook" target="21" />
+      <module name="casehub-platform-testing" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

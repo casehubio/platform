@@ -17,7 +17,12 @@ import java.util.Optional;
  * Standards note: the real did:key spec uses base58btc multibase encoding.
  * This implementation uses base64url for consistency with Java's standard library.
  *
- * Does NOT produce alsoKnownAs entries — did:key documents are deterministic from key bytes only.
+ * <p>The raw key bytes from the did:key multicodec encoding are wrapped in SPKI
+ * (X.509 SubjectPublicKeyInfo) format before being stored in {@link VerificationMethod},
+ * consistent with the platform SPKI convention.
+ *
+ * <p>Does NOT produce alsoKnownAs entries — did:key documents are deterministic
+ * from key bytes only.
  */
 @ApplicationScoped
 @DIDMethod
@@ -26,6 +31,9 @@ public class KeyDIDResolver implements DIDResolver {
 
     private static final Logger LOG = Logger.getLogger(KeyDIDResolver.class);
     private static final String DID_KEY_PREFIX = "did:key:";
+    private static final byte[] ED25519_SPKI_PREFIX = {
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
+    };
 
     @Override
     public Optional<DIDDocument> resolve(final String actorId, final String did) {
@@ -35,14 +43,22 @@ public class KeyDIDResolver implements DIDResolver {
             if (!keyPart.startsWith("z")) return Optional.empty();
             final byte[] multicodec = Base64.getUrlDecoder().decode(keyPart.substring(1));
             if (multicodec.length < 2) return Optional.empty();
-            final byte[] keyBytes = new byte[multicodec.length - 2];
-            System.arraycopy(multicodec, 2, keyBytes, 0, keyBytes.length);
+            final byte[] rawKey = new byte[multicodec.length - 2];
+            System.arraycopy(multicodec, 2, rawKey, 0, rawKey.length);
+            final byte[] spkiBytes = wrapEd25519Spki(rawKey);
             final String vmId = did + "#" + keyPart;
-            final var vm = new VerificationMethod(vmId, "Ed25519VerificationKey2020", keyBytes);
+            final var vm = new VerificationMethod(vmId, "Ed25519VerificationKey2020", spkiBytes);
             return Optional.of(new DIDDocument(did, List.of(vm), List.of()));
         } catch (final Exception e) {
             LOG.debugf("KeyDIDResolver: failed to decode %s: %s", did, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private static byte[] wrapEd25519Spki(final byte[] rawKey) {
+        final byte[] spki = new byte[ED25519_SPKI_PREFIX.length + rawKey.length];
+        System.arraycopy(ED25519_SPKI_PREFIX, 0, spki, 0, ED25519_SPKI_PREFIX.length);
+        System.arraycopy(rawKey, 0, spki, ED25519_SPKI_PREFIX.length, rawKey.length);
+        return spki;
     }
 }

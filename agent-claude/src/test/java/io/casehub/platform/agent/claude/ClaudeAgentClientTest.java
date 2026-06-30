@@ -133,6 +133,22 @@ class ClaudeAgentClientTest {
     }
 
     @Test
+    void constructor_zeroMaxConcurrentSessions_throwsIllegalState() {
+        assertThatThrownBy(() -> new ClaudeAgentClient(props(0), c -> Multi.createFrom().empty()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-concurrent-sessions")
+            .hasMessageContaining("0");
+    }
+
+    @Test
+    void constructor_negativeMaxConcurrentSessions_throwsIllegalState() {
+        assertThatThrownBy(() -> new ClaudeAgentClient(props(-3), c -> Multi.createFrom().empty()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-concurrent-sessions")
+            .hasMessageContaining("-3");
+    }
+
+    @Test
     void validateBinary_nonExistentPath_throwsIllegalStateException() {
         var p = props(1);
         when(p.binaryPath()).thenReturn(Optional.of("/no/such/binary/claude-xyz-nonexistent"));

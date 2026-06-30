@@ -68,7 +68,12 @@ public class ClaudeAgentClient {
     @Inject
     public ClaudeAgentClient(ClaudeAgentProperties properties) {
         this.properties = properties;
-        this.semaphore = new Semaphore(properties.maxConcurrentSessions());
+        int maxSessions = properties.maxConcurrentSessions();
+        if (maxSessions < 1) {
+            throw new IllegalStateException(
+                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 1, got " + maxSessions);
+        }
+        this.semaphore = new Semaphore(maxSessions);
         this.activeSessions = new CopyOnWriteArraySet<>();
         this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "casehub-agent-timeout");
@@ -96,7 +101,12 @@ public class ClaudeAgentClient {
     public ClaudeAgentClient(ClaudeAgentProperties properties,
                              Function<AgentSessionConfig, Multi<AgentEvent>> streamFactory) {
         this.properties = properties;
-        this.semaphore = new Semaphore(properties.maxConcurrentSessions());
+        int maxSessions = properties.maxConcurrentSessions();
+        if (maxSessions < 1) {
+            throw new IllegalStateException(
+                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 1, got " + maxSessions);
+        }
+        this.semaphore = new Semaphore(maxSessions);
         this.activeSessions = new CopyOnWriteArraySet<>();
         this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "casehub-agent-timeout");

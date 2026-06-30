@@ -14,6 +14,7 @@ package io.casehub.platform.agent;
  *   <li>{@link ToolCallDelta} — backends that stream tool arguments token-by-token.
  *   <li>{@link ToolCallComplete} — universal for backends that support tool use.
  *   <li>{@link ToolResult} — observability; what the tool returned to the agent.
+ *   <li>{@link InvocationComplete} — terminal; cost, usage, and timing metadata.
  * </ul>
  */
 public sealed interface AgentEvent permits
@@ -21,7 +22,8 @@ public sealed interface AgentEvent permits
         AgentEvent.ThinkingDelta,
         AgentEvent.ToolCallDelta,
         AgentEvent.ToolCallComplete,
-        AgentEvent.ToolResult {
+        AgentEvent.ToolResult,
+        AgentEvent.InvocationComplete {
 
     record TextDelta(String text) implements AgentEvent {}
 
@@ -60,4 +62,18 @@ public sealed interface AgentEvent permits
                 throw new IllegalArgumentException("content must not be null");
         }
     }
+
+    /**
+     * Terminal event emitted once per invocation with cost, usage, and timing metadata.
+     *
+     * <p>Token counts are zero when the backend does not report them. {@code totalCostUsd}
+     * is null when cost information is unavailable.
+     */
+    record InvocationComplete(
+            int inputTokens, int outputTokens, int thinkingTokens,
+            int cacheReadTokens, int cacheWriteTokens,
+            Double totalCostUsd,
+            long durationMs, long apiDurationMs,
+            String sessionId, int numTurns,
+            boolean isError) implements AgentEvent {}
 }

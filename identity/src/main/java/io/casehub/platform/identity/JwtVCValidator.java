@@ -40,9 +40,6 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
 
     private static final Logger LOG = Logger.getLogger(JwtVCValidator.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final byte[] ED25519_X509_PREFIX = {
-            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
-    };
 
     private final Map<String, String> credentials;
     private final DIDResolver resolver;
@@ -164,76 +161,27 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
                 .findFirst();
     }
 
-    private static boolean verifySignature(final String alg, final byte[] rawPublicKey,
+    private static boolean verifySignature(final String alg, final byte[] spkiPublicKey,
                                            final byte[] data, final byte[] signatureBytes) throws Exception {
-        return switch (alg) {
-            case "EdDSA" -> verifyEd25519(rawPublicKey, data, signatureBytes);
-            case "ES256" -> verifyES256(rawPublicKey, data, signatureBytes);
-            default -> false;
+        final String keyAlg = switch (alg) {
+            case "EdDSA" -> "Ed25519";
+            case "ES256" -> "EC";
+            default -> null;
         };
-    }
+        if (keyAlg == null) return false;
 
-    private static boolean verifyEd25519(final byte[] rawPublicKey, final byte[] data,
-                                         final byte[] signatureBytes) throws Exception {
-        final byte[] x509Encoded = new byte[ED25519_X509_PREFIX.length + rawPublicKey.length];
-        System.arraycopy(ED25519_X509_PREFIX, 0, x509Encoded, 0, ED25519_X509_PREFIX.length);
-        System.arraycopy(rawPublicKey, 0, x509Encoded, ED25519_X509_PREFIX.length, rawPublicKey.length);
-        final PublicKey publicKey = KeyFactory.getInstance("Ed25519")
-                .generatePublic(new X509EncodedKeySpec(x509Encoded));
-        final Signature sig = Signature.getInstance("Ed25519");
+        final String sigAlg = switch (alg) {
+            case "EdDSA" -> "Ed25519";
+            case "ES256" -> "SHA256withECDSA";
+            default -> throw new IllegalArgumentException(alg);
+        };
+
+        final PublicKey publicKey = KeyFactory.getInstance(keyAlg)
+                .generatePublic(new X509EncodedKeySpec(spkiPublicKey));
+        final Signature sig = Signature.getInstance(sigAlg);
         sig.initVerify(publicKey);
         sig.update(data);
         return sig.verify(signatureBytes);
-    }
-
-    private static boolean verifyES256(final byte[] rawPublicKey, final byte[] data,
-                                       final byte[] signatureBytes) throws Exception {
-        // Raw 65-byte uncompressed point (0x04 || x || y) or 64-byte (x || y)
-        final byte[] uncompressed;
-        if (rawPublicKey.length == 64) {
-            uncompressed = new byte[65];
-            uncompressed[0] = 0x04;
-            System.arraycopy(rawPublicKey, 0, uncompressed, 1, 64);
-        } else {
-            uncompressed = rawPublicKey;
-        }
-        // Build X.509 SubjectPublicKeyInfo for EC P-256
-        final byte[] x509Encoded = buildEcX509(uncompressed);
-        final PublicKey publicKey = KeyFactory.getInstance("EC")
-                .generatePublic(new X509EncodedKeySpec(x509Encoded));
-        final Signature sig = Signature.getInstance("SHA256withECDSA");
-        sig.initVerify(publicKey);
-        sig.update(data);
-        return sig.verify(signatureBytes);
-    }
-
-    private static byte[] buildEcX509(final byte[] uncompressedPoint) {
-        // ASN.1 DER: SEQUENCE { SEQUENCE { OID ecPublicKey, OID prime256v1 }, BIT STRING { point } }
-        final byte[] oidEc = {0x06, 0x07, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x02, 0x01};
-        final byte[] oidP256 = {0x06, 0x08, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x03, 0x01, 0x07};
-        final byte[] algSeq = asn1Sequence(concat(oidEc, oidP256));
-        final byte[] bitContent = new byte[1 + uncompressedPoint.length];
-        System.arraycopy(uncompressedPoint, 0, bitContent, 1, uncompressedPoint.length);
-        final byte[] fullBitString = new byte[2 + bitContent.length];
-        fullBitString[0] = 0x03;
-        fullBitString[1] = (byte) bitContent.length;
-        System.arraycopy(bitContent, 0, fullBitString, 2, bitContent.length);
-        return asn1Sequence(concat(algSeq, fullBitString));
-    }
-
-    private static byte[] asn1Sequence(final byte[] content) {
-        final byte[] seq = new byte[2 + content.length];
-        seq[0] = 0x30;
-        seq[1] = (byte) content.length;
-        System.arraycopy(content, 0, seq, 2, content.length);
-        return seq;
-    }
-
-    private static byte[] concat(final byte[] a, final byte[] b) {
-        final byte[] result = new byte[a.length + b.length];
-        System.arraycopy(a, 0, result, 0, a.length);
-        System.arraycopy(b, 0, result, a.length, b.length);
-        return result;
     }
 
     private static byte[] base64urlDecode(final String encoded) {

@@ -118,6 +118,7 @@ final class AgentEventBridge {
                         toolRequests.add(ter);
                     }
                     case AgentEvent.ToolResult ignored -> {}
+                    case AgentEvent.InvocationComplete ignored -> {}
                 }
             },
             handler::onError,

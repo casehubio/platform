@@ -9,6 +9,7 @@ import org.springaicommunity.claude.agent.sdk.types.SystemMessage;
 import org.springaicommunity.claude.agent.sdk.types.TextBlock;
 import org.springaicommunity.claude.agent.sdk.types.ThinkingBlock;
 import org.springaicommunity.claude.agent.sdk.types.ToolUseBlock;
+import org.springaicommunity.claude.agent.sdk.types.ToolResultBlock;
 import org.springaicommunity.claude.agent.sdk.types.UserMessage;
 
 import java.util.List;
@@ -138,19 +139,118 @@ class MessageEventMapperTest {
     }
 
     @Test
-    void resultMessage_skipped() {
-        final var msg = ResultMessage.builder().subtype("success").build();
+    void resultMessage_maps_to_invocationComplete() {
+        final var msg = ResultMessage.builder()
+            .subtype("success")
+            .durationMs(1500)
+            .durationApiMs(1200)
+            .isError(false)
+            .numTurns(3)
+            .sessionId("sess-123")
+            .totalCostUsd(0.042)
+            .usage(Map.of(
+                "input_tokens", 1000,
+                "output_tokens", 500,
+                "thinking_tokens", 200,
+                "cache_creation_input_tokens", 50,
+                "cache_read_input_tokens", 300))
+            .build();
+        final var events = MessageEventMapper.toEvents(msg, toolIndex);
+
+        assertThat(events).singleElement().satisfies(e -> {
+            assertThat(e).isInstanceOf(AgentEvent.InvocationComplete.class);
+            final var ic = (AgentEvent.InvocationComplete) e;
+            assertThat(ic.inputTokens()).isEqualTo(1000);
+            assertThat(ic.outputTokens()).isEqualTo(500);
+            assertThat(ic.thinkingTokens()).isEqualTo(200);
+            assertThat(ic.cacheWriteTokens()).isEqualTo(50);
+            assertThat(ic.cacheReadTokens()).isEqualTo(300);
+            assertThat(ic.totalCostUsd()).isEqualTo(0.042);
+            assertThat(ic.durationMs()).isEqualTo(1500);
+            assertThat(ic.apiDurationMs()).isEqualTo(1200);
+            assertThat(ic.sessionId()).isEqualTo("sess-123");
+            assertThat(ic.numTurns()).isEqualTo(3);
+            assertThat(ic.isError()).isFalse();
+        });
+    }
+
+    @Test
+    void resultMessage_nullUsage_zeroTokens() {
+        final var msg = ResultMessage.builder()
+            .subtype("success")
+            .isError(true)
+            .build();
+        final var events = MessageEventMapper.toEvents(msg, toolIndex);
+
+        assertThat(events).singleElement().satisfies(e -> {
+            final var ic = (AgentEvent.InvocationComplete) e;
+            assertThat(ic.inputTokens()).isZero();
+            assertThat(ic.outputTokens()).isZero();
+            assertThat(ic.thinkingTokens()).isZero();
+            assertThat(ic.cacheReadTokens()).isZero();
+            assertThat(ic.cacheWriteTokens()).isZero();
+            assertThat(ic.totalCostUsd()).isNull();
+            assertThat(ic.isError()).isTrue();
+        });
+    }
+
+    @Test
+    void userMessage_text_skipped() {
+        final var msg = new UserMessage("hello");
         final var events = MessageEventMapper.toEvents(msg, toolIndex);
 
         assertThat(events).isEmpty();
     }
 
     @Test
-    void userMessage_skipped() {
-        final var msg = new UserMessage("hello");
+    void userMessage_toolResultBlock_maps_to_toolResult() {
+        final var trb = ToolResultBlock.builder()
+            .toolUseId("tu-42")
+            .content("file contents here")
+            .isError(false)
+            .build();
+        final var msg = new UserMessage(List.of(trb));
         final var events = MessageEventMapper.toEvents(msg, toolIndex);
 
-        assertThat(events).isEmpty();
+        assertThat(events).singleElement().satisfies(e -> {
+            assertThat(e).isInstanceOf(AgentEvent.ToolResult.class);
+            final var tr = (AgentEvent.ToolResult) e;
+            assertThat(tr.toolCallId()).isEqualTo("tu-42");
+            assertThat(tr.content()).isEqualTo("file contents here");
+            assertThat(tr.isError()).isFalse();
+        });
+    }
+
+    @Test
+    void userMessage_toolResultBlock_error() {
+        final var trb = ToolResultBlock.builder()
+            .toolUseId("tu-99")
+            .content("command failed")
+            .isError(true)
+            .build();
+        final var msg = new UserMessage(List.of(trb));
+        final var events = MessageEventMapper.toEvents(msg, toolIndex);
+
+        assertThat(events).singleElement().satisfies(e -> {
+            final var tr = (AgentEvent.ToolResult) e;
+            assertThat(tr.isError()).isTrue();
+        });
+    }
+
+    @Test
+    void userMessage_toolResultBlock_objectContent_serialized() {
+        final var trb = ToolResultBlock.builder()
+            .toolUseId("tu-7")
+            .content(List.of(Map.of("type", "text", "text", "structured output")))
+            .isError(false)
+            .build();
+        final var msg = new UserMessage(List.of(trb));
+        final var events = MessageEventMapper.toEvents(msg, toolIndex);
+
+        assertThat(events).singleElement().satisfies(e -> {
+            final var tr = (AgentEvent.ToolResult) e;
+            assertThat(tr.content()).contains("structured output");
+        });
     }
 
     @Test

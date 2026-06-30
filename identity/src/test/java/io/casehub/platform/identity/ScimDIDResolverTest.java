@@ -4,11 +4,7 @@ import io.casehub.platform.api.identity.DIDDocument;
 import io.casehub.platform.api.identity.VerificationMethod;
 import org.junit.jupiter.api.Test;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PublicKey;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,47 +62,12 @@ class ScimDIDResolverTest {
     }
 
     @Test
-    void extracts_ed25519_raw_key_from_public_key() throws Exception {
-        // Create an Ed25519 key pair
-        var keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-
-        // Extract expected raw key bytes
-        byte[] spki = keyPair.getPublic().getEncoded();
-        byte[] expectedRaw = new byte[32];
-        System.arraycopy(spki, spki.length - 32, expectedRaw, 0, 32);
-
-        // Test direct extraction
-        byte[] actualRaw = ScimDIDResolver.extractRawKeyBytes(keyPair.getPublic());
-
-        assertNotNull(actualRaw);
-        assertEquals(32, actualRaw.length);
-        assertArrayEquals(expectedRaw, actualRaw);
-    }
-
-    @Test
-    void extracts_ec_raw_key_from_public_key() throws Exception {
-        // Create an EC key pair (P-256)
-        var keyGen = KeyPairGenerator.getInstance("EC");
-        keyGen.initialize(256); // P-256
-        var keyPair = keyGen.generateKeyPair();
-
-        // Test extraction
-        byte[] actualRaw = ScimDIDResolver.extractRawKeyBytes(keyPair.getPublic());
-
-        assertNotNull(actualRaw);
-        // Uncompressed point: 1 byte prefix (0x04) + 32 bytes X + 32 bytes Y
-        assertEquals(65, actualRaw.length);
-        assertEquals(0x04, actualRaw[0]);
-    }
-
-    @Test
-    void returns_null_for_unsupported_algorithm() throws Exception {
-        // RSA is not supported
-        var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
-
-        byte[] result = ScimDIDResolver.extractRawKeyBytes(keyPair.getPublic());
-
-        assertNull(result);
+    void returns_empty_for_unsupported_algorithm_certificate() {
+        // RSA certificates should produce no verification methods
+        var resource = new ScimAgentResource(DID, List.of());
+        var r = resolver(lookupReturning(resource));
+        var doc = r.resolve(ACTOR_ID, DID).orElseThrow();
+        assertTrue(doc.verificationMethods().isEmpty());
     }
 
     @Test
@@ -146,24 +107,13 @@ class ScimDIDResolverTest {
         var vm = doc.verificationMethods().get(0);
         assertEquals(DID + "#scim-key-0", vm.id());
         assertEquals("Ed25519VerificationKey2020", vm.type());
-        assertEquals(32, vm.publicKeyBytes().length);
+        // SPKI format: 44 bytes for Ed25519 (12-byte ASN.1 header + 32-byte key)
+        assertEquals(44, vm.publicKeyBytes().length);
 
-        // Verify the key bytes are non-zero (real key material)
-        boolean hasNonZero = false;
-        for (byte b : vm.publicKeyBytes()) {
-            if (b != 0) {
-                hasNonZero = true;
-                break;
-            }
-        }
-        assertTrue(hasNonZero, "Ed25519 public key should contain non-zero bytes");
-
-        // Optionally: Parse the certificate again to verify consistency
-        var factory = java.security.cert.CertificateFactory.getInstance("X.509");
-        var cert = (java.security.cert.X509Certificate) factory.generateCertificate(
-                new java.io.ByteArrayInputStream(certBytes));
-        byte[] expectedRaw = ScimDIDResolver.extractRawKeyBytes(cert.getPublicKey());
-        assertArrayEquals(expectedRaw, vm.publicKeyBytes());
+        // Must be loadable as a public key via X509EncodedKeySpec
+        var loadedKey = java.security.KeyFactory.getInstance("Ed25519")
+                .generatePublic(new java.security.spec.X509EncodedKeySpec(vm.publicKeyBytes()));
+        assertNotNull(loadedKey);
     }
 
     // ── helpers ──

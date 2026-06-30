@@ -75,11 +75,8 @@ class JwtVCValidatorTest {
     }
 
     private DIDDocument issuerDocument() {
-        final byte[] publicKeyBytes = issuerKeyPair.getPublic().getEncoded();
-        // Extract raw 32-byte Ed25519 key from X.509 encoding (skip 12-byte ASN.1 prefix)
-        final byte[] rawKey = new byte[32];
-        System.arraycopy(publicKeyBytes, publicKeyBytes.length - 32, rawKey, 0, 32);
-        final var vm = new VerificationMethod(ISSUER_DID + "#key-0", "Ed25519VerificationKey2020", rawKey);
+        final byte[] spkiBytes = issuerKeyPair.getPublic().getEncoded();
+        final var vm = new VerificationMethod(ISSUER_DID + "#key-0", "Ed25519VerificationKey2020", spkiBytes);
         return new DIDDocument(ISSUER_DID, List.of(vm), List.of());
     }
 

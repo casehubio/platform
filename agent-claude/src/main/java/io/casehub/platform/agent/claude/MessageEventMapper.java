@@ -6,9 +6,12 @@ import org.jboss.logging.Logger;
 import org.springaicommunity.claude.agent.sdk.types.AssistantMessage;
 import org.springaicommunity.claude.agent.sdk.types.ContentBlock;
 import org.springaicommunity.claude.agent.sdk.types.Message;
+import org.springaicommunity.claude.agent.sdk.types.ResultMessage;
 import org.springaicommunity.claude.agent.sdk.types.TextBlock;
 import org.springaicommunity.claude.agent.sdk.types.ThinkingBlock;
+import org.springaicommunity.claude.agent.sdk.types.ToolResultBlock;
 import org.springaicommunity.claude.agent.sdk.types.ToolUseBlock;
+import org.springaicommunity.claude.agent.sdk.types.UserMessage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +21,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Maps Claude SDK {@link Message} objects to {@link AgentEvent} instances.
  *
- * <p>Only {@link AssistantMessage} content blocks are mapped — all other message
- * types (ResultMessage, UserMessage, SystemMessage) are silently skipped.
+ * <p>{@link AssistantMessage} content blocks are mapped to streaming events.
+ * {@link ResultMessage} is mapped to a terminal {@link AgentEvent.InvocationComplete}.
+ * {@link UserMessage} content blocks containing {@link ToolResultBlock} are mapped to
+ * {@link AgentEvent.ToolResult}. All other message types (SystemMessage) are silently skipped.
  *
  * <p>The Claude SDK delivers complete content blocks, not streaming fragments.
  * {@link AgentEvent.ToolCallDelta} is never emitted by this mapper.
@@ -30,6 +35,8 @@ class MessageEventMapper {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     static List<AgentEvent> toEvents(final Message message, final AtomicInteger toolIndex) {
+        if (message instanceof ResultMessage rm) return List.of(toInvocationComplete(rm));
+        if (message instanceof UserMessage um) return toToolResults(um);
         if (!(message instanceof AssistantMessage am)) return List.of();
         final List<AgentEvent> events = new ArrayList<>();
         for (final ContentBlock block : am.content()) {
@@ -52,6 +59,51 @@ class MessageEventMapper {
             }
         }
         return events;
+    }
+
+    private static List<AgentEvent> toToolResults(final UserMessage um) {
+        final List<ContentBlock> blocks = um.getContentAsBlocks();
+        if (blocks == null || blocks.isEmpty()) return List.of();
+        final List<AgentEvent> events = new ArrayList<>();
+        for (final ContentBlock block : blocks) {
+            if (block instanceof ToolResultBlock trb) {
+                final String content = serializeContent(trb.content());
+                events.add(new AgentEvent.ToolResult(
+                    trb.toolUseId(), content, Boolean.TRUE.equals(trb.isError())));
+            }
+        }
+        return events;
+    }
+
+    private static String serializeContent(final Object content) {
+        if (content == null) return "";
+        if (content instanceof String s) return s;
+        try {
+            return MAPPER.writeValueAsString(content);
+        } catch (final Exception e) {
+            LOG.warnf("Failed to serialize tool result content: %s", e.getMessage());
+            return content.toString();
+        }
+    }
+
+    private static AgentEvent.InvocationComplete toInvocationComplete(final ResultMessage rm) {
+        final Map<String, Object> usage = rm.usage();
+        return new AgentEvent.InvocationComplete(
+            getInt(usage, "input_tokens"),
+            getInt(usage, "output_tokens"),
+            getInt(usage, "thinking_tokens"),
+            getInt(usage, "cache_read_input_tokens"),
+            getInt(usage, "cache_creation_input_tokens"),
+            rm.totalCostUsd(),
+            rm.durationMs(), rm.durationApiMs(),
+            rm.sessionId(), rm.numTurns(),
+            rm.isError());
+    }
+
+    private static int getInt(final Map<String, Object> map, final String key) {
+        if (map == null) return 0;
+        final Object value = map.get(key);
+        return value instanceof Number n ? n.intValue() : 0;
     }
 
     private static String serializeInput(final Map<String, Object> input) {

@@ -8,6 +8,11 @@ import java.util.Arrays;
  * <p>Represents a single public key associated with a DID, identified by its
  * {@code id} fragment and key {@code type} (e.g. {@code Ed25519VerificationKey2020}).
  *
+ * <p>{@code publicKeyBytes} stores SPKI (X.509 SubjectPublicKeyInfo) DER-encoded bytes.
+ * For Ed25519 this is 44 bytes (12-byte ASN.1 header + 32-byte key); for EC P-256 this
+ * is 91 bytes. SPKI is the format returned by {@code PublicKey.getEncoded()} and consumed
+ * by {@code KeyFactory.generatePublic(new X509EncodedKeySpec(bytes))}.
+ *
  * <p>{@code publicKeyBytes} is defensively copied on construction and on access —
  * callers cannot mutate the stored key material.
  */

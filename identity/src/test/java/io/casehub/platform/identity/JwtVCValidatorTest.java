@@ -71,7 +71,7 @@ class JwtVCValidatorTest {
     }
 
     private DIDResolver resolverReturning(final DIDDocument doc) {
-        return did -> ISSUER_DID.equals(did) ? Optional.ofNullable(doc) : Optional.empty();
+        return (actorId, did) -> ISSUER_DID.equals(did) ? Optional.ofNullable(doc) : Optional.empty();
     }
 
     private DIDDocument issuerDocument() {
@@ -92,7 +92,7 @@ class JwtVCValidatorTest {
 
     @Test
     void unconfigured_actor_returns_empty() {
-        final var validator = createValidator(Map.of(), did -> Optional.empty());
+        final var validator = createValidator(Map.of(), (actorId, did) -> Optional.empty());
         final var result = validator.validate(ACTOR_ID, ACTOR_DID);
         assertTrue(result.isEmpty());
     }
@@ -156,7 +156,7 @@ class JwtVCValidatorTest {
         // Resolver returns empty for the issuer DID
         final var validator = createValidator(
                 Map.of(ACTOR_ID, file.toString()),
-                did -> Optional.empty());
+                (actorId, did) -> Optional.empty());
 
         final var result = validator.validate(ACTOR_ID, ACTOR_DID);
         assertTrue(result.isPresent());
@@ -183,7 +183,7 @@ class JwtVCValidatorTest {
     void missing_credential_file_returns_NOT_FOUND() {
         final var validator = createValidator(
                 Map.of(ACTOR_ID, "/nonexistent/path/credential.jwt"),
-                did -> Optional.empty());
+                (actorId, did) -> Optional.empty());
 
         final var result = validator.validate(ACTOR_ID, ACTOR_DID);
         assertTrue(result.isPresent());

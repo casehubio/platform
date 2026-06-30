@@ -3,11 +3,12 @@ package io.casehub.platform.identity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.identity.DIDDocument;
+import io.casehub.platform.api.identity.DIDMethod;
 import io.casehub.platform.api.identity.DIDResolver;
 import io.casehub.platform.api.identity.VerificationMethod;
 import io.casehub.platform.identity.config.IdentityConfig;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
@@ -40,7 +41,8 @@ import java.util.regex.Pattern;
  * </ul>
  */
 @ApplicationScoped
-@Alternative
+@DIDMethod
+@Priority(100)
 public class WebDIDResolver implements DIDResolver {
 
     private static final Logger LOG = Logger.getLogger(WebDIDResolver.class);
@@ -65,7 +67,7 @@ public class WebDIDResolver implements DIDResolver {
     }
 
     @Override
-    public Optional<DIDDocument> resolve(final String did) {
+    public Optional<DIDDocument> resolve(final String actorId, final String did) {
         if (did == null || !did.startsWith(DID_WEB_PREFIX)) {
             return Optional.empty();
         }

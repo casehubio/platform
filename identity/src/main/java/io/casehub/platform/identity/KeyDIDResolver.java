@@ -1,10 +1,11 @@
 package io.casehub.platform.identity;
 
 import io.casehub.platform.api.identity.DIDDocument;
+import io.casehub.platform.api.identity.DIDMethod;
 import io.casehub.platform.api.identity.DIDResolver;
 import io.casehub.platform.api.identity.VerificationMethod;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import org.jboss.logging.Logger;
 
 import java.util.Base64;
@@ -19,14 +20,15 @@ import java.util.Optional;
  * Does NOT produce alsoKnownAs entries — did:key documents are deterministic from key bytes only.
  */
 @ApplicationScoped
-@Alternative
+@DIDMethod
+@Priority(100)
 public class KeyDIDResolver implements DIDResolver {
 
     private static final Logger LOG = Logger.getLogger(KeyDIDResolver.class);
     private static final String DID_KEY_PREFIX = "did:key:";
 
     @Override
-    public Optional<DIDDocument> resolve(final String did) {
+    public Optional<DIDDocument> resolve(final String actorId, final String did) {
         if (did == null || !did.startsWith(DID_KEY_PREFIX)) return Optional.empty();
         try {
             final String keyPart = did.substring(DID_KEY_PREFIX.length());

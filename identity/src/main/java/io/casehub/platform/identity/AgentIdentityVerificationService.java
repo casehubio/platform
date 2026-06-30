@@ -43,7 +43,7 @@ public class AgentIdentityVerificationService {
         if (actorDid == null) return IdentityVerificationResult.UNVERIFIABLE;
         if (agentPublicKey == null) return IdentityVerificationResult.UNSIGNED;
 
-        final var docOpt = resolver.resolve(actorDid);
+        final var docOpt = resolver.resolve(actorId, actorDid);
         if (docOpt.isEmpty()) return IdentityVerificationResult.DID_UNRESOLVABLE;
 
         final var doc = docOpt.get();

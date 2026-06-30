@@ -50,7 +50,7 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
     JwtVCValidator() {
         super(Duration.ofMinutes(5));
         this.credentials = Map.of();
-        this.resolver = did -> Optional.empty();
+        this.resolver = (actorId, did) -> Optional.empty();
     }
 
     @Inject
@@ -128,7 +128,7 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
                 return CredentialValidationResult.INVALID_SIGNATURE;
             }
 
-            final Optional<DIDDocument> issuerDoc = resolver.resolve(issuerDid);
+            final Optional<DIDDocument> issuerDoc = resolver.resolve(null, issuerDid);
             if (issuerDoc.isEmpty()) {
                 return CredentialValidationResult.ISSUER_UNKNOWN;
             }

@@ -12,7 +12,7 @@ import java.util.Optional;
 @DefaultBean
 public class NoOpDIDResolver implements DIDResolver {
     @Override
-    public Optional<DIDDocument> resolve(final String did) {
+    public Optional<DIDDocument> resolve(final String actorId, final String did) {
         return Optional.empty();
     }
 }

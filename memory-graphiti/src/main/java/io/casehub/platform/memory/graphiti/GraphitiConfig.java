@@ -14,8 +14,8 @@ public interface GraphitiConfig {
 
     /**
      * Comma-separated list of domain names that this Graphiti deployment stores.
-     * Required to enable {@link io.casehub.platform.api.memory.MemoryCapability#ERASE_ENTITY}.
-     * When absent, {@code eraseEntity()} throws {@link io.casehub.platform.api.memory.MemoryCapabilityException}.
+     * Required to enable {@link io.casehub.memory.MemoryCapability#ERASE_ENTITY}.
+     * When absent, {@code eraseEntity()} throws {@link io.casehub.memory.MemoryCapabilityException}.
      */
     @WithName("known-domains")
     Optional<List<String>> knownDomains();

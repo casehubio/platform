@@ -1,8 +1,7 @@
 package io.casehub.platform.memory;
 
-import io.casehub.platform.api.memory.*;
-import io.casehub.platform.api.memory.GraphCaseMemoryStore;
-import io.casehub.platform.api.memory.GraphMemoryQuery;
+import io.casehub.memory.GraphCaseMemoryStore;
+import io.casehub.memory.GraphMemoryQuery;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;

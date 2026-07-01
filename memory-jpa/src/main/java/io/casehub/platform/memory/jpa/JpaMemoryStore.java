@@ -3,7 +3,6 @@ package io.casehub.platform.memory.jpa;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.identity.CurrentPrincipal;
-import io.casehub.platform.api.memory.*;
 import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;

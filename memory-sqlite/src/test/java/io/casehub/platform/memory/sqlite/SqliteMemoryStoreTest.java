@@ -1,6 +1,5 @@
 package io.casehub.platform.memory.sqlite;
 
-import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;

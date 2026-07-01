@@ -1,7 +1,6 @@
 package io.casehub.platform.memory.mem0;
 
-import io.casehub.platform.api.memory.CaseMemoryStore;
-import io.casehub.platform.api.memory.MemoryDomain;
+import io.casehub.memory.CaseMemoryStore;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;

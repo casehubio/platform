@@ -1,7 +1,7 @@
 package io.casehub.platform.memory.graphiti;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
-import io.casehub.platform.api.memory.*;
+import io.casehub.memory.*;
 import io.casehub.platform.memory.graphiti.dto.*;
 import io.quarkus.arc.Arc;
 import io.micrometer.core.annotation.Timed;

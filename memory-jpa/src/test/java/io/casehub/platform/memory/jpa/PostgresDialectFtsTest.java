@@ -1,6 +1,5 @@
 package io.casehub.platform.memory.jpa;
 
-import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.common.QuarkusTestResource;

@@ -1,12 +1,12 @@
 package io.casehub.platform.memory;
 
-import io.casehub.platform.api.memory.CaseMemoryStore;
-import io.casehub.platform.api.memory.EraseRequest;
-import io.casehub.platform.api.memory.ReactiveCaseMemoryStore;
-import io.casehub.platform.api.memory.Memory;
-import io.casehub.platform.api.memory.MemoryInput;
-import io.casehub.platform.api.memory.MemoryQuery;
-import io.casehub.platform.api.memory.StoreAllResult;
+import io.casehub.memory.CaseMemoryStore;
+import io.casehub.memory.EraseRequest;
+import io.casehub.memory.ReactiveCaseMemoryStore;
+import io.casehub.memory.Memory;
+import io.casehub.memory.MemoryInput;
+import io.casehub.memory.MemoryQuery;
+import io.casehub.memory.StoreAllResult;
 import io.quarkus.arc.DefaultBean;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;

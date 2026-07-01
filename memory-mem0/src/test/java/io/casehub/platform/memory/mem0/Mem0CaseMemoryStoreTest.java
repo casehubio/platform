@@ -1,7 +1,6 @@
 package io.casehub.platform.memory.mem0;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
-import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;

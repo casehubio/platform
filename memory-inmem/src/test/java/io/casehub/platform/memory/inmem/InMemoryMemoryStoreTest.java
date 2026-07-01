@@ -1,7 +1,6 @@
 package io.casehub.platform.memory.inmem;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
-import io.casehub.platform.api.memory.*;
 import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

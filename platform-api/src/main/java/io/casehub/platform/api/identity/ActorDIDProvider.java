@@ -7,9 +7,11 @@ import java.util.Optional;
  *
  * <p>Return empty for actors without a DID binding.
  *
- * <p>Implementations are CDI beans. The default no-op implementation returns
- * {@link Optional#empty()} for every actor. Override with {@code @Alternative}
- * to integrate with an identity registry.
+ * <p>Implementations are CDI beans annotated with {@code @ActorDIDSource} and
+ * {@code @Priority}. The composite {@code CompositeActorDIDProvider} iterates
+ * all registered providers in ascending priority order (lowest value first)
+ * and returns the first non-empty result. The default no-op implementation returns
+ * {@link Optional#empty()} for every actor.
  */
 public interface ActorDIDProvider {
 
@@ -20,4 +22,13 @@ public interface ActorDIDProvider {
      * @return the DID URI (e.g. {@code "did:web:example.com:agents:tarkus"}), or empty
      */
     Optional<String> didFor(String actorId);
+
+    /**
+     * Invalidates any cached state for the given actor.
+     * Called by the composite to propagate invalidation to all children.
+     * No-op by default — override in caching implementations.
+     *
+     * @param actorId the actor whose cached state should be cleared
+     */
+    default void invalidate(String actorId) {}
 }

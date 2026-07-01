@@ -8,8 +8,6 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,7 +27,7 @@ public class CompositeDIDResolver implements DIDResolver {
 
     @Inject
     public CompositeDIDResolver(@DIDMethod Instance<DIDResolver> methodResolvers) {
-        this(toSortedList(methodResolvers));
+        this(CdiPriorityUtils.toSortedList(methodResolvers));
     }
 
     CompositeDIDResolver(List<DIDResolver> resolvers) {
@@ -48,23 +46,5 @@ public class CompositeDIDResolver implements DIDResolver {
             }
         }
         return Optional.empty();
-    }
-
-    private static List<DIDResolver> toSortedList(Instance<DIDResolver> instance) {
-        var list = new ArrayList<Instance.Handle<DIDResolver>>();
-        instance.handles().forEach(list::add);
-        list.sort(Comparator.comparingInt(CompositeDIDResolver::priorityOf));
-        return list.stream()
-                .map(Instance.Handle::get)
-                .collect(java.util.stream.Collectors.toUnmodifiableList());
-    }
-
-    private static int priorityOf(Instance.Handle<?> handle) {
-        var bean = handle.getBean();
-        if (bean instanceof io.quarkus.arc.InjectableBean<?> injectable) {
-            Integer p = injectable.getPriority();
-            if (p != null) return p;
-        }
-        return Integer.MAX_VALUE;
     }
 }

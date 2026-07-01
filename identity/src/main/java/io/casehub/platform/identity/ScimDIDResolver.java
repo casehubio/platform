@@ -4,6 +4,7 @@ import io.casehub.platform.api.identity.DIDDocument;
 import io.casehub.platform.api.identity.DIDMethod;
 import io.casehub.platform.api.identity.DIDResolver;
 import io.casehub.platform.api.identity.VerificationMethod;
+import io.casehub.platform.api.identity.VerificationMethodType;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -94,8 +95,8 @@ public class ScimDIDResolver implements DIDResolver {
                     .generateCertificate(new ByteArrayInputStream(derBytes));
 
             final String vmType = switch (cert.getPublicKey().getAlgorithm()) {
-                case "Ed25519", "EdDSA" -> "Ed25519VerificationKey2020";
-                case "EC" -> "EcdsaSecp256r1VerificationKey2019";
+                case "Ed25519", "EdDSA" -> VerificationMethodType.ED25519;
+                case "EC" -> VerificationMethodType.P256;
                 default -> null;
             };
             if (vmType == null) return Optional.empty();

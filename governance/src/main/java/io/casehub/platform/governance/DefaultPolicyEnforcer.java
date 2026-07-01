@@ -55,18 +55,29 @@ public class DefaultPolicyEnforcer implements PolicyEnforcer {
                 return executeWithTimeout(policy.timeoutMs(), action);
             } catch (Exception e) {
                 lastException = e;
+                if (e instanceof InterruptedPolicyException) break;
                 if (attempt < maxAttempts) {
                     sleep(computeDelay(delayMs, backoff, attempt, maxDelayMs));
                 }
             }
         }
-        throw new PolicyEnforcementException(
+        if (lastException instanceof PolicyEnforcementException pe) {
+            throw pe;
+        }
+        throw new RetryExhaustedException(
             "All " + maxAttempts + " attempts failed", lastException);
     }
 
     private <T> T executeWithTimeout(Integer timeoutMs, Supplier<T> action) {
         if (timeoutMs == null) {
-            return action.get();
+            try {
+                return action.get();
+            } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedPolicyException("Interrupted during execution", e);
+                }
+                throw e;
+            }
         }
         Callable<T> callable = action::get;
         Future<T> future = timeoutExecutor.submit(callable);
@@ -74,15 +85,14 @@ public class DefaultPolicyEnforcer implements PolicyEnforcer {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             future.cancel(true);
-            throw new PolicyEnforcementException(
-                "Action timed out after " + timeoutMs + "ms");
+            throw new TimeoutPolicyException("Action timed out after " + timeoutMs + "ms");
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException re) throw re;
             throw new PolicyEnforcementException("Action failed", cause);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new PolicyEnforcementException("Interrupted during execution", e);
+            throw new InterruptedPolicyException("Interrupted during execution", e);
         }
     }
 
@@ -106,6 +116,7 @@ public class DefaultPolicyEnforcer implements PolicyEnforcer {
             Thread.sleep(ms);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw new InterruptedPolicyException("Interrupted during backoff", e);
         }
     }
 }

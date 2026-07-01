@@ -38,13 +38,13 @@ class DefaultPolicyEnforcerTest {
     }
 
     @Test
-    void execute_exhaustsRetries_throws() {
+    void execute_exhaustsRetries_throwsRetryExhaustedException() {
         ExecutionPolicy policy = new ExecutionPolicy(null, new RetryPolicy(2, 10));
 
         assertThatThrownBy(() -> enforcer.execute(policy, () -> {
             throw new RuntimeException("permanent");
         }))
-            .isInstanceOf(PolicyEnforcementException.class)
+            .isInstanceOf(RetryExhaustedException.class)
             .hasMessageContaining("2 attempts")
             .hasCauseInstanceOf(RuntimeException.class);
     }
@@ -73,7 +73,7 @@ class DefaultPolicyEnforcerTest {
     }
 
     @Test
-    void execute_timeout_failsIfExceeded() {
+    void execute_timeout_throwsTimeoutPolicyException() {
         ExecutionPolicy policy = new ExecutionPolicy(50, new RetryPolicy(1, 0));
 
         assertThatThrownBy(() -> enforcer.execute(policy, () -> {
@@ -84,10 +84,7 @@ class DefaultPolicyEnforcerTest {
             }
             return "late";
         }))
-            .isInstanceOf(PolicyEnforcementException.class)
-            .hasMessageContaining("1 attempts")
-            .cause()
-            .isInstanceOf(PolicyEnforcementException.class)
+            .isInstanceOf(TimeoutPolicyException.class)
             .hasMessageContaining("timed out");
     }
 
@@ -133,5 +130,57 @@ class DefaultPolicyEnforcerTest {
         // Without cap: 100 + 200 = 300ms. With cap at 150: 100 + 150 = 250ms.
         // Allow generous margin for CI variance but confirm it's under uncapped time.
         assertThat(elapsed).isLessThan(500);
+    }
+
+    @Test
+    void execute_interrupted_throwsInterruptedPolicyException() {
+        ExecutionPolicy policy = new ExecutionPolicy(5000, new RetryPolicy(1, 0));
+
+        Thread.currentThread().interrupt();
+
+        assertThatThrownBy(() -> enforcer.execute(policy, () -> "result"))
+            .isInstanceOf(InterruptedPolicyException.class)
+            .hasMessageContaining("Interrupted");
+
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        Thread.interrupted(); // clear flag for other tests
+    }
+
+    @Test
+    void execute_interruptDuringSleep_throwsInterruptedPolicyException() {
+        AtomicInteger attempts = new AtomicInteger(0);
+        ExecutionPolicy policy = new ExecutionPolicy(null, new RetryPolicy(3, 5000));
+
+        Thread testThread = Thread.currentThread();
+        Thread interruptor = new Thread(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+            testThread.interrupt();
+        });
+        interruptor.start();
+
+        assertThatThrownBy(() -> enforcer.execute(policy, () -> {
+            attempts.incrementAndGet();
+            throw new RuntimeException("fail");
+        }))
+            .isInstanceOf(InterruptedPolicyException.class)
+            .hasMessageContaining("Interrupted during backoff");
+
+        assertThat(attempts.get()).isEqualTo(1);
+        Thread.interrupted(); // clear flag
+    }
+
+    @Test
+    void execute_interruptWithoutTimeout_throwsInterruptedPolicyException() {
+        ExecutionPolicy policy = new ExecutionPolicy(null, new RetryPolicy(3, 10));
+
+        Thread.currentThread().interrupt();
+
+        assertThatThrownBy(() -> enforcer.execute(policy, () -> {
+            throw new RuntimeException("fail while interrupted");
+        }))
+            .isInstanceOf(InterruptedPolicyException.class)
+            .hasMessageContaining("Interrupted");
+
+        Thread.interrupted(); // clear flag
     }
 }

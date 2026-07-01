@@ -50,4 +50,24 @@ class ScimAgentLookupTest {
         var ex = assertThrows(IllegalArgumentException.class, lookup::validate);
         assertTrue(ex.getMessage().contains("auth-token"));
     }
+
+    @Test
+    void get_validates_lazily_on_first_use() {
+        var lookup = new ScimAgentLookup(
+                "http://scim.example.com", "token", 5000, Duration.ofMinutes(5), true);
+        assertTrue(lookup.isConfigured());
+        var ex = assertThrows(IllegalArgumentException.class,
+                () -> lookup.get("claude:reviewer@v1"));
+        assertTrue(ex.getMessage().contains("HTTPS"));
+    }
+
+    @Test
+    void get_validates_authToken_lazily() {
+        var lookup = new ScimAgentLookup(
+                "https://scim.example.com", "", 5000, Duration.ofMinutes(5), true);
+        assertTrue(lookup.isConfigured());
+        var ex = assertThrows(IllegalArgumentException.class,
+                () -> lookup.get("claude:reviewer@v1"));
+        assertTrue(ex.getMessage().contains("auth-token"));
+    }
 }

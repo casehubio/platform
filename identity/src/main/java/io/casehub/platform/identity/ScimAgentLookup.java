@@ -99,6 +99,7 @@ public class ScimAgentLookup extends AbstractCachingIdentityProvider<ScimAgentRe
     @Override
     protected Optional<ScimAgentResource> loadContext(final String actorId) {
         if (!isConfigured()) return Optional.empty();
+        validate();
 
         final String encodedActorId = URLEncoder.encode(actorId, StandardCharsets.UTF_8)
                 .replace("+", "%20");

@@ -62,6 +62,14 @@ public final class UUIDv7 {
     /**
      * Generate a UUID v7 with specified timestamp. Exposed for testing.
      *
+     * <p>Handles sequence overflow and clock regression:
+     * <ul>
+     *   <li>When sequence exceeds 4095 (0xFFF), advances timestamp by 1ms and resets sequence to 0.</li>
+     *   <li>When clock goes backward (timestampMs &lt; lastTimestamp), treats it as same-millisecond case,
+     *       incrementing sequence and wrapping if needed. Ensures UUIDs remain monotonic even during
+     *       clock regression.</li>
+     * </ul>
+     *
      * @param instant timestamp to embed in the UUID
      * @return UUID v7 with the given timestamp
      */
@@ -69,16 +77,19 @@ public final class UUIDv7 {
         long timestampMs = instant.toEpochMilli();
         State state = THREAD_STATE.get();
 
-        // Monotonic sequence: increment if same timestamp, reset if new timestamp
-        int sequence;
-        if (timestampMs == state.lastTimestamp) {
-            state.sequence = (state.sequence + 1) & 0xFFF;  // 12-bit wraparound
-            sequence = state.sequence;
+        if (timestampMs <= state.lastTimestamp) {
+            timestampMs = state.lastTimestamp;
+            state.sequence++;
+            if (state.sequence > 0xFFF) {
+                timestampMs++;
+                state.lastTimestamp = timestampMs;
+                state.sequence = 0;
+            }
         } else {
             state.lastTimestamp = timestampMs;
             state.sequence = 0;
-            sequence = 0;
         }
+        int sequence = state.sequence;
 
         // 48-bit timestamp (milliseconds since epoch)
         long mostSigBits = timestampMs << 16;

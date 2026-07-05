@@ -247,7 +247,7 @@ public record AllNotificationsRead(
 | Folder | ArtifactId | CDI Tier | Purpose |
 |--------|-----------|----------|---------|
 | `notifications-inmem/` | `casehub-platform-notifications-inmem` | CDI 4 | `@Alternative @Priority(100)` — both SPIs natively. ConcurrentHashMap. Test + ephemeral installs |
-| `notifications-jpa/` | `casehub-platform-notifications-jpa` | CDI 2 | `@ApplicationScoped` — both SPIs natively via Hibernate ORM + Hibernate Reactive. Flyway migrations. H2 reactive emulation for tests |
+| `notifications-jpa/` | `casehub-platform-notifications-jpa` | CDI 2 | `@ApplicationScoped` — both SPIs natively via Hibernate ORM + Hibernate Reactive. Flyway migrations. PostgreSQL DevServices for tests |
 | `notifications/` | `casehub-platform-notifications` | — | REST resources + SSE push endpoint. Depends on store SPI, observes CDI events. No persistence logic (not a backend — no CDI tier) |
 
 Tier numbers reference the CDI priority ladder (`persistence-backend-cdi-priority.md`): CDI 1 = `@DefaultBean`, CDI 2 = `@ApplicationScoped`, CDI 4 = `@Alternative @Priority(100)`. The REST module is a consumer, not a backend implementation — it has no CDI tier.
@@ -372,7 +372,7 @@ quarkus.flyway.clean-at-start=true
 quarkus.hibernate-orm.schema-management.strategy=none
 ```
 
-Uses PostgreSQL DevServices (Testcontainers), matching the `acl-jpa` pattern. H2 reactive emulation was attempted but fails with Hibernate Reactive Panache on `Instant`/`TIMESTAMP` fields (see GE-20260705-2aa4c8).
+Uses PostgreSQL DevServices (Testcontainers), matching the `acl-jpa` pattern.
 
 ### Retention
 
@@ -457,7 +457,7 @@ Server-Sent Events endpoint at `/notifications/stream`. Unidirectional server-to
 | `store-owned-ttl-vs-spi-ttl.md` | ✓ Retention config in implementations, not SPI signature |
 | `maven-submodule-folder-naming.md` | ✓ Short names: notifications-inmem/, notifications-jpa/, notifications/ |
 | `noop-registry-must-not-fire-cdi-events.md` | ✓ NoOp does NOT fire events |
-| `quarkus-test-database.md` | ✓ H2 PostgreSQL mode, both JDBC + reactive URLs |
+| `quarkus-test-database.md` | ✓ PostgreSQL DevServices configuration |
 | `platform-module-progression.md` | ✓ Progressive classpath-driven adoption |
 | `platform-ownership-check.md` | ✓ Platform infrastructure, no domain entity types in API |
 

@@ -114,10 +114,9 @@ public abstract class NotificationStoreContractTest {
     }
 
     @Test
-    void find_ordersNewestFirst() throws InterruptedException {
-        // Store with small delay to ensure different createdAt
+    void find_ordersNewestFirst() {
+        // UUIDv7 sequence counter ensures deterministic ordering within same millisecond
         var notif1 = store().store(createInput("user-1", "tenant-1", "First", "category"));
-        Thread.sleep(10);
         var notif2 = store().store(createInput("user-1", "tenant-1", "Second", "category"));
 
         var query = new NotificationQuery("user-1", "tenant-1", null, null, null, 10);

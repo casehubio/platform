@@ -7,6 +7,7 @@ import io.casehub.platform.api.notification.AllNotificationsRead;
 import io.casehub.platform.api.notification.NotificationCreated;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
 import io.casehub.platform.api.notification.ReactiveNotificationStore;
+import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
@@ -216,6 +217,13 @@ public class NotificationSseResource {
         } catch (Exception e) {
             LOG.debug("Failed to send initial unread count", e);
         }
+    }
+
+    @Scheduled(every = "60s")
+    void sweepStaleEmitters() {
+        connections.forEach((key, emitters) ->
+            emitters.removeIf(e -> e.eventSink().isClosed()));
+        connections.entrySet().removeIf(e -> e.getValue().isEmpty());
     }
 
     /**

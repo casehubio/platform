@@ -41,7 +41,7 @@ public abstract class SubscriptionStoreContractTest {
         var subscription = store().store(input);
 
         assertThat(subscription.id()).isNotNull();
-        assertThat(subscription.userId()).isEqualTo("user-1");
+        assertThat(subscription.ownerId()).isEqualTo("user-1");
         assertThat(subscription.tenancyId()).isEqualTo("tenant-1");
         assertThat(subscription.name()).isEqualTo("My Subscription");
         assertThat(subscription.eventType()).isEqualTo("work-item.created");
@@ -110,6 +110,8 @@ public abstract class SubscriptionStoreContractTest {
                 "Disabled",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 false
         );
@@ -146,7 +148,7 @@ public abstract class SubscriptionStoreContractTest {
         var page = store().find(query);
 
         assertThat(page.subscriptions()).hasSize(1);
-        assertThat(page.subscriptions().get(0).userId()).isEqualTo("user-1");
+        assertThat(page.subscriptions().get(0).ownerId()).isEqualTo("user-1");
     }
 
     // Update Tests
@@ -155,7 +157,7 @@ public abstract class SubscriptionStoreContractTest {
     void update_changesName() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Old Name", "event-type"));
 
-        var update = new SubscriptionUpdate("New Name", null, null, null, null);
+        var update = new SubscriptionUpdate("New Name", null, null, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -167,7 +169,7 @@ public abstract class SubscriptionStoreContractTest {
     void update_changesEventType() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "old-event"));
 
-        var update = new SubscriptionUpdate(null, "new-event", null, null, null);
+        var update = new SubscriptionUpdate(null, "new-event", null, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -179,7 +181,7 @@ public abstract class SubscriptionStoreContractTest {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "event-type"));
 
         var newConstraints = List.of(new Constraint("newField", ConstraintOp.EQ, "newValue"));
-        var update = new SubscriptionUpdate(null, null, newConstraints, null, null);
+        var update = new SubscriptionUpdate(null, null, newConstraints, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -191,7 +193,7 @@ public abstract class SubscriptionStoreContractTest {
     void update_changesEnabled() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "event-type"));
 
-        var update = new SubscriptionUpdate(null, null, null, null, false);
+        var update = new SubscriptionUpdate(null, null, null, null, null, null, false);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -210,7 +212,7 @@ public abstract class SubscriptionStoreContractTest {
             Thread.currentThread().interrupt();
         }
 
-        var update = new SubscriptionUpdate("New Name", null, null, null, null);
+        var update = new SubscriptionUpdate("New Name", null, null, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -221,7 +223,7 @@ public abstract class SubscriptionStoreContractTest {
     void update_nullFieldsUnchanged() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "event-type"));
 
-        var update = new SubscriptionUpdate("New Name", null, null, null, null);
+        var update = new SubscriptionUpdate("New Name", null, null, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -234,7 +236,7 @@ public abstract class SubscriptionStoreContractTest {
     void update_wrongUser_returnsEmpty() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "event-type"));
 
-        var update = new SubscriptionUpdate("New Name", null, null, null, null);
+        var update = new SubscriptionUpdate("New Name", null, null, null, null, null, null);
         var updated = store().update(subscription.id(), "user-2", "tenant-1", update);
 
         assertThat(updated).isEmpty();
@@ -272,6 +274,8 @@ public abstract class SubscriptionStoreContractTest {
                 "Disabled",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 false
         );
@@ -302,13 +306,15 @@ public abstract class SubscriptionStoreContractTest {
 
     // Helper Methods
 
-    private SubscriptionInput createInput(String userId, String tenancyId, String name, String eventType) {
+    private SubscriptionInput createInput(String ownerId, String tenancyId, String name, String eventType) {
         return new SubscriptionInput(
-                userId,
+                ownerId,
                 tenancyId,
                 name,
                 eventType,
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, ownerId)),
+                false,
                 createTemplate(),
                 true
         );

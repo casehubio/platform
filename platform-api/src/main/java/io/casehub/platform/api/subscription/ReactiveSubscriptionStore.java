@@ -19,8 +19,8 @@ import java.util.Optional;
  * <p>The no-op {@code @DefaultBean} implementation must NOT fire events.
  *
  * <p><strong>User Ownership Enforcement:</strong> {@code findById}, {@code update}, and
- * {@code delete} enforce user-level ownership via {@code userId} parameter.
- * Implementations WHERE clause includes {@code user_id = ? AND tenancy_id = ?}, making
+ * {@code delete} enforce user-level ownership via {@code ownerId} parameter.
+ * Implementations WHERE clause includes {@code owner_id = ? AND tenancy_id = ?}, making
  * authorization structural at the SPI boundary.
  *
  * <p><strong>Single Event Type:</strong> Each subscription matches exactly one event
@@ -48,11 +48,11 @@ public interface ReactiveSubscriptionStore {
      * or wrong user. No information leak — empty is the same regardless of reason.
      *
      * @param id        subscription id
-     * @param userId    subscription owner (authorization check)
+     * @param ownerId   subscription owner (authorization check)
      * @param tenancyId tenant isolation (authorization check)
      * @return Uni emitting subscription if found and authorized, empty otherwise
      */
-    Uni<Optional<Subscription>> findById(String id, String userId, String tenancyId);
+    Uni<Optional<Subscription>> findById(String id, String ownerId, String tenancyId);
 
     /**
      * Query subscriptions with cursor-based pagination.
@@ -81,12 +81,12 @@ public interface ReactiveSubscriptionStore {
      * (non-no-op implementations only).
      *
      * @param id        subscription id
-     * @param userId    subscription owner (authorization check)
+     * @param ownerId   subscription owner (authorization check)
      * @param tenancyId tenant isolation (authorization check)
      * @param update    partial update (null fields unchanged)
      * @return Uni emitting updated subscription with new {@code updatedAt}, or empty if not found/unauthorized
      */
-    Uni<Optional<Subscription>> update(String id, String userId, String tenancyId, SubscriptionUpdate update);
+    Uni<Optional<Subscription>> update(String id, String ownerId, String tenancyId, SubscriptionUpdate update);
 
     /**
      * Delete a subscription.
@@ -98,11 +98,11 @@ public interface ReactiveSubscriptionStore {
      * (non-no-op implementations only).
      *
      * @param id        subscription id
-     * @param userId    subscription owner (authorization check)
+     * @param ownerId   subscription owner (authorization check)
      * @param tenancyId tenant isolation (authorization check)
      * @return Uni emitting true if deleted, false if not found/unauthorized
      */
-    Uni<Boolean> delete(String id, String userId, String tenancyId);
+    Uni<Boolean> delete(String id, String ownerId, String tenancyId);
 
     /**
      * Stream all enabled subscriptions across all users and tenants. Used by subscription

@@ -39,7 +39,7 @@ public class NoOpSubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> findById(final String id, final String userId, final String tenancyId) {
+    public Optional<Subscription> findById(final String id, final String ownerId, final String tenancyId) {
         return Optional.empty();
     }
 
@@ -49,12 +49,12 @@ public class NoOpSubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> update(final String id, final String userId, final String tenancyId, final SubscriptionUpdate update) {
+    public Optional<Subscription> update(final String id, final String ownerId, final String tenancyId, final SubscriptionUpdate update) {
         return Optional.empty();
     }
 
     @Override
-    public boolean delete(final String id, final String userId, final String tenancyId) {
+    public boolean delete(final String id, final String ownerId, final String tenancyId) {
         return false;
     }
 
@@ -74,11 +74,13 @@ public class NoOpSubscriptionStore implements SubscriptionStore {
         final var now = Instant.now();
         return new Subscription(
                 UUIDv7.generate(),
-                input.userId(),
+                input.ownerId(),
                 input.tenancyId(),
                 input.name(),
                 input.eventType(),
                 input.constraints(),
+                input.targets(),
+                input.includeActor(),
                 input.template(),
                 input.enabled(),
                 now,  // createdAt

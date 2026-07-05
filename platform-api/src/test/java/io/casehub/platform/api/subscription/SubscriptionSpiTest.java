@@ -202,6 +202,7 @@ class SubscriptionSpiTest {
     @Test
     void subscriptionInput_validConstruction() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = new NotificationTemplate(
                 "Title",
                 null,
@@ -218,22 +219,27 @@ class SubscriptionSpiTest {
                 "My Subscription",
                 "work-item.created",
                 constraints,
+                targets,
+                false,
                 template,
                 true
         );
 
-        assertThat(input.userId()).isEqualTo("user-1");
+        assertThat(input.ownerId()).isEqualTo("user-1");
         assertThat(input.tenancyId()).isEqualTo("tenant-1");
         assertThat(input.name()).isEqualTo("My Subscription");
         assertThat(input.eventType()).isEqualTo("work-item.created");
         assertThat(input.constraints()).hasSize(1);
+        assertThat(input.targets()).hasSize(1);
+        assertThat(input.includeActor()).isFalse();
         assertThat(input.template()).isEqualTo(template);
         assertThat(input.enabled()).isTrue();
     }
 
     @Test
-    void subscriptionInput_rejectsNullUserId() {
+    void subscriptionInput_rejectsNullOwnerId() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 null,
@@ -241,16 +247,19 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true
         ))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("userId");
+                .hasMessageContaining("ownerId");
     }
 
     @Test
     void subscriptionInput_rejectsNullTenancyId() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
@@ -258,6 +267,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true
         ))
@@ -268,6 +279,7 @@ class SubscriptionSpiTest {
     @Test
     void subscriptionInput_rejectsNullName() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
@@ -275,6 +287,8 @@ class SubscriptionSpiTest {
                 null,
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true
         ))
@@ -285,6 +299,7 @@ class SubscriptionSpiTest {
     @Test
     void subscriptionInput_rejectsNullEventType() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
@@ -292,6 +307,8 @@ class SubscriptionSpiTest {
                 "Name",
                 null,
                 constraints,
+                targets,
+                false,
                 template,
                 true
         ))
@@ -301,6 +318,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullConstraints() {
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
@@ -308,6 +326,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 null,
+                targets,
+                false,
                 template,
                 true
         ))
@@ -316,14 +336,36 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscriptionInput_rejectsNullTemplate() {
+    void subscriptionInput_rejectsNullTargets() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
                 "tenant-1",
                 "Name",
                 "event-type",
                 constraints,
+                null,
+                false,
+                template,
+                true
+        ))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("targets");
+    }
+
+    @Test
+    void subscriptionInput_rejectsNullTemplate() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
+        assertThatThrownBy(() -> new SubscriptionInput(
+                "user-1",
+                "tenant-1",
+                "Name",
+                "event-type",
+                constraints,
+                targets,
+                false,
                 null,
                 true
         ))
@@ -334,6 +376,7 @@ class SubscriptionSpiTest {
     @Test
     void subscriptionInput_makesDefensiveCopyOfConstraints() {
         var mutableList = new java.util.ArrayList<>(List.of(new Constraint("status", ConstraintOp.EQ, "active")));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var input = new SubscriptionInput(
                 "user-1",
@@ -341,6 +384,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 mutableList,
+                targets,
+                false,
                 template,
                 true
         );
@@ -352,11 +397,36 @@ class SubscriptionSpiTest {
         assertThat(input.constraints()).hasSize(1);
     }
 
+    @Test
+    void subscriptionInput_makesDefensiveCopyOfTargets() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var mutableTargets = new java.util.ArrayList<>(List.of(new NotificationTarget(TargetType.USER, "user-1")));
+        var template = createTemplate();
+        var input = new SubscriptionInput(
+                "user-1",
+                "tenant-1",
+                "Name",
+                "event-type",
+                constraints,
+                mutableTargets,
+                false,
+                template,
+                true
+        );
+
+        // Mutate original list
+        mutableTargets.clear();
+
+        // Input's copy is unaffected
+        assertThat(input.targets()).hasSize(1);
+    }
+
     // Subscription tests
 
     @Test
     void subscription_validConstruction() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var createdAt = Instant.now();
         var updatedAt = createdAt.plusSeconds(60);
@@ -368,6 +438,8 @@ class SubscriptionSpiTest {
                 "My Subscription",
                 "work-item.created",
                 constraints,
+                targets,
+                false,
                 template,
                 true,
                 createdAt,
@@ -375,11 +447,13 @@ class SubscriptionSpiTest {
         );
 
         assertThat(subscription.id()).isEqualTo("sub-123");
-        assertThat(subscription.userId()).isEqualTo("user-1");
+        assertThat(subscription.ownerId()).isEqualTo("user-1");
         assertThat(subscription.tenancyId()).isEqualTo("tenant-1");
         assertThat(subscription.name()).isEqualTo("My Subscription");
         assertThat(subscription.eventType()).isEqualTo("work-item.created");
         assertThat(subscription.constraints()).hasSize(1);
+        assertThat(subscription.targets()).hasSize(1);
+        assertThat(subscription.includeActor()).isFalse();
         assertThat(subscription.template()).isEqualTo(template);
         assertThat(subscription.enabled()).isTrue();
         assertThat(subscription.createdAt()).isEqualTo(createdAt);
@@ -389,6 +463,7 @@ class SubscriptionSpiTest {
     @Test
     void subscription_rejectsNullId() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
                 null,
@@ -397,6 +472,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true,
                 Instant.now(),
@@ -409,6 +486,7 @@ class SubscriptionSpiTest {
     @Test
     void subscription_rejectsNullCreatedAt() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
                 "sub-123",
@@ -417,6 +495,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true,
                 null,
@@ -429,6 +509,7 @@ class SubscriptionSpiTest {
     @Test
     void subscription_rejectsNullUpdatedAt() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
                 "sub-123",
@@ -437,6 +518,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 constraints,
+                targets,
+                false,
                 template,
                 true,
                 Instant.now(),
@@ -449,6 +532,7 @@ class SubscriptionSpiTest {
     @Test
     void subscription_makesDefensiveCopyOfConstraints() {
         var mutableList = new java.util.ArrayList<>(List.of(new Constraint("status", ConstraintOp.EQ, "active")));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var subscription = new Subscription(
                 "sub-123",
@@ -457,6 +541,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 mutableList,
+                targets,
+                false,
                 template,
                 true,
                 Instant.now(),
@@ -470,16 +556,46 @@ class SubscriptionSpiTest {
         assertThat(subscription.constraints()).hasSize(1);
     }
 
+    @Test
+    void subscription_makesDefensiveCopyOfTargets() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var mutableTargets = new java.util.ArrayList<>(List.of(new NotificationTarget(TargetType.USER, "user-1")));
+        var template = createTemplate();
+        var subscription = new Subscription(
+                "sub-123",
+                "user-1",
+                "tenant-1",
+                "Name",
+                "event-type",
+                constraints,
+                mutableTargets,
+                false,
+                template,
+                true,
+                Instant.now(),
+                Instant.now()
+        );
+
+        // Mutate original list
+        mutableTargets.clear();
+
+        // Subscription's copy is unaffected
+        assertThat(subscription.targets()).hasSize(1);
+    }
+
     // SubscriptionUpdate tests
 
     @Test
     void subscriptionUpdate_validConstruction_allFieldsSet() {
         var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets = List.of(new NotificationTarget(TargetType.USER, "user-2"));
         var template = createTemplate();
         var update = new SubscriptionUpdate(
                 "New Name",
                 "new-event-type",
                 constraints,
+                targets,
+                true,
                 template,
                 false
         );
@@ -487,17 +603,21 @@ class SubscriptionSpiTest {
         assertThat(update.name()).isEqualTo("New Name");
         assertThat(update.eventType()).isEqualTo("new-event-type");
         assertThat(update.constraints()).hasSize(1);
+        assertThat(update.targets()).hasSize(1);
+        assertThat(update.includeActor()).isTrue();
         assertThat(update.template()).isEqualTo(template);
         assertThat(update.enabled()).isFalse();
     }
 
     @Test
     void subscriptionUpdate_allFieldsNullable() {
-        var update = new SubscriptionUpdate(null, null, null, null, null);
+        var update = new SubscriptionUpdate(null, null, null, null, null, null, null);
 
         assertThat(update.name()).isNull();
         assertThat(update.eventType()).isNull();
         assertThat(update.constraints()).isNull();
+        assertThat(update.targets()).isNull();
+        assertThat(update.includeActor()).isNull();
         assertThat(update.template()).isNull();
         assertThat(update.enabled()).isNull();
     }
@@ -509,6 +629,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 mutableList,
+                null,
+                null,
                 createTemplate(),
                 true
         );
@@ -518,6 +640,26 @@ class SubscriptionSpiTest {
 
         // Update's copy is unaffected
         assertThat(update.constraints()).hasSize(1);
+    }
+
+    @Test
+    void subscriptionUpdate_makesDefensiveCopyOfTargets() {
+        var mutableTargets = new java.util.ArrayList<>(List.of(new NotificationTarget(TargetType.USER, "user-1")));
+        var update = new SubscriptionUpdate(
+                "Name",
+                "event-type",
+                null,
+                mutableTargets,
+                null,
+                createTemplate(),
+                true
+        );
+
+        // Mutate original list
+        mutableTargets.clear();
+
+        // Update's copy is unaffected
+        assertThat(update.targets()).hasSize(1);
     }
 
     // SubscriptionQuery tests
@@ -532,7 +674,7 @@ class SubscriptionSpiTest {
                 25
         );
 
-        assertThat(query.userId()).isEqualTo("user-1");
+        assertThat(query.ownerId()).isEqualTo("user-1");
         assertThat(query.tenancyId()).isEqualTo("tenant-1");
         assertThat(query.enabled()).isTrue();
         assertThat(query.cursor()).isEqualTo("cursor-abc");
@@ -554,7 +696,7 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscriptionQuery_rejectsNullUserId() {
+    void subscriptionQuery_rejectsNullOwnerId() {
         assertThatThrownBy(() -> new SubscriptionQuery(
                 null,
                 "tenant-1",
@@ -563,7 +705,7 @@ class SubscriptionSpiTest {
                 10
         ))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("userId");
+                .hasMessageContaining("ownerId");
     }
 
     @Test
@@ -616,6 +758,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -650,6 +794,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -683,6 +829,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -708,6 +856,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -720,6 +870,8 @@ class SubscriptionSpiTest {
                 "Old Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now().minusSeconds(60),
@@ -739,6 +891,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -758,6 +912,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),
@@ -777,6 +933,8 @@ class SubscriptionSpiTest {
                 "Name",
                 "event-type",
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 createTemplate(),
                 true,
                 Instant.now(),

@@ -43,8 +43,8 @@ public class NoOpReactiveSubscriptionStore implements ReactiveSubscriptionStore 
     }
 
     @Override
-    public Uni<Optional<Subscription>> findById(final String id, final String userId, final String tenancyId) {
-        return Uni.createFrom().item(() -> delegate.findById(id, userId, tenancyId));
+    public Uni<Optional<Subscription>> findById(final String id, final String ownerId, final String tenancyId) {
+        return Uni.createFrom().item(() -> delegate.findById(id, ownerId, tenancyId));
     }
 
     @Override
@@ -53,13 +53,13 @@ public class NoOpReactiveSubscriptionStore implements ReactiveSubscriptionStore 
     }
 
     @Override
-    public Uni<Optional<Subscription>> update(final String id, final String userId, final String tenancyId, final SubscriptionUpdate update) {
-        return Uni.createFrom().item(() -> delegate.update(id, userId, tenancyId, update));
+    public Uni<Optional<Subscription>> update(final String id, final String ownerId, final String tenancyId, final SubscriptionUpdate update) {
+        return Uni.createFrom().item(() -> delegate.update(id, ownerId, tenancyId, update));
     }
 
     @Override
-    public Uni<Boolean> delete(final String id, final String userId, final String tenancyId) {
-        return Uni.createFrom().item(() -> delegate.delete(id, userId, tenancyId));
+    public Uni<Boolean> delete(final String id, final String ownerId, final String tenancyId) {
+        return Uni.createFrom().item(() -> delegate.delete(id, ownerId, tenancyId));
     }
 
     @Override

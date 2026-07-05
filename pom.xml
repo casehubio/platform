@@ -33,6 +33,7 @@
         <module>notifications</module>
         <module>subscriptions</module>
         <module>subscriptions-inmem</module>
+        <module>subscriptions-jpa</module>
         <module>streams-kafka</module>
         <module>streams-amqp</module>
         <module>streams-webhook</module>

@@ -129,6 +129,9 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `notifications-inmem/` | `casehub-platform-notifications-inmem` | @Alternative @Priority(100) volatile InMemoryNotificationStore + InMemoryReactiveNotificationStore — ConcurrentHashMap, CDI events, bounded-size retention. Both SPIs implemented natively (non-blocking, no bridge). No quarkus:build goal. Do NOT combine with notifications-jpa in production scope |
 | `notifications-jpa/` | `casehub-platform-notifications-jpa` | @ApplicationScoped JPA NotificationStore + ReactiveNotificationStore — Hibernate Reactive Panache (reactive native) + Vert.x context await (blocking). PostgreSQL, Flyway V1 (`classpath:db/notification/migration`). Both SPIs native. CDI events via fireAsync(). @Scheduled retention purge (90d read/dismissed, 365d unread). No quarkus:build goal. Do NOT combine with notifications-inmem in production scope |
 | `notifications/` | `casehub-platform-notifications` | REST + SSE API layer — `@Path("/notifications")` JAX-RS endpoints (list, unread-count, markRead, dismiss, markAllRead) + SSE push at `/notifications/stream`. Uses ReactiveNotificationStore (RESTEasy Reactive). CDI event observers push NotificationCreated/StatusChanged/AllNotificationsRead to connected SSE clients. CurrentPrincipal-enforced tenant + user isolation. No persistence logic |
+| `subscriptions-inmem/` | `casehub-platform-subscriptions-inmem` | @Alternative @Priority(100) volatile InMemorySubscriptionStore + InMemoryReactiveSubscriptionStore — ConcurrentHashMap, CDI events. Both SPIs implemented natively. No quarkus:build goal. Do NOT combine with subscriptions-jpa in production scope |
+| `subscriptions-jpa/` | `casehub-platform-subscriptions-jpa` | @ApplicationScoped JPA SubscriptionStore + ReactiveSubscriptionStore — Hibernate Reactive Panache (reactive native) + Vert.x context await (blocking). PostgreSQL, Flyway V1 (`classpath:db/subscription/migration`). JSON columns for constraints + template. Both SPIs native. CDI events via fireAsync(). No quarkus:build goal. Do NOT combine with subscriptions-inmem in production scope |
+| `subscriptions/` | `casehub-platform-subscriptions` | SubscriptionEngine (@ApplicationScoped) + REST API (@Path("/subscriptions") CRUD + enable/disable). Registers platform-global notification DataSource, wires subscriptions into alpha network via EventTypeObjectType + ConstraintCompiler + TemplateResolver. MVEL for constraint predicates (mock phase until MVEL3 publishes). MethodHandle for all fixed property access. No quarkus:build goal |
 | `acl-inmem/` | `casehub-platform-acl-inmem` | @Alternative @Priority(10) volatile AccessControlProvider — ConcurrentHashMap, constructor-injected GroupMembershipProvider, no quarkus:build goal. Add as test scope for @QuarkusTest isolation. Do NOT combine with acl-jpa in the same scope |
 | `acl-jpa/` | `casehub-platform-acl-jpa` | @ApplicationScoped JPA AccessControlProvider — Hibernate Reactive Panache, PostgreSQL, Flyway V1 (`classpath:db/acl/migration`). Group-based grants via GroupMembershipProvider.groupsOf(). Resource parent inheritance with depth guard (20). Audit logging (GRANT/REVOKE) with tenancy. No quarkus:build goal. Do NOT combine with acl-inmem in the same scope |
 | `streams-kafka/` | `casehub-platform-streams-kafka` | @Startup @ApplicationScoped static Kafka channel ingestion — @Incoming("casehub-kafka-stream"), always raw byte[], builds CloudEvent from STREAM_EVENT_TYPE; sets datacontenttype when STREAM_DATA_CONTENT_TYPE present on descriptor. Does NOT observe EndpointRegistered. CAMEL and KAFKA are mutually exclusive for same topic. |
@@ -157,6 +160,17 @@ io.casehub.platform.api
                    NotificationSeverity (enum: INFO/WARNING/URGENT), NotificationStatus (enum: UNREAD/READ/DISMISSED),
                    NotificationCreated, NotificationStatusChanged, AllNotificationsRead (CDI events),
                    UUIDv7 (utility: time-ordered UUID per RFC 9562 §5.7, monotonic within same millisecond)
+  .subscription  — SubscriptionStore (SPI: blocking store/findById/find/update/delete/findAllEnabled),
+                   ReactiveSubscriptionStore (SPI: reactive mirror, Uni<>/Multi<> — peer contract, not bridge),
+                   Subscription (record: id, userId, tenancyId, name, eventType, constraints, template, enabled, createdAt, updatedAt),
+                   SubscriptionInput (record: routing layer input — no id/timestamps),
+                   SubscriptionUpdate (record: partial update — all fields nullable),
+                   SubscriptionQuery (record: userId, tenancyId, enabled?, cursor?, limit),
+                   SubscriptionPage (record: subscriptions, nextCursor — cursor-keyset pagination),
+                   Constraint (record: field, op, value), ConstraintOp (enum: EQ/NEQ/GT/LT/GTE/LTE/IN/STARTS_WITH/CONTAINS),
+                   NotificationTemplate (record: titlePattern, bodyPattern, severity, category, actionUrlPattern, entityType, entityIdField, actorIdField),
+                   SubscriptionCreated, SubscriptionUpdated, SubscriptionDeleted (CDI events),
+                   SubscriptionConstants (NOTIFICATION_DATASOURCE_PATH — well-known DataSource path for domain bridges)
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference

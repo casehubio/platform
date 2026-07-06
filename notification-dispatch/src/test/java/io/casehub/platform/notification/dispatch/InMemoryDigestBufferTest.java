@@ -1,0 +1,94 @@
+package io.casehub.platform.notification.dispatch;
+
+import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.notification.NotificationSeverity;
+import io.casehub.platform.api.notification.NotificationSource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class InMemoryDigestBufferTest {
+
+    private InMemoryDigestBuffer buffer;
+    private static final DigestBufferKey KEY = new DigestBufferKey("user-1", "tenant-1", "email");
+
+    @BeforeEach
+    void setUp() {
+        buffer = new InMemoryDigestBuffer(500);
+    }
+
+    @Test
+    void add_then_drain_returnsItems() {
+        buffer.add(KEY, sampleInput("Title 1"));
+        buffer.add(KEY, sampleInput("Title 2"));
+
+        var items = buffer.drain(KEY);
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).title()).isEqualTo("Title 1");
+        assertThat(items.get(1).title()).isEqualTo("Title 2");
+    }
+
+    @Test
+    void drain_clearsBuffer() {
+        buffer.add(KEY, sampleInput("Title 1"));
+        buffer.drain(KEY);
+
+        assertThat(buffer.pendingKeys()).isEmpty();
+        assertThat(buffer.drain(KEY)).isEmpty();
+    }
+
+    @Test
+    void drain_unknownKey_returnsEmpty() {
+        assertThat(buffer.drain(KEY)).isEmpty();
+    }
+
+    @Test
+    void pendingKeys_returnsOnlyKeysWithItems() {
+        var key2 = new DigestBufferKey("user-2", "tenant-1", "email");
+        buffer.add(KEY, sampleInput("Title 1"));
+        buffer.add(key2, sampleInput("Title 2"));
+
+        assertThat(buffer.pendingKeys()).containsExactlyInAnyOrder(KEY, key2);
+    }
+
+    @Test
+    void oldestPendingTimestamp_returnsFirstAddTime() throws InterruptedException {
+        buffer.add(KEY, sampleInput("Title 1"));
+        var firstTimestamp = buffer.oldestPendingTimestamp(KEY);
+        assertThat(firstTimestamp).isPresent();
+
+        Thread.sleep(10);
+        buffer.add(KEY, sampleInput("Title 2"));
+        var secondTimestamp = buffer.oldestPendingTimestamp(KEY);
+
+        assertThat(secondTimestamp).isEqualTo(firstTimestamp);
+    }
+
+    @Test
+    void oldestPendingTimestamp_unknownKey_returnsEmpty() {
+        assertThat(buffer.oldestPendingTimestamp(KEY)).isEmpty();
+    }
+
+    @Test
+    void eviction_dropsOldestWhenMaxExceeded() {
+        buffer = new InMemoryDigestBuffer(3);
+        buffer.add(KEY, sampleInput("Item 1"));
+        buffer.add(KEY, sampleInput("Item 2"));
+        buffer.add(KEY, sampleInput("Item 3"));
+        buffer.add(KEY, sampleInput("Item 4"));
+
+        var items = buffer.drain(KEY);
+        assertThat(items).hasSize(3);
+        assertThat(items.get(0).title()).isEqualTo("Item 2");
+    }
+
+    private static NotificationInput sampleInput(String title) {
+        return new NotificationInput("user-1", "tenant-1", title, null, "test",
+                NotificationSeverity.INFO, null,
+                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"));
+    }
+}

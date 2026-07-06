@@ -3,6 +3,7 @@ package io.casehub.platform.notification.dispatch;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
+import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
@@ -12,6 +13,7 @@ import io.casehub.platform.api.notification.settings.SuppressionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,19 +35,19 @@ class ChannelRouterTest {
         // Register in-app: internal, default enabled, INFO
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO),
+                        false, true, NotificationSeverity.INFO, null),
                 IN_APP_DELIVERER);
 
         // Register email: external, default enabled, WARNING
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.WARNING),
+                        true, true, NotificationSeverity.WARNING, null),
                 EMAIL_DELIVERER);
 
         // Register SMS: external, default disabled, URGENT
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.SMS, "SMS",
-                        true, false, NotificationSeverity.URGENT),
+                        true, false, NotificationSeverity.URGENT, null),
                 SMS_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -160,7 +162,7 @@ class ChannelRouterTest {
     void route_usesUserPreference_overChannelDefault() {
         // User enables SMS (default disabled) with INFO threshold
         var userPrefs = Map.of(
-                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO));
+                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO, null));
 
         var result = router.route(
                 userPrefs,
@@ -175,7 +177,7 @@ class ChannelRouterTest {
     void route_userDisablesChannel() {
         // User disables in-app
         var userPrefs = Map.of(
-                DeliveryChannels.IN_APP, new ChannelPreference(false, NotificationSeverity.INFO));
+                DeliveryChannels.IN_APP, new ChannelPreference(false, NotificationSeverity.INFO, null));
 
         var result = router.route(
                 userPrefs,
@@ -184,6 +186,106 @@ class ChannelRouterTest {
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .doesNotContain(DeliveryChannels.IN_APP);
+    }
+
+    @Test
+    void route_externalChannelWithDigest_markedDigested() {
+        // Register email with default digest schedule
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                EMAIL_DELIVERER);
+
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.INFO);
+
+        var email = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+                .findFirst().orElseThrow();
+        assertThat(email.digested()).isTrue();
+    }
+
+    @Test
+    void route_urgentSeverity_bypassesDigest() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                EMAIL_DELIVERER);
+
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.URGENT);
+
+        var email = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+                .findFirst().orElseThrow();
+        assertThat(email.digested()).isFalse();
+    }
+
+    @Test
+    void route_internalChannel_neverDigested() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App",
+                        false, true, NotificationSeverity.INFO, null),
+                IN_APP_DELIVERER);
+
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.INFO);
+
+        var inApp = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.IN_APP))
+                .findFirst().orElseThrow();
+        assertThat(inApp.digested()).isFalse();
+    }
+
+    @Test
+    void route_userPreferenceOverridesDefaultDigest() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO, null),
+                EMAIL_DELIVERER);
+
+        router = new ChannelRouter(registry);
+
+        // User enables digest on email
+        var userPrefs = Map.of(
+                DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(2))));
+
+        var result = router.route(userPrefs,
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.INFO);
+
+        var email = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+                .findFirst().orElseThrow();
+        assertThat(email.digested()).isTrue();
+    }
+
+    @Test
+    void route_noDigestSchedule_notDigested() {
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.WARNING);
+
+        var email = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+                .findFirst().orElseThrow();
+        assertThat(email.digested()).isFalse();
     }
 
     // --- helpers ---

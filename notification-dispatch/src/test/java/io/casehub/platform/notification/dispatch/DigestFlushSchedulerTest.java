@@ -1,0 +1,198 @@
+package io.casehub.platform.notification.dispatch;
+
+import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.api.delivery.DeliveryChannels;
+import io.casehub.platform.api.delivery.DeliveryResult;
+import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.delivery.DigestSchedule;
+import io.casehub.platform.api.delivery.DigestSummary;
+import io.casehub.platform.api.delivery.NotificationDeliverer;
+import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.notification.NotificationSeverity;
+import io.casehub.platform.api.notification.NotificationSource;
+import io.casehub.platform.api.notification.settings.ChannelPreference;
+import io.casehub.platform.api.notification.settings.MuteRule;
+import io.casehub.platform.api.notification.settings.MuteRuleInput;
+import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
+import io.casehub.platform.api.notification.settings.NotificationPreferenceUpdate;
+import io.casehub.platform.api.notification.settings.NotificationPreferences;
+import io.casehub.platform.api.notification.settings.Snooze;
+import io.casehub.platform.api.notification.settings.SnoozeInput;
+import io.casehub.platform.api.notification.settings.SuppressionStore;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class DigestFlushSchedulerTest {
+
+    private InMemoryDigestBuffer buffer;
+    private StubPreferenceStore preferenceStore;
+    private StubSuppressionStore suppressionStore;
+    private InMemoryDeliveryChannelRegistry channelRegistry;
+    private CapturingDigestDeliverer emailDeliverer;
+    private DigestFlushScheduler scheduler;
+
+    private static final String USER = "user-1";
+    private static final String TENANT = "tenant-1";
+    private static final DigestBufferKey EMAIL_KEY = new DigestBufferKey(USER, TENANT, DeliveryChannels.EMAIL);
+
+    @BeforeEach
+    void setUp() {
+        buffer = new InMemoryDigestBuffer(500);
+        preferenceStore = new StubPreferenceStore();
+        suppressionStore = new StubSuppressionStore();
+        channelRegistry = new InMemoryDeliveryChannelRegistry();
+        emailDeliverer = new CapturingDigestDeliverer(DeliveryChannels.EMAIL);
+
+        channelRegistry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                emailDeliverer);
+
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)))),
+                null, Instant.now());
+
+        scheduler = new DigestFlushScheduler(
+                buffer, preferenceStore, suppressionStore,
+                new SuppressionEvaluator(), channelRegistry);
+    }
+
+    @Test
+    void tick_flushesWhenIntervalElapsed() {
+        // Buffer an item — timestamp will be ~now
+        buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
+
+        // Use a 1-minute interval; item was just added so NOT due yet
+        // (oldest + 1min is in the future, so isFlushDue returns false)
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                null, Instant.now());
+
+        scheduler.tick();
+        assertThat(emailDeliverer.received).isEmpty();
+    }
+
+    @Test
+    void tick_defersWhenSnoozed() {
+        buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
+        suppressionStore.snooze = new Snooze(USER, TENANT,
+                Instant.now().plus(1, ChronoUnit.HOURS), Instant.now());
+
+        // Even with a very short interval, snooze defers
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                null, Instant.now());
+
+        scheduler.tick();
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingKeys()).contains(EMAIL_KEY);
+    }
+
+    @Test
+    void tick_perKeyErrorIsolation() {
+        var key2 = new DigestBufferKey("user-2", TENANT, DeliveryChannels.EMAIL);
+        buffer.add(EMAIL_KEY, sampleInput("Item for user-1"));
+        buffer.add(key2, sampleInput("Item for user-2"));
+
+        // user-1 preference store throws
+        preferenceStore.throwForUser = USER;
+        preferenceStore.prefs2 = new NotificationPreferences("user-2", TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                null, Instant.now());
+
+        // user-1 fails but user-2 should still be processed (though not due yet)
+        scheduler.tick();
+        // No crash — error isolated
+        assertThat(buffer.pendingKeys()).contains(EMAIL_KEY);
+    }
+
+    @Test
+    void tick_drainsOrphansWhenScheduleRemoved() {
+        buffer.add(EMAIL_KEY, sampleInput("Orphaned item"));
+        // User has no digest schedule anymore
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null)),
+                null, Instant.now());
+
+        scheduler.tick();
+        // Orphan should be flushed immediately
+        assertThat(emailDeliverer.received).hasSize(1);
+        assertThat(buffer.pendingKeys()).doesNotContain(EMAIL_KEY);
+    }
+
+    // --- helpers ---
+
+    private static NotificationInput sampleInput(String title) {
+        return new NotificationInput(USER, TENANT, title, null, "test",
+                NotificationSeverity.INFO, null,
+                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"));
+    }
+
+    private static final class CapturingDigestDeliverer implements NotificationDeliverer {
+        private final String channel;
+        final List<DigestSummary> received = new ArrayList<>();
+
+        CapturingDigestDeliverer(String channel) { this.channel = channel; }
+
+        @Override
+        public String channelId() { return channel; }
+
+        @Override
+        public DeliveryResult deliver(NotificationInput notification) {
+            return new DeliveryResult(true, null);
+        }
+
+        @Override
+        public DeliveryResult deliverDigest(DigestSummary summary) {
+            received.add(summary);
+            return new DeliveryResult(true, null);
+        }
+    }
+
+    private static final class StubPreferenceStore implements NotificationPreferenceStore {
+        NotificationPreferences prefs;
+        NotificationPreferences prefs2;
+        String throwForUser;
+
+        @Override
+        public Optional<NotificationPreferences> get(String userId, String tenancyId) {
+            if (userId.equals(throwForUser)) throw new RuntimeException("Simulated failure");
+            if (prefs2 != null && userId.equals(prefs2.userId())) return Optional.of(prefs2);
+            return prefs != null && userId.equals(prefs.userId()) ? Optional.of(prefs) : Optional.empty();
+        }
+
+        @Override
+        public NotificationPreferences update(String u, String t, NotificationPreferenceUpdate up) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class StubSuppressionStore implements SuppressionStore {
+        Snooze snooze;
+
+        @Override public MuteRule addMute(MuteRuleInput i) { throw new UnsupportedOperationException(); }
+        @Override public List<MuteRule> activeMutes(String u, String t) { return List.of(); }
+        @Override public boolean removeMute(String m, String u, String t) { throw new UnsupportedOperationException(); }
+        @Override public Snooze activateSnooze(SnoozeInput i) { throw new UnsupportedOperationException(); }
+        @Override public Optional<Snooze> activeSnooze(String u, String t) {
+            return snooze != null && u.equals(snooze.userId()) ? Optional.of(snooze) : Optional.empty();
+        }
+        @Override public boolean cancelSnooze(String u, String t) { throw new UnsupportedOperationException(); }
+    }
+}

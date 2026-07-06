@@ -131,7 +131,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `notifications/` | `casehub-platform-notifications` | REST + SSE API layer — `@Path("/notifications")` JAX-RS endpoints (list, unread-count, markRead, dismiss, markAllRead, preferences, mute, snooze, channels) + SSE push at `/notifications/stream`. Uses ReactiveNotificationStore (RESTEasy Reactive). CDI event observers push NotificationCreated/StatusChanged/AllNotificationsRead to connected SSE clients. CurrentPrincipal-enforced tenant + user isolation. No persistence logic |
 | `notification-settings-inmem/` | `casehub-platform-notification-settings-inmem` | @Alternative @Priority(100) volatile InMemoryNotificationPreferenceStore + InMemorySuppressionStore — ConcurrentHashMap, lazy expiry eviction. No quarkus:build goal. Do NOT combine with notification-settings-jpa in production scope |
 | `notification-settings-jpa/` | `casehub-platform-notification-settings-jpa` | @ApplicationScoped JPA NotificationPreferenceStore + SuppressionStore — Hibernate ORM Panache (blocking-only). PostgreSQL, Flyway V1 (`classpath:db/notification-settings/migration`). JSON columns for channelDefaults + quietHours. @Scheduled retention purge for expired mutes/snoozes. No quarkus:build goal. Do NOT combine with notification-settings-inmem in production scope |
-| `notification-dispatch/` | `casehub-platform-notification-dispatch` | NotificationDispatcher (@ObservesAsync SubscriptionMatched) + TargetResolver + SuppressionEvaluator + ChannelRouter + InAppNotificationDeliverer + InMemoryDeliveryChannelRegistry + TemplateResolver. Orchestrates: target resolution → suppression → template resolution → channel routing → delivery. No quarkus:build goal |
+| `notification-dispatch/` | `casehub-platform-notification-dispatch` | NotificationDispatcher (@ObservesAsync SubscriptionMatched) + TargetResolver + SuppressionEvaluator (evaluate + evaluateUserLevel) + ChannelRouter (digested flag) + InAppNotificationDeliverer + InMemoryDeliveryChannelRegistry + InMemoryDigestBuffer (@ApplicationScoped, ConcurrentHashMap, max-size eviction via `casehub.notification.digest.max-buffer-size`) + DigestFlushScheduler (@Scheduled tick, per-key error isolation, polymorphic isFlushDue, orphan drain, suppression deferral) + TemplateResolver. Orchestrates: target resolution → suppression → template resolution → channel routing → delivery (immediate or digest buffer). No quarkus:build goal |
 | `subscriptions-inmem/` | `casehub-platform-subscriptions-inmem` | @Alternative @Priority(100) volatile InMemorySubscriptionStore + InMemoryReactiveSubscriptionStore — ConcurrentHashMap, CDI events. Both SPIs implemented natively. No quarkus:build goal. Do NOT combine with subscriptions-jpa in production scope |
 | `subscriptions-jpa/` | `casehub-platform-subscriptions-jpa` | @ApplicationScoped JPA SubscriptionStore + ReactiveSubscriptionStore — Hibernate Reactive Panache (reactive native) + Vert.x context await (blocking). PostgreSQL, Flyway V1 (`classpath:db/subscription/migration`). JSON columns for constraints + template. Both SPIs native. CDI events via fireAsync(). No quarkus:build goal. Do NOT combine with subscriptions-inmem in production scope |
 | `subscriptions/` | `casehub-platform-subscriptions` | SubscriptionEngine (@ApplicationScoped) + REST API (@Path("/subscriptions") CRUD + enable/disable). Registers platform-global notification DataSource, wires subscriptions into alpha network via EventTypeObjectType + ConstraintCompiler. Fires SubscriptionMatched CDI event (async) — delivery delegated to NotificationDispatcher in notification-dispatch/. MVEL for constraint predicates (mock phase until MVEL3 publishes). MethodHandle for all fixed property access. No quarkus:build goal |
@@ -223,17 +223,21 @@ io.casehub.platform.api
                    open-WorkItems, and open-obligation slices of the actor state view)
   .notification.settings — NotificationPreferenceStore (SPI: blocking get/update per user),
                    NotificationPreferences (record: userId, tenancyId, channelDefaults, quietHours, updatedAt),
-                   ChannelPreference (record: enabled, minSeverity), QuietHours (record: start, end, timezone),
+                   ChannelPreference (record: enabled, minSeverity, digestSchedule), QuietHours (record: start, end, timezone),
                    NotificationPreferenceUpdate (record: channelDefaults, quietHours, clearQuietHours),
                    SuppressionStore (SPI: mute CRUD + snooze activate/cancel),
                    MuteRule (record: id, userId, tenancyId, scope, scopeId, entityType, createdAt, expiresAt),
                    MuteScope (enum: ENTITY/CATEGORY), MuteRuleInput, Snooze (record: userId, tenancyId, until, createdAt),
                    SnoozeInput, SuppressionResult (record: isMuted, isSnoozed, quietHoursActive)
   .delivery      — DeliveryChannelRegistry (SPI: register descriptor+deliverer/resolve/discover),
-                   DeliveryChannelDescriptor (record: channelId, displayName, external, defaultEnabled, defaultMinSeverity),
+                   DeliveryChannelDescriptor (record: channelId, displayName, external, defaultEnabled, defaultMinSeverity, defaultDigestSchedule),
                    DeliveryChannels (constants: IN_APP, EMAIL, SMS, PUSH),
-                   NotificationDeliverer (SPI: channelId + deliver → DeliveryResult),
-                   DeliveryResult (record: success, failureReason)
+                   NotificationDeliverer (SPI: channelId + deliver → DeliveryResult + default deliverDigest(DigestSummary)),
+                   DeliveryResult (record: success, failureReason),
+                   DigestSchedule (sealed interface: isFlushDue — Interval(Duration) + DailyAt(LocalTime, ZoneId)),
+                   DigestBuffer (SPI: add/drain/pendingKeys/oldestPendingTimestamp),
+                   DigestBufferKey (record: userId, tenancyId, channelId),
+                   DigestSummary (record: userId, tenancyId, channelId, notifications, periodStart, periodEnd)
   .credentials   — CredentialResolver (SPI: resolve(credentialRef) → Map<String, String>),
                    CredentialPropertyKeys (reserved keys: USER, PASSWORD, BEARER_TOKEN, API_KEY, EXPIRES_AT)
 ```

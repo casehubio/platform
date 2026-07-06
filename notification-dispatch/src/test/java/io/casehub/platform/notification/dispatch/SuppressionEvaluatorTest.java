@@ -240,4 +240,49 @@ class SuppressionEvaluatorTest {
         assertThat(result.isSnoozed()).isTrue();
         assertThat(result.quietHoursActive()).isTrue();
     }
+
+    @Test
+    void evaluateUserLevel_noSnoozeNoQuietHours_allFalse() {
+        var result = evaluator.evaluateUserLevel(Optional.empty(), null);
+
+        assertThat(result.isMuted()).isFalse();
+        assertThat(result.isSnoozed()).isFalse();
+        assertThat(result.quietHoursActive()).isFalse();
+    }
+
+    @Test
+    void evaluateUserLevel_activeSnooze_snoozedTrue() {
+        var snooze = new Snooze(USER, TENANT, NOW.plus(1, ChronoUnit.HOURS), NOW);
+
+        var result = evaluator.evaluateUserLevel(Optional.of(snooze), null);
+
+        assertThat(result.isMuted()).isFalse();
+        assertThat(result.isSnoozed()).isTrue();
+    }
+
+    @Test
+    void evaluateUserLevel_quietHoursActive_quietHoursTrue() {
+        var zone = ZoneId.systemDefault();
+        var nowLocal = LocalTime.now(zone);
+        var quietHours = new QuietHours(nowLocal.minusHours(1), nowLocal.plusHours(1), zone);
+
+        var result = evaluator.evaluateUserLevel(Optional.empty(), quietHours);
+
+        assertThat(result.isMuted()).isFalse();
+        assertThat(result.quietHoursActive()).isTrue();
+    }
+
+    @Test
+    void evaluateUserLevel_neverReturnsMuted() {
+        var snooze = new Snooze(USER, TENANT, NOW.plus(1, ChronoUnit.HOURS), NOW);
+        var zone = ZoneId.systemDefault();
+        var nowLocal = LocalTime.now(zone);
+        var quietHours = new QuietHours(nowLocal.minusHours(1), nowLocal.plusHours(1), zone);
+
+        var result = evaluator.evaluateUserLevel(Optional.of(snooze), quietHours);
+
+        assertThat(result.isMuted()).isFalse();
+        assertThat(result.isSnoozed()).isTrue();
+        assertThat(result.quietHoursActive()).isTrue();
+    }
 }

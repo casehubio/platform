@@ -47,7 +47,8 @@ public class InAppNotificationDeliverer implements NotificationDeliverer {
                         "In-App Inbox",
                         false,
                         true,
-                        NotificationSeverity.INFO),
+                        NotificationSeverity.INFO,
+                        null),
                 this);
     }
 

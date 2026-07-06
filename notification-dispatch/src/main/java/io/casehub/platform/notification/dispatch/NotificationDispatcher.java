@@ -1,6 +1,8 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryResult;
+import io.casehub.platform.api.delivery.DigestBuffer;
+import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
@@ -44,18 +46,21 @@ public class NotificationDispatcher {
     private final ChannelRouter channelRouter;
     private final NotificationPreferenceStore preferenceStore;
     private final SuppressionStore suppressionStore;
+    private final DigestBuffer digestBuffer;
 
     @Inject
     public NotificationDispatcher(final TargetResolver targetResolver,
                                   final SuppressionEvaluator suppressionEvaluator,
                                   final ChannelRouter channelRouter,
                                   final NotificationPreferenceStore preferenceStore,
-                                  final SuppressionStore suppressionStore) {
+                                  final SuppressionStore suppressionStore,
+                                  final DigestBuffer digestBuffer) {
         this.targetResolver = targetResolver;
         this.suppressionEvaluator = suppressionEvaluator;
         this.channelRouter = channelRouter;
         this.preferenceStore = preferenceStore;
         this.suppressionStore = suppressionStore;
+        this.digestBuffer = digestBuffer;
     }
 
     /**
@@ -128,8 +133,14 @@ public class NotificationDispatcher {
         final Set<ResolvedChannel> channels = channelRouter.route(
                 channelDefaults, suppressionResult, notificationInput.severity());
 
-        // Delivery — per-channel error isolation
+        // Delivery — three-path routing: digest, suppress, or deliver
         for (final ResolvedChannel channel : channels) {
+            if (channel.digested()) {
+                digestBuffer.add(
+                        new DigestBufferKey(userId, tenancyId, channel.channelId()),
+                        notificationInput);
+                continue;
+            }
             if (channel.suppressed()) {
                 continue;
             }

@@ -31,7 +31,7 @@ class JpaNotificationPreferenceStoreTest {
     @Test
     @TestTransaction
     void update_createsPreferences_whenNoneExist() {
-        var channelPrefs = Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING));
+        var channelPrefs = Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null));
         var update = new NotificationPreferenceUpdate(channelPrefs, null, false);
 
         var result = store.update("user1", "tenant1", update);
@@ -46,12 +46,12 @@ class JpaNotificationPreferenceStoreTest {
     @Test
     @TestTransaction
     void update_updatesChannelDefaults() {
-        var initial = Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO));
+        var initial = Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null));
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(initial, null, false));
 
         var updated = Map.of(
-                "email", new ChannelPreference(false, NotificationSeverity.URGENT),
-                "sms", new ChannelPreference(true, NotificationSeverity.WARNING)
+                "email", new ChannelPreference(false, NotificationSeverity.URGENT, null),
+                "sms", new ChannelPreference(true, NotificationSeverity.WARNING, null)
         );
         var result = store.update("user1", "tenant1", new NotificationPreferenceUpdate(updated, null, false));
 
@@ -99,7 +99,7 @@ class JpaNotificationPreferenceStoreTest {
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(Map.of(), quietHours, false));
 
         var result = store.update("user1", "tenant1",
-                new NotificationPreferenceUpdate(Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO)), null, false));
+                new NotificationPreferenceUpdate(Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)), null, false));
 
         assertThat(result.quietHours()).isEqualTo(quietHours);
     }
@@ -108,11 +108,11 @@ class JpaNotificationPreferenceStoreTest {
     @TestTransaction
     void get_isolatesByUserAndTenancy() {
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(
-                Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO)), null, false));
+                Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)), null, false));
         store.update("user2", "tenant1", new NotificationPreferenceUpdate(
-                Map.of("sms", new ChannelPreference(true, NotificationSeverity.WARNING)), null, false));
+                Map.of("sms", new ChannelPreference(true, NotificationSeverity.WARNING, null)), null, false));
         store.update("user1", "tenant2", new NotificationPreferenceUpdate(
-                Map.of("push", new ChannelPreference(true, NotificationSeverity.URGENT)), null, false));
+                Map.of("push", new ChannelPreference(true, NotificationSeverity.URGENT, null)), null, false));
 
         var user1Tenant1 = store.get("user1", "tenant1");
         var user2Tenant1 = store.get("user2", "tenant1");

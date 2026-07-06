@@ -3,6 +3,9 @@ package io.casehub.platform.notification.dispatch;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
+import io.casehub.platform.api.delivery.DigestBuffer;
+import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
@@ -27,6 +30,7 @@ import io.casehub.platform.api.subscription.TargetType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -53,6 +57,7 @@ class NotificationDispatcherTest {
     private StubNotificationPreferenceStore preferenceStore;
     private StubSuppressionStore suppressionStore;
     private InMemoryDeliveryChannelRegistry channelRegistry;
+    private CapturingDigestBuffer digestBuffer;
 
     // Pipeline components
     private NotificationDispatcher dispatcher;
@@ -62,12 +67,13 @@ class NotificationDispatcherTest {
         preferenceStore = new StubNotificationPreferenceStore();
         suppressionStore = new StubSuppressionStore();
         channelRegistry = new InMemoryDeliveryChannelRegistry();
+        digestBuffer = new CapturingDigestBuffer();
         deliveredNotifications.clear();
 
         // Register in-app channel with capturing deliverer
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO),
+                        false, true, NotificationSeverity.INFO, null),
                 new CapturingDeliverer(DeliveryChannels.IN_APP, deliveredNotifications));
 
         final GroupMembershipProvider groupProvider = groupName -> {
@@ -85,7 +91,7 @@ class NotificationDispatcherTest {
 
         dispatcher = new NotificationDispatcher(
                 targetResolver, suppressionEvaluator, channelRouter,
-                preferenceStore, suppressionStore);
+                preferenceStore, suppressionStore, digestBuffer);
     }
 
     @Test
@@ -219,7 +225,7 @@ class NotificationDispatcherTest {
         var failingDeliverer = new FailingDeliverer("email");
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.INFO),
+                        true, true, NotificationSeverity.INFO, null),
                 failingDeliverer);
 
         var sub = subscription(
@@ -231,6 +237,55 @@ class NotificationDispatcherTest {
 
         // In-app should still succeed despite email failure
         assertThat(deliveredNotifications).hasSize(1);
+    }
+
+    @Test
+    void dispatch_digestedChannel_buffersInsteadOfDelivering() {
+        // Register email with digest schedule
+        channelRegistry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1))),
+                new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
+
+        var sub = subscription(
+                List.of(new NotificationTarget(TargetType.USER, "user-recipient")),
+                false);
+        var pojo = new TestEvent("wi-1", "actor-user", "completed");
+
+        dispatcher.onMatch(new SubscriptionMatched(sub, pojo));
+
+        // In-app delivered immediately
+        assertThat(deliveredNotifications).hasSize(1);
+        assertThat(deliveredNotifications.get(0).userId()).isEqualTo("user-recipient");
+
+        // Email buffered, not delivered
+        assertThat(digestBuffer.buffered).hasSize(1);
+        assertThat(digestBuffer.buffered.get(0).key().channelId()).isEqualTo(DeliveryChannels.EMAIL);
+    }
+
+    @Test
+    void dispatch_urgentSeverity_bypassesDigest() {
+        channelRegistry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1))),
+                new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
+
+        var urgentTemplate = new NotificationTemplate(
+                "URGENT: {status}", null, NotificationSeverity.URGENT, "urgent.event",
+                null, "work-item", "entityId", "actorId");
+        var sub = new Subscription("sub-1", "owner-1", TENANT, "Urgent", "test.event",
+                List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-recipient")),
+                false, urgentTemplate, true, NOW, NOW);
+        var pojo = new TestEvent("wi-1", "actor-user", "critical");
+
+        dispatcher.onMatch(new SubscriptionMatched(sub, pojo));
+
+        // Both in-app and email delivered immediately (URGENT bypasses digest)
+        assertThat(deliveredNotifications).hasSize(2);
+        assertThat(digestBuffer.buffered).isEmpty();
     }
 
     // --- helpers ---
@@ -336,6 +391,36 @@ class NotificationDispatcherTest {
         @Override
         public boolean cancelSnooze(String userId, String tenancyId) {
             throw new UnsupportedOperationException("Not used in tests");
+        }
+    }
+
+    private static final class CapturingDigestBuffer implements DigestBuffer {
+        record BufferedItem(DigestBufferKey key, NotificationInput notification) {}
+        final List<BufferedItem> buffered = new ArrayList<>();
+
+        @Override
+        public void add(DigestBufferKey key, NotificationInput notification) {
+            buffered.add(new BufferedItem(key, notification));
+        }
+
+        @Override
+        public List<NotificationInput> drain(DigestBufferKey key) {
+            var items = buffered.stream()
+                    .filter(b -> b.key().equals(key))
+                    .map(BufferedItem::notification)
+                    .toList();
+            buffered.removeIf(b -> b.key().equals(key));
+            return items;
+        }
+
+        @Override
+        public Set<DigestBufferKey> pendingKeys() {
+            return buffered.stream().map(BufferedItem::key).collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public Optional<Instant> oldestPendingTimestamp(DigestBufferKey key) {
+            return Optional.of(Instant.now());
         }
     }
 }

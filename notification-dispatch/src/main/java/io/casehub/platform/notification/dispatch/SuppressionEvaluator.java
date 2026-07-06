@@ -53,6 +53,21 @@ public class SuppressionEvaluator {
         return new SuppressionResult(isMuted, isSnoozed, quietHoursActive);
     }
 
+    /**
+     * Evaluate user-level suppression state (for digest batches with heterogeneous entities).
+     *
+     * <p>User-level suppression checks only snooze and quiet hours; muting is entity-specific
+     * and cannot be applied to a digest containing multiple entities.
+     *
+     * @param activeSnooze pre-fetched active snooze for the user
+     * @param quietHours   user's quiet hours configuration (nullable = no quiet hours)
+     * @return suppression result with isMuted always false, isSnoozed and quietHoursActive as evaluated
+     */
+    public SuppressionResult evaluateUserLevel(final Optional<Snooze> activeSnooze,
+                                               final QuietHours quietHours) {
+        return new SuppressionResult(false, checkSnoozed(activeSnooze), checkQuietHours(quietHours));
+    }
+
     private boolean checkMuted(final List<MuteRule> activeMutes,
                                final String entityType,
                                final String entityId,
@@ -82,13 +97,13 @@ public class SuppressionEvaluator {
         return false;
     }
 
-    private boolean checkSnoozed(final Optional<Snooze> activeSnooze) {
+    boolean checkSnoozed(final Optional<Snooze> activeSnooze) {
         return activeSnooze
                 .filter(snooze -> Instant.now().isBefore(snooze.until()))
                 .isPresent();
     }
 
-    private boolean checkQuietHours(final QuietHours quietHours) {
+    boolean checkQuietHours(final QuietHours quietHours) {
         if (quietHours == null) {
             return false;
         }

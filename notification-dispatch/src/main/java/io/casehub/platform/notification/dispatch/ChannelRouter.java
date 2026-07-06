@@ -2,6 +2,7 @@ package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
+import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.settings.ChannelPreference;
@@ -88,7 +89,19 @@ public class ChannelRouter {
             final boolean suppressed = descriptor.external()
                     && (suppressionResult.isSnoozed() || suppressionResult.quietHoursActive());
 
-            result.add(new ResolvedChannel(channelId, deliverer, suppressed));
+            // Determine effective digest schedule: user preference overrides channel default
+            final DigestSchedule effectiveDigest;
+            if (userPref != null && userPref.digestSchedule() != null) {
+                effectiveDigest = userPref.digestSchedule();
+            } else {
+                effectiveDigest = descriptor.defaultDigestSchedule();
+            }
+
+            final boolean digested = descriptor.external()
+                    && effectiveDigest != null
+                    && severity != NotificationSeverity.URGENT;
+
+            result.add(new ResolvedChannel(channelId, deliverer, suppressed, digested));
         }
 
         return result;

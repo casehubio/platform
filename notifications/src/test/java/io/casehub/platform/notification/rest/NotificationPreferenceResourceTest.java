@@ -64,7 +64,7 @@ class NotificationPreferenceResourceTest {
     @Test
     void put_storesAndReturnsPreferences() {
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING)),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null)),
             new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("America/New_York")),
             false
         );
@@ -131,7 +131,7 @@ class NotificationPreferenceResourceTest {
     void tenantIsolation_userCannotAccessOtherTenantPreferences() {
         // user-1 in default tenant sets preferences
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO)),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)),
             null,
             false
         );
@@ -158,7 +158,7 @@ class NotificationPreferenceResourceTest {
     void put_overridesUserIdFromPrincipal() {
         // The REST layer should override userId/tenancyId from CurrentPrincipal
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO)),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)),
             null,
             false
         );

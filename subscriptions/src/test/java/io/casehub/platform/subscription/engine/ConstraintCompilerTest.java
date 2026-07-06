@@ -39,10 +39,10 @@ class ConstraintCompilerTest {
     }
 
     @Test
-    void compile_meePlaceholder_substitutedWithUserId() {
+    void compile_meePlaceholder_substitutedWithOwnerId() {
         var constraints = List.of(new Constraint("assignee", ConstraintOp.EQ, "$me"));
-        var fe = ConstraintCompiler.compile(constraints, "tenant-1", "user-42");
-        assertThat(fe.expression()).contains("assignee == \"user-42\"");
+        var fe = ConstraintCompiler.compile(constraints, "tenant-1", "owner-42");
+        assertThat(fe.expression()).contains("assignee == \"owner-42\"");
     }
 
     @Test
@@ -122,7 +122,7 @@ class ConstraintCompilerTest {
     }
 
     @Test
-    void compile_rejectsNullUserId() {
+    void compile_rejectsNullOwnerId() {
         assertThatThrownBy(() -> ConstraintCompiler.compile(List.of(), "tenant-1", null))
                 .isInstanceOf(NullPointerException.class);
     }

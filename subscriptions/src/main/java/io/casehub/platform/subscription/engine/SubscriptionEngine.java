@@ -6,13 +6,14 @@ import io.casehub.platform.api.datasource.DataSource;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.datasource.DataSourceRegistry;
 import io.casehub.platform.api.datasource.SubscriptionHandle;
-import io.casehub.platform.api.notification.NotificationStore;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
+import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -32,8 +33,9 @@ import static io.casehub.platform.api.subscription.SubscriptionConstants.NOTIFIC
  * each as an alpha network subscriber, and handles dynamic mutations via CDI
  * event observers.
  *
- * <p>On match, resolves the template against the event POJO and stores the
- * resulting notification via {@link NotificationStore}.
+ * <p>On match, fires {@link SubscriptionMatched} via {@code fireAsync()}.
+ * The {@code NotificationDispatcher} observes these events and orchestrates
+ * delivery.
  *
  * <h2>Thread safety</h2>
  * <p>Uses {@link ConcurrentHashMap#compute(Object, java.util.function.BiFunction)}
@@ -52,17 +54,17 @@ public class SubscriptionEngine {
 
     private final DataSourceRegistry dataSourceRegistry;
     private final SubscriptionStore subscriptionStore;
-    private final NotificationStore notificationStore;
+    private final Event<SubscriptionMatched> matchEvent;
     private final ConcurrentHashMap<String, SubscriptionHandle> handles = new ConcurrentHashMap<>();
     private volatile DataSource<Object> notificationDataSource;
 
     @Inject
     public SubscriptionEngine(final DataSourceRegistry dataSourceRegistry,
                                final SubscriptionStore subscriptionStore,
-                               final NotificationStore notificationStore) {
+                               final Event<SubscriptionMatched> matchEvent) {
         this.dataSourceRegistry = dataSourceRegistry;
         this.subscriptionStore = subscriptionStore;
-        this.notificationStore = notificationStore;
+        this.matchEvent = matchEvent;
     }
 
     /**
@@ -89,7 +91,7 @@ public class SubscriptionEngine {
      * Wires a subscription into the alpha network. Creates an {@link EventTypeObjectType}
      * for type discrimination, compiles the constraints into a tenant-isolated
      * {@link io.casehub.platform.api.datasource.FilterExpression}, and subscribes a
-     * {@link DataProcessor} that resolves the template and stores the notification.
+     * {@link DataProcessor} that fires {@link SubscriptionMatched} events.
      *
      * <p>Uses {@code ConcurrentHashMap.compute()} for per-key atomicity — if a handle
      * already exists for this subscription ID, it is unsubscribed first.
@@ -99,14 +101,8 @@ public class SubscriptionEngine {
         var filter = ConstraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
-        DataProcessor<Object> processor = pojo -> {
-            var input = TemplateResolver.resolve(
-                    subscription.template(), pojo,
-                    subscription.ownerId(), subscription.tenancyId());
-            if (input != null) {
-                notificationStore.store(input);
-            }
-        };
+        DataProcessor<Object> processor = pojo ->
+                matchEvent.fireAsync(new SubscriptionMatched(subscription, pojo));
 
         var handle = notificationDataSource.subscribe(objectType, filter, processor);
 
@@ -128,14 +124,8 @@ public class SubscriptionEngine {
         var filter = ConstraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
-        DataProcessor<Object> processor = pojo -> {
-            var input = TemplateResolver.resolve(
-                    subscription.template(), pojo,
-                    subscription.ownerId(), subscription.tenancyId());
-            if (input != null) {
-                notificationStore.store(input);
-            }
-        };
+        DataProcessor<Object> processor = pojo ->
+                matchEvent.fireAsync(new SubscriptionMatched(subscription, pojo));
 
         return notificationDataSource.subscribe(objectType, filter, processor);
     }

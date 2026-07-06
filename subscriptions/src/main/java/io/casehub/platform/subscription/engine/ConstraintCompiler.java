@@ -37,17 +37,17 @@ public final class ConstraintCompiler {
      *
      * @param constraints user-defined constraints (may be empty)
      * @param tenancyId   tenant for isolation (never null)
-     * @param userId      user for {@code $me} placeholder substitution (never null)
+     * @param ownerId     subscription owner for {@code $me} placeholder substitution (never null)
      * @return compiled FilterExpression with tenant-aware predicate
      */
     public static FilterExpression<Object> compile(final List<Constraint> constraints,
                                                    final String tenancyId,
-                                                   final String userId) {
+                                                   final String ownerId) {
         Objects.requireNonNull(constraints, "constraints");
         Objects.requireNonNull(tenancyId, "tenancyId");
-        Objects.requireNonNull(userId, "userId");
+        Objects.requireNonNull(ownerId, "ownerId");
 
-        final String mvelExpression = buildMvelExpression(constraints, userId);
+        final String mvelExpression = buildMvelExpression(constraints, ownerId);
         final String expression = "tenant=" + tenancyId + ":" + mvelExpression;
 
         // Tenant isolation via MethodHandle — MVEL-independent
@@ -60,21 +60,21 @@ public final class ConstraintCompiler {
     }
 
     private static String buildMvelExpression(final List<Constraint> constraints,
-                                              final String userId) {
+                                              final String ownerId) {
         if (constraints.isEmpty()) {
             return "true";
         }
         var joiner = new StringJoiner(" && ");
         for (final Constraint constraint : constraints) {
-            joiner.add(toMvelClause(constraint, userId));
+            joiner.add(toMvelClause(constraint, ownerId));
         }
         return joiner.toString();
     }
 
-    private static String toMvelClause(final Constraint constraint, final String userId) {
+    private static String toMvelClause(final Constraint constraint, final String ownerId) {
         final String field = constraint.field();
         final String rawValue = String.valueOf(constraint.value());
-        final String value = "$me".equals(rawValue) ? userId : rawValue;
+        final String value = "$me".equals(rawValue) ? ownerId : rawValue;
         final ConstraintOp op = constraint.op();
 
         return switch (op) {

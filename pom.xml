@@ -32,6 +32,7 @@
         <module>notifications-jpa</module>
         <module>notifications</module>
         <module>notification-settings-inmem</module>
+        <module>notification-settings-jpa</module>
         <module>subscriptions</module>
         <module>subscriptions-inmem</module>
         <module>subscriptions-jpa</module>

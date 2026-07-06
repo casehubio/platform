@@ -9,6 +9,7 @@ import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.NotificationStore;
 
+import io.quarkus.arc.Unremovable;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -22,6 +23,7 @@ import org.jboss.logging.Logger;
  * In-app is an internal channel (not external), so it is never suppressed
  * by snooze or quiet hours — only mute drops it entirely.
  */
+@Unremovable
 @ApplicationScoped
 public class InAppNotificationDeliverer implements NotificationDeliverer {
 

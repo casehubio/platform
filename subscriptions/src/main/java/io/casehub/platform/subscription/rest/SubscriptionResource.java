@@ -1,11 +1,15 @@
 package io.casehub.platform.subscription.rest;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionPage;
 import io.casehub.platform.api.subscription.SubscriptionQuery;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
+import io.casehub.platform.api.subscription.TargetType;
+
+import java.util.List;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -22,7 +26,7 @@ import jakarta.ws.rs.core.Response;
 /**
  * REST endpoints for subscription CRUD operations.
  *
- * <p>All endpoints use {@link CurrentPrincipal} for identity — userId and tenancyId
+ * <p>All endpoints use {@link CurrentPrincipal} for identity — ownerId and tenancyId
  * are never passed as request parameters. Tenant and user isolation is enforced by
  * the principal.
  *
@@ -44,20 +48,28 @@ public class SubscriptionResource {
     /**
      * Create a new subscription.
      *
-     * <p>The userId and tenancyId in the request body are ignored — they are overridden
-     * from the current principal to enforce user-level authorization.
+     * <p>The ownerId and tenancyId in the request body are ignored — they are overridden
+     * from the current principal to enforce user-level authorization. If targets is null
+     * or empty, defaults to [NotificationTarget(USER, principal.actorId())].
      *
-     * @param input subscription input (userId/tenancyId overridden from principal)
+     * @param input subscription input (ownerId/tenancyId overridden from principal)
      * @return 201 with created subscription
      */
     @POST
     public Uni<Response> create(final SubscriptionInput input) {
+        // Default targets to USER pointing to owner if not provided
+        final var targets = (input.targets() == null || input.targets().isEmpty())
+            ? List.of(new NotificationTarget(TargetType.USER, principal.actorId()))
+            : input.targets();
+
         final var securedInput = new SubscriptionInput(
             principal.actorId(),
             principal.tenancyId(),
             input.name(),
             input.eventType(),
             input.constraints(),
+            targets,
+            input.includeActor(),
             input.template(),
             input.enabled()
         );
@@ -144,7 +156,7 @@ public class SubscriptionResource {
     @Path("/{id}/enable")
     public Uni<Response> enable(@PathParam("id") final String id) {
         return store.update(id, principal.actorId(), principal.tenancyId(),
-                new SubscriptionUpdate(null, null, null, null, true))
+                new SubscriptionUpdate(null, null, null, null, null, null, true))
             .map(opt -> opt.map(s -> Response.ok(s).build())
                 .orElse(Response.status(404).build()));
     }
@@ -159,7 +171,7 @@ public class SubscriptionResource {
     @Path("/{id}/disable")
     public Uni<Response> disable(@PathParam("id") final String id) {
         return store.update(id, principal.actorId(), principal.tenancyId(),
-                new SubscriptionUpdate(null, null, null, null, false))
+                new SubscriptionUpdate(null, null, null, null, null, null, false))
             .map(opt -> opt.map(s -> Response.ok(s).build())
                 .orElse(Response.status(404).build()));
     }

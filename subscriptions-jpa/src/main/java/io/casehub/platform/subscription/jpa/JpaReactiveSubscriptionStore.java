@@ -62,11 +62,11 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
     }
 
     @Override
-    public Uni<Optional<Subscription>> findById(String id, String userId, String tenancyId) {
+    public Uni<Optional<Subscription>> findById(String id, String ownerId, String tenancyId) {
         return Panache.withSession(() ->
                 SubscriptionEntity.<SubscriptionEntity>find(
-                                "id = ?1 AND userId = ?2 AND tenancyId = ?3",
-                                id, userId, tenancyId)
+                                "id = ?1 AND ownerId = ?2 AND tenancyId = ?3",
+                                id, ownerId, tenancyId)
                         .firstResult()
                         .map(entity -> entity == null
                                 ? Optional.empty()
@@ -77,9 +77,9 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
     public Uni<SubscriptionPage> find(SubscriptionQuery query) {
         return Panache.withSession(() -> {
             StringBuilder hql = new StringBuilder(
-                    "FROM SubscriptionEntity WHERE userId = ?1 AND tenancyId = ?2");
+                    "FROM SubscriptionEntity WHERE ownerId = ?1 AND tenancyId = ?2");
             List<Object> params = new ArrayList<>();
-            params.add(query.userId());
+            params.add(query.ownerId());
             params.add(query.tenancyId());
             int paramIndex = 3;
 
@@ -134,12 +134,12 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
     }
 
     @Override
-    public Uni<Optional<Subscription>> update(String id, String userId, String tenancyId,
+    public Uni<Optional<Subscription>> update(String id, String ownerId, String tenancyId,
                                                SubscriptionUpdate update) {
         return Panache.withTransaction(() ->
                 SubscriptionEntity.<SubscriptionEntity>find(
-                                "id = ?1 AND userId = ?2 AND tenancyId = ?3",
-                                id, userId, tenancyId)
+                                "id = ?1 AND ownerId = ?2 AND tenancyId = ?3",
+                                id, ownerId, tenancyId)
                         .firstResult()
                         .map(entity -> {
                             if (entity == null) {
@@ -161,11 +161,11 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
     }
 
     @Override
-    public Uni<Boolean> delete(String id, String userId, String tenancyId) {
+    public Uni<Boolean> delete(String id, String ownerId, String tenancyId) {
         return Panache.withTransaction(() ->
                 SubscriptionEntity.<SubscriptionEntity>find(
-                                "id = ?1 AND userId = ?2 AND tenancyId = ?3",
-                                id, userId, tenancyId)
+                                "id = ?1 AND ownerId = ?2 AND tenancyId = ?3",
+                                id, ownerId, tenancyId)
                         .firstResult()
                         .chain(entity -> {
                             if (entity == null) {
@@ -210,6 +210,12 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
         }
         if (update.constraints() != null) {
             entity.constraintsJson = SubscriptionEntity.serializeConstraints(update.constraints(), mapper);
+        }
+        if (update.targets() != null) {
+            entity.targetsJson = SubscriptionEntity.serializeTargets(update.targets(), mapper);
+        }
+        if (update.includeActor() != null) {
+            entity.includeActor = update.includeActor();
         }
         if (update.template() != null) {
             entity.templateJson = SubscriptionEntity.serializeTemplate(update.template(), mapper);

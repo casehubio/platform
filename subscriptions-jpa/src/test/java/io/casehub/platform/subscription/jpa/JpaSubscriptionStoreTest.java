@@ -11,6 +11,8 @@ import io.casehub.platform.api.subscription.SubscriptionQuery;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionStoreContractTest;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
+import io.casehub.platform.api.subscription.NotificationTarget;
+import io.casehub.platform.api.subscription.TargetType;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.vertx.RunOnVertxContext;
@@ -119,7 +121,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 () -> Panache.withTransaction(() -> SubscriptionEntity.deleteAll())
                         .chain(() -> reactiveStore.store(input))
                         .chain(sub -> reactiveStore.update(sub.id(), "user-1", "tenant-1",
-                                new SubscriptionUpdate("New Name", null, null, null, null))),
+                                new SubscriptionUpdate("New Name", null, null, null, null, null, null))),
                 updated -> {
                     assertThat(updated).isPresent();
                     assertThat(updated.get().name()).isEqualTo("New Name");
@@ -135,7 +137,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 () -> Panache.withTransaction(() -> SubscriptionEntity.deleteAll())
                         .chain(() -> reactiveStore.store(input))
                         .chain(sub -> reactiveStore.update(sub.id(), "user-2", "tenant-1",
-                                new SubscriptionUpdate("New", null, null, null, null))),
+                                new SubscriptionUpdate("New", null, null, null, null, null, null))),
                 updated -> assertThat(updated).isEmpty());
     }
 
@@ -165,9 +167,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
     @RunOnVertxContext
     void reactive_findAllEnabled_returnsOnlyEnabled(UniAsserter asserter) {
         var enabledInput = createTestInput("user-1", "tenant-1", "Enabled", "event-type");
-        var disabledInput = new SubscriptionInput(
-                "user-1", "tenant-1", "Disabled", "event-type",
-                List.of(), createTemplate(), false);
+        var disabledInput = new SubscriptionInput("user-1", "tenant-1", "Disabled", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, createTemplate(), false);
         asserter.assertThat(
                 () -> Panache.withTransaction(() -> SubscriptionEntity.deleteAll())
                         .chain(() -> reactiveStore.store(enabledInput))
@@ -189,7 +189,8 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
         );
         var input = new SubscriptionInput(
                 "user-1", "tenant-1", "With Constraints", "event-type",
-                constraints, createTemplate(), true);
+                constraints, List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, createTemplate(), true);
 
         var subscription = blockingStore.store(input);
 
@@ -213,9 +214,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 "entityId",
                 "actorId"
         );
-        var input = new SubscriptionInput(
-                "user-1", "tenant-1", "Template Sub", "event-type",
-                List.of(), template, true);
+        var input = new SubscriptionInput("user-1", "tenant-1", "Template Sub", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true);
 
         var subscription = blockingStore.store(input);
 
@@ -244,7 +243,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 createTestInput("user-1", "tenant-1", "Name", "event-type"));
 
         var newConstraints = List.of(new Constraint("newField", ConstraintOp.NEQ, "excluded"));
-        var update = new SubscriptionUpdate(null, null, newConstraints, null, null);
+        var update = new SubscriptionUpdate(null, null, newConstraints, null, null, null, null);
         var updated = blockingStore.update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
@@ -281,9 +280,10 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
 
     // Helper
 
-    private SubscriptionInput createTestInput(String userId, String tenancyId, String name, String eventType) {
-        return new SubscriptionInput(userId, tenancyId, name, eventType,
-                List.of(), createTemplate(), true);
+    private SubscriptionInput createTestInput(String ownerId, String tenancyId, String name, String eventType) {
+        return new SubscriptionInput(ownerId, tenancyId, name, eventType,
+                List.of(), List.of(new NotificationTarget(TargetType.USER, ownerId)), false,
+                createTemplate(), true);
     }
 
     private NotificationTemplate createTemplate() {

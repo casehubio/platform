@@ -73,9 +73,9 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> findById(String id, String userId, String tenancyId) {
+    public Optional<Subscription> findById(String id, String ownerId, String tenancyId) {
         return Optional.ofNullable(store.get(id))
-                .filter(s -> s.userId().equals(userId))
+                .filter(s -> s.ownerId().equals(ownerId))
                 .filter(s -> s.tenancyId().equals(tenancyId));
     }
 
@@ -86,7 +86,7 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
                 .reversed();
 
         var filtered = store.values().stream()
-                .filter(s -> s.userId().equals(query.userId()))
+                .filter(s -> s.ownerId().equals(query.ownerId()))
                 .filter(s -> s.tenancyId().equals(query.tenancyId()))
                 .filter(s -> query.enabled() == null || s.enabled() == query.enabled())
                 .filter(s -> matchesCursor(s, query.cursor()))
@@ -102,7 +102,7 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> update(String id, String userId, String tenancyId, SubscriptionUpdate update) {
+    public Optional<Subscription> update(String id, String ownerId, String tenancyId, SubscriptionUpdate update) {
         var result = new Object() {
             Subscription updated = null;
             Subscription previous = null;
@@ -110,7 +110,7 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
 
         store.compute(id, (key, subscription) -> {
             if (subscription == null
-                    || !subscription.userId().equals(userId)
+                    || !subscription.ownerId().equals(ownerId)
                     || !subscription.tenancyId().equals(tenancyId)) {
                 return subscription; // No change
             }
@@ -127,14 +127,14 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public boolean delete(String id, String userId, String tenancyId) {
+    public boolean delete(String id, String ownerId, String tenancyId) {
         var result = new Object() {
             Subscription deleted = null;
         };
 
         store.compute(id, (key, subscription) -> {
             if (subscription != null
-                    && subscription.userId().equals(userId)
+                    && subscription.ownerId().equals(ownerId)
                     && subscription.tenancyId().equals(tenancyId)) {
                 result.deleted = subscription;
                 return null; // Remove from map
@@ -161,11 +161,13 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
         var now = Instant.now();
         return new Subscription(
                 UUIDv7.generate(),
-                input.userId(),
+                input.ownerId(),
                 input.tenancyId(),
                 input.name(),
                 input.eventType(),
                 input.constraints(),
+                input.targets(),
+                input.includeActor(),
                 input.template(),
                 input.enabled(),
                 now,  // createdAt
@@ -176,11 +178,13 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
     private Subscription applyUpdate(Subscription subscription, SubscriptionUpdate update) {
         return new Subscription(
                 subscription.id(),
-                subscription.userId(),
+                subscription.ownerId(),
                 subscription.tenancyId(),
                 update.name() != null ? update.name() : subscription.name(),
                 update.eventType() != null ? update.eventType() : subscription.eventType(),
                 update.constraints() != null ? update.constraints() : subscription.constraints(),
+                update.targets() != null ? update.targets() : subscription.targets(),
+                update.includeActor() != null ? update.includeActor() : subscription.includeActor(),
                 update.template() != null ? update.template() : subscription.template(),
                 update.enabled() != null ? update.enabled() : subscription.enabled(),
                 subscription.createdAt(),

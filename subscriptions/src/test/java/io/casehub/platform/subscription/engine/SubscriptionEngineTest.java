@@ -12,12 +12,14 @@ import io.casehub.platform.api.notification.NotificationStore;
 import io.casehub.platform.api.notification.UUIDv7;
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
+import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.datasource.memory.InMemoryDataSourceRegistry;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
 
@@ -98,7 +100,8 @@ class SubscriptionEngineTest {
                 null, "work-item", "workItemId", "actor");
         var input = new SubscriptionInput("user-1", "tenant-1", "My sub",
                 "io.casehub.work.workitem.completed",
-                List.of(), template, true);
+                List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, template, true);
         subStore.store(input);
 
         engine.onStartup(null);
@@ -202,9 +205,10 @@ class SubscriptionEngineTest {
         var allEnabled = subStore.findAllEnabled().toList();
         var original = allEnabled.get(0);
         var updated = new Subscription(
-                original.id(), original.userId(), original.tenancyId(), original.name(),
+                original.id(), original.ownerId(), original.tenancyId(), original.name(),
                 "io.casehub.work.workitem.created",
-                original.constraints(), original.template(), true,
+                original.constraints(), original.targets(), original.includeActor(),
+                original.template(), true,
                 original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(updated, original));
@@ -228,8 +232,9 @@ class SubscriptionEngineTest {
 
         var original = subStore.findAllEnabled().toList().get(0);
         var disabled = new Subscription(
-                original.id(), original.userId(), original.tenancyId(), original.name(),
-                original.eventType(), original.constraints(), original.template(), false,
+                original.id(), original.ownerId(), original.tenancyId(), original.name(),
+                original.eventType(), original.constraints(), original.targets(),
+                original.includeActor(), original.template(), false,
                 original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(disabled, original));
@@ -270,7 +275,9 @@ class SubscriptionEngineTest {
 
         // Delete a subscription that was never wired — should not throw
         var ghost = new Subscription("ghost-id", "user-1", "tenant-1", "Ghost",
-                "io.casehub.work.ghost", List.of(), defaultTemplate(), true,
+                "io.casehub.work.ghost", List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, defaultTemplate(), true,
                 Instant.now(), Instant.now());
         engine.onDeleted(new SubscriptionDeleted(ghost));
 
@@ -291,9 +298,10 @@ class SubscriptionEngineTest {
 
         // Simulate rapid update + delete — delete must win
         var updated = new Subscription(
-                original.id(), original.userId(), original.tenancyId(), original.name(),
+                original.id(), original.ownerId(), original.tenancyId(), original.name(),
                 "io.casehub.work.workitem.created",
-                original.constraints(), original.template(), true,
+                original.constraints(), original.targets(), original.includeActor(),
+                original.template(), true,
                 original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(updated, original));
@@ -318,7 +326,8 @@ class SubscriptionEngineTest {
                 "entity", "missingField", "actor");
         var input = new SubscriptionInput("user-1", "tenant-1", "Sub",
                 "io.casehub.work.workitem.completed",
-                List.of(), template, true);
+                List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, template, true);
         subStore.store(input);
 
         engine.onStartup(null);
@@ -331,10 +340,12 @@ class SubscriptionEngineTest {
 
     // --- Helpers ---
 
-    private SubscriptionInput subscriptionInput(final String userId, final String tenancyId,
+    private SubscriptionInput subscriptionInput(final String ownerId, final String tenancyId,
                                                 final String eventType, final boolean enabled) {
-        return new SubscriptionInput(userId, tenancyId, "Test sub",
-                eventType, List.of(), defaultTemplate(), enabled);
+        return new SubscriptionInput(ownerId, tenancyId, "Test sub",
+                eventType, List.of(),
+                List.of(new NotificationTarget(TargetType.USER, ownerId)),
+                false, defaultTemplate(), enabled);
     }
 
     private NotificationTemplate defaultTemplate() {

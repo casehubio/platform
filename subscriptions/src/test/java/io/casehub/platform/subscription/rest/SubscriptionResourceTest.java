@@ -8,6 +8,8 @@ import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
+import io.casehub.platform.api.subscription.NotificationTarget;
+import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
@@ -60,6 +62,8 @@ class SubscriptionResourceTest {
             "Work item notifications",
             "io.casehub.work.item.created",
             List.of(new Constraint("priority", ConstraintOp.EQ, "HIGH")),
+            List.of(new NotificationTarget(TargetType.USER, "user-1")),
+            false,
             template,
             true
         );
@@ -74,7 +78,7 @@ class SubscriptionResourceTest {
             .statusCode(201)
             .contentType(ContentType.JSON)
             .body("id", notNullValue())
-            .body("userId", equalTo("user-1"))
+            .body("ownerId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
             .body("name", equalTo("Work item notifications"))
             .body("eventType", equalTo("io.casehub.work.item.created"))
@@ -96,14 +100,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.event.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.event.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         store.store(input).await().indefinitely();
 
@@ -116,7 +113,7 @@ class SubscriptionResourceTest {
             .contentType(ContentType.JSON)
             .body("subscriptions", hasSize(1))
             .body("subscriptions[0].name", equalTo("Test subscription"))
-            .body("subscriptions[0].userId", equalTo("user-1"))
+            .body("subscriptions[0].ownerId", equalTo("user-1"))
             .body("nextCursor", nullValue());
     }
 
@@ -134,25 +131,11 @@ class SubscriptionResourceTest {
             "actorId"
         );
 
-        var enabledInput = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Enabled subscription",
-            "test.enabled",
-            List.of(),
-            template,
-            true
+        var enabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Enabled subscription", "test.enabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         store.store(enabledInput).await().indefinitely();
 
-        var disabledInput = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Disabled subscription",
-            "test.disabled",
-            List.of(),
-            template,
-            false
+        var disabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Disabled subscription", "test.disabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false
         );
         store.store(disabledInput).await().indefinitely();
 
@@ -189,6 +172,8 @@ class SubscriptionResourceTest {
                 "Subscription " + i,
                 "test.type." + i,
                 List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false,
                 template,
                 true
             );
@@ -219,14 +204,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -239,7 +217,7 @@ class SubscriptionResourceTest {
             .contentType(ContentType.JSON)
             .body("id", equalTo(subscription.id()))
             .body("name", equalTo("Test subscription"))
-            .body("userId", equalTo("user-1"));
+            .body("ownerId", equalTo("user-1"));
     }
 
     @Test
@@ -255,14 +233,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-2",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-2", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-2")), false, template, true
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -287,20 +258,15 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Original name",
-            "test.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Original name", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         var subscription = store.store(input).await().indefinitely();
 
         // When: update name
         var update = new SubscriptionUpdate(
             "Updated name",
+            null,
+            null,
             null,
             null,
             null,
@@ -324,6 +290,8 @@ class SubscriptionResourceTest {
     void update_returns404ForNonexistentSubscription() {
         var update = new SubscriptionUpdate(
             "Updated name",
+            null,
+            null,
             null,
             null,
             null,
@@ -352,14 +320,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -400,14 +361,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.type",
-            List.of(),
-            template,
-            false
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -435,14 +389,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput(
-            "user-1",
-            TenancyConstants.DEFAULT_TENANT_ID,
-            "Test subscription",
-            "test.type",
-            List.of(),
-            template,
-            true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
         );
         var subscription = store.store(input).await().indefinitely();
 

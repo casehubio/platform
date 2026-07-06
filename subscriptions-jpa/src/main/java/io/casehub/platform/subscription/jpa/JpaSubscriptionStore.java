@@ -42,8 +42,8 @@ public class JpaSubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> findById(String id, String userId, String tenancyId) {
-        return execute(() -> reactiveStore.findById(id, userId, tenancyId));
+    public Optional<Subscription> findById(String id, String ownerId, String tenancyId) {
+        return execute(() -> reactiveStore.findById(id, ownerId, tenancyId));
     }
 
     @Override
@@ -52,13 +52,13 @@ public class JpaSubscriptionStore implements SubscriptionStore {
     }
 
     @Override
-    public Optional<Subscription> update(String id, String userId, String tenancyId, SubscriptionUpdate update) {
-        return execute(() -> reactiveStore.update(id, userId, tenancyId, update));
+    public Optional<Subscription> update(String id, String ownerId, String tenancyId, SubscriptionUpdate update) {
+        return execute(() -> reactiveStore.update(id, ownerId, tenancyId, update));
     }
 
     @Override
-    public boolean delete(String id, String userId, String tenancyId) {
-        return execute(() -> reactiveStore.delete(id, userId, tenancyId));
+    public boolean delete(String id, String ownerId, String tenancyId) {
+        return execute(() -> reactiveStore.delete(id, ownerId, tenancyId));
     }
 
     @Override

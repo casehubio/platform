@@ -97,12 +97,12 @@ public class SubscriptionEngine {
     private void wireSubscription(final Subscription subscription) {
         var objectType = new EventTypeObjectType(subscription.eventType());
         var filter = ConstraintCompiler.compile(
-                subscription.constraints(), subscription.tenancyId(), subscription.userId());
+                subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
         DataProcessor<Object> processor = pojo -> {
             var input = TemplateResolver.resolve(
                     subscription.template(), pojo,
-                    subscription.userId(), subscription.tenancyId());
+                    subscription.ownerId(), subscription.tenancyId());
             if (input != null) {
                 notificationStore.store(input);
             }
@@ -126,12 +126,12 @@ public class SubscriptionEngine {
     private SubscriptionHandle wireAndReturnHandle(final Subscription subscription) {
         var objectType = new EventTypeObjectType(subscription.eventType());
         var filter = ConstraintCompiler.compile(
-                subscription.constraints(), subscription.tenancyId(), subscription.userId());
+                subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
         DataProcessor<Object> processor = pojo -> {
             var input = TemplateResolver.resolve(
                     subscription.template(), pojo,
-                    subscription.userId(), subscription.tenancyId());
+                    subscription.ownerId(), subscription.tenancyId());
             if (input != null) {
                 notificationStore.store(input);
             }

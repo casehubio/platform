@@ -47,8 +47,8 @@ public class InMemoryReactiveSubscriptionStore implements ReactiveSubscriptionSt
     }
 
     @Override
-    public Uni<Optional<Subscription>> findById(String id, String userId, String tenancyId) {
-        return Uni.createFrom().item(() -> delegate.findById(id, userId, tenancyId));
+    public Uni<Optional<Subscription>> findById(String id, String ownerId, String tenancyId) {
+        return Uni.createFrom().item(() -> delegate.findById(id, ownerId, tenancyId));
     }
 
     @Override
@@ -57,13 +57,13 @@ public class InMemoryReactiveSubscriptionStore implements ReactiveSubscriptionSt
     }
 
     @Override
-    public Uni<Optional<Subscription>> update(String id, String userId, String tenancyId, SubscriptionUpdate update) {
-        return Uni.createFrom().item(() -> delegate.update(id, userId, tenancyId, update));
+    public Uni<Optional<Subscription>> update(String id, String ownerId, String tenancyId, SubscriptionUpdate update) {
+        return Uni.createFrom().item(() -> delegate.update(id, ownerId, tenancyId, update));
     }
 
     @Override
-    public Uni<Boolean> delete(String id, String userId, String tenancyId) {
-        return Uni.createFrom().item(() -> delegate.delete(id, userId, tenancyId));
+    public Uni<Boolean> delete(String id, String ownerId, String tenancyId) {
+        return Uni.createFrom().item(() -> delegate.delete(id, ownerId, tenancyId));
     }
 
     @Override

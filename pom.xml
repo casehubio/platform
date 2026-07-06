@@ -42,6 +42,7 @@
         <module>streams-camel</module>
         <module>governance</module>
         <module>credentials-quarkus</module>
+        <module>notification-dispatch</module>
     </modules>
 
     <properties>

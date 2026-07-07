@@ -44,6 +44,7 @@
         <module>governance</module>
         <module>credentials-quarkus</module>
         <module>notification-dispatch</module>
+        <module>digest-inmem</module>
     </modules>
 
     <properties>

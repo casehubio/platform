@@ -1,4 +1,4 @@
-package io.casehub.platform.notification.dispatch;
+package io.casehub.platform.delivery.digest.inmem;
 
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;

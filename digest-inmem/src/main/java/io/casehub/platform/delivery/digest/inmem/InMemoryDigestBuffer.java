@@ -1,9 +1,11 @@
-package io.casehub.platform.notification.dispatch;
+package io.casehub.platform.delivery.digest.inmem;
 
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Alternative;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -14,6 +16,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+@Alternative
+@Priority(100)
 @ApplicationScoped
 public class InMemoryDigestBuffer implements DigestBuffer {
 

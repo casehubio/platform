@@ -1,6 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.delivery.digest.inmem.InMemoryDigestBuffer;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestBufferKey;

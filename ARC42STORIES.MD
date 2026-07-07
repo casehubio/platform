@@ -147,6 +147,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
 | L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
 | L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
+| L12: Digest Buffer Adapters | `digest-inmem/`, `digest-jpa/` | `DigestBuffer` SPI implementations — volatile in-memory or persistent JPA; mutually exclusive per CDI priority tier |
 
 ### Journey and Chapter sequencing rationale
 
@@ -220,6 +221,10 @@ C4Container
     Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
     Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate Reactive + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
   }
+  Container_Boundary(l12, "L12: Digest Buffer Adapters — mutually exclusive per priority tier") {
+    Container(digestInmem, "casehub-platform-digest-inmem", "Java", "@Alternative @Priority(100) InMemoryDigestBuffer — volatile, ConcurrentHashMap")
+    Container(digestJpa, "casehub-platform-digest-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaDigestBuffer — Flyway V2000, JSON payload")
+  }
 
   Rel(platform, api, "implements SPIs from")
   Rel(testing, api, "implements SPIs from")
@@ -240,6 +245,8 @@ C4Container
   Rel(endpointsMem, api, "implements EndpointRegistry from")
   Rel(aclInmem, api, "implements AccessControlProvider from")
   Rel(aclJpa, api, "implements AccessControlProvider from")
+  Rel(digestInmem, api, "implements DigestBuffer from")
+  Rel(digestJpa, api, "implements DigestBuffer from")
   Rel(streamsKafka, api, "fires Event<CloudEvent> via")
   Rel(streamsAmqp, api, "fires Event<CloudEvent> via")
   Rel(streamsWebhook, api, "fires Event<CloudEvent> via")
@@ -322,6 +329,8 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-streams-amqp` | `compile` | Configure `casehub.streams.amqp.*`; single address per channel |
 | `casehub-platform-streams-webhook` | `compile` | Configure `casehub.streams.webhook.public-url`; POST `/streams/webhook/{tenancyId}/{streamId}` |
 | `casehub-platform-streams-poll` | `compile` | Configure poll descriptor endpoints; explicit 4xx/5xx status check (HttpClient does not throw) |
+| `casehub-platform-digest-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile digest buffer. Do NOT combine with `digest-jpa` in same scope |
+| `casehub-platform-digest-jpa` | `compile` + Flyway location | `classpath:db/digest/migration` required; Flyway `V2000` schema. Configurable `casehub.notification.digest.max-buffer-size` (default 0 = no eviction) |
 | `casehub-platform-streams-camel` | `compile` | Requires `quarkus-camel` extension; routes built from CAMEL-protocol `EndpointDescriptor` records |
 
 ---

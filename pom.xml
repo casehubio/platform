@@ -45,6 +45,7 @@
         <module>credentials-quarkus</module>
         <module>notification-dispatch</module>
         <module>digest-inmem</module>
+        <module>digest-jpa</module>
     </modules>
 
     <properties>

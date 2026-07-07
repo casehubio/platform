@@ -209,10 +209,6 @@ C4Container
   Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
     Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
   }
-  Container_Boundary(l11, "L11: Access Control") {
-    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(1) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
-    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaAccessControlProvider — Flyway V2000, parent-resource hierarchy")
-  }
   Container_Boundary(l10, "L10: Stream Ingestion") {
     Container(streamsKafka, "casehub-platform-streams-kafka", "SmallRye Reactive Messaging", "@Startup static Kafka @Incoming channel — raw byte[], builds CloudEvent")
     Container(streamsAmqp, "casehub-platform-streams-amqp", "SmallRye Reactive Messaging", "@Startup static AMQP @Incoming channel — single address, raw byte[]")
@@ -320,7 +316,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-agent-langchain4j` | `compile` | Bidirectional: `ChatModelAgentProvider` (@Alternative @Priority(1)) wraps any ChatModel as AgentProvider, fail-fast semaphore (`max-concurrent-sessions`, default 10) gates `invoke()` and `openSession()`; `AgentProviderChatModel` (@DefaultBean @Priority(10)) wraps any AgentProvider as ChatModel. Not compatible with `engine.Agent` (forces `ResponseFormatType.JSON`) |
 | `casehub-platform-endpoints-memory` | `test` (isolation) or `compile` (ephemeral installs) | Volatile — data lost on restart. `@Alternative @Priority(100)` beats JPA and NoSQL adapters. Do NOT combine with a JPA endpoints backend in same scope |
 | `casehub-platform-endpoints-config` | `compile` | YAML-backed startup populator; requires a registry backend (e.g. `endpoints-memory`) to be meaningful |
-| `casehub-platform-acl-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(1)` volatile ACL store. Do NOT combine with `acl-jpa` in same scope |
+| `casehub-platform-acl-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(10)` volatile ACL store. Do NOT combine with `acl-jpa` in same scope |
 | `casehub-platform-acl-jpa` | `compile` + Flyway location | `classpath:db/acl/migration` required; Flyway `V2000` schema |
 | `casehub-platform-streams-kafka` | `compile` | Configure `casehub.streams.kafka.*`; CAMEL and KAFKA mutually exclusive for same topic |
 | `casehub-platform-streams-amqp` | `compile` | Configure `casehub.streams.amqp.*`; single address per channel |
@@ -917,14 +913,14 @@ Five classpath-activated transports that each receive external events and fire `
 **Blog:** —
 
 **What this delivers**
-`AccessControlProvider` SPI defines flat-grant resource-level access control: `canAccess(actorId, resourceId, AclAction)` (default true — allow-all when no adapter active), `grant()`, `revoke()`, `revokeAll()`, `registerParent()` (resource hierarchy for inherited grants), `accessibleResources()`. `AclAction`, `AclResourceType`, `AclEntry`, `AccessDeniedException` live in `platform-api`. `NoOpAccessControlProvider @DefaultBean` in `platform/` is the silent allow-all default. `acl-inmem/` provides `InMemoryAccessControlProvider @Alternative @Priority(1)` backed by a `ConcurrentHashMap` — volatile, no restart survival, for test isolation and ephemeral deployments. `acl-jpa/` provides `JpaAccessControlProvider @ApplicationScoped` with Flyway V2000 schema (`AclEntryEntity`, `ResourceParentEntity` for hierarchy). `GroupMembershipProvider.groupsOf(actorId)` inverse lookup (#93) enables role-based grant resolution — "which groups is this actor in?" — a prerequisite for group-based ACL policies.
+`AccessControlProvider` SPI defines flat-grant resource-level access control: `canAccess(actorId, resourceId, AclAction)` (default true — allow-all when no adapter active), `grant()`, `revoke()`, `revokeAll()`, `registerParent()` (resource hierarchy for inherited grants), `accessibleResources()`. `AclAction`, `AclResourceType`, `AclEntry`, `AccessDeniedException` live in `platform-api`. `NoOpAccessControlProvider @DefaultBean` in `platform/` is the silent allow-all default. `acl-inmem/` provides `InMemoryAccessControlProvider @Alternative @Priority(10)` backed by a `ConcurrentHashMap` — volatile, no restart survival, for test isolation and ephemeral deployments. `acl-jpa/` provides `JpaAccessControlProvider @ApplicationScoped` with Flyway V2000 schema (`AclEntryEntity`, `ResourceParentEntity` for hierarchy). `GroupMembershipProvider.groupsOf(actorId)` inverse lookup (#93) enables role-based grant resolution — "which groups is this actor in?" — a prerequisite for group-based ACL policies.
 
 **Accountability gaps closed**
 - Resource-level access control without hardcoded checks → L1 (`AccessControlProvider` SPI, `AclAction`, `AclEntry`, `AccessDeniedException`)
 - Allow-all default without configuration — before: no ACL, every check was implicit → L2 (`NoOpAccessControlProvider @DefaultBean`)
 - Inverse group membership — "groups of actor X" previously unavailable → L1 (`GroupMembershipProvider.groupsOf(actorId)`)
 - Durable ACL storage → L11 (`JpaAccessControlProvider`)
-- Test-isolated volatile ACL → L11 (`InMemoryAccessControlProvider @Alternative @Priority(1)`)
+- Test-isolated volatile ACL → L11 (`InMemoryAccessControlProvider @Alternative @Priority(10)`)
 
 **Layer Impact**
 | Layer | Delta |
@@ -1606,7 +1602,7 @@ Classpath-activated CDI event bus transport — each transport module subscribes
 #### Layer — L11: Access Control
 
 **Participates in chapters:** C21
-**Architectural patterns:** `@DefaultBean` CDI displacement, `@Alternative @Priority(1)` ladder, contract test inheritance
+**Architectural patterns:** `@DefaultBean` CDI displacement, `@Alternative @Priority(10)` ladder, contract test inheritance
 **Issues:** platform#68, platform#91, platform#92, platform#93, platform#94, platform#95, platform#96
 **Blog:** —
 **Completed:** 2026-06-13
@@ -1623,7 +1619,7 @@ What this layer adds:
 - **`AclEntry`** — record: `actorId`, `resourceId`, `action`, `expires`
 - **`AccessDeniedException`** — unchecked; thrown by consumers after `canAccess()` returns false
 - **`NoOpAccessControlProvider @DefaultBean`** — `canAccess()` always returns `true`; `grant()`/`revoke()` are no-ops; safe allow-all default
-- **`InMemoryAccessControlProvider @Alternative @Priority(1)`** — `ConcurrentHashMap`; volatile; for `@QuarkusTest` isolation and ephemeral deployments
+- **`InMemoryAccessControlProvider @Alternative @Priority(10)`** — `ConcurrentHashMap`; volatile; for `@QuarkusTest` isolation and ephemeral deployments
 - **`JpaAccessControlProvider @ApplicationScoped`** — Flyway V2000; `AclEntryEntity` + `ResourceParentEntity` (for `registerParent`/hierarchy traversal); parent walks up the hierarchy checking for inherited grants
 - **`GroupMembershipProvider.groupsOf(actorId)`** — inverse lookup added to `platform-api` SPI (#93): "which groups is actorId a member of?" — enables group-based ACL grant queries
 
@@ -1635,7 +1631,7 @@ Not closed here: ACL Phase 2 (identity propagation from DID/VC assertions into A
 |---|---|---|
 | Resource-level access gating | Consumers check membership or roles inline — no standard — every module re-implements | `AccessControlProvider.canAccess()` |
 | Inverse group membership | "Who is actor X a member of?" unanswerable — only "who is in group G?" existed | `GroupMembershipProvider.groupsOf(actorId)` |
-| Test-isolated ACL state | ACL grants leak between tests when using JPA | `InMemoryAccessControlProvider @Alternative @Priority(1)` |
+| Test-isolated ACL state | ACL grants leak between tests when using JPA | `InMemoryAccessControlProvider @Alternative @Priority(10)` |
 
 #### Key files
 
@@ -1646,7 +1642,7 @@ Not closed here: ACL Phase 2 (identity propagation from DID/VC assertions into A
 - `platform-api/src/main/java/io/casehub/platform/api/acl/AccessDeniedException.java` — unchecked
 - `platform-api/src/main/java/io/casehub/platform/api/identity/GroupMembershipProvider.java` — `groupsOf(actorId)` added (#93)
 - `platform/src/main/java/io/casehub/platform/acl/NoOpAccessControlProvider.java` — `@DefaultBean @ApplicationScoped`
-- `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java` — `@Alternative @Priority(1) @ApplicationScoped`
+- `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java` — `@Alternative @Priority(10) @ApplicationScoped`
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` — `@ApplicationScoped`; Flyway V2000
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)

@@ -199,6 +199,8 @@ io.casehub.platform.api
                    ObjectType (pluggable type discriminator), ClassObjectType, DataProcessor, SubscriptionHandle,
                    FilterExpression (shareable predicate), DataSourceDescriptor, DataSourceQuery,
                    DataSourceRegistered (CDI event), Marshaller, MarshalException
+  .governance    — ExecutionPolicy (record: timeoutMs, RetryPolicy), RetryPolicy (record: maxRetries, delay, BackoffStrategy),
+                   BackoffStrategy (enum: FIXED/EXPONENTIAL/EXPONENTIAL_WITH_JITTER)
   .endpoints     — EndpointRegistry (SPI: register/resolve/discover/deregister by (Path, tenancyId)),
                    EndpointDescriptor (record: path, tenancyId, type, protocol, properties, credentialRef, capabilities),
                    EndpointPermissions (static: assertTenant(tenancyId, principal) — write-auth for runtime registration),

@@ -187,29 +187,32 @@ public class AccessDeniedException extends SecurityException {
 
 ## 5. SPI Interface
 
-In `platform-api`, zero dependencies. Blocking only — reactive callers wrap with `Uni.createFrom().item()`.
+In `platform-api`, zero dependencies. All methods return `CompletionStage<T>` — the JPA adapter uses Hibernate Reactive Panache internally, and a unified async API avoids forcing callers to distinguish between blocking and reactive backends.
 
 ```java
 package io.casehub.platform.api.acl;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 public interface AccessControlProvider {
 
-    boolean canAccess(String actorId, String resourceId, AclAction action);
+    CompletionStage<Boolean> canAccess(String actorId, String resourceId, AclAction action);
 
-    void grant(String actorId, String resourceId, AclAction action, Instant expires);
+    CompletionStage<Void> grant(String actorId, String resourceId, AclAction action, Instant expires);
 
-    void revoke(String actorId, String resourceId, AclAction action);
+    CompletionStage<Void> revoke(String actorId, String resourceId, AclAction action);
 
-    void revokeAll(String actorId, String resourceId);
+    CompletionStage<Void> revokeAll(String actorId, String resourceId);
 
-    void registerParent(String childResourceId, String parentResourceId);
+    CompletionStage<Void> registerParent(String childResourceId, String parentResourceId);
 
-    List<String> accessibleResources(String actorId, String resourceType, AclAction action);
+    CompletionStage<List<String>> accessibleResources(String actorId, String resourceType, AclAction action);
 }
 ```
+
+Default implementations return permissive values: `canAccess()` returns `true`, mutators return completed void, `accessibleResources()` returns empty list.
 
 Group expansion is internal — the implementation calls `GroupMembershipProvider.groupsOf(actorId)` to resolve the actor's groups, then checks for matching `group:<name>` entries. Call sites never handle group expansion.
 
@@ -225,13 +228,17 @@ Returns the groups that `actorId` belongs to. The existing `membersOf(groupName)
 
 ### 5.2 Contract Test
 
-`AccessControlProviderSpiTest` — abstract contract test in `platform-api` (or `testing/`). Each implementation (`acl-inmem/`, `acl-jpa/`) extends it. Covers:
+`AccessControlProviderContractTest` — abstract contract test in `platform-api` test-jar. Each implementation (`acl-inmem/`, `acl-jpa/`) extends it. Covers:
 - grant/revoke/revokeAll lifecycle
 - canAccess with direct grants
 - canAccess with group-based grants via `group:<name>`
-- registerParent and inheritance walk
+- registerParent and inheritance walk (including re-parenting)
 - expires_at honoured
 - accessibleResources filtering
+- Idempotent duplicate grants
+- No-op revoke of non-existent grants
+- All four AclAction values (READ, WRITE, ADMIN, CLAIM)
+- Depth guard at 20 for parent hierarchy traversal
 
 ---
 
@@ -273,11 +280,12 @@ Consistent with the existing `@DefaultBean` pattern (`NoOpCaseMemoryStore`).
 
 `casehub-platform-acl-jpa`
 
-`JpaAccessControlProvider` `@ApplicationScoped` — displaces no-op by classpath presence. Queries `acl_entry` and `resource_parent` tables. Composes with `GroupMembershipProvider.groupsOf(actorId)` for group-based grant resolution.
+`JpaAccessControlProvider` `@ApplicationScoped` — displaces no-op by classpath presence. Queries `acl_entry` and `resource_parent` tables. Composes with `GroupMembershipProvider.groupsOf(actorId)` for group-based grant resolution. Audit logging via `AclAuditLogEntity` records every `grant()`, `revoke()`, and `revokeAll()` operation.
 
 Dependencies:
 - `platform-api` (`AccessControlProvider` SPI, `GroupMembershipProvider`)
-- Quarkus Hibernate ORM
+- Quarkus Hibernate Reactive Panache (`quarkus-hibernate-reactive-panache`)
+- Quarkus Flyway + PostgreSQL JDBC (schema management only)
 
 Same pattern as `persistence-jpa/`, `memory-jpa/`.
 
@@ -295,34 +303,64 @@ Schema for `acl-jpa/`:
 
 ```sql
 CREATE TABLE acl_entry (
-    id          BIGSERIAL PRIMARY KEY,
+    id          BIGINT       NOT NULL,
     actor_id    VARCHAR(255) NOT NULL,
     resource_id VARCHAR(255) NOT NULL,
-    action      VARCHAR(50)  NOT NULL,
-    condition   TEXT         NULL,
-    granted_at  TIMESTAMP    NOT NULL DEFAULT now(),
-    expires_at  TIMESTAMP    NULL,
-    tenancy_id  VARCHAR(64)  NOT NULL,
-
+    action      VARCHAR(255) NOT NULL,
+    condition   TEXT,
+    granted_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at  TIMESTAMP WITH TIME ZONE,
+    tenancy_id  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id),
     CONSTRAINT uq_acl_entry UNIQUE (actor_id, resource_id, action)
 );
 
 CREATE TABLE resource_parent (
     child_resource_id  VARCHAR(255) NOT NULL,
     parent_resource_id VARCHAR(255) NOT NULL,
-    tenancy_id         VARCHAR(64)  NOT NULL,
+    tenancy_id         VARCHAR(255) NOT NULL,
     PRIMARY KEY (child_resource_id)
+);
+
+CREATE TABLE acl_audit_log (
+    id           BIGINT                   NOT NULL,
+    actor_id     VARCHAR(255)             NOT NULL,
+    resource_id  VARCHAR(255)             NOT NULL,
+    action       VARCHAR(50)              NOT NULL,
+    operation    VARCHAR(20)              NOT NULL,
+    performed_by VARCHAR(255)             NOT NULL,
+    performed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    expires_at   TIMESTAMP WITH TIME ZONE,
+    metadata     JSONB,
+    tenancy_id   VARCHAR(64)              NOT NULL,
+    PRIMARY KEY (id)
 );
 
 CREATE INDEX idx_acl_actor_resource ON acl_entry (actor_id, resource_id);
 CREATE INDEX idx_acl_resource       ON acl_entry (resource_id);
 CREATE INDEX idx_acl_tenancy        ON acl_entry (tenancy_id);
 CREATE INDEX idx_rp_parent          ON resource_parent (parent_resource_id);
+CREATE INDEX idx_audit_resource     ON acl_audit_log (resource_id);
+CREATE INDEX idx_audit_actor        ON acl_audit_log (actor_id);
+CREATE INDEX idx_audit_performed    ON acl_audit_log (performed_by);
+CREATE INDEX idx_audit_performed_at ON acl_audit_log (performed_at);
+CREATE INDEX idx_audit_tenancy      ON acl_audit_log (tenancy_id);
 ```
 
 Key columns:
-- **`expires_at`** — time-bounded grants for human delegation (auditor access windows, temporary delegation). Not for worker execution lifetime.
+- **`expires_at`** — time-bounded grants for human delegation (auditor access windows, temporary delegation). Not for worker execution lifetime. Uses `TIMESTAMP WITH TIME ZONE`.
 - **`condition`** — reserved for future ABAC; not evaluated initially.
+
+### 8.1 Audit Logging
+
+Every `grant()`, `revoke()`, and `revokeAll()` operation writes an `acl_audit_log` entry. Fields:
+- **`operation`** — `"GRANT"` or `"REVOKE"`
+- **`performed_by`** — `CurrentPrincipal.actorId()` of the caller
+- **`performed_at`** — server timestamp
+- **`tenancy_id`** — `CurrentPrincipal.tenancyId()`
+- **`metadata`** — JSONB, reserved for future use (currently not populated)
+
+`revokeAll()` creates one audit entry per revoked action. Duplicate grants each create an audit entry (the audit trail preserves the full operation history even when the grant itself is idempotent at the data level).
 
 ---
 

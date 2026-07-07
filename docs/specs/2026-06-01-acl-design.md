@@ -340,8 +340,8 @@ Following the existing casehub-platform module pattern exactly.
 |--------|----------|---------|
 | `platform-api` (extension) | `casehub-platform-api` | `AccessControlProvider` SPI, `AclAction` enum, `AclEntry` model — zero deps |
 | `platform/` (extension) | `casehub-platform` | `@DefaultBean` no-op `AccessControlProvider` — silent allow-all (safe default for environments without ACL installed; consumers add the real backend) |
-| `acl-jpa/` (new) | `casehub-platform-acl-jpa` | `@Alternative @Priority(1)` JPA-backed `AccessControlProvider`. Flyway at `classpath:db/acl/migration`. Composes with `GroupMembershipProvider`. |
-| `acl-inmem/` (new) | `casehub-platform-acl-inmem` | `@Alternative @Priority(1)` in-memory `AccessControlProvider` — `ConcurrentHashMap`, suitable for `@QuarkusTest` isolation. Pattern mirrors `memory-inmem/`. |
+| `acl-jpa/` (new) | `casehub-platform-acl-jpa` | `@ApplicationScoped` JPA-backed `AccessControlProvider`. Hibernate Reactive Panache, Flyway at `classpath:db/acl/migration`. Composes with `GroupMembershipProvider`. Audit logging. |
+| `acl-inmem/` (new) | `casehub-platform-acl-inmem` | `@Alternative @Priority(10)` in-memory `AccessControlProvider` — `ConcurrentHashMap`, suitable for `@QuarkusTest` isolation. Test-override tier, beats all production adapters. |
 
 ### 5.2 Default Bean Behaviour
 

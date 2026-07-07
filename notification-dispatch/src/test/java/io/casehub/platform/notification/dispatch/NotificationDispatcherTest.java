@@ -21,6 +21,7 @@ import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
 import io.casehub.platform.api.subscription.Constraint;
+import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
@@ -85,7 +86,8 @@ class NotificationDispatcherTest {
             return Set.of();
         };
 
-        final var targetResolver = new TargetResolver(groupProvider);
+        final EntityWatcherProvider entityWatcherProvider = (entityType, entityId, tenancyId) -> Set.of();
+        final var targetResolver = new TargetResolver(groupProvider, entityWatcherProvider);
         final var suppressionEvaluator = new SuppressionEvaluator();
         final var channelRouter = new ChannelRouter(channelRegistry);
 
@@ -421,6 +423,19 @@ class NotificationDispatcherTest {
         @Override
         public Optional<Instant> oldestPendingTimestamp(DigestBufferKey key) {
             return Optional.of(Instant.now());
+        }
+
+        @Override
+        public int pendingCount(DigestBufferKey key) {
+            return (int) buffered.stream().filter(b -> b.key().equals(key)).count();
+        }
+
+        @Override
+        public Set<DigestBufferKey> pendingKeysForUser(String userId, String tenancyId) {
+            return buffered.stream()
+                    .map(BufferedItem::key)
+                    .filter(key -> key.userId().equals(userId) && key.tenancyId().equals(tenancyId))
+                    .collect(java.util.stream.Collectors.toSet());
         }
     }
 }

@@ -8,7 +8,8 @@ ALTER TABLE subscription ADD COLUMN targets_json TEXT;
 ALTER TABLE subscription ADD COLUMN include_actor BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Backfill: existing subscriptions get explicit USER target pointing to owner
-UPDATE subscription SET targets_json = '[{"type":"USER","id":"' || owner_id || '"}]'
+UPDATE subscription SET targets_json =
+    jsonb_build_array(jsonb_build_object('type', 'USER', 'id', owner_id))::text
     WHERE targets_json IS NULL;
 
 -- Make targets_json non-nullable after backfill

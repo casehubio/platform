@@ -18,5 +18,11 @@ public enum TargetType {
     /**
      * POJO field name — resolved at dispatch time via MethodHandle.
      */
-    EVENT_FIELD
+    EVENT_FIELD,
+
+    /**
+     * Users watching the entity involved in the event — expanded via
+     * {@code EntityWatcherProvider.watchersOf(entityType, entityId, tenancyId)} at dispatch time.
+     */
+    ENTITY_WATCHERS
 }

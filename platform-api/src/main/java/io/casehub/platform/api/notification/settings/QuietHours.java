@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * Quiet hours configuration — recurring daily time window where external
- * channel delivery is suppressed.
+ * channel delivery is suppressed or buffered.
  *
  * <p>Handles midnight crossing: when {@code start >= end}, the window spans
  * midnight (e.g., 22:00–07:00).
@@ -14,11 +14,13 @@ import java.util.Objects;
  * @param start    start time (inclusive) in user's local timezone
  * @param end      end time (exclusive) in user's local timezone
  * @param timezone user's timezone for evaluation
+ * @param action   action to take during quiet hours (null = SUPPRESS)
  */
 public record QuietHours(
         LocalTime start,
         LocalTime end,
-        ZoneId timezone
+        ZoneId timezone,
+        QuietHoursAction action
 ) {
     public QuietHours {
         Objects.requireNonNull(start, "start");

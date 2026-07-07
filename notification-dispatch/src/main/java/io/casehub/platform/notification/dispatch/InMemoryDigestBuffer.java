@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @ApplicationScoped
 public class InMemoryDigestBuffer implements DigestBuffer {
@@ -32,7 +32,7 @@ public class InMemoryDigestBuffer implements DigestBuffer {
     public void add(DigestBufferKey key, NotificationInput notification) {
         buffers.compute(key, (k, entry) -> {
             if (entry == null) {
-                var list = new ArrayList<NotificationInput>();
+                var list = new CopyOnWriteArrayList<NotificationInput>();
                 list.add(notification);
                 return new BufferEntry(list, Instant.now());
             }
@@ -62,5 +62,18 @@ public class InMemoryDigestBuffer implements DigestBuffer {
         return entry != null ? Optional.of(entry.firstAdded()) : Optional.empty();
     }
 
-    record BufferEntry(ArrayList<NotificationInput> notifications, Instant firstAdded) {}
+    @Override
+    public int pendingCount(DigestBufferKey key) {
+        var entry = buffers.get(key);
+        return entry != null ? entry.notifications().size() : 0;
+    }
+
+    @Override
+    public Set<DigestBufferKey> pendingKeysForUser(String userId, String tenancyId) {
+        return buffers.keySet().stream()
+                .filter(key -> key.userId().equals(userId) && key.tenancyId().equals(tenancyId))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    record BufferEntry(CopyOnWriteArrayList<NotificationInput> notifications, Instant firstAdded) {}
 }

@@ -51,17 +51,17 @@ public class JpaSuppressionStore implements SuppressionStore {
 
     @Override
     public List<MuteRule> activeMutes(String userId, String tenancyId) {
+        Instant now = Instant.now();
         List<MuteRuleEntity> entities = entityManager.createQuery(
-                        "SELECT m FROM MuteRuleEntity m WHERE m.userId = :userId AND m.tenancyId = :tenancyId",
+                        "SELECT m FROM MuteRuleEntity m WHERE m.userId = :userId AND m.tenancyId = :tenancyId"
+                        + " AND (m.expiresAt IS NULL OR m.expiresAt > :now)",
                         MuteRuleEntity.class)
                 .setParameter("userId", userId)
                 .setParameter("tenancyId", tenancyId)
+                .setParameter("now", now)
                 .getResultList();
 
-        // Expiry filtering in Java — keeps query simple, per in-memory pattern
-        Instant now = Instant.now();
         return entities.stream()
-                .filter(entity -> entity.expiresAt == null || !now.isAfter(entity.expiresAt))
                 .map(MuteRuleEntity::toMuteRule)
                 .toList();
     }

@@ -3,6 +3,7 @@ package io.casehub.platform.notification.dispatch;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.delivery.DigestGroupBy;
 import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.notification.NotificationInput;
@@ -17,6 +18,8 @@ import org.jboss.logging.Logger;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -43,6 +46,7 @@ public class DigestFlushScheduler {
     private final SuppressionEvaluator suppressionEvaluator;
     private final DeliveryChannelRegistry channelRegistry;
     private final ConcurrentHashMap<DigestBufferKey, Instant> lastFlushTimes = new ConcurrentHashMap<>();
+    private final Set<DigestBufferKey> quietHoursDeferredKeys = ConcurrentHashMap.newKeySet();
 
     @Inject
     public DigestFlushScheduler(DigestBuffer digestBuffer,
@@ -59,18 +63,17 @@ public class DigestFlushScheduler {
 
     @Scheduled(every = "${casehub.notification.digest.tick-interval:1m}")
     void tick() {
+        Instant now = Instant.now();
         for (DigestBufferKey key : digestBuffer.pendingKeys()) {
             try {
-                processKey(key);
+                processKey(key, now);
             } catch (Exception e) {
                 LOG.warnf(e, "Digest flush failed for key %s", key);
             }
         }
     }
 
-    void processKey(DigestBufferKey key) {
-        Instant now = Instant.now();
-
+    void processKey(DigestBufferKey key, Instant now) {
         // Look up user's digest schedule
         var prefs = preferenceStore.get(key.userId(), key.tenancyId());
         DigestSchedule schedule = prefs
@@ -82,31 +85,47 @@ public class DigestFlushScheduler {
         if (schedule == null) {
             // Orphan: user disabled digest since buffering — flush immediately
             LOG.debugf("Orphan drain for key %s — schedule removed", key);
-            flushKey(key, now);
+            quietHoursDeferredKeys.remove(key);
+            flushKey(key, now, null);
             return;
         }
 
-        // Check if flush is due
+        // 1. Quiet hours tracking — pure time comparison, no DB hit
+        var quietHours = prefs.map(NotificationPreferences::quietHours).orElse(null);
+        if (quietHours != null) {
+            var qhResult = suppressionEvaluator.evaluateUserLevel(Optional.empty(), quietHours, now);
+            if (qhResult.quietHoursActive()) {
+                quietHoursDeferredKeys.add(key);
+                return;
+            }
+        }
+
+        // 2. Schedule gate — is flush due?
         Instant oldest = digestBuffer.oldestPendingTimestamp(key).orElse(now);
         Instant lastFlush = lastFlushTimes.getOrDefault(key, Instant.EPOCH);
-        if (!schedule.isFlushDue(oldest, lastFlush, now)) {
+        boolean deferredFlush = quietHoursDeferredKeys.contains(key);
+        if (!deferredFlush && !schedule.isFlushDue(oldest, lastFlush, now)) {
             return;
         }
 
-        // Check user-level suppression (snooze / quiet hours)
+        // 3. Snooze check — only hits DB when flush is imminent
         var activeSnooze = suppressionStore.activeSnooze(key.userId(), key.tenancyId());
-        var quietHours = prefs.map(NotificationPreferences::quietHours).orElse(null);
-        var suppression = suppressionEvaluator.evaluateUserLevel(activeSnooze, quietHours);
-        if (suppression.isSnoozed() || suppression.quietHoursActive()) {
-            LOG.debugf("Digest flush deferred for %s — snoozed=%s, quietHours=%s",
-                    key, suppression.isSnoozed(), suppression.quietHoursActive());
+        var suppression = suppressionEvaluator.evaluateUserLevel(activeSnooze, quietHours, now);
+        if (suppression.isSnoozed()) {
             return;
         }
 
-        flushKey(key, now);
+        // 4. Flush
+        quietHoursDeferredKeys.remove(key);
+        DigestGroupBy groupBy = prefs
+                .map(NotificationPreferences::channelDefaults)
+                .map(cd -> cd.get(key.channelId()))
+                .map(ChannelPreference::groupBy)
+                .orElse(null);
+        flushKey(key, now, groupBy);
     }
 
-    private void flushKey(DigestBufferKey key, Instant now) {
+    private void flushKey(DigestBufferKey key, Instant now, DigestGroupBy groupBy) {
         Instant periodStart = lastFlushTimes.getOrDefault(key,
                 digestBuffer.oldestPendingTimestamp(key).orElse(now));
 
@@ -118,7 +137,7 @@ public class DigestFlushScheduler {
 
         var summary = new DigestSummary(
                 key.userId(), key.tenancyId(), key.channelId(),
-                items, periodStart, now);
+                items, periodStart, now, groupBy);
 
         channelRegistry.resolveDeliverer(key.channelId())
                 .ifPresentOrElse(

@@ -86,6 +86,28 @@ class InMemoryDigestBufferTest {
         assertThat(items.get(0).title()).isEqualTo("Item 2");
     }
 
+    @Test
+    void pendingCount_returnsItemCount() {
+        buffer.add(KEY, sampleInput("one"));
+        buffer.add(KEY, sampleInput("two"));
+        assertThat(buffer.pendingCount(KEY)).isEqualTo(2);
+    }
+
+    @Test
+    void pendingCount_returnsZero_whenKeyAbsent() {
+        assertThat(buffer.pendingCount(KEY)).isEqualTo(0);
+    }
+
+    @Test
+    void pendingKeysForUser_filtersToUser() {
+        var otherKey = new DigestBufferKey("other-user", "tenant-1", "email");
+        buffer.add(KEY, sampleInput("mine"));
+        buffer.add(otherKey, sampleInput("theirs"));
+
+        var keys = buffer.pendingKeysForUser("user-1", "tenant-1");
+        assertThat(keys).containsExactly(KEY);
+    }
+
     private static NotificationInput sampleInput(String title) {
         return new NotificationInput("user-1", "tenant-1", title, null, "test",
                 NotificationSeverity.INFO, null,

@@ -7,6 +7,8 @@ import io.casehub.platform.api.subscription.NotificationTemplate;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,6 +26,8 @@ public final class TemplateResolver {
 
     private static final Logger LOG = Logger.getLogger(TemplateResolver.class);
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]+)}");
+    private static final ConcurrentHashMap<Class<?>, ConcurrentHashMap<String, Optional<java.lang.invoke.MethodHandle>>> HANDLE_CACHE =
+            new ConcurrentHashMap<>();
 
     private TemplateResolver() {
         // Utility class — no instances
@@ -86,15 +90,24 @@ public final class TemplateResolver {
 
     /**
      * Extracts a field value from a POJO by calling its no-arg accessor method via MethodHandle.
-     * Returns null if the field is not found or the value is null.
+     * MethodHandles are cached to avoid repeated reflection. Returns null if the field is not found
+     * or the value is null.
      *
      * <p>Package-private for reuse by {@link TargetResolver}.
      */
     static String extractField(final Object pojo, final String fieldName) {
         try {
-            var method = pojo.getClass().getMethod(fieldName);
-            var handle = MethodHandles.lookup().unreflect(method);
-            final Object value = handle.invoke(pojo);
+            var classHandles = HANDLE_CACHE.computeIfAbsent(pojo.getClass(), k -> new ConcurrentHashMap<>());
+            var handle = classHandles.computeIfAbsent(fieldName, f -> {
+                try {
+                    var method = pojo.getClass().getMethod(f);
+                    return Optional.of(MethodHandles.lookup().unreflect(method));
+                } catch (Exception e) {
+                    return Optional.empty();
+                }
+            });
+            if (handle.isEmpty()) return null;
+            final Object value = handle.get().invoke(pojo);
             return value != null ? value.toString() : null;
         } catch (Throwable e) {
             return null;

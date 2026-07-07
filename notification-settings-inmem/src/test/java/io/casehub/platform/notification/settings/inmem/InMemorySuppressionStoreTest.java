@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -260,5 +261,21 @@ class InMemorySuppressionStoreTest {
     void cancelSnooze_returnsFalse_whenNone() {
         var cancelled = store.cancelSnooze("user1", "tenant1");
         assertThat(cancelled).isFalse();
+    }
+
+    @Test
+    void activeMutes_evictsExpiredRules() {
+        store.addMute(new MuteRuleInput("user-1", "tenant-1", MuteScope.ENTITY,
+                "entity-1", "work-item", Instant.now().minus(1, ChronoUnit.HOURS)));
+        store.addMute(new MuteRuleInput("user-1", "tenant-1", MuteScope.ENTITY,
+                "entity-2", "work-item", null));
+
+        List<MuteRule> active = store.activeMutes("user-1", "tenant-1");
+        assertThat(active).hasSize(1);
+        assertThat(active.get(0).scopeId()).isEqualTo("entity-2");
+
+        // Second read should also return 1 — expired rule was evicted, not just filtered
+        List<MuteRule> secondRead = store.activeMutes("user-1", "tenant-1");
+        assertThat(secondRead).hasSize(1);
     }
 }

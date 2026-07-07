@@ -73,15 +73,16 @@ public class InMemorySuppressionStore implements SuppressionStore {
     @Override
     public List<MuteRule> activeMutes(String userId, String tenancyId) {
         String key = makeKey(userId, tenancyId);
-        List<MuteRule> rules = muteStore.get(key);
-        if (rules == null) {
-            return List.of();
-        }
-
         Instant now = Instant.now();
-        return rules.stream()
-                .filter(rule -> rule.expiresAt() == null || !now.isAfter(rule.expiresAt()))
-                .toList();
+        List<MuteRule> active = new ArrayList<>();
+        muteStore.computeIfPresent(key, (k, rules) -> {
+            List<MuteRule> filtered = rules.stream()
+                    .filter(r -> r.expiresAt() == null || !now.isAfter(r.expiresAt()))
+                    .toList();
+            active.addAll(filtered);
+            return filtered.isEmpty() ? null : new ArrayList<>(filtered);
+        });
+        return active.isEmpty() ? List.of() : List.copyOf(active);
     }
 
     @Override

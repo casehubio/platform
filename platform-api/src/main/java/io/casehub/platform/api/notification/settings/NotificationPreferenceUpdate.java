@@ -21,7 +21,6 @@ public record NotificationPreferenceUpdate(
 ) {
     public NotificationPreferenceUpdate {
         if (channelDefaults != null) {
-            Objects.requireNonNull(channelDefaults, "channelDefaults");
             channelDefaults = Map.copyOf(channelDefaults);
         }
     }

@@ -14,6 +14,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Map;
@@ -58,14 +59,14 @@ class NotificationPreferenceResourceTest {
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
             .body("quietHours", nullValue())
-            .body("updatedAt", notNullValue());
+            .body("updatedAt", equalTo(Instant.EPOCH.toString()));
     }
 
     @Test
     void put_storesAndReturnsPreferences() {
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null)),
-            new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("America/New_York")),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null, null)),
+            new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("America/New_York"), null),
             false
         );
 
@@ -98,7 +99,7 @@ class NotificationPreferenceResourceTest {
         // First, set quiet hours
         var setUpdate = new NotificationPreferenceUpdate(
             null,
-            new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC")),
+            new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC"), null),
             false
         );
         given()
@@ -131,7 +132,7 @@ class NotificationPreferenceResourceTest {
     void tenantIsolation_userCannotAccessOtherTenantPreferences() {
         // user-1 in default tenant sets preferences
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
             null,
             false
         );
@@ -158,7 +159,7 @@ class NotificationPreferenceResourceTest {
     void put_overridesUserIdFromPrincipal() {
         // The REST layer should override userId/tenancyId from CurrentPrincipal
         var update = new NotificationPreferenceUpdate(
-            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)),
+            Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
             null,
             false
         );

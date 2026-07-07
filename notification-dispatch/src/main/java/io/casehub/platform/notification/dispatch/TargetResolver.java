@@ -2,6 +2,7 @@ package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
+import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.Subscription;
 
@@ -17,8 +18,9 @@ import java.util.Set;
  * Resolves subscription targets to concrete user IDs.
  *
  * <p>Iterates {@link Subscription#targets()}, expanding {@code GROUP} targets
- * via {@link GroupMembershipProvider} and {@code EVENT_FIELD} targets via
- * MethodHandle extraction from the event POJO. Deduplicates across all targets.
+ * via {@link GroupMembershipProvider}, {@code EVENT_FIELD} targets via
+ * MethodHandle extraction from the event POJO, and {@code ENTITY_WATCHERS}
+ * via {@link EntityWatcherProvider}. Deduplicates across all targets.
  *
  * <p>Unless {@link Subscription#includeActor()} is true, the triggering actor
  * (extracted via {@code template.actorIdField()}) is removed from the result set.
@@ -29,10 +31,13 @@ public class TargetResolver {
     private static final Logger LOG = Logger.getLogger(TargetResolver.class);
 
     private final GroupMembershipProvider groupMembershipProvider;
+    private final EntityWatcherProvider entityWatcherProvider;
 
     @Inject
-    public TargetResolver(final GroupMembershipProvider groupMembershipProvider) {
+    public TargetResolver(final GroupMembershipProvider groupMembershipProvider,
+                          final EntityWatcherProvider entityWatcherProvider) {
         this.groupMembershipProvider = groupMembershipProvider;
+        this.entityWatcherProvider = entityWatcherProvider;
     }
 
     /**
@@ -67,6 +72,26 @@ public class TargetResolver {
                                 target.id(), pojo.getClass().getSimpleName(), subscription.id());
                     } else {
                         recipients.add(userId);
+                    }
+                }
+
+                case ENTITY_WATCHERS -> {
+                    final String entityType = target.id().isBlank()
+                            ? subscription.template().entityType()
+                            : target.id();
+                    final String entityId = TemplateResolver.extractField(pojo,
+                            subscription.template().entityIdField());
+                    if (entityId != null) {
+                        final Set<String> watchers = entityWatcherProvider.watchersOf(
+                                entityType, entityId, subscription.tenancyId());
+                        if (watchers.isEmpty()) {
+                            LOG.debugf("ENTITY_WATCHERS for %s/%s resolved to no watchers",
+                                    entityType, entityId);
+                        }
+                        recipients.addAll(watchers);
+                    } else {
+                        LOG.warnf("ENTITY_WATCHERS target: entityIdField '%s' resolved to null on %s",
+                                subscription.template().entityIdField(), pojo.getClass().getSimpleName());
                     }
                 }
             }

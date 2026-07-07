@@ -4,6 +4,7 @@ import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.delivery.DigestGroupBy;
 import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
@@ -16,6 +17,8 @@ import io.casehub.platform.api.notification.settings.MuteRuleInput;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceUpdate;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
+import io.casehub.platform.api.notification.settings.QuietHours;
+import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
@@ -24,6 +27,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +68,7 @@ class DigestFlushSchedulerTest {
 
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4)))),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null)),
                 null, Instant.now());
 
         scheduler = new DigestFlushScheduler(
@@ -71,7 +77,7 @@ class DigestFlushSchedulerTest {
     }
 
     @Test
-    void tick_flushesWhenIntervalElapsed() {
+    void tick_doesNotFlush_whenIntervalNotElapsed() {
         // Buffer an item — timestamp will be ~now
         buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
 
@@ -79,7 +85,7 @@ class DigestFlushSchedulerTest {
         // (oldest + 1min is in the future, so isFlushDue returns false)
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null)),
                 null, Instant.now());
 
         scheduler.tick();
@@ -95,7 +101,7 @@ class DigestFlushSchedulerTest {
         // Even with a very short interval, snooze defers
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null)),
                 null, Instant.now());
 
         scheduler.tick();
@@ -113,7 +119,7 @@ class DigestFlushSchedulerTest {
         preferenceStore.throwForUser = USER;
         preferenceStore.prefs2 = new NotificationPreferences("user-2", TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1)))),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null)),
                 null, Instant.now());
 
         // user-1 fails but user-2 should still be processed (though not due yet)
@@ -127,13 +133,124 @@ class DigestFlushSchedulerTest {
         buffer.add(EMAIL_KEY, sampleInput("Orphaned item"));
         // User has no digest schedule anymore
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
-                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null)),
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
                 null, Instant.now());
 
         scheduler.tick();
         // Orphan should be flushed immediately
         assertThat(emailDeliverer.received).hasSize(1);
         assertThat(buffer.pendingKeys()).doesNotContain(EMAIL_KEY);
+    }
+
+    @Test
+    void processKey_flushesWhenIntervalElapsed() {
+        buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null)),
+                null, Instant.now());
+
+        // Simulate 5 hours after buffer add
+        Instant futureNow = Instant.now().plus(5, ChronoUnit.HOURS);
+        scheduler.processKey(EMAIL_KEY, futureNow);
+
+        assertThat(emailDeliverer.received).hasSize(1);
+        assertThat(emailDeliverer.received.get(0).notifications()).hasSize(1);
+    }
+
+    @Test
+    void processKey_defersWhenQuietHoursActive() {
+        buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
+
+        // Quiet hours 22:00-07:00 UTC, now is 23:00 UTC
+        var qh = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC"), null);
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null)),
+                qh, Instant.now());
+
+        Instant duringQH = LocalDate.of(2026, 1, 1).atTime(23, 0).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, duringQH);
+
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingKeys()).contains(EMAIL_KEY);
+    }
+
+    @Test
+    void processKey_flushesImmediatelyAfterQuietHoursEnd() {
+        buffer.add(EMAIL_KEY, sampleInput("Deferred notification"));
+
+        var qh = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC"),
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null)),
+                qh, Instant.now());
+
+        // First tick during quiet hours — deferred
+        Instant duringQH = LocalDate.of(2026, 1, 1).atTime(23, 0).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, duringQH);
+        assertThat(emailDeliverer.received).isEmpty();
+
+        // Second tick after quiet hours end — flush immediately regardless of schedule
+        Instant afterQH = LocalDate.of(2026, 1, 2).atTime(8, 0).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, afterQH);
+        assertThat(emailDeliverer.received).hasSize(1);
+    }
+
+    @Test
+    void processKey_orphanDrainClearsQuietHoursDeferredKey() {
+        buffer.add(EMAIL_KEY, sampleInput("Deferred notification"));
+
+        var qh = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC"),
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null)),
+                qh, Instant.now());
+
+        // Step 1: tick during quiet hours — key deferred
+        Instant duringQH = LocalDate.of(2026, 1, 1).atTime(23, 0).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, duringQH);
+        assertThat(emailDeliverer.received).isEmpty();
+
+        // Step 2: user removes digest schedule while still in quiet hours
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
+                qh, Instant.now());
+
+        // Step 3: next tick — orphan drain flushes buffer
+        Instant stillDuringQH = LocalDate.of(2026, 1, 1).atTime(23, 30).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, stillDuringQH);
+        assertThat(emailDeliverer.received).hasSize(1);
+        emailDeliverer.received.clear();
+
+        // Step 4: user re-enables digest schedule, new notification arrives
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null)),
+                null, Instant.now());
+        buffer.add(EMAIL_KEY, sampleInput("New notification"));
+
+        // Step 5: tick outside quiet hours — should follow normal schedule, NOT phantom deferred flush
+        Instant afterQH = LocalDate.of(2026, 1, 2).atTime(8, 0).atZone(ZoneId.of("UTC")).toInstant();
+        scheduler.processKey(EMAIL_KEY, afterQH);
+        assertThat(emailDeliverer.received).as("phantom deferred key should not bypass schedule gate").isEmpty();
+    }
+
+    @Test
+    void processKey_passesGroupByToDigestSummary() {
+        buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofHours(4)), DigestGroupBy.CATEGORY)),
+                null, Instant.now());
+
+        Instant futureNow = Instant.now().plus(5, ChronoUnit.HOURS);
+        scheduler.processKey(EMAIL_KEY, futureNow);
+
+        assertThat(emailDeliverer.received).hasSize(1);
+        assertThat(emailDeliverer.received.get(0).groupBy()).isEqualTo(DigestGroupBy.CATEGORY);
     }
 
     // --- helpers ---

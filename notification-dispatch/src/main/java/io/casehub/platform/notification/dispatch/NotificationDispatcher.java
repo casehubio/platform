@@ -7,6 +7,7 @@ import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
 import io.casehub.platform.api.notification.settings.QuietHours;
+import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
@@ -17,6 +18,7 @@ import jakarta.inject.Inject;
 
 import org.jboss.logging.Logger;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
@@ -107,11 +109,12 @@ public class NotificationDispatcher {
                 .orElse(null);
 
         // Evaluate suppression
+        final Instant now = Instant.now();
         final var suppressionResult = suppressionEvaluator.evaluate(
                 activeMutes, activeSnooze, quietHours,
                 entityType,
                 entityId != null ? entityId : "",
-                category);
+                category, now);
 
         // If muted → drop entirely (all channels)
         if (suppressionResult.isMuted()) {
@@ -130,8 +133,13 @@ public class NotificationDispatcher {
         final Map<String, io.casehub.platform.api.notification.settings.ChannelPreference> channelDefaults =
                 preferences.map(NotificationPreferences::channelDefaults).orElse(Map.of());
 
+        final QuietHoursAction quietHoursAction = preferences
+                .map(NotificationPreferences::quietHours)
+                .map(QuietHours::action)
+                .orElse(null);
+
         final Set<ResolvedChannel> channels = channelRouter.route(
-                channelDefaults, suppressionResult, notificationInput.severity());
+                channelDefaults, suppressionResult, notificationInput.severity(), quietHoursAction);
 
         // Delivery — three-path routing: digest, suppress, or deliver
         for (final ResolvedChannel channel : channels) {

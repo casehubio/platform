@@ -23,7 +23,7 @@ class DigestSummaryTest {
     void rejectsEmptyNotifications() {
         assertThatThrownBy(() -> new DigestSummary(
                 "user-1", "tenant-1", "email", List.of(),
-                Instant.now(), Instant.now()))
+                Instant.now(), Instant.now(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("notifications must not be empty");
     }
@@ -32,7 +32,7 @@ class DigestSummaryTest {
     void rejectsNullNotifications() {
         assertThatThrownBy(() -> new DigestSummary(
                 "user-1", "tenant-1", "email", null,
-                Instant.now(), Instant.now()))
+                Instant.now(), Instant.now(), null))
                 .isInstanceOf(NullPointerException.class);
     }
 
@@ -40,7 +40,7 @@ class DigestSummaryTest {
     void createsDefensiveCopy() {
         var mutable = new java.util.ArrayList<>(List.of(SAMPLE));
         var summary = new DigestSummary("user-1", "tenant-1", "email",
-                mutable, Instant.now(), Instant.now());
+                mutable, Instant.now(), Instant.now(), null);
         mutable.add(SAMPLE);
         assertThat(summary.notifications()).hasSize(1);
     }

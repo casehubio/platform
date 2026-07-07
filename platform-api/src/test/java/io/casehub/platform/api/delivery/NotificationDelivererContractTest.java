@@ -33,7 +33,7 @@ class NotificationDelivererContractTest {
         var input2 = sampleInput("Title 2");
         var input3 = sampleInput("Title 3");
         var summary = new DigestSummary("user-1", "tenant-1", "test",
-                List.of(input1, input2, input3), Instant.now().minusSeconds(3600), Instant.now());
+                List.of(input1, input2, input3), Instant.now().minusSeconds(3600), Instant.now(), null);
 
         DeliveryResult result = deliverer.deliverDigest(summary);
 

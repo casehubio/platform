@@ -32,4 +32,14 @@ public class NoOpDigestBuffer implements DigestBuffer {
     public Optional<Instant> oldestPendingTimestamp(DigestBufferKey key) {
         return Optional.empty();
     }
+
+    @Override
+    public int pendingCount(DigestBufferKey key) {
+        return 0;
+    }
+
+    @Override
+    public Set<DigestBufferKey> pendingKeysForUser(String userId, String tenancyId) {
+        return Set.of();
+    }
 }

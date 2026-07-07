@@ -31,7 +31,7 @@ class JpaNotificationPreferenceStoreTest {
     @Test
     @TestTransaction
     void update_createsPreferences_whenNoneExist() {
-        var channelPrefs = Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null));
+        var channelPrefs = Map.of("email", new ChannelPreference(true, NotificationSeverity.WARNING, null, null));
         var update = new NotificationPreferenceUpdate(channelPrefs, null, false);
 
         var result = store.update("user1", "tenant1", update);
@@ -46,12 +46,12 @@ class JpaNotificationPreferenceStoreTest {
     @Test
     @TestTransaction
     void update_updatesChannelDefaults() {
-        var initial = Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null));
+        var initial = Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null, null));
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(initial, null, false));
 
         var updated = Map.of(
-                "email", new ChannelPreference(false, NotificationSeverity.URGENT, null),
-                "sms", new ChannelPreference(true, NotificationSeverity.WARNING, null)
+                "email", new ChannelPreference(false, NotificationSeverity.URGENT, null, null),
+                "sms", new ChannelPreference(true, NotificationSeverity.WARNING, null, null)
         );
         var result = store.update("user1", "tenant1", new NotificationPreferenceUpdate(updated, null, false));
 
@@ -64,7 +64,8 @@ class JpaNotificationPreferenceStoreTest {
         var quietHours = new QuietHours(
                 LocalTime.of(22, 0),
                 LocalTime.of(7, 0),
-                ZoneId.of("America/New_York")
+                ZoneId.of("America/New_York"),
+                null
         );
         var update = new NotificationPreferenceUpdate(Map.of(), quietHours, false);
 
@@ -79,7 +80,8 @@ class JpaNotificationPreferenceStoreTest {
         var quietHours = new QuietHours(
                 LocalTime.of(22, 0),
                 LocalTime.of(7, 0),
-                ZoneId.of("America/New_York")
+                ZoneId.of("America/New_York"),
+                null
         );
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(Map.of(), quietHours, false));
 
@@ -94,12 +96,13 @@ class JpaNotificationPreferenceStoreTest {
         var quietHours = new QuietHours(
                 LocalTime.of(22, 0),
                 LocalTime.of(7, 0),
-                ZoneId.of("America/New_York")
+                ZoneId.of("America/New_York"),
+                null
         );
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(Map.of(), quietHours, false));
 
         var result = store.update("user1", "tenant1",
-                new NotificationPreferenceUpdate(Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)), null, false));
+                new NotificationPreferenceUpdate(Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null, null)), null, false));
 
         assertThat(result.quietHours()).isEqualTo(quietHours);
     }
@@ -108,11 +111,11 @@ class JpaNotificationPreferenceStoreTest {
     @TestTransaction
     void get_isolatesByUserAndTenancy() {
         store.update("user1", "tenant1", new NotificationPreferenceUpdate(
-                Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null)), null, false));
+                Map.of("email", new ChannelPreference(true, NotificationSeverity.INFO, null, null)), null, false));
         store.update("user2", "tenant1", new NotificationPreferenceUpdate(
-                Map.of("sms", new ChannelPreference(true, NotificationSeverity.WARNING, null)), null, false));
+                Map.of("sms", new ChannelPreference(true, NotificationSeverity.WARNING, null, null)), null, false));
         store.update("user1", "tenant2", new NotificationPreferenceUpdate(
-                Map.of("push", new ChannelPreference(true, NotificationSeverity.URGENT, null)), null, false));
+                Map.of("push", new ChannelPreference(true, NotificationSeverity.URGENT, null, null)), null, false));
 
         var user1Tenant1 = store.get("user1", "tenant1");
         var user2Tenant1 = store.get("user2", "tenant1");

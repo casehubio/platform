@@ -8,6 +8,7 @@ import io.casehub.platform.api.notification.settings.Snooze;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -23,12 +24,17 @@ class SuppressionEvaluatorTest {
     private static final String USER = "user-1";
     private static final String TENANT = "tenant-1";
     private static final Instant NOW = Instant.now();
+    private static final ZoneId TZ = ZoneId.of("UTC");
+    // For "within quiet hours 22:00-07:00 at 23:00 UTC"
+    private static final Instant DURING_QH = LocalDate.of(2026, 1, 1).atTime(23, 0).atZone(TZ).toInstant();
+    // For "outside quiet hours at 12:00 UTC"
+    private static final Instant OUTSIDE_QH = LocalDate.of(2026, 1, 1).atTime(12, 0).atZone(TZ).toInstant();
 
     @Test
     void evaluate_noMutesNoSnooze_returnsAllFalse() {
         var result = evaluator.evaluate(
                 List.of(), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isFalse();
         assertThat(result.isSnoozed()).isFalse();
@@ -42,7 +48,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isTrue();
     }
@@ -54,7 +60,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isFalse();
     }
@@ -66,7 +72,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isFalse();
     }
@@ -78,7 +84,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isTrue();
     }
@@ -90,7 +96,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isTrue();
     }
@@ -102,22 +108,22 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isFalse();
     }
 
     @Test
-    void evaluate_expiredMute_ignored() {
-        var mute = new MuteRule("m-1", USER, TENANT, MuteScope.ENTITY,
-                "wi-123", "work-item", NOW.minus(2, ChronoUnit.HOURS),
+    void evaluate_expiredMuteFromStore_notRefiltered() {
+        // Store returns an "expired" rule — evaluator should trust the store and treat it as active.
+        // This verifies the evaluator no longer re-filters by expiry.
+        var expiredRule = new MuteRule("rule-1", USER, TENANT, MuteScope.ENTITY,
+                "entity-1", "work-item", NOW.minus(2, ChronoUnit.HOURS),
                 NOW.minus(1, ChronoUnit.HOURS));
-
-        var result = evaluator.evaluate(
-                List.of(mute), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
-
-        assertThat(result.isMuted()).isFalse();
+        var result = evaluator.evaluate(List.of(expiredRule), Optional.empty(), null,
+                "work-item", "entity-1", "test-category", NOW);
+        // Store is authoritative — if it returned the rule, the evaluator trusts it
+        assertThat(result.isMuted()).isTrue();
     }
 
     @Test
@@ -127,7 +133,7 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(), Optional.of(snooze), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isSnoozed()).isTrue();
     }
@@ -139,61 +145,46 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(), Optional.of(snooze), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isSnoozed()).isFalse();
     }
 
     @Test
     void evaluate_quietHoursActive_sameDayWindow() {
-        // Create quiet hours that span the current time
-        var zone = ZoneId.systemDefault();
-        var nowLocal = LocalTime.now(zone);
-        var start = nowLocal.minusHours(1);
-        var end = nowLocal.plusHours(1);
-        var quietHours = new QuietHours(start, end, zone);
+        // Test at 12:00 UTC with window 10:00-14:00
+        var testTime = OUTSIDE_QH; // 12:00 UTC
+        var quietHours = new QuietHours(LocalTime.of(10, 0), LocalTime.of(14, 0), TZ, null);
 
         var result = evaluator.evaluate(
                 List.of(), Optional.empty(), quietHours,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", testTime);
 
         assertThat(result.quietHoursActive()).isTrue();
     }
 
     @Test
     void evaluate_quietHoursActive_crossMidnight() {
-        // Cross-midnight: 22:00 to 07:00 — test at 23:00
-        var zone = ZoneId.of("UTC");
-        var quietHours = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), zone);
-
-        // The evaluator checks against Instant.now(), so we test the logic
-        // by creating hours that definitely contain now or definitely don't
-        var nowLocal = LocalTime.now(zone);
-        boolean shouldBeActive = nowLocal.isAfter(LocalTime.of(22, 0))
-                || nowLocal.equals(LocalTime.of(22, 0))
-                || nowLocal.isBefore(LocalTime.of(7, 0));
+        // Cross-midnight: 22:00 to 07:00 — test at 23:00 UTC
+        var testTime = DURING_QH; // 23:00 UTC
+        var quietHours = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), TZ, null);
 
         var result = evaluator.evaluate(
                 List.of(), Optional.empty(), quietHours,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", testTime);
 
-        assertThat(result.quietHoursActive()).isEqualTo(shouldBeActive);
+        assertThat(result.quietHoursActive()).isTrue();
     }
 
     @Test
     void evaluate_quietHoursInactive_outsideWindow() {
-        // Window that is definitely NOT now: 3am-4am if current time is mid-day
-        // Use a timezone trick: pick a zone where it's guaranteed to be outside
-        var zone = ZoneId.systemDefault();
-        var nowLocal = LocalTime.now(zone);
-        // Create a 1-minute window starting 2 hours from now
-        var start = nowLocal.plusHours(2);
-        var end = start.plusMinutes(1);
-        var quietHours = new QuietHours(start, end, zone);
+        // Test at 12:00 UTC with window 14:00-16:00 (outside)
+        var testTime = OUTSIDE_QH; // 12:00 UTC
+        var quietHours = new QuietHours(LocalTime.of(14, 0), LocalTime.of(16, 0), TZ, null);
 
         var result = evaluator.evaluate(
                 List.of(), Optional.empty(), quietHours,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", testTime);
 
         assertThat(result.quietHoursActive()).isFalse();
     }
@@ -202,7 +193,7 @@ class SuppressionEvaluatorTest {
     void evaluate_noQuietHours_quietHoursActiveFalse() {
         var result = evaluator.evaluate(
                 List.of(), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.quietHoursActive()).isFalse();
     }
@@ -216,25 +207,24 @@ class SuppressionEvaluatorTest {
 
         var result = evaluator.evaluate(
                 List.of(mute1, mute2), Optional.empty(), null,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", NOW);
 
         assertThat(result.isMuted()).isTrue();
     }
 
     @Test
     void evaluate_allThreeActive() {
+        var testTime = OUTSIDE_QH; // 12:00 UTC
         var mute = new MuteRule("m-1", USER, TENANT, MuteScope.ENTITY,
-                "wi-123", "work-item", NOW, null);
+                "wi-123", "work-item", testTime, null);
         var snooze = new Snooze(USER, TENANT,
-                NOW.plus(1, ChronoUnit.HOURS), NOW);
-        var zone = ZoneId.systemDefault();
-        var nowLocal = LocalTime.now(zone);
+                testTime.plus(1, ChronoUnit.HOURS), testTime);
         var quietHours = new QuietHours(
-                nowLocal.minusHours(1), nowLocal.plusHours(1), zone);
+                LocalTime.of(10, 0), LocalTime.of(14, 0), TZ, null);
 
         var result = evaluator.evaluate(
                 List.of(mute), Optional.of(snooze), quietHours,
-                "work-item", "wi-123", "comment");
+                "work-item", "wi-123", "comment", testTime);
 
         assertThat(result.isMuted()).isTrue();
         assertThat(result.isSnoozed()).isTrue();
@@ -243,7 +233,7 @@ class SuppressionEvaluatorTest {
 
     @Test
     void evaluateUserLevel_noSnoozeNoQuietHours_allFalse() {
-        var result = evaluator.evaluateUserLevel(Optional.empty(), null);
+        var result = evaluator.evaluateUserLevel(Optional.empty(), null, NOW);
 
         assertThat(result.isMuted()).isFalse();
         assertThat(result.isSnoozed()).isFalse();
@@ -254,7 +244,7 @@ class SuppressionEvaluatorTest {
     void evaluateUserLevel_activeSnooze_snoozedTrue() {
         var snooze = new Snooze(USER, TENANT, NOW.plus(1, ChronoUnit.HOURS), NOW);
 
-        var result = evaluator.evaluateUserLevel(Optional.of(snooze), null);
+        var result = evaluator.evaluateUserLevel(Optional.of(snooze), null, NOW);
 
         assertThat(result.isMuted()).isFalse();
         assertThat(result.isSnoozed()).isTrue();
@@ -262,11 +252,10 @@ class SuppressionEvaluatorTest {
 
     @Test
     void evaluateUserLevel_quietHoursActive_quietHoursTrue() {
-        var zone = ZoneId.systemDefault();
-        var nowLocal = LocalTime.now(zone);
-        var quietHours = new QuietHours(nowLocal.minusHours(1), nowLocal.plusHours(1), zone);
+        var testTime = OUTSIDE_QH; // 12:00 UTC
+        var quietHours = new QuietHours(LocalTime.of(10, 0), LocalTime.of(14, 0), TZ, null);
 
-        var result = evaluator.evaluateUserLevel(Optional.empty(), quietHours);
+        var result = evaluator.evaluateUserLevel(Optional.empty(), quietHours, testTime);
 
         assertThat(result.isMuted()).isFalse();
         assertThat(result.quietHoursActive()).isTrue();
@@ -274,12 +263,11 @@ class SuppressionEvaluatorTest {
 
     @Test
     void evaluateUserLevel_neverReturnsMuted() {
-        var snooze = new Snooze(USER, TENANT, NOW.plus(1, ChronoUnit.HOURS), NOW);
-        var zone = ZoneId.systemDefault();
-        var nowLocal = LocalTime.now(zone);
-        var quietHours = new QuietHours(nowLocal.minusHours(1), nowLocal.plusHours(1), zone);
+        var testTime = OUTSIDE_QH; // 12:00 UTC
+        var snooze = new Snooze(USER, TENANT, testTime.plus(1, ChronoUnit.HOURS), testTime);
+        var quietHours = new QuietHours(LocalTime.of(10, 0), LocalTime.of(14, 0), TZ, null);
 
-        var result = evaluator.evaluateUserLevel(Optional.of(snooze), quietHours);
+        var result = evaluator.evaluateUserLevel(Optional.of(snooze), quietHours, testTime);
 
         assertThat(result.isMuted()).isFalse();
         assertThat(result.isSnoozed()).isTrue();

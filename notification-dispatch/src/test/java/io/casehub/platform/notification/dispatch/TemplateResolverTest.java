@@ -142,5 +142,29 @@ class TemplateResolverTest {
                 .isInstanceOf(NullPointerException.class);
     }
 
+    @Test
+    void extractField_cachedAcrossCalls() {
+        var event = new TestEvent("entity-1", "actor-1");
+        // First call populates cache
+        String first = TemplateResolver.extractField(event, "entityId");
+        // Second call uses cache
+        String second = TemplateResolver.extractField(event, "entityId");
+        assertThat(first).isEqualTo("entity-1");
+        assertThat(second).isEqualTo("entity-1");
+    }
+
+    @Test
+    void extractField_missingField_cachedAsEmpty() {
+        var event = new TestEvent("entity-1", "actor-1");
+        // First call — field doesn't exist
+        String first = TemplateResolver.extractField(event, "nonExistent");
+        // Second call — should return null without re-reflecting
+        String second = TemplateResolver.extractField(event, "nonExistent");
+        assertThat(first).isNull();
+        assertThat(second).isNull();
+    }
+
     record TestWorkItem(String status, String detail, UUID workItemId, String actor) {}
+
+    record TestEvent(String entityId, String actorId) {}
 }

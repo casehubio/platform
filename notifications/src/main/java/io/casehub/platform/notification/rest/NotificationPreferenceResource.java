@@ -47,7 +47,7 @@ public class NotificationPreferenceResource {
                 principal.tenancyId(),
                 Map.of(),
                 null,
-                Instant.now()
+                Instant.EPOCH
             ));
     }
 

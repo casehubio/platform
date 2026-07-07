@@ -3,10 +3,12 @@ package io.casehub.platform.notification.dispatch;
 import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.casehub.platform.api.notification.NotificationSeverity;
+import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.TargetType;
+import io.casehub.platform.subscription.NoOpEntityWatcherProvider;
 
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +41,18 @@ class TargetResolverTest {
         return Set.of();
     };
 
-    private final TargetResolver resolver = new TargetResolver(groupProvider);
+    // Stub EntityWatcherProvider that returns configurable watchers
+    private final EntityWatcherProvider entityWatcherProvider = (entityType, entityId, tenancyId) -> {
+        if ("work-item".equals(entityType) && "entity-1".equals(entityId)) {
+            return Set.of("watcher-1", "watcher-2");
+        }
+        if ("case".equals(entityType) && "entity-2".equals(entityId)) {
+            return Set.of("watcher-3");
+        }
+        return Set.of();
+    };
+
+    private final TargetResolver resolver = new TargetResolver(groupProvider, entityWatcherProvider);
 
     @Test
     void resolve_userTarget_addsDirectly() {
@@ -169,6 +182,90 @@ class TargetResolverTest {
                 "direct-user", "user-1", "user-2", "user-3", "user-assignee");
     }
 
+    @Test
+    void resolve_entityWatchersTarget_expandsViaProvider() {
+        var targets = List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "work-item"));
+        var sub = subscription(targets, false);
+        var pojo = new TestEvent("entity-1", "actor-1");
+
+        Set<String> result = resolver.resolve(sub, pojo);
+
+        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+    }
+
+    @Test
+    void resolve_entityWatchersTarget_blankId_usesTemplateEntityType() {
+        var targets = List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, ""));
+        var sub = subscription(targets, false);
+        var pojo = new TestEvent("entity-1", "actor-1");
+
+        Set<String> result = resolver.resolve(sub, pojo);
+
+        // template.entityType() is "work-item" — should resolve the same watchers
+        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+    }
+
+    @Test
+    void resolve_entityWatchersTarget_noProvider_returnsEmpty() {
+        // Create resolver with NoOp provider
+        var noOpResolver = new TargetResolver(groupProvider, new NoOpEntityWatcherProvider());
+        var targets = List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "work-item"));
+        var sub = subscription(targets, false);
+        var pojo = new TestEvent("entity-1", "actor-1");
+
+        Set<String> result = noOpResolver.resolve(sub, pojo);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void resolve_entityWatchersTarget_differentEntityType_resolvesDifferentWatchers() {
+        // Override template with different entity type
+        var template = new NotificationTemplate(
+                "Title", null, NotificationSeverity.INFO, "test.category",
+                null, "case", "entityId", "actorId");
+        var sub = new Subscription(
+                "sub-1", "owner-1", TENANT, "Test Sub", "test.event",
+                List.of(), List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "")),
+                false, template, true, NOW, NOW);
+        var pojo = new TestEvent("entity-2", "actor-1");
+
+        Set<String> result = resolver.resolve(sub, pojo);
+
+        assertThat(result).containsExactly("watcher-3");
+    }
+
+    @Test
+    void resolve_entityWatchersTarget_entityIdNull_skips() {
+        var targets = List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "work-item"));
+        var sub = subscription(targets, false);
+        var pojo = new TestEventNoEntityId("actor-1");
+
+        Set<String> result = resolver.resolve(sub, pojo);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void resolve_entityWatchersTarget_excludesActor() {
+        // Configure watcher provider to return actor in watcher set
+        EntityWatcherProvider watcherWithActor = (entityType, entityId, tenancyId) -> {
+            if ("work-item".equals(entityType) && "entity-1".equals(entityId)) {
+                return Set.of("watcher-1", "actor-1", "watcher-2");
+            }
+            return Set.of();
+        };
+        var resolverWithActor = new TargetResolver(groupProvider, watcherWithActor);
+        var targets = List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "work-item"));
+        var sub = subscription(targets, false);
+        var pojo = new TestEvent("entity-1", "actor-1");
+
+        Set<String> result = resolverWithActor.resolve(sub, pojo);
+
+        // actor-1 should be excluded (includeActor = false)
+        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+    }
+
     // --- helpers ---
 
     private Subscription subscription(List<NotificationTarget> targets, boolean includeActor) {
@@ -179,4 +276,5 @@ class TargetResolverTest {
 
     record TestEvent(String entityId, String actorId) {}
     record TestEventWithAssignee(String entityId, String actorId, String assigneeId) {}
+    record TestEventNoEntityId(String actorId) {}
 }

@@ -8,6 +8,7 @@ import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.settings.ChannelPreference;
+import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.SuppressionResult;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,13 +39,14 @@ class ChannelRouterTest {
                         false, true, NotificationSeverity.INFO, null),
                 IN_APP_DELIVERER);
 
-        // Register email: external, default enabled, WARNING
+        // Register email: external, default enabled, WARNING, with digest schedule
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.WARNING, null),
+                        true, true, NotificationSeverity.WARNING,
+                        new DigestSchedule.Interval(Duration.ofHours(4))),
                 EMAIL_DELIVERER);
 
-        // Register SMS: external, default disabled, URGENT
+        // Register SMS: external, default disabled, URGENT, no digest
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.SMS, "SMS",
                         true, false, NotificationSeverity.URGENT, null),
@@ -62,7 +64,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         assertThat(result).hasSize(1);
         assertThat(result).extracting(ResolvedChannel::channelId)
@@ -75,7 +78,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.WARNING);
+                NotificationSeverity.WARNING,
+                null);
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .containsExactlyInAnyOrder(DeliveryChannels.IN_APP, DeliveryChannels.EMAIL);
@@ -87,7 +91,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.URGENT);
+                NotificationSeverity.URGENT,
+                null);
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .containsExactlyInAnyOrder(DeliveryChannels.IN_APP, DeliveryChannels.EMAIL);
@@ -100,7 +105,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, true, false),
-                NotificationSeverity.URGENT);
+                NotificationSeverity.URGENT,
+                null);
 
         // In-app should not be suppressed (internal)
         var inApp = result.stream()
@@ -120,7 +126,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, false, true),
-                NotificationSeverity.URGENT);
+                NotificationSeverity.URGENT,
+                null);
 
         var inApp = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.IN_APP))
@@ -138,7 +145,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, true, true),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         var inApp = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.IN_APP))
@@ -152,7 +160,8 @@ class ChannelRouterTest {
         var result = router.route(
                 Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .contains(DeliveryChannels.IN_APP);
@@ -162,12 +171,13 @@ class ChannelRouterTest {
     void route_usesUserPreference_overChannelDefault() {
         // User enables SMS (default disabled) with INFO threshold
         var userPrefs = Map.of(
-                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO, null));
+                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO, null, null));
 
         var result = router.route(
                 userPrefs,
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .contains(DeliveryChannels.SMS);
@@ -177,12 +187,13 @@ class ChannelRouterTest {
     void route_userDisablesChannel() {
         // User disables in-app
         var userPrefs = Map.of(
-                DeliveryChannels.IN_APP, new ChannelPreference(false, NotificationSeverity.INFO, null));
+                DeliveryChannels.IN_APP, new ChannelPreference(false, NotificationSeverity.INFO, null, null));
 
         var result = router.route(
                 userPrefs,
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         assertThat(result).extracting(ResolvedChannel::channelId)
                 .doesNotContain(DeliveryChannels.IN_APP);
@@ -202,7 +213,8 @@ class ChannelRouterTest {
 
         var result = router.route(Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         var email = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
@@ -223,7 +235,8 @@ class ChannelRouterTest {
 
         var result = router.route(Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.URGENT);
+                NotificationSeverity.URGENT,
+                null);
 
         var email = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
@@ -243,7 +256,8 @@ class ChannelRouterTest {
 
         var result = router.route(Map.of(),
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         var inApp = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.IN_APP))
@@ -264,11 +278,12 @@ class ChannelRouterTest {
         // User enables digest on email
         var userPrefs = Map.of(
                 DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(2))));
+                        new DigestSchedule.Interval(Duration.ofHours(2)), null));
 
         var result = router.route(userPrefs,
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.INFO);
+                NotificationSeverity.INFO,
+                null);
 
         var email = result.stream()
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
@@ -278,14 +293,69 @@ class ChannelRouterTest {
 
     @Test
     void route_noDigestSchedule_notDigested() {
-        var result = router.route(Map.of(),
+        // SMS has no digest schedule — even when enabled, should not be digested
+        var userPrefs = Map.of(
+                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO, null, null));
+        var result = router.route(userPrefs,
                 new SuppressionResult(false, false, false),
-                NotificationSeverity.WARNING);
+                NotificationSeverity.WARNING,
+                null);
 
-        var email = result.stream()
-                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+        var sms = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.SMS))
                 .findFirst().orElseThrow();
-        assertThat(email.digested()).isFalse();
+        assertThat(sms.digested()).isFalse();
+    }
+
+    @Test
+    void route_bufferForDigest_quietHoursActive_routesToDigest() {
+        var suppression = new SuppressionResult(false, false, true); // quiet hours active
+        var channels = router.route(Map.of(), suppression, NotificationSeverity.WARNING,
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+
+        var email = channels.stream().filter(c -> c.channelId().equals(DeliveryChannels.EMAIL)).findFirst();
+        assertThat(email).isPresent();
+        assertThat(email.get().digested()).isTrue();
+        assertThat(email.get().suppressed()).isFalse();
+    }
+
+    @Test
+    void route_bufferForDigest_urgentDuringQuietHours_alsoBuffered() {
+        var suppression = new SuppressionResult(false, false, true);
+        var channels = router.route(Map.of(), suppression, NotificationSeverity.URGENT,
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+
+        var email = channels.stream().filter(c -> c.channelId().equals(DeliveryChannels.EMAIL)).findFirst();
+        assertThat(email).isPresent();
+        assertThat(email.get().digested()).isTrue();
+    }
+
+    @Test
+    void route_bufferForDigest_noDigestSchedule_stillSuppressed() {
+        // SMS has no digest schedule in setUp
+        var suppression = new SuppressionResult(false, false, true);
+        // First enable SMS
+        var userPrefs = Map.of(
+                DeliveryChannels.SMS, new ChannelPreference(true, NotificationSeverity.INFO, null, null));
+        var channels = router.route(userPrefs, suppression, NotificationSeverity.INFO,
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+
+        var sms = channels.stream().filter(c -> c.channelId().equals(DeliveryChannels.SMS)).findFirst();
+        assertThat(sms).isPresent();
+        assertThat(sms.get().suppressed()).isTrue();
+        assertThat(sms.get().digested()).isFalse();
+    }
+
+    @Test
+    void route_bufferForDigest_snoozedAndQuietHours_bothFlagsSet() {
+        var suppression = new SuppressionResult(false, true, true); // snoozed AND quiet hours active
+        var channels = router.route(Map.of(), suppression, NotificationSeverity.WARNING,
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+
+        var email = channels.stream().filter(c -> c.channelId().equals(DeliveryChannels.EMAIL)).findFirst();
+        assertThat(email).isPresent();
+        assertThat(email.get().digested()).isTrue();
+        assertThat(email.get().suppressed()).isTrue();
     }
 
     // --- helpers ---

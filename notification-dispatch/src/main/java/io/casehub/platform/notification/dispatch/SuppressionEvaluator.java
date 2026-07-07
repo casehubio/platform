@@ -38,6 +38,7 @@ public class SuppressionEvaluator {
      * @param entityType   notification entity type
      * @param entityId     notification entity ID
      * @param category     notification category
+     * @param now          evaluation time
      * @return suppression result with independent flags for mute, snooze, and quiet hours
      */
     public SuppressionResult evaluate(final List<MuteRule> activeMutes,
@@ -45,10 +46,11 @@ public class SuppressionEvaluator {
                                       final QuietHours quietHours,
                                       final String entityType,
                                       final String entityId,
-                                      final String category) {
+                                      final String category,
+                                      final Instant now) {
         final boolean isMuted = checkMuted(activeMutes, entityType, entityId, category);
-        final boolean isSnoozed = checkSnoozed(activeSnooze);
-        final boolean quietHoursActive = checkQuietHours(quietHours);
+        final boolean isSnoozed = checkSnoozed(activeSnooze, now);
+        final boolean quietHoursActive = checkQuietHours(quietHours, now);
 
         return new SuppressionResult(isMuted, isSnoozed, quietHoursActive);
     }
@@ -61,24 +63,20 @@ public class SuppressionEvaluator {
      *
      * @param activeSnooze pre-fetched active snooze for the user
      * @param quietHours   user's quiet hours configuration (nullable = no quiet hours)
+     * @param now          evaluation time
      * @return suppression result with isMuted always false, isSnoozed and quietHoursActive as evaluated
      */
     public SuppressionResult evaluateUserLevel(final Optional<Snooze> activeSnooze,
-                                               final QuietHours quietHours) {
-        return new SuppressionResult(false, checkSnoozed(activeSnooze), checkQuietHours(quietHours));
+                                               final QuietHours quietHours,
+                                               final Instant now) {
+        return new SuppressionResult(false, checkSnoozed(activeSnooze, now), checkQuietHours(quietHours, now));
     }
 
     private boolean checkMuted(final List<MuteRule> activeMutes,
                                final String entityType,
                                final String entityId,
                                final String category) {
-        final Instant now = Instant.now();
         for (final MuteRule rule : activeMutes) {
-            // Skip expired rules
-            if (rule.expiresAt() != null && now.isAfter(rule.expiresAt())) {
-                continue;
-            }
-
             if (rule.scope() == MuteScope.ENTITY) {
                 // ENTITY scope: entityType + entityId must match
                 if (entityType.equals(rule.entityType()) && entityId.equals(rule.scopeId())) {
@@ -97,27 +95,27 @@ public class SuppressionEvaluator {
         return false;
     }
 
-    boolean checkSnoozed(final Optional<Snooze> activeSnooze) {
+    boolean checkSnoozed(final Optional<Snooze> activeSnooze, final Instant now) {
         return activeSnooze
-                .filter(snooze -> Instant.now().isBefore(snooze.until()))
+                .filter(snooze -> now.isBefore(snooze.until()))
                 .isPresent();
     }
 
-    boolean checkQuietHours(final QuietHours quietHours) {
+    boolean checkQuietHours(final QuietHours quietHours, final Instant now) {
         if (quietHours == null) {
             return false;
         }
 
-        final LocalTime now = LocalTime.now(quietHours.timezone());
+        final LocalTime localNow = now.atZone(quietHours.timezone()).toLocalTime();
         final LocalTime start = quietHours.start();
         final LocalTime end = quietHours.end();
 
         if (start.isBefore(end)) {
             // Same-day window: start <= now < end
-            return !now.isBefore(start) && now.isBefore(end);
+            return !localNow.isBefore(start) && localNow.isBefore(end);
         } else {
             // Cross-midnight: start >= end means now >= start || now < end
-            return !now.isBefore(start) || now.isBefore(end);
+            return !localNow.isBefore(start) || localNow.isBefore(end);
         }
     }
 }

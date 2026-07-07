@@ -181,4 +181,52 @@ public abstract class AccessControlProviderContractTest {
     void revoke_nonExistentIsNoOp() {
         assertDoesNotThrow(() -> await(provider().revoke("actor1", "case:abc", AclAction.READ)));
     }
+
+    @Test
+    void canAccess_adminAction_worksLikeOtherActions() {
+        await(provider().grant("actor1", "case:abc", AclAction.ADMIN, null));
+        assertTrue(await(provider().canAccess("actor1", "case:abc", AclAction.ADMIN)));
+        assertFalse(await(provider().canAccess("actor1", "case:abc", AclAction.READ)));
+    }
+
+    @Test
+    void canAccess_claimAction_worksLikeOtherActions() {
+        await(provider().grant("actor1", "case:abc", AclAction.CLAIM, null));
+        assertTrue(await(provider().canAccess("actor1", "case:abc", AclAction.CLAIM)));
+        assertFalse(await(provider().canAccess("actor1", "case:abc", AclAction.WRITE)));
+    }
+
+    @Test
+    void registerParent_depthGuardAt20_returnsFalse() {
+        await(provider().grant("actor1", "case:root", AclAction.READ, null));
+        String prev = "case:root";
+        for (int i = 1; i <= 21; i++) {
+            String child = "res:child" + i;
+            await(provider().registerParent(child, prev));
+            prev = child;
+        }
+        assertFalse(await(provider().canAccess("actor1", prev, AclAction.READ)));
+    }
+
+    @Test
+    void accessibleResources_planItemType_returnsCorrectResources() {
+        await(provider().grant("actor1", "planitem:pi1", AclAction.READ, null));
+        await(provider().grant("actor1", "case:abc", AclAction.READ, null));
+
+        List<String> result = await(provider().accessibleResources("actor1",
+                AclResourceType.PLAN_ITEM, AclAction.READ));
+        assertEquals(1, result.size());
+        assertTrue(result.contains("planitem:pi1"));
+    }
+
+    @Test
+    void accessibleResources_deduplicatesDirectAndGroupGrants() {
+        await(provider().grant("actor1", "case:abc", AclAction.READ, null));
+        await(provider().grant("group:managers", "case:abc", AclAction.READ, null));
+
+        List<String> result = await(provider().accessibleResources("actor1",
+                AclResourceType.CASE, AclAction.READ));
+        assertEquals(1, result.size());
+        assertTrue(result.contains("case:abc"));
+    }
 }

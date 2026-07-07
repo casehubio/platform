@@ -2,6 +2,7 @@ package io.casehub.platform.api.delivery;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -92,5 +93,65 @@ class DigestScheduleTest {
         Instant lastFlush = Instant.parse("2026-07-05T09:00:00Z");
         Instant now = Instant.parse("2026-07-06T08:59:59Z");
         assertThat(daily.isFlushDue(oldest, lastFlush, now)).isFalse();
+    }
+
+    // --- WeeklyAt ---
+
+    @Test
+    void weeklyAt_rejectsNullDay() {
+        assertThatThrownBy(() -> new DigestSchedule.WeeklyAt(null, LocalTime.of(9, 0), ZoneId.of("UTC")))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void weeklyAt_rejectsNullTime() {
+        assertThatThrownBy(() -> new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, null, ZoneId.of("UTC")))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void weeklyAt_rejectsNullTimezone() {
+        assertThatThrownBy(() -> new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, LocalTime.of(9, 0), null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void weeklyAt_isFlushDue_trueWhenTargetDayAndTimePassedAndNotFlushedThisWeek() {
+        // Monday 9:00 UTC schedule, now is Monday 09:00:01, last flushed previous Monday
+        var weekly = new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, LocalTime.of(9, 0), ZoneId.of("UTC"));
+        Instant oldest = Instant.parse("2026-07-01T06:00:00Z");       // Wednesday
+        Instant lastFlush = Instant.parse("2026-06-29T09:00:00Z");    // previous Monday
+        Instant now = Instant.parse("2026-07-06T09:00:01Z");          // Monday 09:00:01
+        assertThat(weekly.isFlushDue(oldest, lastFlush, now)).isTrue();
+    }
+
+    @Test
+    void weeklyAt_isFlushDue_falseWhenAlreadyFlushedThisWeek() {
+        // Monday 9:00 UTC, already flushed this Monday
+        var weekly = new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, LocalTime.of(9, 0), ZoneId.of("UTC"));
+        Instant oldest = Instant.parse("2026-07-06T10:00:00Z");
+        Instant lastFlush = Instant.parse("2026-07-06T09:00:00Z");    // flushed this Monday at 09:00
+        Instant now = Instant.parse("2026-07-06T12:00:00Z");          // Monday 12:00
+        assertThat(weekly.isFlushDue(oldest, lastFlush, now)).isFalse();
+    }
+
+    @Test
+    void weeklyAt_isFlushDue_falseBeforeTargetDayOfWeek() {
+        // Monday 9:00 UTC schedule, now is Sunday
+        var weekly = new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, LocalTime.of(9, 0), ZoneId.of("UTC"));
+        Instant oldest = Instant.parse("2026-07-01T06:00:00Z");
+        Instant lastFlush = Instant.parse("2026-06-29T09:00:00Z");    // previous Monday
+        Instant now = Instant.parse("2026-07-05T15:00:00Z");          // Sunday 15:00
+        assertThat(weekly.isFlushDue(oldest, lastFlush, now)).isFalse();
+    }
+
+    @Test
+    void weeklyAt_isFlushDue_falseOnTargetDayBeforeTargetTime() {
+        // Monday 9:00 UTC schedule, now is Monday 08:59
+        var weekly = new DigestSchedule.WeeklyAt(DayOfWeek.MONDAY, LocalTime.of(9, 0), ZoneId.of("UTC"));
+        Instant oldest = Instant.parse("2026-07-01T06:00:00Z");
+        Instant lastFlush = Instant.parse("2026-06-29T09:00:00Z");    // previous Monday
+        Instant now = Instant.parse("2026-07-06T08:59:59Z");          // Monday 08:59:59
+        assertThat(weekly.isFlushDue(oldest, lastFlush, now)).isFalse();
     }
 }

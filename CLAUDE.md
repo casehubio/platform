@@ -134,7 +134,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `notification-dispatch/` | `casehub-platform-notification-dispatch` | NotificationDispatcher (@ObservesAsync SubscriptionMatched) + TargetResolver + SuppressionEvaluator (evaluate + evaluateUserLevel) + ChannelRouter (digested flag) + InAppNotificationDeliverer + InMemoryDeliveryChannelRegistry + InMemoryDigestBuffer (@ApplicationScoped, ConcurrentHashMap, max-size eviction via `casehub.notification.digest.max-buffer-size`) + DigestFlushScheduler (@Scheduled tick, per-key error isolation, polymorphic isFlushDue, orphan drain, suppression deferral) + TemplateResolver. Orchestrates: target resolution → suppression → template resolution → channel routing → delivery (immediate or digest buffer). No quarkus:build goal |
 | `subscriptions-inmem/` | `casehub-platform-subscriptions-inmem` | @Alternative @Priority(100) volatile InMemorySubscriptionStore + InMemoryReactiveSubscriptionStore — ConcurrentHashMap, CDI events. Both SPIs implemented natively. No quarkus:build goal. Do NOT combine with subscriptions-jpa in production scope |
 | `subscriptions-jpa/` | `casehub-platform-subscriptions-jpa` | @ApplicationScoped JPA SubscriptionStore + ReactiveSubscriptionStore — Hibernate Reactive Panache (reactive native) + Vert.x context await (blocking). PostgreSQL, Flyway V1 (`classpath:db/subscription/migration`). JSON columns for constraints + template. Both SPIs native. CDI events via fireAsync(). No quarkus:build goal. Do NOT combine with subscriptions-inmem in production scope |
-| `subscriptions/` | `casehub-platform-subscriptions` | SubscriptionEngine (@ApplicationScoped) + REST API (@Path("/subscriptions") CRUD + enable/disable). Registers platform-global notification DataSource, wires subscriptions into alpha network via EventTypeObjectType + ConstraintCompiler. Fires SubscriptionMatched CDI event (async) — delivery delegated to NotificationDispatcher in notification-dispatch/. MVEL for constraint predicates (mock phase until MVEL3 publishes). MethodHandle for all fixed property access. No quarkus:build goal |
+| `subscriptions/` | `casehub-platform-subscriptions` | SubscriptionEngine (@ApplicationScoped) + REST API (@Path("/subscriptions") CRUD + enable/disable + `GET /subscriptions/event-types` discovery). InMemoryEventTypeRegistry (@ApplicationScoped ConcurrentHashMap). Registers platform-global notification DataSource, wires subscriptions into alpha network via EventTypeObjectType + ConstraintCompiler. Fires SubscriptionMatched CDI event (async) — delivery delegated to NotificationDispatcher in notification-dispatch/. MVEL for constraint predicates (mock phase until MVEL3 publishes). MethodHandle for all fixed property access. No quarkus:build goal |
 | `acl-inmem/` | `casehub-platform-acl-inmem` | @Alternative @Priority(10) volatile AccessControlProvider — ConcurrentHashMap, constructor-injected GroupMembershipProvider, no quarkus:build goal. Add as test scope for @QuarkusTest isolation. Do NOT combine with acl-jpa in the same scope |
 | `acl-jpa/` | `casehub-platform-acl-jpa` | @ApplicationScoped JPA AccessControlProvider — Hibernate Reactive Panache, PostgreSQL, Flyway V1 (`classpath:db/acl/migration`). Group-based grants via GroupMembershipProvider.groupsOf(). Resource parent inheritance with depth guard (20). Audit logging (GRANT/REVOKE) with tenancy. No quarkus:build goal. Do NOT combine with acl-inmem in the same scope |
 | `streams-kafka/` | `casehub-platform-streams-kafka` | @Startup @ApplicationScoped static Kafka channel ingestion — @Incoming("casehub-kafka-stream"), always raw byte[], builds CloudEvent from STREAM_EVENT_TYPE; sets datacontenttype when STREAM_DATA_CONTENT_TYPE present on descriptor. Does NOT observe EndpointRegistered. CAMEL and KAFKA are mutually exclusive for same topic. |
@@ -175,7 +175,10 @@ io.casehub.platform.api
                    Constraint (record: field, op, value), ConstraintOp (enum: EQ/NEQ/GT/LT/GTE/LTE/IN/STARTS_WITH/CONTAINS),
                    NotificationTemplate (record: titlePattern, bodyPattern, severity, category, actionUrlPattern, entityType, entityIdField, actorIdField),
                    SubscriptionCreated, SubscriptionUpdated, SubscriptionDeleted (CDI events),
-                   SubscriptionConstants (NOTIFICATION_DATASOURCE_PATH — well-known DataSource path for domain bridges)
+                   SubscriptionConstants (NOTIFICATION_DATASOURCE_PATH — well-known DataSource path for domain bridges),
+                   EventTypeRegistry (SPI: register/resolve/discover event type metadata),
+                   EventTypeDescriptor (record: eventType, displayName, description, fields),
+                   EventFieldDescriptor (record: name, displayName, type)
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
                    SettingsScope, MapPreferences, Preference, SingleValuePreference, MultiValuePreference
@@ -234,7 +237,7 @@ io.casehub.platform.api
                    DeliveryChannels (constants: IN_APP, EMAIL, SMS, PUSH),
                    NotificationDeliverer (SPI: channelId + deliver → DeliveryResult + default deliverDigest(DigestSummary)),
                    DeliveryResult (record: success, failureReason),
-                   DigestSchedule (sealed interface: isFlushDue — Interval(Duration) + DailyAt(LocalTime, ZoneId)),
+                   DigestSchedule (sealed interface: isFlushDue — Interval(Duration) + DailyAt(LocalTime, ZoneId) + WeeklyAt(DayOfWeek, LocalTime, ZoneId)),
                    DigestBuffer (SPI: add/drain/pendingKeys/oldestPendingTimestamp),
                    DigestBufferKey (record: userId, tenancyId, channelId),
                    DigestSummary (record: userId, tenancyId, channelId, notifications, periodStart, periodEnd)

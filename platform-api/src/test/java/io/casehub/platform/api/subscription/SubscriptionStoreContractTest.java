@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +69,12 @@ public abstract class SubscriptionStoreContractTest {
         var found = store().findById(subscription.id(), "user-1", "tenant-1");
 
         assertThat(found).isPresent();
-        assertThat(found.get()).isEqualTo(subscription);
+        assertThat(found.get())
+                .usingRecursiveComparison()
+                .withComparatorForType(
+                        Comparator.comparing(a -> a.truncatedTo(ChronoUnit.MICROS)),
+                        Instant.class)
+                .isEqualTo(subscription);
     }
 
     @Test

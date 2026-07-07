@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -69,16 +70,16 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     public CompletionStage<List<String>> accessibleResources(String actorId, String resourceType, AclAction action) {
         Set<String> candidates = buildCandidateSet(actorId);
         String prefix = resourceType + ":";
-        List<String> result = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
                     && entry.action() == action
                     && entry.resourceId().startsWith(prefix)
                     && !entry.isExpired()) {
-                result.add(entry.resourceId());
+                seen.add(entry.resourceId());
             }
         }
-        return CompletableFuture.completedFuture(result);
+        return CompletableFuture.completedFuture(new ArrayList<>(seen));
     }
 
     private Set<String> buildCandidateSet(String actorId) {

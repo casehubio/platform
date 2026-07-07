@@ -87,7 +87,8 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                 AclEntryEntity.delete(
                                 "actorId = ?1 and resourceId = ?2 and action = ?3",
                                 actorId, resourceId, action.name())
-                        .chain(() -> {
+                        .chain(count -> {
+                            if (count == 0) return Uni.createFrom().voidItem();
                             AclAuditLogEntity log = new AclAuditLogEntity();
                             log.actorId = actorId;
                             log.resourceId = resourceId;
@@ -96,9 +97,8 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                             log.performedBy = principal.actorId();
                             log.performedAt = Instant.now();
                             log.tenancyId = principal.tenancyId();
-                            return log.persist();
+                            return log.persist().replaceWithVoid();
                         })
-                        .replaceWithVoid()
         ));
     }
 

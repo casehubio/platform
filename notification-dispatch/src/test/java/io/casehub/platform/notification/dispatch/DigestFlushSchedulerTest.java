@@ -64,7 +64,7 @@ class DigestFlushSchedulerTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
                 emailDeliverer);
 
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
@@ -72,9 +72,14 @@ class DigestFlushSchedulerTest {
                         new DigestSchedule.Interval(Duration.ofHours(4)), null)),
                 null, Instant.now());
 
+        var deliveryAttemptStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore(10000);
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        var deliveryTracker = new DeliveryTracker(deliveryAttemptStore, objectMapper, Duration.ofSeconds(30));
+
         scheduler = new DigestFlushScheduler(
                 buffer, preferenceStore, suppressionStore,
-                new SuppressionEvaluator(), channelRegistry);
+                new SuppressionEvaluator(), channelRegistry, deliveryTracker);
     }
 
     @Test

@@ -125,7 +125,8 @@ public class ChannelRouter {
                     && effectiveDigest != null
                     && (!severity.isAtLeast(NotificationSeverity.URGENT) || quietHoursBuffering);
 
-            result.add(new ResolvedChannel(channelId, deliverer, suppressed, digested));
+            result.add(new ResolvedChannel(channelId, deliverer, suppressed, digested,
+                    descriptor.guaranteedMinSeverity()));
         }
 
         return result;

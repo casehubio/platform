@@ -49,6 +49,7 @@ public class NotificationDispatcher {
     private final NotificationPreferenceStore preferenceStore;
     private final SuppressionStore suppressionStore;
     private final DigestBuffer digestBuffer;
+    private final DeliveryTracker deliveryTracker;
 
     @Inject
     public NotificationDispatcher(final TargetResolver targetResolver,
@@ -56,13 +57,15 @@ public class NotificationDispatcher {
                                   final ChannelRouter channelRouter,
                                   final NotificationPreferenceStore preferenceStore,
                                   final SuppressionStore suppressionStore,
-                                  final DigestBuffer digestBuffer) {
+                                  final DigestBuffer digestBuffer,
+                                  final DeliveryTracker deliveryTracker) {
         this.targetResolver = targetResolver;
         this.suppressionEvaluator = suppressionEvaluator;
         this.channelRouter = channelRouter;
         this.preferenceStore = preferenceStore;
         this.suppressionStore = suppressionStore;
         this.digestBuffer = digestBuffer;
+        this.deliveryTracker = deliveryTracker;
     }
 
     /**
@@ -154,13 +157,22 @@ public class NotificationDispatcher {
             }
             try {
                 final DeliveryResult result = channel.deliverer().deliver(notificationInput);
-                if (!result.success()) {
+                if (result.success()) {
+                    deliveryTracker.recordSuccess(
+                            channel.channelId(), notificationInput, null);
+                } else {
                     LOG.warnf("Delivery failed for channel '%s', user '%s': %s",
                             channel.channelId(), userId, result.failureReason());
+                    deliveryTracker.recordFailure(
+                            channel.channelId(), notificationInput, null,
+                            channel.guaranteedMinSeverity(), result.failureReason());
                 }
             } catch (Exception e) {
                 LOG.warnf(e, "Delivery error for channel '%s', user '%s'",
                         channel.channelId(), userId);
+                deliveryTracker.recordFailure(
+                        channel.channelId(), notificationInput, null,
+                        channel.guaranteedMinSeverity(), e.getMessage());
             }
         }
     }

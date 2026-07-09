@@ -14,6 +14,7 @@ import java.util.Objects;
  * @param defaultEnabled          default enabled state when user has no preference
  * @param defaultMinSeverity      default minimum severity when user has no preference
  * @param defaultDigestSchedule   default digest schedule (null = immediate delivery)
+ * @param guaranteedMinSeverity   minimum severity for retry on failure (null = no retry)
  */
 public record DeliveryChannelDescriptor(
         String channelId,
@@ -21,7 +22,8 @@ public record DeliveryChannelDescriptor(
         boolean external,
         boolean defaultEnabled,
         NotificationSeverity defaultMinSeverity,
-        DigestSchedule defaultDigestSchedule
+        DigestSchedule defaultDigestSchedule,
+        NotificationSeverity guaranteedMinSeverity
 ) {
     public DeliveryChannelDescriptor {
         Objects.requireNonNull(channelId, "channelId");

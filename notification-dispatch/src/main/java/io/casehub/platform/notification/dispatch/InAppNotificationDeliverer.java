@@ -48,6 +48,7 @@ public class InAppNotificationDeliverer implements NotificationDeliverer {
                         false,
                         true,
                         NotificationSeverity.INFO,
+                        null,
                         null),
                 this);
     }

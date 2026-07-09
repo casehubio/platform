@@ -74,7 +74,7 @@ class NotificationDispatcherTest {
         // Register in-app channel with capturing deliverer
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO, null),
+                        false, true, NotificationSeverity.INFO, null, null),
                 new CapturingDeliverer(DeliveryChannels.IN_APP, deliveredNotifications));
 
         final GroupMembershipProvider groupProvider = groupName -> {
@@ -91,9 +91,14 @@ class NotificationDispatcherTest {
         final var suppressionEvaluator = new SuppressionEvaluator();
         final var channelRouter = new ChannelRouter(channelRegistry);
 
+        var deliveryAttemptStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore(10000);
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        var deliveryTracker = new DeliveryTracker(deliveryAttemptStore, objectMapper, java.time.Duration.ofSeconds(30));
+
         dispatcher = new NotificationDispatcher(
                 targetResolver, suppressionEvaluator, channelRouter,
-                preferenceStore, suppressionStore, digestBuffer);
+                preferenceStore, suppressionStore, digestBuffer, deliveryTracker);
     }
 
     @Test
@@ -227,7 +232,7 @@ class NotificationDispatcherTest {
         var failingDeliverer = new FailingDeliverer("email");
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.INFO, null),
+                        true, true, NotificationSeverity.INFO, null, null),
                 failingDeliverer);
 
         var sub = subscription(
@@ -247,7 +252,7 @@ class NotificationDispatcherTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1))),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null),
                 new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
 
         var sub = subscription(
@@ -271,7 +276,7 @@ class NotificationDispatcherTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1))),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null),
                 new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
 
         var urgentTemplate = new NotificationTemplate(

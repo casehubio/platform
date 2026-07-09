@@ -46,6 +46,8 @@
         <module>notification-dispatch</module>
         <module>digest-inmem</module>
         <module>digest-jpa</module>
+        <module>delivery-tracking-inmem</module>
+        <module>delivery-tracking-jpa</module>
     </modules>
 
     <properties>

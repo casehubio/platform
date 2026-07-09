@@ -36,20 +36,20 @@ class ChannelRouterTest {
         // Register in-app: internal, default enabled, INFO
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO, null),
+                        false, true, NotificationSeverity.INFO, null, null),
                 IN_APP_DELIVERER);
 
         // Register email: external, default enabled, WARNING, with digest schedule
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.WARNING,
-                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
                 EMAIL_DELIVERER);
 
         // Register SMS: external, default disabled, URGENT, no digest
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.SMS, "SMS",
-                        true, false, NotificationSeverity.URGENT, null),
+                        true, false, NotificationSeverity.URGENT, null, null),
                 SMS_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -206,7 +206,7 @@ class ChannelRouterTest {
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -228,7 +228,7 @@ class ChannelRouterTest {
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4))),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -249,7 +249,7 @@ class ChannelRouterTest {
         registry = new InMemoryDeliveryChannelRegistry();
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App",
-                        false, true, NotificationSeverity.INFO, null),
+                        false, true, NotificationSeverity.INFO, null, null),
                 IN_APP_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -270,7 +270,7 @@ class ChannelRouterTest {
         registry = new InMemoryDeliveryChannelRegistry();
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.INFO, null),
+                        true, true, NotificationSeverity.INFO, null, null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -305,6 +305,40 @@ class ChannelRouterTest {
                 .filter(rc -> rc.channelId().equals(DeliveryChannels.SMS))
                 .findFirst().orElseThrow();
         assertThat(sms.digested()).isFalse();
+    }
+
+    @Test
+    void route_populatesGuaranteedMinSeverity() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                        true, true, NotificationSeverity.INFO, null,
+                        NotificationSeverity.WARNING),
+                EMAIL_DELIVERER);
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.WARNING,
+                null);
+
+        var email = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.EMAIL))
+                .findFirst().orElseThrow();
+        assertThat(email.guaranteedMinSeverity()).isEqualTo(NotificationSeverity.WARNING);
+    }
+
+    @Test
+    void route_nullGuaranteedMinSeverity_propagated() {
+        var result = router.route(Map.of(),
+                new SuppressionResult(false, false, false),
+                NotificationSeverity.INFO,
+                null);
+
+        var inApp = result.stream()
+                .filter(rc -> rc.channelId().equals(DeliveryChannels.IN_APP))
+                .findFirst().orElseThrow();
+        assertThat(inApp.guaranteedMinSeverity()).isNull();
     }
 
     @Test

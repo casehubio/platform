@@ -10,14 +10,13 @@
         <version>0.2-SNAPSHOT</version>
     </parent>
 
-    <artifactId>casehub-platform-notification-dispatch</artifactId>
+    <artifactId>casehub-platform-delivery-tracking-jpa</artifactId>
     <packaging>jar</packaging>
-    <name>CaseHub Platform Notification Dispatch</name>
-    <description>Notification dispatch pipeline — NotificationDispatcher + TargetResolver +
-        SuppressionEvaluator + ChannelRouter + InAppNotificationDeliverer +
-        InMemoryDeliveryChannelRegistry. Observes SubscriptionMatched and orchestrates
-        target resolution, suppression evaluation, channel routing, and delivery.
-        No quarkus:build goal.</description>
+    <name>CaseHub Platform Delivery Tracking JPA</name>
+    <description>JPA-backed DeliveryAttemptStore. @ApplicationScoped — Tier 2, beats @DefaultBean no-op.
+        Hibernate ORM Panache (blocking-only). claimRetryable via SELECT FOR UPDATE SKIP LOCKED.
+        Add as compile dep; consumers must add classpath:db/delivery-tracking/migration to
+        quarkus.flyway.locations. Do NOT combine with delivery-tracking-inmem in production scope.</description>
 
     <dependencies>
         <dependency>
@@ -27,41 +26,23 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
+            <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jackson</artifactId>
-        </dependency>
 
         <!-- Test -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-notification-settings-inmem</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-notifications-inmem</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-testing</artifactId>
@@ -69,20 +50,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-digest-inmem</artifactId>
-            <version>${project.version}</version>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-delivery-tracking-inmem</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

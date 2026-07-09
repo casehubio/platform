@@ -45,6 +45,7 @@ public class DigestFlushScheduler {
     private final SuppressionStore suppressionStore;
     private final SuppressionEvaluator suppressionEvaluator;
     private final DeliveryChannelRegistry channelRegistry;
+    private final DeliveryTracker deliveryTracker;
     private final ConcurrentHashMap<DigestBufferKey, Instant> lastFlushTimes = new ConcurrentHashMap<>();
     private final Set<DigestBufferKey> quietHoursDeferredKeys = ConcurrentHashMap.newKeySet();
 
@@ -53,12 +54,14 @@ public class DigestFlushScheduler {
                                 NotificationPreferenceStore preferenceStore,
                                 SuppressionStore suppressionStore,
                                 SuppressionEvaluator suppressionEvaluator,
-                                DeliveryChannelRegistry channelRegistry) {
+                                DeliveryChannelRegistry channelRegistry,
+                                DeliveryTracker deliveryTracker) {
         this.digestBuffer = digestBuffer;
         this.preferenceStore = preferenceStore;
         this.suppressionStore = suppressionStore;
         this.suppressionEvaluator = suppressionEvaluator;
         this.channelRegistry = channelRegistry;
+        this.deliveryTracker = deliveryTracker;
     }
 
     @Scheduled(every = "${casehub.notification.digest.tick-interval:1m}")
@@ -139,25 +142,32 @@ public class DigestFlushScheduler {
                 key.userId(), key.tenancyId(), key.channelId(),
                 items, periodStart, now, groupBy);
 
-        channelRegistry.resolveDeliverer(key.channelId())
-                .ifPresentOrElse(
-                        deliverer -> {
-                            try {
-                                var result = deliverer.deliverDigest(summary);
-                                if (result.success()) {
-                                    LOG.infof("Digest flushed: user=%s, channel=%s, count=%d, period=%s→%s",
-                                            key.userId(), key.channelId(), items.size(), periodStart, now);
-                                    lastFlushTimes.put(key, now);
-                                } else {
-                                    LOG.warnf("Digest delivery failed: user=%s, channel=%s, reason=%s",
-                                            key.userId(), key.channelId(), result.failureReason());
-                                }
-                            } catch (Exception e) {
-                                LOG.warnf(e, "Digest delivery error: user=%s, channel=%s",
-                                        key.userId(), key.channelId());
-                            }
-                        },
-                        () -> LOG.warnf("No deliverer for channel '%s' — digest items lost", key.channelId())
-                );
+        var descriptor = channelRegistry.resolve(key.channelId()).orElse(null);
+        var deliverer = channelRegistry.resolveDeliverer(key.channelId()).orElse(null);
+        if (deliverer == null) {
+            LOG.warnf("No deliverer for channel '%s' — digest items lost", key.channelId());
+            return;
+        }
+
+        var guaranteedMinSeverity = descriptor != null ? descriptor.guaranteedMinSeverity() : null;
+        var preRecorded = deliveryTracker.preRecordDigest(key.channelId(), summary, guaranteedMinSeverity);
+
+        try {
+            var result = deliverer.deliverDigest(summary);
+            if (result.success()) {
+                LOG.infof("Digest flushed: user=%s, channel=%s, count=%d, period=%s→%s",
+                        key.userId(), key.channelId(), items.size(), periodStart, now);
+                lastFlushTimes.put(key, now);
+                deliveryTracker.confirmDigestSuccess(preRecorded);
+            } else {
+                LOG.warnf("Digest delivery failed: user=%s, channel=%s, reason=%s",
+                        key.userId(), key.channelId(), result.failureReason());
+                deliveryTracker.confirmDigestFailure(preRecorded, result.failureReason());
+            }
+        } catch (Exception e) {
+            LOG.warnf(e, "Digest delivery error: user=%s, channel=%s",
+                    key.userId(), key.channelId());
+            deliveryTracker.confirmDigestFailure(preRecorded, e.getMessage());
+        }
     }
 }

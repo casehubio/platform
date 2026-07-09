@@ -34,7 +34,7 @@ class DeliveryChannelResourceTest {
         principal.setTenancyId(TenancyConstants.DEFAULT_TENANT_ID);
 
         registry.register(
-                new DeliveryChannelDescriptor("test_channel", "Test Channel", true, false, NotificationSeverity.WARNING, null),
+                new DeliveryChannelDescriptor("test_channel", "Test Channel", true, false, NotificationSeverity.WARNING, null, null),
                 new TestDeliverer());
     }
 

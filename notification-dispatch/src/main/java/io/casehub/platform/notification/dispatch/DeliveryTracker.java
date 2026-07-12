@@ -7,7 +7,7 @@ import io.casehub.platform.api.delivery.DeliveryType;
 import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,4 +1,4 @@
-package io.casehub.platform.notification.dispatch;
+package io.casehub.platform.delivery.channel.inmem;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;

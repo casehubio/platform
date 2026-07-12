@@ -1,5 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
+
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
@@ -9,7 +11,6 @@ import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
-import io.casehub.platform.api.notification.Notification;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.settings.MuteRule;
@@ -20,14 +21,12 @@ import io.casehub.platform.api.notification.settings.NotificationPreferences;
 import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
-import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.TargetType;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +35,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 

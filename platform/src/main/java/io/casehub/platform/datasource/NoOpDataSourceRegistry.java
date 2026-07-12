@@ -102,4 +102,9 @@ public class NoOpDataSourceRegistry implements DataSourceRegistry {
 
     @Override
     public void deregister(final Path path, final String tenancyId) {}
+
+    @Override
+    public void update(final DataSourceDescriptor descriptor) {
+    }
+
 }

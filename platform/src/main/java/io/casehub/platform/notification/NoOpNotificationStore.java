@@ -6,7 +6,7 @@ import io.casehub.platform.api.notification.NotificationPage;
 import io.casehub.platform.api.notification.NotificationQuery;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStore;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 

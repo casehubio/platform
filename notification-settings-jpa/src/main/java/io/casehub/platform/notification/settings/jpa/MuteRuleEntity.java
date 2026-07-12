@@ -1,6 +1,6 @@
 package io.casehub.platform.notification.settings.jpa;
 
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.notification.settings.MuteRule;
 import io.casehub.platform.api.notification.settings.MuteRuleInput;
 import io.casehub.platform.api.notification.settings.MuteScope;

@@ -1,7 +1,9 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
-import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryExhausted;
@@ -13,10 +15,8 @@ import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.NotificationSource;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.event.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

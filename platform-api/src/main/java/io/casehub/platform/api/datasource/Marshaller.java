@@ -1,11 +1,12 @@
 package io.casehub.platform.api.datasource;
 
 /**
- * Transforms objects from one type to another in the alpha network.
+ * Transforms objects from one type to another.
  *
- * <p>Used by {@link io.casehub.platform.datasource.MarshallNode} (implementation detail)
- * to convert between types during event routing. Typical use case: unmarshalling
- * {@code CloudEvent} payloads into domain objects.
+ * <p>Used as a pre-processing decorator on {@link DataSource#add(Object)} when
+ * configured via {@link DataSourceDescriptor#marshallerKeys()}. Typical use case:
+ * unmarshalling {@code CloudEvent} payloads into domain objects before alpha
+ * network routing.
  *
  * @param <I> input type
  * @param <O> output type

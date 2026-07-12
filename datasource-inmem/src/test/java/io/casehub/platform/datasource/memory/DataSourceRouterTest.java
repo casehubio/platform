@@ -1,10 +1,13 @@
 package io.casehub.platform.datasource.memory;
 
+import io.casehub.platform.datasource.alpha.AlphaDataSource;
+
 import io.casehub.platform.api.datasource.ClassObjectType;
 import io.casehub.platform.api.datasource.DataSource;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceRegistered;
+import io.casehub.platform.api.datasource.DataSourceUpdated;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.datasource.DataSourceRouter;
 import io.cloudevents.CloudEvent;
@@ -45,7 +48,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -62,7 +65,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -79,7 +82,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("global"), io.casehub.platform.api.identity.TenancyConstants.PLATFORM_TENANT_ID,
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -97,7 +100,7 @@ class DataSourceRouterTest {
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
                 Set.of("siem.alert.critical"),
-                Map.of());
+                Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -117,7 +120,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -135,7 +138,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> ds = registry.register(descriptor);
         List<Object> received = new ArrayList<>();
         ds.subscribe(received::add);
@@ -155,7 +158,7 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
 
         DataSource<?> ds1 = registry.register(descriptor);
         List<Object> received1 = new ArrayList<>();
@@ -185,12 +188,61 @@ class DataSourceRouterTest {
         DataSourceDescriptor descriptor = new DataSourceDescriptor(
                 Path.parse("siem"), "t1",
                 new ClassObjectType<>(CloudEvent.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         registry.register(descriptor);
         registry.deregister(Path.parse("siem"), "t1");
 
         router.onStartup(null);
         router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
         router.onCloudEvent(cloudEvent("siem.alert", "t1"));
+    }
+
+    // --- Update ---
+
+    @Test
+    void update_replacesDescriptorAndDataSource() {
+        DataSourceDescriptor original = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of("siem.alert"), Map.of(), Map.of());
+        DataSource<?> ds = registry.register(original);
+
+        router.onStartup(null);
+        router.onDataSourceRegistered(new DataSourceRegistered(original));
+
+        DataSourceDescriptor updated = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of("siem.alert", "siem.info"), Map.of(), Map.of());
+        router.onDataSourceUpdated(new DataSourceUpdated(original, updated, ds));
+
+        List<Object> received = new ArrayList<>();
+        ds.subscribe(received::add);
+        router.onCloudEvent(cloudEvent("siem.info", "t1"));
+        assertThat(received).hasSize(1);
+    }
+
+    @Test
+    void update_beforeStartup_replaysCorrectly() {
+        DataSourceDescriptor original = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of("siem.alert"), Map.of(), Map.of());
+        DataSource<?> ds = registry.register(original);
+
+        router.onDataSourceRegistered(new DataSourceRegistered(original));
+
+        DataSourceDescriptor updated = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of("siem.alert", "siem.info"), Map.of(), Map.of());
+        router.onDataSourceUpdated(new DataSourceUpdated(original, updated, ds));
+
+        router.onStartup(null);
+
+        List<Object> received = new ArrayList<>();
+        ds.subscribe(received::add);
+        router.onCloudEvent(cloudEvent("siem.info", "t1"));
+        assertThat(received).hasSize(1);
     }
 }

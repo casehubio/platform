@@ -1,4 +1,4 @@
-package io.casehub.platform.datasource.memory;
+package io.casehub.platform.datasource.alpha;
 
 import io.casehub.platform.api.datasource.DataProcessor;
 import io.casehub.platform.api.datasource.FilterExpression;
@@ -23,9 +23,9 @@ import java.util.function.Predicate;
  */
 final class TypeNode<T> implements DataProcessor<Object> {
 
-    private final ObjectType<T> objectType;
-    private final List<FilterNode<T>> filterNodes = new CopyOnWriteArrayList<>();
-    private final FanOutProcessor<T> noFilterSubscribers = new FanOutProcessor<>();
+    private final ObjectType<T>       objectType;
+    private final List<FilterNode<T>> filterNodes         = new CopyOnWriteArrayList<>();
+    private final FanOutProcessor<T>  noFilterSubscribers = new FanOutProcessor<>();
 
     TypeNode(ObjectType<T> objectType) {
         this.objectType = Objects.requireNonNull(objectType, "objectType");

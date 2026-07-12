@@ -9,7 +9,7 @@ import io.casehub.platform.api.notification.NotificationQuery;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
 import io.casehub.platform.api.notification.NotificationStore;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -18,7 +18,6 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;

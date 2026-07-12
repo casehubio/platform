@@ -78,7 +78,7 @@ public class SubscriptionEngine {
                 NOTIFICATION_DATASOURCE_PATH,
                 PLATFORM_TENANT_ID,
                 new ClassObjectType<>(Object.class),
-                null, Set.of(), Map.of());
+                null, Set.of(), Map.of(), Map.of());
         notificationDataSource = (DataSource<Object>) dataSourceRegistry.register(descriptor);
 
         LOG.info("Notification DataSource registered at " + NOTIFICATION_DATASOURCE_PATH);

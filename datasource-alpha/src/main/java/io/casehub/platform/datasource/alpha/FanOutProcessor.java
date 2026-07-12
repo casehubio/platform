@@ -1,4 +1,4 @@
-package io.casehub.platform.datasource.memory;
+package io.casehub.platform.datasource.alpha;
 
 import io.casehub.platform.api.datasource.DataProcessor;
 import org.jboss.logging.Logger;

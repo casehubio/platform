@@ -2,7 +2,7 @@ package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSource;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 
 import java.lang.invoke.MethodHandles;

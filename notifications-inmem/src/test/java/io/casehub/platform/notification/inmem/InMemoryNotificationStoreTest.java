@@ -5,7 +5,7 @@ import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.NotificationSource;
 import io.casehub.platform.api.notification.NotificationStore;
 import io.casehub.platform.api.notification.NotificationStoreContractTest;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

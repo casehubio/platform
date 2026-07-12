@@ -109,4 +109,24 @@ public interface DataSourceRegistry {
      * zero. If no subscribers are active at deregister time, cleanup is immediate.
      */
     void deregister(Path path, String tenancyId);
+
+    /**
+     * Update the descriptor for an existing DataSource registration.
+     *
+     * <p>Key match: {@code (path, tenancyId)} must match an existing registration.
+     * The DataSource instance survives — active subscriptions are preserved.
+     *
+     * <p>Immutable field: {@code objectType} — changing objectType invalidates
+     * TypeNode routing for existing subscribers. ObjectType changes require
+     * {@link #deregister} followed by {@link #register}. Implementations MUST
+     * throw {@code IllegalArgumentException} if objectType differs.
+     *
+     * <p>Non-no-op implementations MUST throw {@code IllegalStateException} if the
+     * key is not found. The {@code @DefaultBean} NoOp is exempt (accepts silently).
+     *
+     * @throws IllegalStateException    if key not found (non-no-op implementations)
+     * @throws IllegalArgumentException if objectType differs from existing
+     */
+    void update(DataSourceDescriptor descriptor);
+
 }

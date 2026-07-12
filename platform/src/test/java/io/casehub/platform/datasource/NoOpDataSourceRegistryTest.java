@@ -19,7 +19,7 @@ class NoOpDataSourceRegistryTest {
         var desc = new DataSourceDescriptor(
                 Path.parse("test"), "t1",
                 new ClassObjectType<>(Object.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSource<?> dataSource = registry.register(desc);
         assertThat(dataSource).isNotNull();
 
@@ -53,5 +53,13 @@ class NoOpDataSourceRegistryTest {
     @Test
     void deregister_noOp() {
         registry.deregister(Path.parse("any"), "t1");
+    }
+
+    @Test
+    void update_silentNoOp() {
+        var desc = new DataSourceDescriptor(
+                Path.of("test"), "t1", new ClassObjectType<>(Object.class), null,
+                Set.of(), Map.of(), Map.of());
+        registry.update(desc);
     }
 }

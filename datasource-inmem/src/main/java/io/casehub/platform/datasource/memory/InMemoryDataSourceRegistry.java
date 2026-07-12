@@ -1,8 +1,15 @@
 package io.casehub.platform.datasource.memory;
 
-import io.casehub.platform.api.datasource.*;
+import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.DataSourceDeregistered;
+import io.casehub.platform.api.datasource.DataSourceDescriptor;
+import io.casehub.platform.api.datasource.DataSourceQuery;
+import io.casehub.platform.api.datasource.DataSourceRegistered;
+import io.casehub.platform.api.datasource.DataSourceRegistry;
+import io.casehub.platform.api.datasource.DataSourceUpdated;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.path.Path;
+import io.casehub.platform.datasource.alpha.AlphaDataSource;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -54,17 +61,21 @@ public class InMemoryDataSourceRegistry implements DataSourceRegistry {
 
     private final Event<DataSourceRegistered> dataSourceRegisteredEvent;
     private final Event<DataSourceDeregistered> dataSourceDeregisteredEvent;
+    private final Event<DataSourceUpdated> dataSourceUpdatedEvent;
 
     @Inject
     public InMemoryDataSourceRegistry(Event<DataSourceRegistered> dataSourceRegisteredEvent,
-                                       Event<DataSourceDeregistered> dataSourceDeregisteredEvent) {
+                                       Event<DataSourceDeregistered> dataSourceDeregisteredEvent,
+                                       Event<DataSourceUpdated> dataSourceUpdatedEvent) {
         this.dataSourceRegisteredEvent = dataSourceRegisteredEvent;
         this.dataSourceDeregisteredEvent = dataSourceDeregisteredEvent;
+        this.dataSourceUpdatedEvent = dataSourceUpdatedEvent;
     }
 
     InMemoryDataSourceRegistry() {
         this.dataSourceRegisteredEvent = null;
         this.dataSourceDeregisteredEvent = null;
+        this.dataSourceUpdatedEvent = null;
     }
 
     @Override
@@ -149,6 +160,37 @@ public class InMemoryDataSourceRegistry implements DataSourceRegistry {
                 });
         }
     }
+
+    @Override
+    public void update(final DataSourceDescriptor descriptor) {
+        final RegistryKey          key      = new RegistryKey(descriptor.path().value(), descriptor.tenancyId());
+        final DataSourceDescriptor existing = descriptors.get(key);
+        if (existing == null) {
+            throw new IllegalStateException("No DataSource registered for path=" +
+                                            descriptor.path() + ", tenancyId=" + descriptor.tenancyId());
+        }
+        if (!descriptor.objectType().getTypeKey().equals(existing.objectType().getTypeKey())) {
+            throw new IllegalArgumentException(
+                    "objectType is immutable — deregister and re-register to change type");
+        }
+        descriptors.put(key, descriptor);
+        if (dataSourceUpdatedEvent != null) {
+            DataSource<?> ds = sources.get(key);
+            if (ds == null) {
+                LOG.debugf("DataSource deregistered during update for path=%s — skipping event",
+                        descriptor.path());
+                return;
+            }
+            dataSourceUpdatedEvent.fireAsync(new DataSourceUpdated(existing, descriptor, ds))
+                                  .whenComplete((e, t) -> {
+                                      if (t != null) {
+                                          LOG.warnf(t, "DataSourceUpdated observer failed for path %s",
+                                                    descriptor.path());
+                                      }
+                                  });
+        }
+    }
+
 
     private static boolean matchesTenancy(final DataSourceDescriptor d, final String tenancyId) {
         return d.tenancyId().equals(tenancyId)

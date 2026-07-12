@@ -22,7 +22,7 @@ class DataSourceRegisteredTest {
         var desc = new DataSourceDescriptor(
                 Path.parse("test"), "t1",
                 new ClassObjectType<>(Object.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         var event = new DataSourceRegistered(desc);
         assertThat(event.descriptor()).isSameAs(desc);
     }

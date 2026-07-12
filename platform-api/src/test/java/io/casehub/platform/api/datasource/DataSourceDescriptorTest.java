@@ -22,7 +22,7 @@ class DataSourceDescriptorTest {
         DataSourceDescriptor desc = new DataSourceDescriptor(
                 Path.parse("siem/alerts"), "tenant-1",
                 new ClassObjectType<>(String.class), null,
-                mutableTypes, mutableProps);
+                mutableTypes, mutableProps, Map.of());
 
         mutableProps.put("other", "val");
         mutableTypes.add("io.casehub.other");
@@ -35,11 +35,11 @@ class DataSourceDescriptorTest {
         DataSourceDescriptor global = new DataSourceDescriptor(
                 Path.parse("global"), TenancyConstants.PLATFORM_TENANT_ID,
                 new ClassObjectType<>(Object.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         DataSourceDescriptor tenant = new DataSourceDescriptor(
                 Path.parse("tenant"), "t1",
                 new ClassObjectType<>(Object.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
         assertThat(global.isPlatformGlobal()).isTrue();
         assertThat(tenant.isPlatformGlobal()).isFalse();
     }
@@ -47,7 +47,7 @@ class DataSourceDescriptorTest {
     @Test
     void nullsRejected() {
         assertThatThrownBy(() -> new DataSourceDescriptor(
-                null, "t", new ClassObjectType<>(Object.class), null, Set.of(), Map.of()))
+                null, "t", new ClassObjectType<>(Object.class), null, Set.of(), Map.of(), Map.of()))
                 .isInstanceOf(NullPointerException.class);
     }
 }

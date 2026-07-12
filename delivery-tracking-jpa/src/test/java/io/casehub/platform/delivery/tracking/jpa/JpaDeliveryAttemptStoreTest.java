@@ -5,7 +5,7 @@ import io.casehub.platform.api.delivery.DeliveryAttemptQuery;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.DeliveryType;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.TestTransaction;

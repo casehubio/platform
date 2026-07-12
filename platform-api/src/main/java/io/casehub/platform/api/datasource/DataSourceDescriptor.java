@@ -12,11 +12,10 @@ import java.util.Set;
  *
  * <p>The unique key is {@code (path, tenancyId)}. Registration is idempotent —
  * re-registering the same key returns the existing DataSource (first descriptor wins).
- * Descriptor update requires explicit deregister followed by register.
  *
  * <p>Field order: key components ({@code path}, {@code tenancyId}) lead, followed by
  * type metadata ({@code objectType}), then optional integration fields
- * ({@code endpointPath}, {@code acceptedEventTypes}, {@code properties}).
+ * ({@code endpointPath}, {@code acceptedEventTypes}, {@code properties}, {@code marshallerKeys}).
  *
  * <p>{@code endpointPath} is nullable — {@code null} indicates a case-scoped DataSource
  * (created per-case by the engine). Non-null values point to an endpoint in the
@@ -27,6 +26,10 @@ import java.util.Set;
  *
  * <p>{@code properties} holds non-secret configuration. No reserved keys yet — future
  * use for DataSource-specific config.
+ *
+ * <p>{@code marshallerKeys} maps accepted event types to marshaller keys in the
+ * {@link MarshallerRegistry}. Empty map means no marshalling. Unmapped event types
+ * pass through without marshalling.
  */
 public record DataSourceDescriptor(
         Path path,
@@ -34,17 +37,20 @@ public record DataSourceDescriptor(
         ObjectType<?> objectType,
         Path endpointPath,
         Set<String> acceptedEventTypes,
-        Map<String, String> properties
+        Map<String, String> properties,
+        Map<String, String> marshallerKeys
 ) {
 
     public DataSourceDescriptor {
-        Objects.requireNonNull(path,                "path");
-        Objects.requireNonNull(tenancyId,           "tenancyId");
-        Objects.requireNonNull(objectType,          "objectType");
-        Objects.requireNonNull(acceptedEventTypes,  "acceptedEventTypes");
-        Objects.requireNonNull(properties,          "properties");
+        Objects.requireNonNull(path, "path");
+        Objects.requireNonNull(tenancyId, "tenancyId");
+        Objects.requireNonNull(objectType, "objectType");
+        Objects.requireNonNull(acceptedEventTypes, "acceptedEventTypes");
+        Objects.requireNonNull(properties, "properties");
+        Objects.requireNonNull(marshallerKeys, "marshallerKeys");
         acceptedEventTypes = Set.copyOf(acceptedEventTypes);
         properties         = Map.copyOf(properties);
+        marshallerKeys     = Map.copyOf(marshallerKeys);
     }
 
     /**

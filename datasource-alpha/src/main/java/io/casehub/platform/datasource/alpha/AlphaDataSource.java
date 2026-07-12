@@ -1,6 +1,10 @@
-package io.casehub.platform.datasource.memory;
+package io.casehub.platform.datasource.alpha;
 
-import io.casehub.platform.api.datasource.*;
+import io.casehub.platform.api.datasource.ClassObjectType;
+import io.casehub.platform.api.datasource.DataProcessor;
+import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.ObjectType;
+import io.casehub.platform.api.datasource.SubscriptionHandle;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,9 +46,9 @@ import java.util.function.Predicate;
  */
 public final class AlphaDataSource<T> implements DataSource<T> {
 
-    private final FanOutProcessor<T> directSubscribers = new FanOutProcessor<>();
-    private final Map<Object, TypeNode<?>> typeNodes = new ConcurrentHashMap<>();
-    private final AtomicInteger shareCount = new AtomicInteger(0);
+    private final FanOutProcessor<T>       directSubscribers = new FanOutProcessor<>();
+    private final Map<Object, TypeNode<?>> typeNodes         = new ConcurrentHashMap<>();
+    private final AtomicInteger            shareCount        = new AtomicInteger(0);
     private volatile boolean pendingRemoval = false;
     private Runnable onEmpty;
 
@@ -101,7 +105,7 @@ public final class AlphaDataSource<T> implements DataSource<T> {
      * count reaches zero — immediately if already zero, otherwise when the last
      * subscriber unsubscribes.
      */
-    void markForRemoval(Runnable onEmpty) {
+    public void markForRemoval(Runnable onEmpty) {
         synchronized (this) {
             this.pendingRemoval = true;
             this.onEmpty = onEmpty;
@@ -111,7 +115,7 @@ public final class AlphaDataSource<T> implements DataSource<T> {
         }
     }
 
-    boolean isPendingRemoval() {
+    public boolean isPendingRemoval() {
         return pendingRemoval;
     }
 

@@ -1,6 +1,6 @@
 package io.casehub.platform.subscription;
 
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionPage;

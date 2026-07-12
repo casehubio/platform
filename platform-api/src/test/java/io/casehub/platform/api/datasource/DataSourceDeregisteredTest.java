@@ -15,7 +15,7 @@ class DataSourceDeregisteredTest {
     private final DataSourceDescriptor desc = new DataSourceDescriptor(
             Path.parse("test"), "t1",
             new ClassObjectType<>(Object.class), null,
-            Set.of(), Map.of());
+            Set.of(), Map.of(), Map.of());
 
     private final DataSource<Object> stubDs = new DataSource<>() {
         @Override public void add(Object value) {}

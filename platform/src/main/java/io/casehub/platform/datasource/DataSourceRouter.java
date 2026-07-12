@@ -4,13 +4,14 @@ import io.casehub.platform.api.datasource.DataSource;
 import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.datasource.DataSourceRegistered;
+import io.casehub.platform.api.datasource.DataSourceUpdated;
 import io.casehub.platform.api.datasource.DataSourceRegistry;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.cloudevents.CloudEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.ObservesAsync;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
@@ -22,9 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * CDI bridge routing {@code @ObservesAsync CloudEvent} events to registered DataSources.
  *
- * <p>Startup: {@code @Observes StartupEvent} replays queued events (both
- * {@link DataSourceRegistered} and {@link DataSourceDeregistered}) in order, then sets
- * {@code started = true}.
+ * <p>Startup: {@code @Observes StartupEvent} replays queued events
+ * ({@link DataSourceRegistered}, {@link DataSourceDeregistered}, and
+ * {@link DataSourceUpdated}) in order, then sets {@code started = true}.
  *
  * <p>Runtime: {@code @ObservesAsync DataSourceRegistered} wires new DataSources using
  * convergent logic — resolves the current DataSource from the registry, replaces stale
@@ -65,6 +66,8 @@ public class DataSourceRouter {
                     wireRoute(r);
                 } else if (event instanceof DataSourceDeregistered d) {
                     unwireRoute(d);
+                } else if (event instanceof DataSourceUpdated u) {
+                    applyUpdate(u);
                 }
             }
             pendingEvents.clear();
@@ -92,6 +95,29 @@ public class DataSourceRouter {
         }
         unwireRoute(event);
     }
+
+    public void onDataSourceUpdated(@ObservesAsync DataSourceUpdated event) {
+        if (!started.get()) {
+            synchronized (pendingEvents) {
+                pendingEvents.add(event);
+            }
+            return;
+        }
+        applyUpdate(event);
+    }
+
+    private void applyUpdate(DataSourceUpdated event) {
+        var path      = event.newDescriptor().path().value();
+        var tenancyId = event.newDescriptor().tenancyId();
+        boolean removed = wiredDataSources.removeIf(w ->
+                w.descriptor().path().value().equals(path)
+                && w.descriptor().tenancyId().equals(tenancyId));
+        if (removed) {
+            wiredDataSources.add(new WiredDataSource(event.newDescriptor(), event.dataSource()));
+            LOG.debugf("DataSource updated for path %s, tenant %s", path, tenancyId);
+        }
+    }
+
 
     private void wireRoute(DataSourceRegistered event) {
         DataSourceDescriptor descriptor = event.descriptor();

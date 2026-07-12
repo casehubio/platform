@@ -13,54 +13,43 @@ import jakarta.ws.rs.Path;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * REST endpoints for notification user preferences.
- *
- * <p>All endpoints use {@link CurrentPrincipal} for identity — userId and tenancyId
- * are never passed as request parameters. Tenant isolation is enforced by the principal.
- */
 @ApplicationScoped
 @Path("/notifications/preferences")
 public class NotificationPreferenceResource {
 
     private final NotificationPreferenceStore store;
-    private final CurrentPrincipal principal;
+    private final CurrentPrincipal            principal;
+    private final PreferenceValidator         validator;
 
     @Inject
-    public NotificationPreferenceResource(NotificationPreferenceStore store, CurrentPrincipal principal) {
-        this.store = store;
+    public NotificationPreferenceResource(NotificationPreferenceStore store,
+                                          CurrentPrincipal principal,
+                                          PreferenceValidator validator) {
+        this.store     = store;
         this.principal = principal;
+        this.validator = validator;
     }
 
-    /**
-     * Get current user's preferences.
-     *
-     * <p>Returns empty preferences (empty channelDefaults, no quiet hours) if none stored.
-     *
-     * @return notification preferences
-     */
     @GET
     public NotificationPreferences get() {
         return store.get(principal.actorId(), principal.tenancyId())
-            .orElseGet(() -> new NotificationPreferences(
-                principal.actorId(),
-                principal.tenancyId(),
-                Map.of(),
-                null,
-                Instant.EPOCH
-            ));
+                    .orElseGet(() -> new NotificationPreferences(
+                            principal.actorId(),
+                            principal.tenancyId(),
+                            Map.of(),
+                            null,
+                            Instant.EPOCH
+                    ));
     }
 
-    /**
-     * Update (upsert) user preferences.
-     *
-     * <p>userId and tenancyId are overridden from CurrentPrincipal — never from request body.
-     *
-     * @param update preference update
-     * @return updated preferences
-     */
     @PUT
     public NotificationPreferences update(NotificationPreferenceUpdate update) {
+        var existing = store.get(principal.actorId(), principal.tenancyId()).orElse(null);
+        try {
+            validator.validate(update, existing);
+        } catch (IllegalArgumentException e) {
+            throw new jakarta.ws.rs.BadRequestException(e.getMessage());
+        }
         return store.update(principal.actorId(), principal.tenancyId(), update);
     }
 }

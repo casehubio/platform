@@ -1,4 +1,4 @@
-package io.casehub.platform.api.notification;
+package io.casehub.platform.api.util;
 
 import java.time.Instant;
 import java.util.UUID;

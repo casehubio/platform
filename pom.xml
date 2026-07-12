@@ -21,7 +21,9 @@
         <module>persistence-mongodb</module>
         <module>endpoints-memory</module>
         <module>endpoints-config</module>
+        <module>datasource-alpha</module>
         <module>datasource-inmem</module>
+        <module>datasource-jpa</module>
         <module>scim</module>
         <module>identity</module>
         <module>agent-claude</module>
@@ -43,6 +45,7 @@
         <module>streams-camel</module>
         <module>governance</module>
         <module>credentials-quarkus</module>
+        <module>delivery-channel-inmem</module>
         <module>notification-dispatch</module>
         <module>digest-inmem</module>
         <module>digest-jpa</module>

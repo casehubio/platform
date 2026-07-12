@@ -6,8 +6,6 @@ import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.path.Path;
-import io.casehub.platform.api.subscription.Constraint;
-import io.casehub.platform.api.subscription.ConstraintOp;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
@@ -17,14 +15,13 @@ import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
 import io.casehub.platform.api.subscription.TargetType;
-import io.casehub.platform.datasource.memory.AlphaDataSource;
+import io.casehub.platform.datasource.alpha.AlphaDataSource;
 import io.casehub.platform.datasource.memory.InMemoryDataSourceRegistry;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
 
 import jakarta.enterprise.event.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,13 +31,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 import static io.casehub.platform.api.identity.TenancyConstants.PLATFORM_TENANT_ID;
 import static io.casehub.platform.api.subscription.SubscriptionConstants.NOTIFICATION_DATASOURCE_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -58,7 +53,7 @@ class SubscriptionEngineTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
-        registry = new InMemoryDataSourceRegistry(null, null);
+        registry = new InMemoryDataSourceRegistry(null, null, null);
         subStore = new InMemorySubscriptionStore(null, null, null);
         matchEvent = mock(Event.class);
         firedEvents = Collections.synchronizedList(new ArrayList<>());
@@ -374,7 +369,7 @@ class SubscriptionEngineTest {
         var ds = registry.resolveSource(NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID).orElseThrow();
         var desc = new DataSourceDescriptor(
                 NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID,
-                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of(), Map.of());
 
         engine.onDataSourceDeregistered(new DataSourceDeregistered(desc, ds));
 
@@ -390,7 +385,7 @@ class SubscriptionEngineTest {
 
         var otherDesc = new DataSourceDescriptor(
                 Path.parse("other/datasource"), PLATFORM_TENANT_ID,
-                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of(), Map.of());
         DataSource<Object> otherDs = new AlphaDataSource<>();
 
         engine.onDataSourceDeregistered(new DataSourceDeregistered(otherDesc, otherDs));
@@ -406,7 +401,7 @@ class SubscriptionEngineTest {
         var ds = registry.resolveSource(NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID).orElseThrow();
         var desc = new DataSourceDescriptor(
                 NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID,
-                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of(), Map.of());
         engine.onDataSourceDeregistered(new DataSourceDeregistered(desc, ds));
 
         var sub = subStore.store(subscriptionInput("owner1", "t1", "work.created", true));

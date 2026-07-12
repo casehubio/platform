@@ -1,7 +1,7 @@
 package io.casehub.platform.subscription.inmem;
 
 import io.casehub.platform.api.notification.NotificationSeverity;
-import io.casehub.platform.api.notification.UUIDv7;
+import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.SubscriptionInput;

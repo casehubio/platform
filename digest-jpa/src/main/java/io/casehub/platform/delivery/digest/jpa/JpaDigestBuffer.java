@@ -3,6 +3,7 @@ package io.casehub.platform.delivery.digest.jpa;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;
+import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -10,6 +11,7 @@ import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +29,9 @@ public class JpaDigestBuffer implements DigestBuffer {
 
     @ConfigProperty(name = "casehub.notification.digest.max-buffer-size", defaultValue = "0")
     int maxBufferSize;
+    @ConfigProperty(name = "casehub.notification.digest.retention-days", defaultValue = "90")
+    int retentionDays;
+
 
     // CDI no-arg constructor
     public JpaDigestBuffer() {
@@ -161,5 +166,25 @@ public class JpaDigestBuffer implements DigestBuffer {
             keys.add(new DigestBufferKey((String) row[0], (String) row[1], (String) row[2]));
         }
         return keys;
+    }
+
+    @Scheduled(cron = "0 0 3 * * ?")
+    @Transactional
+    void retentionPurge() {
+        Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
+        int purged = entityManager.createQuery(
+                                          "DELETE FROM DigestBufferEntity e WHERE e.bufferedAt < :cutoff " +
+                                          "AND NOT EXISTS (" +
+                                          "  SELECT 1 FROM DigestBufferEntity recent " +
+                                          "  WHERE recent.userId = e.userId " +
+                                          "  AND recent.tenancyId = e.tenancyId " +
+                                          "  AND recent.channelId = e.channelId " +
+                                          "  AND recent.bufferedAt >= :cutoff" +
+                                          ")")
+                                  .setParameter("cutoff", cutoff)
+                                  .executeUpdate();
+        if (purged > 0) {
+            LOG.infof("Digest retention purge: %d orphan rows removed", purged);
+        }
     }
 }

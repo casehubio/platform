@@ -18,7 +18,7 @@ class InMemoryDigestBufferTest {
 
     @BeforeEach
     void setUp() {
-        buffer = new InMemoryDigestBuffer(500);
+        buffer = new InMemoryDigestBuffer(500, 90);
     }
 
     @Test
@@ -75,7 +75,7 @@ class InMemoryDigestBufferTest {
 
     @Test
     void eviction_dropsOldestWhenMaxExceeded() {
-        buffer = new InMemoryDigestBuffer(3);
+        buffer = new InMemoryDigestBuffer(3, 90);
         buffer.add(KEY, sampleInput("Item 1"));
         buffer.add(KEY, sampleInput("Item 2"));
         buffer.add(KEY, sampleInput("Item 3"));
@@ -106,6 +106,40 @@ class InMemoryDigestBufferTest {
 
         var keys = buffer.pendingKeysForUser("user-1", "tenant-1");
         assertThat(keys).containsExactly(KEY);
+    }
+
+    // --- TTL expiry tests ---
+
+    @Test
+    void expired_entries_purged_from_pendingKeys() throws InterruptedException {
+        var ttlBuffer = new InMemoryDigestBuffer(500, 50L);
+        ttlBuffer.add(KEY, sampleInput("expiring"));
+        Thread.sleep(100);
+        assertThat(ttlBuffer.pendingKeys()).isEmpty();
+    }
+
+    @Test
+    void drain_returnsEmpty_forExpiredBuffer() throws InterruptedException {
+        var ttlBuffer = new InMemoryDigestBuffer(500, 50L);
+        ttlBuffer.add(KEY, sampleInput("expiring"));
+        Thread.sleep(100);
+        assertThat(ttlBuffer.drain(KEY)).isEmpty();
+    }
+
+    @Test
+    void pendingCount_returnsZero_forExpiredBuffer() throws InterruptedException {
+        var ttlBuffer = new InMemoryDigestBuffer(500, 50L);
+        ttlBuffer.add(KEY, sampleInput("expiring"));
+        Thread.sleep(100);
+        assertThat(ttlBuffer.pendingCount(KEY)).isEqualTo(0);
+    }
+
+    @Test
+    void oldestPendingTimestamp_returnsEmpty_forExpiredBuffer() throws InterruptedException {
+        var ttlBuffer = new InMemoryDigestBuffer(500, 50L);
+        ttlBuffer.add(KEY, sampleInput("expiring"));
+        Thread.sleep(100);
+        assertThat(ttlBuffer.oldestPendingTimestamp(KEY)).isEmpty();
     }
 
     private static NotificationInput sampleInput(String title) {

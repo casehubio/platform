@@ -1,4 +1,4 @@
-package io.casehub.platform.datasource.memory;
+package io.casehub.platform.datasource.alpha;
 
 import io.casehub.platform.api.datasource.DataProcessor;
 
@@ -15,7 +15,7 @@ import java.util.function.Predicate;
  */
 final class FilterNode<T> implements DataProcessor<T> {
 
-    private final Predicate<T> filter;
+    private final Predicate<T>       filter;
     private final FanOutProcessor<T> fanOut = new FanOutProcessor<>();
 
     FilterNode(Predicate<T> filter) {

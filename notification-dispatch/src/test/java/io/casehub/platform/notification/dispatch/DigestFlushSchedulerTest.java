@@ -1,7 +1,8 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
+
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
-import io.casehub.platform.delivery.digest.inmem.InMemoryDigestBuffer;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestBufferKey;
@@ -23,6 +24,7 @@ import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
+import io.casehub.platform.delivery.digest.inmem.InMemoryDigestBuffer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +57,7 @@ class DigestFlushSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        buffer = new InMemoryDigestBuffer(500);
+        buffer = new InMemoryDigestBuffer(500, 90);
         preferenceStore = new StubPreferenceStore();
         suppressionStore = new StubSuppressionStore();
         channelRegistry = new InMemoryDeliveryChannelRegistry();

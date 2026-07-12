@@ -1,6 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestSchedule;
@@ -16,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

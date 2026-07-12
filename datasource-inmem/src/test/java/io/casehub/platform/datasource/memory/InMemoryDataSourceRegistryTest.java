@@ -1,6 +1,9 @@
 package io.casehub.platform.datasource.memory;
 
-import io.casehub.platform.api.datasource.*;
+import io.casehub.platform.api.datasource.ClassObjectType;
+import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.DataSourceDescriptor;
+import io.casehub.platform.api.datasource.DataSourceQuery;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.path.Path;
 import org.junit.jupiter.api.Test;
@@ -9,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InMemoryDataSourceRegistryTest {
 
@@ -18,7 +22,7 @@ class InMemoryDataSourceRegistryTest {
         return new DataSourceDescriptor(
                 Path.parse(path), tenancyId,
                 new ClassObjectType<>(Object.class), null,
-                Set.of(), Map.of());
+                Set.of(), Map.of(), Map.of());
     }
 
     @Test
@@ -134,5 +138,43 @@ class InMemoryDataSourceRegistryTest {
     @Test
     void deregister_unknownKey_noOp() {
         registry.deregister(Path.parse("nonexistent"), "t1");
+    }
+
+    // --- Update ---
+
+    @Test
+    void update_replacesDescriptor() {
+        registry.register(descriptor("test", "t1"));
+        var updated = new DataSourceDescriptor(
+                Path.parse("test"), "t1", new ClassObjectType<>(Object.class), Path.parse("new-ep"),
+                Set.of("order.created"), Map.of("k", "v"), Map.of());
+        registry.update(updated);
+        assertThat(registry.resolve(Path.parse("test"), "t1")).contains(updated);
+    }
+
+    @Test
+    void update_preservesDataSourceInstance() {
+        DataSource<?> ds = registry.register(descriptor("test", "t1"));
+        var updated = new DataSourceDescriptor(
+                Path.parse("test"), "t1", new ClassObjectType<>(Object.class), Path.parse("new-ep"),
+                Set.of(), Map.of(), Map.of());
+        registry.update(updated);
+        assertThat(registry.resolveSource(Path.parse("test"), "t1")).containsSame(ds);
+    }
+
+    @Test
+    void update_throwsIfNotFound() {
+        assertThatThrownBy(() -> registry.update(descriptor("nonexistent", "t1")))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void update_throwsIfObjectTypeChanges() {
+        registry.register(descriptor("test", "t1"));
+        var changed = new DataSourceDescriptor(
+                Path.parse("test"), "t1", new ClassObjectType<>(String.class), null,
+                Set.of(), Map.of(), Map.of());
+        assertThatThrownBy(() -> registry.update(changed))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -3,6 +3,7 @@ package io.casehub.platform.subscription.engine;
 import io.casehub.platform.api.datasource.ClassObjectType;
 import io.casehub.platform.api.datasource.DataProcessor;
 import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.datasource.DataSourceRegistry;
 import io.casehub.platform.api.datasource.SubscriptionHandle;
@@ -97,6 +98,10 @@ public class SubscriptionEngine {
      * already exists for this subscription ID, it is unsubscribed first.
      */
     private void wireSubscription(final Subscription subscription) {
+        if (notificationDataSource == null) {
+            LOG.warnf("Cannot wire subscription %s — notification DataSource not available", subscription.id());
+            return;
+        }
         var objectType = new EventTypeObjectType(subscription.eventType());
         var filter = ConstraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
@@ -120,6 +125,10 @@ public class SubscriptionEngine {
      * where the return value feeds the map.
      */
     private SubscriptionHandle wireAndReturnHandle(final Subscription subscription) {
+        if (notificationDataSource == null) {
+            LOG.warnf("Cannot wire subscription %s — notification DataSource not available", subscription.id());
+            return null;
+        }
         var objectType = new EventTypeObjectType(subscription.eventType());
         var filter = ConstraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
@@ -128,6 +137,20 @@ public class SubscriptionEngine {
                 matchEvent.fireAsync(new SubscriptionMatched(subscription, pojo));
 
         return notificationDataSource.subscribe(objectType, filter, processor);
+    }
+
+    /**
+     * Unwires all subscriptions when the notification DataSource is deregistered.
+     * Ignores deregistration events for other DataSources.
+     */
+    void onDataSourceDeregistered(@ObservesAsync final DataSourceDeregistered event) {
+        if (!NOTIFICATION_DATASOURCE_PATH.equals(event.descriptor().path())) {
+            return;
+        }
+        handles.forEach((id, handle) -> handle.unsubscribe());
+        handles.clear();
+        notificationDataSource = null;
+        LOG.info("Notification DataSource deregistered — all subscriptions unwired");
     }
 
     /**

@@ -10,8 +10,9 @@ import java.util.Set;
 /**
  * Immutable description of a registered DataSource in the {@link DataSourceRegistry}.
  *
- * <p>The unique key is {@code (path, tenancyId)}. Re-registering the same key replaces
- * the descriptor — no merge semantics.
+ * <p>The unique key is {@code (path, tenancyId)}. Registration is idempotent —
+ * re-registering the same key returns the existing DataSource (first descriptor wins).
+ * Descriptor update requires explicit deregister followed by register.
  *
  * <p>Field order: key components ({@code path}, {@code tenancyId}) lead, followed by
  * type metadata ({@code objectType}), then optional integration fields

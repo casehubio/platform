@@ -28,13 +28,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * concurrent modifications (register/deregister) may or may not be visible to an
  * in-flight discover call. This is acceptable for the in-memory use case.
  *
- * <h2>DataSourceRegistered CDI event</h2>
- * <p>Fires {@link DataSourceRegistered} via {@code fireAsync()} after every successful
- * {@link #register(DataSourceDescriptor)} call. Observer exceptions are WARN-logged;
- * the registry operation itself has already succeeded before the event fires.
- * The CDI-proxy path (and unit tests) use a package-private no-arg constructor
- * that leaves {@code dataSourceRegisteredEvent} null; the null guard in
- * {@code register()} prevents NPE in those paths.
+ * <h2>Registration semantics</h2>
+ * <p>Idempotent — {@link #register(DataSourceDescriptor)} returns the existing
+ * {@link DataSource} if the key is already registered and active. Only creates a new
+ * instance for genuinely new registrations or re-registration of a draining DataSource.
+ * Fires {@link DataSourceRegistered} via {@code fireAsync()} only for new instances.
+ *
+ * <h2>Deregistration semantics</h2>
+ * <p>{@link #deregister(Path, String)} marks the DataSource for removal and fires
+ * {@link DataSourceDeregistered}. Map cleanup is deferred until the share count (active
+ * subscriber count) reaches zero. The cleanup callback uses identity-based conditional
+ * removal to prevent corruption when a replacement DataSource exists.
  */
 @Alternative
 @Priority(100)
@@ -49,35 +53,47 @@ public class InMemoryDataSourceRegistry implements DataSourceRegistry {
             new ConcurrentHashMap<>();
 
     private final Event<DataSourceRegistered> dataSourceRegisteredEvent;
+    private final Event<DataSourceDeregistered> dataSourceDeregisteredEvent;
 
     @Inject
-    public InMemoryDataSourceRegistry(Event<DataSourceRegistered> dataSourceRegisteredEvent) {
+    public InMemoryDataSourceRegistry(Event<DataSourceRegistered> dataSourceRegisteredEvent,
+                                       Event<DataSourceDeregistered> dataSourceDeregisteredEvent) {
         this.dataSourceRegisteredEvent = dataSourceRegisteredEvent;
+        this.dataSourceDeregisteredEvent = dataSourceDeregisteredEvent;
     }
 
-    /** Used by CDI proxy subclass (synthetic bytecode) and plain JUnit5 unit tests (same package). */
     InMemoryDataSourceRegistry() {
         this.dataSourceRegisteredEvent = null;
+        this.dataSourceDeregisteredEvent = null;
     }
 
     @Override
     public DataSource<?> register(final DataSourceDescriptor descriptor) {
         final RegistryKey key = new RegistryKey(descriptor.path().value(), descriptor.tenancyId());
-        final DataSource<?> dataSource = new AlphaDataSource<>();
-        descriptors.put(key, descriptor);
-        sources.put(key, dataSource);
+        final boolean[] created = {false};
 
-        if (dataSourceRegisteredEvent != null) {
-            dataSourceRegisteredEvent.fireAsync(new DataSourceRegistered(descriptor))
-                .whenComplete((e, t) -> {
-                    if (t != null) {
-                        LOG.warnf(t, "DataSourceRegistered observer failed for path %s",
-                            descriptor.path());
-                    }
-                });
+        DataSource<?> result = sources.compute(key, (k, existing) -> {
+            if (existing instanceof AlphaDataSource<?> alpha && !alpha.isPendingRemoval()) {
+                return existing;
+            }
+            created[0] = true;
+            return new AlphaDataSource<>();
+        });
+
+        if (created[0]) {
+            descriptors.put(key, descriptor);
+            if (dataSourceRegisteredEvent != null) {
+                dataSourceRegisteredEvent.fireAsync(new DataSourceRegistered(descriptor))
+                    .whenComplete((e, t) -> {
+                        if (t != null) {
+                            LOG.warnf(t, "DataSourceRegistered observer failed for path %s",
+                                descriptor.path());
+                        }
+                    });
+            }
         }
 
-        return dataSource;
+        return result;
     }
 
     @Override
@@ -112,8 +128,26 @@ public class InMemoryDataSourceRegistry implements DataSourceRegistry {
     @Override
     public void deregister(final Path path, final String tenancyId) {
         final RegistryKey key = new RegistryKey(path.value(), tenancyId);
-        descriptors.remove(key);
-        sources.remove(key);
+        final AlphaDataSource<?> source = (AlphaDataSource<?>) sources.get(key);
+        if (source == null) {
+            return;
+        }
+        final DataSourceDescriptor descriptor = descriptors.get(key);
+
+        source.markForRemoval(() -> {
+            if (sources.remove(key, source)) {
+                descriptors.remove(key);
+            }
+        });
+
+        if (descriptor != null && dataSourceDeregisteredEvent != null) {
+            dataSourceDeregisteredEvent.fireAsync(new DataSourceDeregistered(descriptor, source))
+                .whenComplete((e, t) -> {
+                    if (t != null) {
+                        LOG.warnf(t, "DataSourceDeregistered observer failed for path %s", path);
+                    }
+                });
+        }
     }
 
     private static boolean matchesTenancy(final DataSourceDescriptor d, final String tenancyId) {

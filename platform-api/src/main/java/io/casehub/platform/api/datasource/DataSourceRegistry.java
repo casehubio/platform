@@ -29,17 +29,25 @@ import java.util.Optional;
  * <h2>DataSourceRegistered CDI event</h2>
  * <p>Non-no-op implementations have a required obligation to fire
  * {@link DataSourceRegistered} via {@code Event<DataSourceRegistered>.fireAsync()} after
- * every successful {@link #register(DataSourceDescriptor)} call. The no-op
+ * every successful {@link #register(DataSourceDescriptor)} call that creates a new
+ * DataSource (not for idempotent returns of an existing instance). The no-op
  * {@code @DefaultBean} implementation must NOT fire the event — it stores nothing,
  * and firing would trigger stream route creation for phantom DataSources.
+ *
+ * <h2>DataSourceDeregistered CDI event</h2>
+ * <p>Non-no-op implementations have a required obligation to fire
+ * {@link DataSourceDeregistered} via {@code Event<DataSourceDeregistered>.fireAsync()}
+ * after every successful {@link #deregister(Path, String)} call (when the key exists).
+ * The no-op {@code @DefaultBean} implementation must NOT fire the event.
  */
 public interface DataSourceRegistry {
 
     /**
      * Register a DataSource and return its instance.
      *
-     * <p>{@code (path, tenancyId)} is the unique key — upsert semantics: re-registering
-     * the same key replaces the descriptor and returns a new DataSource instance.
+     * <p>{@code (path, tenancyId)} is the unique key — idempotent: re-registering the
+     * same key returns the existing {@link DataSource} instance (first descriptor wins).
+     * Descriptor update requires explicit {@link #deregister} followed by {@code register()}.
      *
      * <p>The returned {@link DataSource} is backed by an alpha network. Calling
      * {@link DataSource#add(Object)} propagates to all active subscriptions.
@@ -91,9 +99,14 @@ public interface DataSourceRegistry {
     /**
      * Deregister by {@code (path, tenancyId)}. No-op if not found.
      *
-     * <p>Deregistering stops further deliveries to all active subscriptions on that
-     * DataSource, but does not invalidate existing {@link SubscriptionHandle} instances —
-     * {@link SubscriptionHandle#isActive()} becomes {@code false}.
+     * <p>Deregistering eventually stops further deliveries to all active subscriptions
+     * on that DataSource once CDI observers have processed the {@link DataSourceDeregistered}
+     * event and unsubscribed. Between {@code deregister()} returning and observer
+     * completion, deliveries continue and {@link SubscriptionHandle#isActive()} remains
+     * {@code true}.
+     *
+     * <p>Map cleanup is deferred until the share count (active subscriber count) reaches
+     * zero. If no subscribers are active at deregister time, cleanup is immediate.
      */
     void deregister(Path path, String tenancyId);
 }

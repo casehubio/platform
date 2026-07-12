@@ -78,4 +78,61 @@ class InMemoryDataSourceRegistryTest {
         assertThat(registry.resolve(Path.parse("test"), "t1")).isEmpty();
         assertThat(registry.resolveSource(Path.parse("test"), "t1")).isEmpty();
     }
+
+    // --- Idempotent register ---
+
+    @Test
+    void register_idempotent_returnsSameDataSource() {
+        DataSource<?> ds1 = registry.register(descriptor("test", "t1"));
+        DataSource<?> ds2 = registry.register(descriptor("test", "t1"));
+        assertThat(ds2).isSameAs(ds1);
+    }
+
+    // --- Lifecycle-aware deregister ---
+
+    @Test
+    void deregister_noSubscribers_cleansImmediately() {
+        registry.register(descriptor("test", "t1"));
+        registry.deregister(Path.parse("test"), "t1");
+        assertThat(registry.resolve(Path.parse("test"), "t1")).isEmpty();
+        assertThat(registry.resolveSource(Path.parse("test"), "t1")).isEmpty();
+    }
+
+    @Test
+    void deregister_activeSubscribers_defersCleanup() {
+        DataSource<?> ds = registry.register(descriptor("test", "t1"));
+        @SuppressWarnings("unchecked")
+        var handle = ((DataSource<Object>) ds).subscribe(obj -> {});
+
+        registry.deregister(Path.parse("test"), "t1");
+
+        assertThat(registry.resolve(Path.parse("test"), "t1")).isPresent();
+        assertThat(registry.resolveSource(Path.parse("test"), "t1")).isPresent();
+
+        handle.unsubscribe();
+
+        assertThat(registry.resolve(Path.parse("test"), "t1")).isEmpty();
+        assertThat(registry.resolveSource(Path.parse("test"), "t1")).isEmpty();
+    }
+
+    @Test
+    void register_duringDrain_createsNewDataSource() {
+        DataSource<?> ds1 = registry.register(descriptor("test", "t1"));
+        @SuppressWarnings("unchecked")
+        var handle = ((DataSource<Object>) ds1).subscribe(obj -> {});
+
+        registry.deregister(Path.parse("test"), "t1");
+
+        DataSource<?> ds2 = registry.register(descriptor("test", "t1"));
+        assertThat(ds2).isNotSameAs(ds1);
+
+        handle.unsubscribe();
+        assertThat(registry.resolveSource(Path.parse("test"), "t1")).isPresent();
+        assertThat(registry.resolveSource(Path.parse("test"), "t1").get()).isSameAs(ds2);
+    }
+
+    @Test
+    void deregister_unknownKey_noOp() {
+        registry.deregister(Path.parse("nonexistent"), "t1");
+    }
 }

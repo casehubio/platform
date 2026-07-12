@@ -1,7 +1,11 @@
 package io.casehub.platform.subscription.engine;
 
+import io.casehub.platform.api.datasource.ClassObjectType;
 import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.DataSourceDeregistered;
+import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.notification.NotificationSeverity;
+import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.ConstraintOp;
 import io.casehub.platform.api.subscription.NotificationTarget;
@@ -13,6 +17,7 @@ import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
 import io.casehub.platform.api.subscription.TargetType;
+import io.casehub.platform.datasource.memory.AlphaDataSource;
 import io.casehub.platform.datasource.memory.InMemoryDataSourceRegistry;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
 
@@ -25,6 +30,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -51,7 +58,7 @@ class SubscriptionEngineTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
-        registry = new InMemoryDataSourceRegistry(null);
+        registry = new InMemoryDataSourceRegistry(null, null);
         subStore = new InMemorySubscriptionStore(null, null, null);
         matchEvent = mock(Event.class);
         firedEvents = Collections.synchronizedList(new ArrayList<>());
@@ -354,6 +361,58 @@ class SubscriptionEngineTest {
 
         // Engine fires event — dispatcher will handle template resolution failure
         assertThat(firedEvents).hasSize(1);
+    }
+
+    // --- Deregistration ---
+
+    @Test
+    void onDataSourceDeregistered_notificationPath_unwiresAll() {
+        engine.onStartup(null);
+        var sub = subStore.store(subscriptionInput("owner1", "t1", "work.created", true));
+        engine.onCreated(new SubscriptionCreated(sub));
+
+        var ds = registry.resolveSource(NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID).orElseThrow();
+        var desc = new DataSourceDescriptor(
+                NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID,
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+
+        engine.onDataSourceDeregistered(new DataSourceDeregistered(desc, ds));
+
+        pushEvent("work.created", "t1", UUID.randomUUID(), "actor1");
+        assertThat(firedEvents).isEmpty();
+    }
+
+    @Test
+    void onDataSourceDeregistered_otherPath_ignored() {
+        engine.onStartup(null);
+        var sub = subStore.store(subscriptionInput("owner1", "t1", "work.created", true));
+        engine.onCreated(new SubscriptionCreated(sub));
+
+        var otherDesc = new DataSourceDescriptor(
+                Path.parse("other/datasource"), PLATFORM_TENANT_ID,
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+        DataSource<Object> otherDs = new AlphaDataSource<>();
+
+        engine.onDataSourceDeregistered(new DataSourceDeregistered(otherDesc, otherDs));
+
+        pushEvent("work.created", "t1", UUID.randomUUID(), "actor1");
+        assertThat(firedEvents).hasSize(1);
+    }
+
+    @Test
+    void onCreated_afterDeregistration_skipsWithoutError() {
+        engine.onStartup(null);
+
+        var ds = registry.resolveSource(NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID).orElseThrow();
+        var desc = new DataSourceDescriptor(
+                NOTIFICATION_DATASOURCE_PATH, PLATFORM_TENANT_ID,
+                new ClassObjectType<>(Object.class), null, Set.of(), Map.of());
+        engine.onDataSourceDeregistered(new DataSourceDeregistered(desc, ds));
+
+        var sub = subStore.store(subscriptionInput("owner1", "t1", "work.created", true));
+        engine.onCreated(new SubscriptionCreated(sub));
+
+        // notificationDataSource is null — no NPE, subscription just not wired
     }
 
     // --- Helpers ---

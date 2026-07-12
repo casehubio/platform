@@ -3,6 +3,7 @@ package io.casehub.platform.datasource.memory;
 import io.casehub.platform.api.datasource.ClassObjectType;
 import io.casehub.platform.api.datasource.DataSource;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
+import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceRegistered;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.datasource.DataSourceRouter;
@@ -107,5 +108,89 @@ class DataSourceRouterTest {
         router.onCloudEvent(cloudEvent("siem.alert.critical", "t1"));
 
         assertThat(received).hasSize(1);
+    }
+
+    // --- Deregistration ---
+
+    @Test
+    void deregister_removesWiredRoute() {
+        DataSourceDescriptor descriptor = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of(), Map.of());
+        DataSource<?> ds = registry.register(descriptor);
+        List<Object> received = new ArrayList<>();
+        ds.subscribe(received::add);
+
+        router.onStartup(null);
+        router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
+        router.onDataSourceDeregistered(new DataSourceDeregistered(descriptor, ds));
+        router.onCloudEvent(cloudEvent("siem.alert", "t1"));
+
+        assertThat(received).isEmpty();
+    }
+
+    @Test
+    void deregister_identityMismatch_doesNotRemove() {
+        DataSourceDescriptor descriptor = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of(), Map.of());
+        DataSource<?> ds = registry.register(descriptor);
+        List<Object> received = new ArrayList<>();
+        ds.subscribe(received::add);
+
+        router.onStartup(null);
+        router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
+
+        DataSource<Object> otherDs = new AlphaDataSource<>();
+        router.onDataSourceDeregistered(new DataSourceDeregistered(descriptor, otherDs));
+        router.onCloudEvent(cloudEvent("siem.alert", "t1"));
+
+        assertThat(received).hasSize(1);
+    }
+
+    @Test
+    void wireRoute_replacesWhenInstanceChanges() {
+        DataSourceDescriptor descriptor = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of(), Map.of());
+
+        DataSource<?> ds1 = registry.register(descriptor);
+        List<Object> received1 = new ArrayList<>();
+        ds1.subscribe(received1::add);
+
+        router.onStartup(null);
+        router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
+
+        @SuppressWarnings("unchecked")
+        var handle = ((DataSource<Object>) ds1).subscribe(obj -> {});
+        registry.deregister(Path.parse("siem"), "t1");
+        handle.unsubscribe();
+
+        DataSource<?> ds2 = registry.register(descriptor);
+        List<Object> received2 = new ArrayList<>();
+        ds2.subscribe(received2::add);
+
+        router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
+        router.onCloudEvent(cloudEvent("siem.alert", "t1"));
+
+        assertThat(received1).isEmpty();
+        assertThat(received2).hasSize(1);
+    }
+
+    @Test
+    void wireRoute_skipsWhenResolveReturnsEmpty() {
+        DataSourceDescriptor descriptor = new DataSourceDescriptor(
+                Path.parse("siem"), "t1",
+                new ClassObjectType<>(CloudEvent.class), null,
+                Set.of(), Map.of());
+        registry.register(descriptor);
+        registry.deregister(Path.parse("siem"), "t1");
+
+        router.onStartup(null);
+        router.onDataSourceRegistered(new DataSourceRegistered(descriptor));
+        router.onCloudEvent(cloudEvent("siem.alert", "t1"));
     }
 }

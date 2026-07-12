@@ -1,6 +1,7 @@
 package io.casehub.platform.datasource;
 
 import io.casehub.platform.api.datasource.DataSource;
+import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
 import io.casehub.platform.api.datasource.DataSourceRegistered;
 import io.casehub.platform.api.datasource.DataSourceRegistry;
@@ -21,12 +22,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * CDI bridge routing {@code @ObservesAsync CloudEvent} events to registered DataSources.
  *
- * <p>Startup: {@code @Observes StartupEvent} replays queued {@link DataSourceRegistered} events
- * (from {@code @Startup} beans) and sets {@code started = true}. All DataSource wiring happens
- * via {@link DataSourceRegistered} events — pre-startup events are queued and replayed at startup.
+ * <p>Startup: {@code @Observes StartupEvent} replays queued events (both
+ * {@link DataSourceRegistered} and {@link DataSourceDeregistered}) in order, then sets
+ * {@code started = true}.
  *
- * <p>Runtime: {@code @ObservesAsync DataSourceRegistered} wires new DataSources. Idempotent:
- * if already wired, skips. {@code @ObservesAsync CloudEvent} routes to all matching DataSources.
+ * <p>Runtime: {@code @ObservesAsync DataSourceRegistered} wires new DataSources using
+ * convergent logic — resolves the current DataSource from the registry, replaces stale
+ * entries, and skips if the DataSource was already deregistered. {@code @ObservesAsync
+ * DataSourceDeregistered} unwires routes using identity comparison against the deregistered
+ * DataSource instance, preventing removal of replacement entries.
+ *
+ * <p>Both handlers are convergent — they produce the correct wired state regardless of
+ * CDI event processing order.
  *
  * <p>Routing logic:
  * <ol>
@@ -35,9 +42,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Check {@link DataSourceDescriptor#acceptedEventTypes()} pre-filter (if non-empty)</li>
  *   <li>Call {@link DataSource#add(Object)} — alpha network propagates to subscribers</li>
  * </ol>
- *
- * <p>When {@link io.casehub.platform.datasource.NoOpDataSourceRegistry} is active, no DataSources
- * exist, so routing is silent no-op.
  */
 @ApplicationScoped
 public class DataSourceRouter {
@@ -47,7 +51,7 @@ public class DataSourceRouter {
     private final DataSourceRegistry registry;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final List<WiredDataSource> wiredDataSources = new CopyOnWriteArrayList<>();
-    private final List<DataSourceRegistered> pendingEvents = new ArrayList<>();
+    private final List<Object> pendingEvents = new ArrayList<>();
 
     @Inject
     public DataSourceRouter(DataSourceRegistry registry) {
@@ -56,7 +60,13 @@ public class DataSourceRouter {
 
     public void onStartup(@Observes StartupEvent ev) {
         synchronized (pendingEvents) {
-            pendingEvents.forEach(this::wireRoute);
+            for (Object event : pendingEvents) {
+                if (event instanceof DataSourceRegistered r) {
+                    wireRoute(r);
+                } else if (event instanceof DataSourceDeregistered d) {
+                    unwireRoute(d);
+                }
+            }
             pendingEvents.clear();
         }
         started.set(true);
@@ -73,27 +83,53 @@ public class DataSourceRouter {
         wireRoute(event);
     }
 
+    public void onDataSourceDeregistered(@ObservesAsync DataSourceDeregistered event) {
+        if (!started.get()) {
+            synchronized (pendingEvents) {
+                pendingEvents.add(event);
+            }
+            return;
+        }
+        unwireRoute(event);
+    }
+
     private void wireRoute(DataSourceRegistered event) {
         DataSourceDescriptor descriptor = event.descriptor();
-        // Idempotent: skip if already wired
-        if (wiredDataSources.stream()
-                .anyMatch(w -> w.descriptor.path().equals(descriptor.path())
-                        && w.descriptor.tenancyId().equals(descriptor.tenancyId()))) {
+
+        var resolved = registry.resolveSource(descriptor.path(), descriptor.tenancyId());
+        if (resolved.isEmpty()) {
+            LOG.debugf("DataSourceRegistered but resolveSource empty (deregistered?): path=%s, tenancyId=%s",
+                    descriptor.path(), descriptor.tenancyId());
             return;
         }
 
-        registry.resolveSource(descriptor.path(), descriptor.tenancyId())
-                .ifPresentOrElse(
-                        dataSource -> {
-                            wiredDataSources.add(new WiredDataSource(descriptor, dataSource));
-                            LOG.debugf("Wired DataSource: path=%s, tenancyId=%s",
-                                    descriptor.path(), descriptor.tenancyId());
-                        },
-                        () -> LOG.warnf("DataSourceRegistered event fired but resolveSource returned empty: path=%s, tenancyId=%s",
-                                descriptor.path(), descriptor.tenancyId())
-                );
+        DataSource<?> dataSource = resolved.get();
+
+        wiredDataSources.removeIf(w ->
+                w.descriptor.path().equals(descriptor.path())
+                && w.descriptor.tenancyId().equals(descriptor.tenancyId())
+                && w.dataSource != dataSource);
+
+        boolean alreadyWired = wiredDataSources.stream()
+                .anyMatch(w -> w.descriptor.path().equals(descriptor.path())
+                        && w.descriptor.tenancyId().equals(descriptor.tenancyId())
+                        && w.dataSource == dataSource);
+
+        if (!alreadyWired) {
+            wiredDataSources.add(new WiredDataSource(descriptor, dataSource));
+            LOG.debugf("Wired DataSource: path=%s, tenancyId=%s",
+                    descriptor.path(), descriptor.tenancyId());
+        }
     }
 
+    private void unwireRoute(DataSourceDeregistered event) {
+        wiredDataSources.removeIf(w ->
+                w.descriptor.path().equals(event.descriptor().path())
+                && w.descriptor.tenancyId().equals(event.descriptor().tenancyId())
+                && w.dataSource == event.dataSource());
+    }
+
+    @SuppressWarnings("unchecked")
     public void onCloudEvent(@ObservesAsync CloudEvent cloudEvent) {
         Object tenancyIdObj = cloudEvent.getExtension("tenancyid");
         if (tenancyIdObj == null) {
@@ -106,20 +142,17 @@ public class DataSourceRouter {
         for (WiredDataSource wired : wiredDataSources) {
             DataSourceDescriptor descriptor = wired.descriptor;
 
-            // Tenancy match: tenant-specific OR platform-global
             boolean tenancyMatch = descriptor.tenancyId().equals(tenancyId)
                     || descriptor.tenancyId().equals(TenancyConstants.PLATFORM_TENANT_ID);
             if (!tenancyMatch) {
                 continue;
             }
 
-            // acceptedEventTypes pre-filter
             if (!descriptor.acceptedEventTypes().isEmpty()
                     && !descriptor.acceptedEventTypes().contains(eventType)) {
                 continue;
             }
 
-            // Route to DataSource
             try {
                 ((DataSource<Object>) wired.dataSource).add(cloudEvent);
             } catch (ClassCastException e) {

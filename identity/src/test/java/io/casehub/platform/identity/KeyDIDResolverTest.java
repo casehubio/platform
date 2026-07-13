@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -124,6 +125,113 @@ class KeyDIDResolverTest {
         assertArrayEquals(expectedSpki, doc.verificationMethods().get(0).publicKeyBytes(),
                 "0x03 prefix must select the odd-Y root");
     }
+// --- secp256k1 tests (JCA unavailable on JDK 21+ — uses known test vectors) ---
+
+    private static final BigInteger SECP256K1_GX = new BigInteger(
+            "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16);
+    private static final BigInteger SECP256K1_GY = new BigInteger(
+            "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16);
+    private static final BigInteger SECP256K1_P  = new BigInteger(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16);
+
+    // secp256k1 SPKI header: SEQUENCE > SEQUENCE { OID ecPublicKey, OID secp256k1 } > BIT STRING 00 04
+    private static final byte[] SECP256K1_SPKI_HEADER = {
+            0x30, 0x56, 0x30, 0x10,
+            0x06, 0x07, 0x2A, (byte) 0x86, 0x48, (byte) 0xCE, 0x3D, 0x02, 0x01,
+            0x06, 0x05, 0x2B, (byte) 0x81, 0x04, 0x00, 0x0A,
+            0x03, 0x42, 0x00, 0x04
+    };
+
+    private byte[] buildExpectedSecp256k1Spki(BigInteger x, BigInteger y) {
+        byte[] xBytes = toUnsignedByteArray(x, 32);
+        byte[] yBytes = toUnsignedByteArray(y, 32);
+        byte[] spki   = new byte[SECP256K1_SPKI_HEADER.length + 64];
+        System.arraycopy(SECP256K1_SPKI_HEADER, 0, spki, 0, SECP256K1_SPKI_HEADER.length);
+        System.arraycopy(xBytes, 0, spki, SECP256K1_SPKI_HEADER.length, 32);
+        System.arraycopy(yBytes, 0, spki, SECP256K1_SPKI_HEADER.length + 32, 32);
+        return spki;
+    }
+
+    @Test
+    void resolved_secp256k1_with_even_y_produces_correct_spki() {
+        // Generator point G has even Y
+        assertFalse(SECP256K1_GY.testBit(0), "Generator point G should have even Y");
+
+        byte[] xBytes     = toUnsignedByteArray(SECP256K1_GX, 32);
+        byte[] compressed = new byte[33];
+        compressed[0] = 0x02;
+        System.arraycopy(xBytes, 0, compressed, 1, 32);
+
+        // secp256k1 multicodec: 0xe7 as LEB128 varint → [0xe7, 0x01]
+        byte[] multicodec = new byte[2 + compressed.length];
+        multicodec[0] = (byte) 0xe7;
+        multicodec[1] = 0x01;
+        System.arraycopy(compressed, 0, multicodec, 2, compressed.length);
+
+        String      didKey = "did:key:z" + Base58.encode(multicodec);
+        DIDDocument doc    = resolver.resolve("actor", didKey).orElseThrow();
+        assertEquals(1, doc.verificationMethods().size());
+
+        VerificationMethod vm = doc.verificationMethods().get(0);
+        assertEquals(VerificationMethodType.SECP256K1, vm.type());
+        assertEquals(88, vm.publicKeyBytes().length);
+
+        byte[] expectedSpki = buildExpectedSecp256k1Spki(SECP256K1_GX, SECP256K1_GY);
+        assertArrayEquals(expectedSpki, vm.publicKeyBytes(),
+                          "secp256k1 SPKI must match independently constructed SPKI from known coordinates");
+    }
+
+    @Test
+    void resolved_secp256k1_with_odd_y_selects_correct_root() {
+        // Use generator point with 0x03 prefix — decompression must yield p - Gy
+        byte[] xBytes     = toUnsignedByteArray(SECP256K1_GX, 32);
+        byte[] compressed = new byte[33];
+        compressed[0] = 0x03;
+        System.arraycopy(xBytes, 0, compressed, 1, 32);
+
+        byte[] multicodec = new byte[2 + compressed.length];
+        multicodec[0] = (byte) 0xe7;
+        multicodec[1] = 0x01;
+        System.arraycopy(compressed, 0, multicodec, 2, compressed.length);
+
+        String      didKey = "did:key:z" + Base58.encode(multicodec);
+        DIDDocument doc    = resolver.resolve("actor", didKey).orElseThrow();
+
+        BigInteger expectedY    = SECP256K1_P.subtract(SECP256K1_GY);
+        byte[]     expectedSpki = buildExpectedSecp256k1Spki(SECP256K1_GX, expectedY);
+        assertArrayEquals(expectedSpki, doc.verificationMethods().get(0).publicKeyBytes(),
+                          "0x03 prefix with even-Y generator must select the odd root (p - Gy)");
+    }
+
+    @Test
+    void resolved_secp256k1_decompressed_y_satisfies_curve_equation() {
+        byte[] xBytes     = toUnsignedByteArray(SECP256K1_GX, 32);
+        byte[] compressed = new byte[33];
+        compressed[0] = 0x02;
+        System.arraycopy(xBytes, 0, compressed, 1, 32);
+
+        byte[] multicodec = new byte[2 + compressed.length];
+        multicodec[0] = (byte) 0xe7;
+        multicodec[1] = 0x01;
+        System.arraycopy(compressed, 0, multicodec, 2, compressed.length);
+
+        String      didKey = "did:key:z" + Base58.encode(multicodec);
+        DIDDocument doc    = resolver.resolve("actor", didKey).orElseThrow();
+
+        byte[] spki = doc.verificationMethods().get(0).publicKeyBytes();
+        // Extract Y from SPKI: header(24) + X(32) + Y(32)
+        byte[] yBytes = new byte[32];
+        System.arraycopy(spki, 56, yBytes, 0, 32);
+        BigInteger y = new BigInteger(1, yBytes);
+
+        // Verify Y^2 = X^3 + 7 (mod p)
+        BigInteger ySquared = y.modPow(BigInteger.TWO, SECP256K1_P);
+        BigInteger xCubedPlus7 = SECP256K1_GX.modPow(BigInteger.valueOf(3), SECP256K1_P)
+                                             .add(BigInteger.valueOf(7)).mod(SECP256K1_P);
+        assertEquals(xCubedPlus7, ySquared,
+                     "Decompressed Y must satisfy secp256k1 curve equation Y² = X³ + 7");
+    }
+
 
     // --- alsoKnownAs tests ---
 

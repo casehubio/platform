@@ -3,8 +3,8 @@ package io.casehub.platform.subscription.engine;
 import io.casehub.platform.api.datasource.FilterExpression;
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.subscription.SubscribableEvent;
 
-import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
@@ -90,27 +90,12 @@ public final class ConstraintCompiler {
         };
     }
 
-    /**
-     * Builds a tenant isolation predicate using MethodHandle to call {@code tenancyId()}
-     * on the event POJO. Returns false if the POJO has no tenancyId() method or the
-     * tenant doesn't match.
-     */
     private static Predicate<Object> buildTenantCheck(final String tenancyId) {
         return object -> {
-            if (object == null) {
-                return false;
+            if (object instanceof SubscribableEvent event) {
+                return tenancyId.equals(event.tenancyId());
             }
-            try {
-                var method = object.getClass().getMethod("tenancyId");
-                if (method.getReturnType() != String.class) {
-                    return false;
-                }
-                var handle = MethodHandles.lookup().unreflect(method);
-                final String pojoTenant = (String) handle.invoke(object);
-                return tenancyId.equals(pojoTenant);
-            } catch (Throwable e) {
-                return false;
-            }
+            return false;
         };
     }
 }

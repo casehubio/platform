@@ -1,5 +1,7 @@
 package io.casehub.platform.subscription.engine;
 
+import io.casehub.platform.api.subscription.SubscribableEvent;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,5 +64,5 @@ class EventTypeObjectTypeTest {
         assertThat(EventTypeObjectType.extractEventType(null)).isNull();
     }
 
-    record TestEvent(String type, String tenancyId) {}
+    record TestEvent(String type, String tenancyId) implements SubscribableEvent {}
 }

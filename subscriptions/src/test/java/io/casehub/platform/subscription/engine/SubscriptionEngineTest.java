@@ -12,6 +12,7 @@ import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionInput;
+import io.casehub.platform.api.subscription.SubscribableEvent;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
 import io.casehub.platform.api.subscription.TargetType;
@@ -438,5 +439,5 @@ class SubscriptionEngineTest {
     // --- Test doubles ---
 
     record TestEvent(String type, String tenancyId, UUID workItemId,
-                     String actor, String status) {}
+                     String actor, String status) implements SubscribableEvent {}
 }

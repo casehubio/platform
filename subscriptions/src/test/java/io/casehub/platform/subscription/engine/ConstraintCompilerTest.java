@@ -2,6 +2,7 @@ package io.casehub.platform.subscription.engine;
 
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.subscription.SubscribableEvent;
 
 import org.junit.jupiter.api.Test;
 
@@ -127,5 +128,5 @@ class ConstraintCompilerTest {
                 .isInstanceOf(NullPointerException.class);
     }
 
-    record TestEvent(String type, String tenancyId) {}
+    record TestEvent(String type, String tenancyId) implements SubscribableEvent {}
 }

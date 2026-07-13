@@ -47,19 +47,19 @@ class DigestStatusResourceTest {
         var key2 = new DigestBufferKey("user-1", TenancyConstants.DEFAULT_TENANT_ID, "sms");
 
         var notification1 = new NotificationInput(
-            "user-1", TenancyConstants.DEFAULT_TENANT_ID,
-            "Title 1", "Body 1", "category-1", NotificationSeverity.INFO,
-            null, new NotificationSource("event-1", "case", "case-1", "actor-1")
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID,
+                "Title 1", "Body 1", "category-1", NotificationSeverity.INFO,
+                null, new NotificationSource("event-1", "case", "case-1", "actor-1")
         );
         var notification2 = new NotificationInput(
-            "user-1", TenancyConstants.DEFAULT_TENANT_ID,
-            "Title 2", "Body 2", "category-2", NotificationSeverity.INFO,
-            null, new NotificationSource("event-2", "case", "case-2", "actor-2")
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID,
+                "Title 2", "Body 2", "category-2", NotificationSeverity.INFO,
+                null, new NotificationSource("event-2", "case", "case-2", "actor-2")
         );
         var notification3 = new NotificationInput(
-            "user-1", TenancyConstants.DEFAULT_TENANT_ID,
-            "Title 3", "Body 3", "category-3", NotificationSeverity.INFO,
-            null, new NotificationSource("event-3", "case", "case-3", "actor-3")
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID,
+                "Title 3", "Body 3", "category-3", NotificationSeverity.INFO,
+                null, new NotificationSource("event-3", "case", "case-3", "actor-3")
         );
 
         digestBuffer.add(key1, notification1);
@@ -68,11 +68,11 @@ class DigestStatusResourceTest {
 
         // Act & Assert
         given()
-            .when().get("/notifications/digest/status")
-            .then()
-            .statusCode(200)
-            .body("email", equalTo(2))
-            .body("sms", equalTo(1));
+                .when().get("/notifications/digest/status")
+                .then()
+                .statusCode(200)
+                .body("email", equalTo(2))
+                .body("sms", equalTo(1));
     }
 
     @Test

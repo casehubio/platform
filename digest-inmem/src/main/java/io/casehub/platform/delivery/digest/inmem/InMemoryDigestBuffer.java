@@ -6,6 +6,7 @@ import io.casehub.platform.api.notification.NotificationInput;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -28,6 +29,7 @@ public class InMemoryDigestBuffer implements DigestBuffer {
     private final int                                             maxBufferSize;
     private final long                                            retentionMs;
 
+    @Inject
     public InMemoryDigestBuffer(
             @ConfigProperty(name = "casehub.notification.digest.max-buffer-size", defaultValue = "500")
             int maxBufferSize,

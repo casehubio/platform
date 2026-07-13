@@ -9,14 +9,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Resolves did:key DIDs by decoding key material directly from the DID string.
- * Standards note: the real did:key spec uses base58btc multibase encoding.
- * This implementation uses base64url for consistency with Java's standard library.
+ * Decodes the multibase-encoded key part via {@link Multibase}, supporting
+ * base58btc ({@code z} prefix, per the W3C did:key specification) and
+ * base64url ({@code u} prefix).
  *
  * <p>Supports Ed25519 (multicodec 0xed) and P-256 (multicodec 0x1200) key types.
  * The multicodec prefix is decoded as an unsigned LEB128 varint.
@@ -33,32 +33,34 @@ import java.util.Optional;
 @Priority(100)
 public class KeyDIDResolver implements DIDResolver {
 
-    private static final Logger LOG = Logger.getLogger(KeyDIDResolver.class);
+    private static final Logger LOG            = Logger.getLogger(KeyDIDResolver.class);
     private static final String DID_KEY_PREFIX = "did:key:";
 
     @Override
     public Optional<DIDDocument> resolve(final String actorId, final String did) {
-        if (did == null || !did.startsWith(DID_KEY_PREFIX)) return Optional.empty();
+        if (did == null || !did.startsWith(DID_KEY_PREFIX)) {return Optional.empty();}
         try {
-            final String keyPart = did.substring(DID_KEY_PREFIX.length());
-            if (!keyPart.startsWith("z")) return Optional.empty();
-            final byte[] multicodec = Base64.getUrlDecoder().decode(keyPart.substring(1));
+            final String keyPart    = did.substring(DID_KEY_PREFIX.length());
+            final byte[] multicodec = Multibase.decode(keyPart);
 
             final int[] varint = decodeVarint(multicodec);
-            if (varint == null) return Optional.empty();
+            if (varint == null) {return Optional.empty();}
 
             final Optional<MulticodecKeyType> keyType = MulticodecKeyType.fromCode(varint[0]);
-            if (keyType.isEmpty()) return Optional.empty();
+            if (keyType.isEmpty()) {return Optional.empty();}
 
-            final MulticodecKeyType type = keyType.get();
-            final byte[] rawKey = Arrays.copyOfRange(multicodec, varint[1], multicodec.length);
-            if (rawKey.length != type.rawKeyLength) return Optional.empty();
+            final MulticodecKeyType type   = keyType.get();
+            final byte[]            rawKey = Arrays.copyOfRange(multicodec, varint[1], multicodec.length);
+            if (rawKey.length != type.rawKeyLength) {return Optional.empty();}
 
             final byte[] spki = type.toSpki(rawKey);
             final String vmId = did + "#" + keyPart;
-            final var vm = new VerificationMethod(vmId, type.vmType, spki);
-            final var aka = actorId != null ? List.of(actorId) : List.<String>of();
+            final var    vm   = new VerificationMethod(vmId, type.vmType, spki);
+            final var    aka  = actorId != null ? List.of(actorId) : List.<String>of();
             return Optional.of(new DIDDocument(did, List.of(vm), aka));
+        } catch (final IllegalArgumentException e) {
+            LOG.debugf("KeyDIDResolver: unsupported multibase encoding in %s: %s", did, e.getMessage());
+            return Optional.empty();
         } catch (final Exception e) {
             LOG.debugf("KeyDIDResolver: failed to decode %s: %s", did, e.getMessage());
             return Optional.empty();
@@ -71,7 +73,7 @@ public class KeyDIDResolver implements DIDResolver {
      * @return {@code int[]{value, bytesConsumed}} or {@code null} if the varint is truncated
      */
     private static int[] decodeVarint(final byte[] data) {
-        if (data == null || data.length == 0) return null;
+        if (data == null || data.length == 0) {return null;}
         int value = 0;
         int shift = 0;
         for (int i = 0; i < Math.min(data.length, 4); i++) {

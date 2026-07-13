@@ -21,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -123,28 +122,28 @@ public class WebDIDResolver implements DIDResolver {
     }
 
     private DIDDocument parseDocument(final String json) throws Exception {
-        final JsonNode root = OBJECT_MAPPER.readTree(json);
-        final String id = root.path("id").asText("");
-        final List<VerificationMethod> vms = new ArrayList<>();
-        final JsonNode vmArray = root.path("verificationMethod");
+        final JsonNode                 root    = OBJECT_MAPPER.readTree(json);
+        final String                   id      = root.path("id").asText("");
+        final List<VerificationMethod> vms     = new ArrayList<>();
+        final JsonNode                 vmArray = root.path("verificationMethod");
         if (vmArray.isArray()) {
             for (final JsonNode vmNode : vmArray) {
-                final String vmId = vmNode.path("id").asText("");
-                final String type = vmNode.path("type").asText("");
+                final String vmId      = vmNode.path("id").asText("");
+                final String type      = vmNode.path("type").asText("");
                 final String multibase = vmNode.path("publicKeyMultibase").asText("");
-                byte[] keyBytes = new byte[0];
-                if (multibase.startsWith("z") && multibase.length() > 1) {
+                byte[]       keyBytes  = new byte[0];
+                if (!multibase.isEmpty()) {
                     try {
-                        keyBytes = Base64.getUrlDecoder().decode(multibase.substring(1));
-                    } catch (final Exception ex) {
-                        LOG.debugf("WebDIDResolver: failed to decode publicKeyMultibase: %s", ex.getMessage());
+                        keyBytes = Multibase.decode(multibase);
+                    } catch (final IllegalArgumentException ex) {
+                        LOG.debugf("WebDIDResolver: unsupported multibase encoding in publicKeyMultibase: %s", ex.getMessage());
                     }
                 }
                 vms.add(new VerificationMethod(vmId, type, keyBytes));
             }
         }
         final List<String> alsoKnownAs = new ArrayList<>();
-        final JsonNode akaArray = root.path("alsoKnownAs");
+        final JsonNode     akaArray    = root.path("alsoKnownAs");
         if (akaArray.isArray()) {
             for (final JsonNode akaNode : akaArray) {
                 alsoKnownAs.add(akaNode.asText());

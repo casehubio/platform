@@ -11,10 +11,12 @@ import java.security.KeyPairGenerator;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KeyDIDResolverTest {
 
@@ -35,14 +37,14 @@ class KeyDIDResolverTest {
         var keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         byte[] spki = keyPair.getPublic().getEncoded();
 
-        // Build a did:key: z + base64url(multicodec_prefix + raw_key)
+        // Build a did:key: z + base58btc(multicodec_prefix + raw_key)
         byte[] raw = new byte[32];
         System.arraycopy(spki, spki.length - 32, raw, 0, 32);
         byte[] multicodec = new byte[2 + raw.length];
         multicodec[0] = (byte) 0xed;
         multicodec[1] = 0x01;
         System.arraycopy(raw, 0, multicodec, 2, raw.length);
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding().encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
 
         DIDDocument doc = resolver.resolve("actor", didKey).orElseThrow();
         assertEquals(1, doc.verificationMethods().size());
@@ -84,8 +86,7 @@ class KeyDIDResolverTest {
         multicodec[1] = 0x24;
         System.arraycopy(compressed, 0, multicodec, 2, compressed.length);
 
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
 
         DIDDocument doc = resolver.resolve("actor", didKey).orElseThrow();
         assertEquals(1, doc.verificationMethods().size());
@@ -117,8 +118,7 @@ class KeyDIDResolverTest {
         multicodec[1] = 0x24;
         System.arraycopy(compressed, 0, multicodec, 2, compressed.length);
 
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
 
         DIDDocument doc = resolver.resolve("actor", didKey).orElseThrow();
         assertArrayEquals(expectedSpki, doc.verificationMethods().get(0).publicKeyBytes(),
@@ -137,8 +137,7 @@ class KeyDIDResolverTest {
         multicodec[0] = (byte) 0xed;
         multicodec[1] = 0x01;
         System.arraycopy(raw, 0, multicodec, 2, raw.length);
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
 
         DIDDocument doc = resolver.resolve("claude:reviewer@v1", didKey).orElseThrow();
         assertEquals(List.of("claude:reviewer@v1"), doc.alsoKnownAs());
@@ -154,8 +153,7 @@ class KeyDIDResolverTest {
         multicodec[0] = (byte) 0xed;
         multicodec[1] = 0x01;
         System.arraycopy(raw, 0, multicodec, 2, raw.length);
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
 
         DIDDocument doc = resolver.resolve(null, didKey).orElseThrow();
         assertTrue(doc.alsoKnownAs().isEmpty());
@@ -167,8 +165,7 @@ class KeyDIDResolverTest {
     void returns_empty_for_unknown_multicodec_code() {
         // Use multicodec 0xFF (unknown)
         byte[] multicodec = new byte[]{(byte) 0xFF, 0x01, 0x00, 0x00};
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
         assertTrue(resolver.resolve("actor", didKey).isEmpty());
     }
 
@@ -178,8 +175,7 @@ class KeyDIDResolverTest {
         byte[] multicodec = new byte[2 + 16];
         multicodec[0] = (byte) 0xed;
         multicodec[1] = 0x01;
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(multicodec);
+        String didKey = "did:key:z" + Base58.encode(multicodec);
         assertTrue(resolver.resolve("actor", didKey).isEmpty());
     }
 
@@ -187,8 +183,7 @@ class KeyDIDResolverTest {
     void returns_empty_for_malformed_varint() {
         // Single byte with continuation bit set -- truncated varint
         byte[] data = new byte[]{(byte) 0x80};
-        String didKey = "did:key:z" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(data);
+        String didKey = "did:key:z" + Base58.encode(data);
         assertTrue(resolver.resolve("actor", didKey).isEmpty());
     }
 

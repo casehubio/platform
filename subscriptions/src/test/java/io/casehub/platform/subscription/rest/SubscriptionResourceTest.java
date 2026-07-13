@@ -4,11 +4,12 @@ import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionInput;
+import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
-import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
@@ -19,9 +20,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 
 @QuarkusTest
 class SubscriptionResourceTest {
@@ -65,7 +70,8 @@ class SubscriptionResourceTest {
             List.of(new NotificationTarget(TargetType.USER, "user-1")),
             false,
             template,
-            true
+            true,
+            null
         );
 
         // When: create subscription
@@ -100,7 +106,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.event.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.event.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         store.store(input).await().indefinitely();
 
@@ -131,11 +137,11 @@ class SubscriptionResourceTest {
             "actorId"
         );
 
-        var enabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Enabled subscription", "test.enabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var enabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Enabled subscription", "test.enabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         store.store(enabledInput).await().indefinitely();
 
-        var disabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Disabled subscription", "test.disabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false
+        var disabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Disabled subscription", "test.disabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false, null
         );
         store.store(disabledInput).await().indefinitely();
 
@@ -175,7 +181,8 @@ class SubscriptionResourceTest {
                 List.of(new NotificationTarget(TargetType.USER, "user-1")),
                 false,
                 template,
-                true
+                true,
+                null
             );
             store.store(input).await().indefinitely();
         }
@@ -204,7 +211,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -233,7 +240,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-2", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-2")), false, template, true
+        var input = new SubscriptionInput("user-2", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-2")), false, template, true, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -258,7 +265,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Original name", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Original name", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -320,7 +327,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -361,7 +368,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -389,7 +396,7 @@ class SubscriptionResourceTest {
             "entityId",
             "actorId"
         );
-        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true
+        var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input).await().indefinitely();
 
@@ -402,5 +409,211 @@ class SubscriptionResourceTest {
             .contentType(ContentType.JSON)
             .body("id", equalTo(subscription.id()))
             .body("enabled", equalTo(false));
+    }
+
+// SYSTEM Scope Tests
+
+    private NotificationTemplate createTestTemplate() {
+        return new NotificationTemplate(
+                "Title", null, NotificationSeverity.INFO, "category",
+                null, "entity", "entityId", "actorId"
+        );
+    }
+
+    private SubscriptionInput createSystemInput(String name, String eventType) {
+        return new SubscriptionInput(
+                principal.actorId(), principal.tenancyId(), name, eventType,
+                List.of(), List.of(new NotificationTarget(TargetType.GROUP, "case-managers")),
+                false, createTestTemplate(), true, SubscriptionScope.SYSTEM
+        );
+    }
+
+    @Test
+    void create_systemScope_adminSucceeds() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(createSystemInput("System Alert", "io.casehub.alert.triggered"))
+                .when().post("/subscriptions")
+                .then()
+                .statusCode(201)
+                .body("scope", equalTo("SYSTEM"))
+                .body("ownerId", equalTo("admin-1"));
+    }
+
+    @Test
+    void create_systemScope_nonAdminForbidden() {
+        given()
+                .contentType(ContentType.JSON)
+                .body(createSystemInput("System Alert", "io.casehub.alert.triggered"))
+                .when().post("/subscriptions")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    void create_systemScope_emptyTargetsRejected() {
+        principal.addGroup("subscription-admins");
+
+        var input = new SubscriptionInput(
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID, "System Alert",
+                "io.casehub.alert.triggered", List.of(),
+                List.of(), false, createTestTemplate(), true, SubscriptionScope.SYSTEM
+        );
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(input)
+                .when().post("/subscriptions")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    void create_systemScope_dollarMeConstraintRejected() {
+        principal.addGroup("subscription-admins");
+
+        var input = new SubscriptionInput(
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID, "System Alert",
+                "io.casehub.alert.triggered",
+                List.of(new Constraint("assigneeId", ConstraintOp.EQ, "$me")),
+                List.of(new NotificationTarget(TargetType.GROUP, "case-managers")),
+                false, createTestTemplate(), true, SubscriptionScope.SYSTEM
+        );
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(input)
+                .when().post("/subscriptions")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    void list_systemScope_returnsTenantWide() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        principal.setActorId("user-1");
+        principal.setGroups(Set.of());
+
+        given()
+                .queryParam("scope", "SYSTEM")
+                .when().get("/subscriptions")
+                .then()
+                .statusCode(200)
+                .body("subscriptions", hasSize(1))
+                .body("subscriptions[0].scope", equalTo("SYSTEM"));
+    }
+
+    @Test
+    void getById_systemScope_anyTenantUserCanRead() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        principal.setActorId("user-1");
+        principal.setGroups(Set.of());
+
+        given()
+                .when().get("/subscriptions/{id}", sub.id())
+                .then()
+                .statusCode(200)
+                .body("scope", equalTo("SYSTEM"));
+    }
+
+    @Test
+    void update_systemScope_adminSucceeds() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(new SubscriptionUpdate("Updated Alert", null, null, null, null, null, null))
+                .when().patch("/subscriptions/{id}", sub.id())
+                .then()
+                .statusCode(200)
+                .body("name", equalTo("Updated Alert"));
+    }
+
+    @Test
+    void update_systemScope_nonAdminForbidden() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        principal.setActorId("user-1");
+        principal.setGroups(Set.of());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(new SubscriptionUpdate("Hacked", null, null, null, null, null, null))
+                .when().patch("/subscriptions/{id}", sub.id())
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    void delete_systemScope_adminSucceeds() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        given()
+                .when().delete("/subscriptions/{id}", sub.id())
+                .then()
+                .statusCode(204);
+    }
+
+    @Test
+    void delete_systemScope_nonAdminForbidden() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        principal.setActorId("user-1");
+        principal.setGroups(Set.of());
+
+        given()
+                .when().delete("/subscriptions/{id}", sub.id())
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    void enable_systemScope_nonAdminForbidden() {
+        principal.setActorId("admin-1");
+        principal.addGroup("subscription-admins");
+        var sub = store.store(createSystemInput("System Alert", "io.casehub.alert.triggered")).await().indefinitely();
+
+        principal.setActorId("user-1");
+        principal.setGroups(Set.of());
+
+        given()
+                .when().patch("/subscriptions/{id}/enable", sub.id())
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    void create_userScope_backwardCompat() {
+        var input = new SubscriptionInput(
+                "user-1", TenancyConstants.DEFAULT_TENANT_ID, "My Sub",
+                "io.casehub.work.item.created", List.of(),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, createTestTemplate(), true, null
+        );
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(input)
+                .when().post("/subscriptions")
+                .then()
+                .statusCode(201)
+                .body("scope", equalTo("USER"));
     }
 }

@@ -222,7 +222,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         );
 
         assertThat(input.ownerId()).isEqualTo("user-1");
@@ -250,7 +251,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("ownerId");
@@ -270,7 +272,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("tenancyId");
@@ -290,7 +293,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("name");
@@ -310,7 +314,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("eventType");
@@ -329,7 +334,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("constraints");
@@ -348,7 +354,8 @@ class SubscriptionSpiTest {
                 null,
                 false,
                 template,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("targets");
@@ -367,7 +374,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 null,
-                true
+                true,
+                null
         ))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("template");
@@ -387,7 +395,8 @@ class SubscriptionSpiTest {
                 targets,
                 false,
                 template,
-                true
+                true,
+                null
         );
 
         // Mutate original list
@@ -411,7 +420,8 @@ class SubscriptionSpiTest {
                 mutableTargets,
                 false,
                 template,
-                true
+                true,
+                null
         );
 
         // Mutate original list
@@ -442,6 +452,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 createdAt,
                 updatedAt
         );
@@ -476,6 +487,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         ))
@@ -499,6 +511,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 null,
                 Instant.now()
         ))
@@ -522,6 +535,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 null
         ))
@@ -545,6 +559,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -572,6 +587,7 @@ class SubscriptionSpiTest {
                 false,
                 template,
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -669,6 +685,7 @@ class SubscriptionSpiTest {
         var query = new SubscriptionQuery(
                 "user-1",
                 "tenant-1",
+                null,
                 true,
                 "cursor-abc",
                 25
@@ -688,6 +705,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 null,
                 null,
+                null,
                 10
         );
 
@@ -702,16 +720,18 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 null,
                 null,
+                null,
                 10
         ))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("ownerId");
+                .hasMessageContaining("ownerId required for USER scope");
     }
 
     @Test
     void subscriptionQuery_rejectsNullTenancyId() {
         assertThatThrownBy(() -> new SubscriptionQuery(
                 "user-1",
+                null,
                 null,
                 null,
                 null,
@@ -728,6 +748,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 null,
                 null,
+                null,
                 0
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -739,6 +760,7 @@ class SubscriptionSpiTest {
         assertThatThrownBy(() -> new SubscriptionQuery(
                 "user-1",
                 "tenant-1",
+                null,
                 null,
                 null,
                 -5
@@ -762,6 +784,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -798,6 +821,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -833,6 +857,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -860,6 +885,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -874,6 +900,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now().minusSeconds(60),
                 Instant.now().minusSeconds(60)
         );
@@ -895,6 +922,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -916,6 +944,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -937,6 +966,7 @@ class SubscriptionSpiTest {
                 false,
                 createTemplate(),
                 true,
+                SubscriptionScope.USER,
                 Instant.now(),
                 Instant.now()
         );
@@ -952,6 +982,73 @@ class SubscriptionSpiTest {
     }
 
     // Helper Methods
+
+
+    @Test
+    void subscription_rejectsNullScope() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
+        var template    = createTemplate();
+        assertThatThrownBy(() -> new Subscription(
+                "sub-123", "user-1", "tenant-1", "Name", "event-type",
+                constraints, targets, false, template, true,
+                null, Instant.now(), Instant.now()
+        ))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("scope");
+    }
+
+    @Test
+    void subscriptionInput_nullScopeDefaultsToUser() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
+        var template    = createTemplate();
+        var input = new SubscriptionInput(
+                "user-1", "tenant-1", "Name", "event-type",
+                constraints, targets, false, template, true, null
+        );
+        assertThat(input.scope()).isEqualTo(SubscriptionScope.USER);
+    }
+
+    @Test
+    void subscriptionInput_explicitSystemScope() {
+        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
+        var template    = createTemplate();
+        var input = new SubscriptionInput(
+                "user-1", "tenant-1", "Name", "event-type",
+                constraints, targets, false, template, true,
+                SubscriptionScope.SYSTEM
+        );
+        assertThat(input.scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void subscriptionQuery_systemScopeAllowsNullOwnerId() {
+        var query = new SubscriptionQuery(
+                null, "tenant-1", SubscriptionScope.SYSTEM, null, null, 10
+        );
+        assertThat(query.ownerId()).isNull();
+        assertThat(query.scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void subscriptionQuery_userScopeRejectsNullOwnerId() {
+        assertThatThrownBy(() -> new SubscriptionQuery(
+                null, "tenant-1", SubscriptionScope.USER, null, null, 10
+        ))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("ownerId required for USER scope");
+    }
+
+    @Test
+    void subscriptionQuery_nullScopeRequiresOwnerId() {
+        assertThatThrownBy(() -> new SubscriptionQuery(
+                null, "tenant-1", null, null, null, 10
+        ))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("ownerId required for USER scope");
+    }
 
     private NotificationTemplate createTemplate() {
         return new NotificationTemplate(

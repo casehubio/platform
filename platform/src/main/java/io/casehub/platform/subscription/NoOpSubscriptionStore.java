@@ -1,12 +1,12 @@
 package io.casehub.platform.subscription;
 
-import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionPage;
 import io.casehub.platform.api.subscription.SubscriptionQuery;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
+import io.casehub.platform.api.util.UUIDv7;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -83,8 +83,9 @@ public class NoOpSubscriptionStore implements SubscriptionStore {
                 input.includeActor(),
                 input.template(),
                 input.enabled(),
-                now,  // createdAt
-                now   // updatedAt
+                input.scope(),
+                now,
+                now
         );
     }
 }

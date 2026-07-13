@@ -8,18 +8,18 @@ import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
+import io.casehub.platform.api.subscription.SubscribableEvent;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionInput;
-import io.casehub.platform.api.subscription.SubscribableEvent;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
+import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
 import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.datasource.alpha.AlphaDataSource;
 import io.casehub.platform.datasource.memory.InMemoryDataSourceRegistry;
 import io.casehub.platform.subscription.inmem.InMemorySubscriptionStore;
-
 import jakarta.enterprise.event.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -119,7 +119,7 @@ class SubscriptionEngineTest {
         var input = new SubscriptionInput("user-1", "tenant-1", "My sub",
                 "io.casehub.work.workitem.completed",
                 List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
-                false, template, true);
+                false, template, true, null);
         var storedSub = subStore.store(input);
 
         engine.onStartup(null);
@@ -229,7 +229,7 @@ class SubscriptionEngineTest {
                 "io.casehub.work.workitem.created",
                 original.constraints(), original.targets(), original.includeActor(),
                 original.template(), true,
-                original.createdAt(), Instant.now());
+                SubscriptionScope.USER, original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(updated, original));
 
@@ -255,7 +255,7 @@ class SubscriptionEngineTest {
                 original.id(), original.ownerId(), original.tenancyId(), original.name(),
                 original.eventType(), original.constraints(), original.targets(),
                 original.includeActor(), original.template(), false,
-                original.createdAt(), Instant.now());
+                SubscriptionScope.USER, original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(disabled, original));
 
@@ -298,7 +298,7 @@ class SubscriptionEngineTest {
                 "io.casehub.work.ghost", List.of(),
                 List.of(new NotificationTarget(TargetType.USER, "user-1")),
                 false, defaultTemplate(), true,
-                Instant.now(), Instant.now());
+                SubscriptionScope.USER, Instant.now(), Instant.now());
         engine.onDeleted(new SubscriptionDeleted(ghost));
 
         // Engine still operational
@@ -322,7 +322,7 @@ class SubscriptionEngineTest {
                 "io.casehub.work.workitem.created",
                 original.constraints(), original.targets(), original.includeActor(),
                 original.template(), true,
-                original.createdAt(), Instant.now());
+                SubscriptionScope.USER, original.createdAt(), Instant.now());
 
         engine.onUpdated(new SubscriptionUpdated(updated, original));
         engine.onDeleted(new SubscriptionDeleted(updated));
@@ -347,7 +347,7 @@ class SubscriptionEngineTest {
         var input = new SubscriptionInput("user-1", "tenant-1", "Sub",
                 "io.casehub.work.workitem.completed",
                 List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
-                false, template, true);
+                false, template, true, null);
         subStore.store(input);
 
         engine.onStartup(null);
@@ -413,12 +413,31 @@ class SubscriptionEngineTest {
 
     // --- Helpers ---
 
+
+    @Test
+    void systemSubscription_wiresAndMatchesIdentically() {
+        var template = defaultTemplate();
+        var input = new SubscriptionInput("admin-1", "tenant-1", "System sub",
+                                          "io.casehub.work.workitem.completed",
+                                          List.of(), List.of(new NotificationTarget(TargetType.GROUP, "case-managers")),
+                                          false, template, true, SubscriptionScope.SYSTEM);
+        var storedSub = subStore.store(input);
+
+        engine.onStartup(null);
+
+        pushEvent("io.casehub.work.workitem.completed", "tenant-1",
+                  UUID.randomUUID(), "actor-1");
+
+        assertThat(firedEvents).hasSize(1);
+        assertThat(firedEvents.get(0).subscription().scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
     private SubscriptionInput subscriptionInput(final String ownerId, final String tenancyId,
                                                 final String eventType, final boolean enabled) {
         return new SubscriptionInput(ownerId, tenancyId, "Test sub",
                 eventType, List.of(),
                 List.of(new NotificationTarget(TargetType.USER, ownerId)),
-                false, defaultTemplate(), enabled);
+                false, defaultTemplate(), enabled, null);
     }
 
     private NotificationTemplate defaultTemplate() {

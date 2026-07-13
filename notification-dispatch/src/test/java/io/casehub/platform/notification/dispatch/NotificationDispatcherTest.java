@@ -26,6 +26,7 @@ import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
+import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.TargetType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -173,7 +174,7 @@ class NotificationDispatcherTest {
                 "sub-1", "owner-1", TENANT, "Test", "test.event",
                 List.of(),
                 List.of(new NotificationTarget(TargetType.USER, "user-recipient")),
-                false, badTemplate, true, NOW, NOW);
+                false, badTemplate, true, SubscriptionScope.USER, NOW, NOW);
         var pojo = new TestEvent("wi-1", "actor-user", "completed");
 
         dispatcher.onMatch(new SubscriptionMatched(sub, pojo));
@@ -283,7 +284,7 @@ class NotificationDispatcherTest {
         var sub = new Subscription("sub-1", "owner-1", TENANT, "Urgent", "test.event",
                 List.of(),
                 List.of(new NotificationTarget(TargetType.USER, "user-recipient")),
-                false, urgentTemplate, true, NOW, NOW);
+                false, urgentTemplate, true, SubscriptionScope.USER, NOW, NOW);
         var pojo = new TestEvent("wi-1", "actor-user", "critical");
 
         dispatcher.onMatch(new SubscriptionMatched(sub, pojo));
@@ -298,7 +299,7 @@ class NotificationDispatcherTest {
     private Subscription subscription(List<NotificationTarget> targets, boolean includeActor) {
         return new Subscription(
                 "sub-1", "owner-1", TENANT, "Test Sub", "test.event",
-                List.of(), targets, includeActor, TEMPLATE, true, NOW, NOW);
+                List.of(), targets, includeActor, TEMPLATE, true, SubscriptionScope.USER, NOW, NOW);
     }
 
     record TestEvent(String entityId, String actorId, String status) {}

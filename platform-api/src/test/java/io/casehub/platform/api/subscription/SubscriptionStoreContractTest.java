@@ -102,7 +102,7 @@ public abstract class SubscriptionStoreContractTest {
         store().store(createInput("user-1", "tenant-1", "Sub 1", "event-type"));
         store().store(createInput("user-1", "tenant-1", "Sub 2", "event-type"));
 
-        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, 10);
+        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, null, 10);
         var page = store().find(query);
 
         assertThat(page.subscriptions()).hasSize(2);
@@ -120,13 +120,14 @@ public abstract class SubscriptionStoreContractTest {
                 List.of(new NotificationTarget(TargetType.USER, "user-1")),
                 false,
                 createTemplate(),
-                false
+                false,
+                null
         );
 
         store().store(input1);
         store().store(input2);
 
-        var query = new SubscriptionQuery("user-1", "tenant-1", true, null, 10);
+        var query = new SubscriptionQuery("user-1", "tenant-1", null, true, null, 10);
         var page = store().find(query);
 
         assertThat(page.subscriptions()).hasSize(1);
@@ -139,7 +140,7 @@ public abstract class SubscriptionStoreContractTest {
         store().store(createInput("user-1", "tenant-1", "Tenant 1", "event-type"));
         store().store(createInput("user-1", "tenant-2", "Tenant 2", "event-type"));
 
-        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, 10);
+        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, null, 10);
         var page = store().find(query);
 
         assertThat(page.subscriptions()).hasSize(1);
@@ -151,7 +152,7 @@ public abstract class SubscriptionStoreContractTest {
         store().store(createInput("user-1", "tenant-1", "User 1", "event-type"));
         store().store(createInput("user-2", "tenant-1", "User 2", "event-type"));
 
-        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, 10);
+        var query = new SubscriptionQuery("user-1", "tenant-1", null, null, null, 10);
         var page = store().find(query);
 
         assertThat(page.subscriptions()).hasSize(1);
@@ -284,7 +285,8 @@ public abstract class SubscriptionStoreContractTest {
                 List.of(new NotificationTarget(TargetType.USER, "user-1")),
                 false,
                 createTemplate(),
-                false
+                false,
+                null
         );
 
         store().store(enabled);
@@ -313,6 +315,138 @@ public abstract class SubscriptionStoreContractTest {
 
     // Helper Methods
 
+
+// SYSTEM Scope Tests
+
+    @Test
+    void store_systemScope_persistsScope() {
+        var input        = createSystemInput("admin-1", "tenant-1", "System Alert", "alert.triggered");
+        var subscription = store().store(input);
+
+        assertThat(subscription.scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void findById_systemScope_anyTenantUserCanRead() {
+        var input        = createSystemInput("admin-1", "tenant-1", "System Alert", "alert.triggered");
+        var subscription = store().store(input);
+
+        var found = store().findById(subscription.id(), "user-2", "tenant-1");
+        assertThat(found).isPresent();
+        assertThat(found.get().scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void findById_systemScope_crossTenantBlocked() {
+        var input        = createSystemInput("admin-1", "tenant-1", "System Alert", "alert.triggered");
+        var subscription = store().store(input);
+
+        var found = store().findById(subscription.id(), "user-1", "tenant-2");
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findById_userScope_otherUserBlocked() {
+        var input        = createInput("user-1", "tenant-1", "My Sub", "event");
+        var subscription = store().store(input);
+
+        var found = store().findById(subscription.id(), "user-2", "tenant-1");
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void find_systemScope_returnsTenantWide() {
+        store().store(createSystemInput("admin-1", "tenant-1", "Alert 1", "alert.a"));
+        store().store(createSystemInput("admin-2", "tenant-1", "Alert 2", "alert.b"));
+        store().store(createInput("user-1", "tenant-1", "My Sub", "event"));
+
+        var query = new SubscriptionQuery(null, "tenant-1", SubscriptionScope.SYSTEM, null, null, 10);
+        var page  = store().find(query);
+
+        assertThat(page.subscriptions()).hasSize(2);
+        assertThat(page.subscriptions()).allMatch(s -> s.scope() == SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void find_systemScope_respectsTenantIsolation() {
+        store().store(createSystemInput("admin-1", "tenant-1", "Alert T1", "alert"));
+        store().store(createSystemInput("admin-2", "tenant-2", "Alert T2", "alert"));
+
+        var query = new SubscriptionQuery(null, "tenant-1", SubscriptionScope.SYSTEM, null, null, 10);
+        var page  = store().find(query);
+
+        assertThat(page.subscriptions()).hasSize(1);
+        assertThat(page.subscriptions().get(0).tenancyId()).isEqualTo("tenant-1");
+    }
+
+    @Test
+    void find_userScope_excludesSystemSubscriptions() {
+        store().store(createSystemInput("admin-1", "tenant-1", "System Alert", "alert"));
+        store().store(createInput("admin-1", "tenant-1", "My Sub", "event"));
+
+        var query = new SubscriptionQuery("admin-1", "tenant-1", null, null, null, 10);
+        var page  = store().find(query);
+
+        assertThat(page.subscriptions()).hasSize(1);
+        assertThat(page.subscriptions().get(0).scope()).isEqualTo(SubscriptionScope.USER);
+        assertThat(page.subscriptions().get(0).name()).isEqualTo("My Sub");
+    }
+
+    @Test
+    void update_systemScope_anyTenantUserCanUpdate() {
+        var input        = createSystemInput("admin-1", "tenant-1", "Alert", "alert");
+        var subscription = store().store(input);
+
+        var update  = new SubscriptionUpdate("Updated Alert", null, null, null, null, null, null);
+        var updated = store().update(subscription.id(), "user-2", "tenant-1", update);
+
+        assertThat(updated).isPresent();
+        assertThat(updated.get().name()).isEqualTo("Updated Alert");
+        assertThat(updated.get().scope()).isEqualTo(SubscriptionScope.SYSTEM);
+    }
+
+    @Test
+    void update_systemScope_crossTenantBlocked() {
+        var input        = createSystemInput("admin-1", "tenant-1", "Alert", "alert");
+        var subscription = store().store(input);
+
+        var update  = new SubscriptionUpdate("Hacked", null, null, null, null, null, null);
+        var updated = store().update(subscription.id(), "user-1", "tenant-2", update);
+
+        assertThat(updated).isEmpty();
+    }
+
+    @Test
+    void delete_systemScope_anyTenantUserCanDelete() {
+        var input        = createSystemInput("admin-1", "tenant-1", "Alert", "alert");
+        var subscription = store().store(input);
+
+        var deleted = store().delete(subscription.id(), "user-2", "tenant-1");
+        assertThat(deleted).isTrue();
+    }
+
+    @Test
+    void delete_systemScope_crossTenantBlocked() {
+        var input        = createSystemInput("admin-1", "tenant-1", "Alert", "alert");
+        var subscription = store().store(input);
+
+        var deleted = store().delete(subscription.id(), "user-1", "tenant-2");
+        assertThat(deleted).isFalse();
+    }
+
+    @Test
+    void findAllEnabled_includesSystemScope() {
+        store().store(createInput("user-1", "tenant-1", "User Sub", "event"));
+        store().store(createSystemInput("admin-1", "tenant-1", "System Sub", "alert"));
+
+        try (var stream = store().findAllEnabled()) {
+            var subscriptions = stream.toList();
+            assertThat(subscriptions).hasSize(2);
+            assertThat(subscriptions).extracting(Subscription::scope)
+                                     .containsExactlyInAnyOrder(SubscriptionScope.USER, SubscriptionScope.SYSTEM);
+        }
+    }
+
     private SubscriptionInput createInput(String ownerId, String tenancyId, String name, String eventType) {
         return new SubscriptionInput(
                 ownerId,
@@ -323,9 +457,21 @@ public abstract class SubscriptionStoreContractTest {
                 List.of(new NotificationTarget(TargetType.USER, ownerId)),
                 false,
                 createTemplate(),
-                true
+                true,
+                null
         );
     }
+
+    private SubscriptionInput createSystemInput(String ownerId, String tenancyId, String name, String eventType) {
+        return new SubscriptionInput(
+                ownerId, tenancyId, name, eventType,
+                List.of(),
+                List.of(new NotificationTarget(TargetType.GROUP, "all-users")),
+                false, createTemplate(), true,
+                SubscriptionScope.SYSTEM
+        );
+    }
+
 
     private NotificationTemplate createTemplate() {
         return new NotificationTemplate(

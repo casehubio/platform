@@ -13,6 +13,8 @@ public final class SubscriptionConstants {
      */
     public static final Path NOTIFICATION_DATASOURCE_PATH =
             Path.of("casehub", "platform", "notifications");
+    public static final String SYSTEM_SUBSCRIPTION_ADMIN_GROUP = "subscription-admins";
+
 
     private SubscriptionConstants() {
         // Utility class — no instances

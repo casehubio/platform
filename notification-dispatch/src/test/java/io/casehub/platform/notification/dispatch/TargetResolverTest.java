@@ -7,6 +7,7 @@ import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
+import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.subscription.NoOpEntityWatcherProvider;
 
@@ -227,7 +228,7 @@ class TargetResolverTest {
         var sub = new Subscription(
                 "sub-1", "owner-1", TENANT, "Test Sub", "test.event",
                 List.of(), List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "")),
-                false, template, true, NOW, NOW);
+                false, template, true, SubscriptionScope.USER, NOW, NOW);
         var pojo = new TestEvent("entity-2", "actor-1");
 
         Set<String> result = resolver.resolve(sub, pojo);
@@ -271,7 +272,7 @@ class TargetResolverTest {
     private Subscription subscription(List<NotificationTarget> targets, boolean includeActor) {
         return new Subscription(
                 "sub-1", "owner-1", TENANT, "Test Sub", "test.event",
-                List.of(), targets, includeActor, TEMPLATE, true, NOW, NOW);
+                List.of(), targets, includeActor, TEMPLATE, true, SubscriptionScope.USER, NOW, NOW);
     }
 
     record TestEvent(String entityId, String actorId) {}

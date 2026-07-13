@@ -4,23 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * What the store persists and returns. Immutable — updates produce new database
- * state, not mutated instances.
- *
- * @param id          UUID v7 — time-ordered for cursor stability
- * @param ownerId     subscription owner (renamed from userId — who manages this subscription)
- * @param tenancyId   tenant isolation
- * @param name        user-facing subscription name
- * @param eventType   event type to match (single type, not multiple)
- * @param constraints filter constraints (AND semantics)
- * @param targets     who gets notified (explicit recipients)
- * @param includeActor include triggering actor in recipients (default false)
- * @param template    notification generation template
- * @param enabled     whether subscription is active
- * @param createdAt   store-generated creation timestamp
- * @param updatedAt   store-generated update timestamp
- */
 public record Subscription(
         String id,
         String ownerId,
@@ -32,6 +15,7 @@ public record Subscription(
         boolean includeActor,
         NotificationTemplate template,
         boolean enabled,
+        SubscriptionScope scope,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -44,9 +28,10 @@ public record Subscription(
         Objects.requireNonNull(constraints, "constraints");
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(template, "template");
+        Objects.requireNonNull(scope, "scope");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");
         constraints = List.copyOf(constraints);
-        targets = List.copyOf(targets);
+        targets     = List.copyOf(targets);
     }
 }

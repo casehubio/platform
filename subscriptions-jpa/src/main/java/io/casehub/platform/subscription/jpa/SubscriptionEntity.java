@@ -3,12 +3,13 @@ package io.casehub.platform.subscription.jpa;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.subscription.Constraint;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionInput;
+import io.casehub.platform.api.subscription.SubscriptionScope;
+import io.casehub.platform.api.util.UUIDv7;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,17 +22,17 @@ import java.util.List;
 
 @Entity
 @Table(name = "subscription",
-        indexes = {
-                @Index(name = "idx_subscription_owner_tenant_enabled",
-                        columnList = "owner_id, tenancy_id, enabled, created_at DESC"),
-                @Index(name = "idx_subscription_enabled",
-                        columnList = "enabled")
-        })
+       indexes = {
+               @Index(name = "idx_subscription_owner_tenant_enabled",
+                      columnList = "owner_id, tenancy_id, enabled, created_at DESC"),
+               @Index(name = "idx_subscription_enabled",
+                      columnList = "enabled")
+       })
 public class SubscriptionEntity extends PanacheEntityBase {
 
-    private static final TypeReference<List<Constraint>> CONSTRAINT_LIST_TYPE =
+    private static final TypeReference<List<Constraint>>         CONSTRAINT_LIST_TYPE =
             new TypeReference<>() {};
-    private static final TypeReference<List<NotificationTarget>> TARGET_LIST_TYPE =
+    private static final TypeReference<List<NotificationTarget>> TARGET_LIST_TYPE     =
             new TypeReference<>() {};
 
     @Id
@@ -63,6 +64,9 @@ public class SubscriptionEntity extends PanacheEntityBase {
 
     @Column(nullable = false)
     public boolean enabled;
+    @Column(nullable = false, length = 10)
+    public String  scope;
+
 
     @Column(name = "created_at", nullable = false)
     public Instant createdAt;
@@ -76,43 +80,22 @@ public class SubscriptionEntity extends PanacheEntityBase {
      */
     static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
         SubscriptionEntity entity = new SubscriptionEntity();
-        entity.id = UUIDv7.generate();
-        entity.ownerId = input.ownerId();
-        entity.tenancyId = input.tenancyId();
-        entity.name = input.name();
-        entity.eventType = input.eventType();
+        entity.id              = UUIDv7.generate();
+        entity.ownerId         = input.ownerId();
+        entity.tenancyId       = input.tenancyId();
+        entity.name            = input.name();
+        entity.eventType       = input.eventType();
         entity.constraintsJson = serializeConstraints(input.constraints(), mapper);
-        entity.targetsJson = serializeTargets(input.targets(), mapper);
-        entity.includeActor = input.includeActor();
-        entity.templateJson = serializeTemplate(input.template(), mapper);
-        entity.enabled = input.enabled();
+        entity.targetsJson     = serializeTargets(input.targets(), mapper);
+        entity.includeActor    = input.includeActor();
+        entity.templateJson    = serializeTemplate(input.template(), mapper);
+        entity.enabled         = input.enabled();
+        entity.scope           = input.scope().name();
         Instant now = Instant.now();
         entity.createdAt = now;
         entity.updatedAt = now;
         return entity;
     }
-
-    /**
-     * Convert entity to domain record.
-     */
-    Subscription toSubscription(ObjectMapper mapper) {
-        return new Subscription(
-                id,
-                ownerId,
-                tenancyId,
-                name,
-                eventType,
-                deserializeConstraints(constraintsJson, mapper),
-                deserializeTargets(targetsJson, mapper),
-                includeActor,
-                deserializeTemplate(templateJson, mapper),
-                enabled,
-                createdAt,
-                updatedAt
-        );
-    }
-
-    // JSON serialization helpers
 
     static String serializeConstraints(List<Constraint> constraints, ObjectMapper mapper) {
         if (constraints == null || constraints.isEmpty()) {
@@ -124,6 +107,8 @@ public class SubscriptionEntity extends PanacheEntityBase {
             throw new IllegalStateException("Failed to serialize constraints", e);
         }
     }
+
+    // JSON serialization helpers
 
     static List<Constraint> deserializeConstraints(String json, ObjectMapper mapper) {
         if (json == null || json.isBlank()) {
@@ -166,5 +151,26 @@ public class SubscriptionEntity extends PanacheEntityBase {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to deserialize targets", e);
         }
+    }
+
+    /**
+     * Convert entity to domain record.
+     */
+    Subscription toSubscription(ObjectMapper mapper) {
+        return new Subscription(
+                id,
+                ownerId,
+                tenancyId,
+                name,
+                eventType,
+                deserializeConstraints(constraintsJson, mapper),
+                deserializeTargets(targetsJson, mapper),
+                includeActor,
+                deserializeTemplate(templateJson, mapper),
+                enabled,
+                SubscriptionScope.valueOf(scope),
+                createdAt,
+                updatedAt
+        );
     }
 }

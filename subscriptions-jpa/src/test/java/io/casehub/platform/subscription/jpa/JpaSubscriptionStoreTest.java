@@ -106,7 +106,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                         .chain(() -> reactiveStore.store(createTestInput("user-1", "tenant-1", "S0", "event-type")))
                         .chain(() -> reactiveStore.store(createTestInput("user-1", "tenant-1", "S1", "event-type")))
                         .chain(() -> reactiveStore.store(createTestInput("user-1", "tenant-1", "S2", "event-type")))
-                        .chain(() -> reactiveStore.find(new SubscriptionQuery("user-1", "tenant-1", null, null, 2))),
+                        .chain(() -> reactiveStore.find(new SubscriptionQuery("user-1", "tenant-1", null, null, null, 2))),
                 page -> {
                     assertThat(page.subscriptions()).hasSize(2);
                     assertThat(page.nextCursor()).isNotNull();
@@ -167,7 +167,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
     @RunOnVertxContext
     void reactive_findAllEnabled_returnsOnlyEnabled(UniAsserter asserter) {
         var enabledInput = createTestInput("user-1", "tenant-1", "Enabled", "event-type");
-        var disabledInput = new SubscriptionInput("user-1", "tenant-1", "Disabled", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, createTemplate(), false);
+        var disabledInput = new SubscriptionInput("user-1", "tenant-1", "Disabled", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, createTemplate(), false, null);
         asserter.assertThat(
                 () -> Panache.withTransaction(() -> SubscriptionEntity.deleteAll())
                         .chain(() -> reactiveStore.store(enabledInput))
@@ -190,7 +190,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
         var input = new SubscriptionInput(
                 "user-1", "tenant-1", "With Constraints", "event-type",
                 constraints, List.of(new NotificationTarget(TargetType.USER, "user-1")),
-                false, createTemplate(), true);
+                false, createTemplate(), true, null);
 
         var subscription = blockingStore.store(input);
 
@@ -214,7 +214,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 "entityId",
                 "actorId"
         );
-        var input = new SubscriptionInput("user-1", "tenant-1", "Template Sub", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true);
+        var input = new SubscriptionInput("user-1", "tenant-1", "Template Sub", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null);
 
         var subscription = blockingStore.store(input);
 
@@ -264,7 +264,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
         String cursor = null;
         int pages = 0;
         do {
-            var query = new SubscriptionQuery("user-1", "tenant-1", null, cursor, 2);
+            var query = new SubscriptionQuery("user-1", "tenant-1", null, null, cursor, 2);
             var page = blockingStore.find(query);
             for (Subscription s : page.subscriptions()) {
                 allIds.add(s.id());
@@ -283,7 +283,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
     private SubscriptionInput createTestInput(String ownerId, String tenancyId, String name, String eventType) {
         return new SubscriptionInput(ownerId, tenancyId, name, eventType,
                 List.of(), List.of(new NotificationTarget(TargetType.USER, ownerId)), false,
-                createTemplate(), true);
+                createTemplate(), true, null);
     }
 
     private NotificationTemplate createTemplate() {

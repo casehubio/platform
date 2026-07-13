@@ -46,7 +46,8 @@ class InMemorySubscriptionStoreTest extends SubscriptionStoreContractTest {
                 targets,
                 false,
                 createTemplate(),
-                true
+                true,
+                null
         );
 
         var subscription = store.store(input);
@@ -70,7 +71,8 @@ class InMemorySubscriptionStoreTest extends SubscriptionStoreContractTest {
                 targets,
                 true,  // includeActor = true
                 createTemplate(),
-                true
+                true,
+                null
         );
 
         var subscription = store.store(input);
@@ -93,7 +95,8 @@ class InMemorySubscriptionStoreTest extends SubscriptionStoreContractTest {
                 targets,
                 true,
                 createTemplate(),
-                true
+                true,
+                null
         );
 
         store.store(input);

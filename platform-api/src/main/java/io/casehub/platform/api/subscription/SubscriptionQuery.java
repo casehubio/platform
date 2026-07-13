@@ -2,25 +2,20 @@ package io.casehub.platform.api.subscription;
 
 import java.util.Objects;
 
-/**
- * Query parameters for listing subscriptions with cursor-based pagination.
- *
- * @param ownerId   subscription owner (required, renamed from userId)
- * @param tenancyId tenant isolation (required)
- * @param enabled   filter by enabled state (nullable = all subscriptions)
- * @param cursor    pagination cursor (nullable = start from beginning)
- * @param limit     page size (must be positive)
- */
 public record SubscriptionQuery(
         String ownerId,
         String tenancyId,
+        SubscriptionScope scope,
         Boolean enabled,
         String cursor,
         int limit
 ) {
     public SubscriptionQuery {
-        Objects.requireNonNull(ownerId, "ownerId");
         Objects.requireNonNull(tenancyId, "tenancyId");
+        scope = scope != null ? scope : SubscriptionScope.USER;
+        if (scope == SubscriptionScope.USER) {
+            Objects.requireNonNull(ownerId, "ownerId required for USER scope");
+        }
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }

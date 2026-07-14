@@ -26,6 +26,11 @@ public final class CredentialPropertyKeys {
 
     /** ISO-8601 expiration timestamp for time-limited credentials. */
     public static final String EXPIRES_AT = "expires-at";
+    /**
+     * HMAC signing secret for webhook signature verification.
+     */
+    public static final String SIGNING_SECRET = "signing-secret";
+
 
     private CredentialPropertyKeys() {}
 }

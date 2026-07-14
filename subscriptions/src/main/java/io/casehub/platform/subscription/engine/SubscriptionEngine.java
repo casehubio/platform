@@ -13,12 +13,12 @@ import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
+import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
-import jakarta.enterprise.event.ObservesAsync;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
-import io.quarkus.runtime.StartupEvent;
 import org.jboss.logging.Logger;
 
 import java.util.Map;
@@ -58,14 +58,18 @@ public class SubscriptionEngine {
     private final Event<SubscriptionMatched> matchEvent;
     private final ConcurrentHashMap<String, SubscriptionHandle> handles = new ConcurrentHashMap<>();
     private volatile DataSource<Object> notificationDataSource;
+    private final    ConstraintCompiler constraintCompiler;
+
 
     @Inject
     public SubscriptionEngine(final DataSourceRegistry dataSourceRegistry,
                                final SubscriptionStore subscriptionStore,
-                               final Event<SubscriptionMatched> matchEvent) {
+                               final Event<SubscriptionMatched> matchEvent,
+                               final ConstraintCompiler constraintCompiler) {
         this.dataSourceRegistry = dataSourceRegistry;
         this.subscriptionStore = subscriptionStore;
         this.matchEvent = matchEvent;
+        this.constraintCompiler = constraintCompiler;
     }
 
     /**
@@ -103,7 +107,7 @@ public class SubscriptionEngine {
             return;
         }
         var objectType = new EventTypeObjectType(subscription.eventType());
-        var filter = ConstraintCompiler.compile(
+        var filter = constraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
         DataProcessor<Object> processor = pojo ->
@@ -130,7 +134,7 @@ public class SubscriptionEngine {
             return null;
         }
         var objectType = new EventTypeObjectType(subscription.eventType());
-        var filter = ConstraintCompiler.compile(
+        var filter = constraintCompiler.compile(
                 subscription.constraints(), subscription.tenancyId(), subscription.ownerId());
 
         DataProcessor<Object> processor = pojo ->

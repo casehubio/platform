@@ -109,7 +109,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `testing/` | `casehub-platform-testing` | @Alternative identity fixtures — no Quarkus runtime. FixedCurrentPrincipal @Priority(200) beats OidcCurrentPrincipal in tests; InMemoryGroupMembershipProvider @Priority(1) |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
-| `expression/` | `casehub-platform-expression` | JQ expression evaluation (JQEvaluator) |
+| `expression/` | `casehub-platform-expression` | Pluggable expression engines — DefaultExpressionEngineRegistry (@ApplicationScoped, CDI-discovers ExpressionEngine beans), MvelExpressionEngine (MVEL3 transpiler, lazy compilation, ConcurrentHashMap cache), JQExpressionEngine (jackson-jq wrapper, Boolean and List result types). Also retains JQEvaluator for backward-compat scope injection ($secret, $config). MVEL3 dep: `org.mvel:mvel3:3.0.0-SNAPSHOT` (JBoss Nexus snapshots) |
 | `persistence-jpa/` | `casehub-platform-persistence-jpa` | JPA-backed PreferenceProvider — scope-aware, hierarchy-resolved, current-only. Add as compile dep; consumers must add `classpath:db/platform/migration` to Flyway locations |
 | `persistence-mongodb/` | `casehub-platform-persistence-mongodb` | MongoDB-backed PreferenceProvider — @Alternative @Priority(1), beats JPA when co-deployed. No Flyway; startup bean creates scope index |
 | `memory-inmem/` | `casehub-platform-memory-inmem` | @Alternative @Priority(10) volatile CaseMemoryStore — ConcurrentHashMap, constructor-injected CurrentPrincipal, no quarkus:build goal. Add as test scope for @QuarkusTest isolation; compile for ephemeral installs. Do NOT combine with memory-jpa or memory-sqlite in the same scope |
@@ -208,6 +208,14 @@ io.casehub.platform.api
                    DataSourceRegistered (CDI event), DataSourceDeregistered (CDI event: descriptor + DataSource instance for identity comparison),
                    DataSourceUpdated (CDI event record: oldDescriptor, newDescriptor, dataSource),
                    Marshaller, MarshalException, MarshallerRegistry (SPI: register/resolve named Marshaller instances)
+  .expression    — CompiledExpression<C,R> (runtime contract: type() + eval(C)),
+                   ExpressionEvaluator (marker: type() discriminator),
+                   ExpressionEngine (factory SPI: compile/validate, typed compile with variables),
+                   ExpressionEngineRegistry (SPI: register/resolve/compile/validate by type key),
+                   JQExpressionEvaluator (record: expression), MvelExpressionEvaluator (record: expression),
+                   LambdaExpression<C,R> (implements both ExpressionEvaluator + CompiledExpression, wraps Function<C,R>),
+                   ExpressionCompilationException, ExpressionEvaluationException,
+                   SecretManager, ConfigManager, ConfigMapNotFoundException, SecretNotFoundException
   .governance    — ExecutionPolicy (record: timeoutMs, RetryPolicy), RetryPolicy (record: maxRetries, delay, BackoffStrategy),
                    BackoffStrategy (enum: FIXED/EXPONENTIAL/EXPONENTIAL_WITH_JITTER)
   .endpoints     — EndpointRegistry (SPI: register/resolve/discover/deregister by (Path, tenancyId)),

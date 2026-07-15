@@ -78,7 +78,7 @@ public class NoOpSubscriptionStore implements SubscriptionStore {
                 input.tenancyId(),
                 input.name(),
                 input.eventType(),
-                input.constraints(),
+                input.filters(),
                 input.targets(),
                 input.includeActor(),
                 input.template(),

@@ -1,5 +1,8 @@
 package io.casehub.platform.subscription.rest;
 
+import io.casehub.platform.api.expression.ExpressionEngineRegistry;
+import io.casehub.platform.api.expression.JQExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
@@ -40,11 +43,15 @@ public class SubscriptionResource {
 
     private final ReactiveSubscriptionStore store;
     private final CurrentPrincipal          principal;
+    private final ExpressionEngineRegistry  expressionRegistry;
 
     @Inject
-    public SubscriptionResource(final ReactiveSubscriptionStore store, final CurrentPrincipal principal) {
-        this.store     = store;
-        this.principal = principal;
+    public SubscriptionResource(final ReactiveSubscriptionStore store,
+                                final CurrentPrincipal principal,
+                                final ExpressionEngineRegistry expressionRegistry) {
+        this.store              = store;
+        this.principal          = principal;
+        this.expressionRegistry = expressionRegistry;
     }
 
     @POST
@@ -59,10 +66,11 @@ public class SubscriptionResource {
                 return Uni.createFrom().item(Response.status(400)
                                                      .entity("SYSTEM scope requires explicit targets").build());
             }
-            for (var constraint : input.constraints()) {
-                if ("$me".equals(String.valueOf(constraint.value()))) {
+            for (var filter : input.filters()) {
+                String expr = extractExpression(filter);
+                if (expr.contains("$me")) {
                     return Uni.createFrom().item(Response.status(400)
-                                                         .entity("$me constraint not allowed for SYSTEM scope").build());
+                                                         .entity("$me filter not allowed for SYSTEM scope").build());
                 }
             }
         }
@@ -77,13 +85,22 @@ public class SubscriptionResource {
                 principal.tenancyId(),
                 input.name(),
                 input.eventType(),
-                input.constraints(),
+                input.filters(),
                 targets,
                 input.includeActor(),
                 input.template(),
                 input.enabled(),
                 effectiveScope
         );
+        for (var filter : securedInput.filters()) {
+            try {
+                expressionRegistry.validate(filter.type(), extractExpression(filter));
+            } catch (Exception e) {
+                return Uni.createFrom().item(Response.status(400)
+                        .entity("Invalid filter expression: " + e.getMessage()).build());
+            }
+        }
+
         return store.store(securedInput)
                     .map(s -> Response.status(201).entity(s).build());
     }
@@ -192,5 +209,11 @@ public class SubscriptionResource {
     private boolean isUnauthorizedSystemAccess(SubscriptionScope scope) {
         return scope == SubscriptionScope.SYSTEM
                && !principal.hasGroup(SubscriptionConstants.SYSTEM_SUBSCRIPTION_ADMIN_GROUP);
+    }
+
+    private static String extractExpression(io.casehub.platform.api.expression.ExpressionEvaluator evaluator) {
+        if (evaluator instanceof io.casehub.platform.api.expression.MvelExpressionEvaluator m) {return m.expression();}
+        if (evaluator instanceof io.casehub.platform.api.expression.JQExpressionEvaluator j) {return j.expression();}
+        throw new IllegalArgumentException("Unknown evaluator type: " + evaluator.type());
     }
 }

@@ -1,5 +1,7 @@
 package io.casehub.platform.api.subscription;
 
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -185,16 +187,17 @@ public abstract class SubscriptionStoreContractTest {
     }
 
     @Test
-    void update_changesConstraints() {
+    void update_changesFilters() {
         var subscription = store().store(createInput("user-1", "tenant-1", "Name", "event-type"));
 
-        var newConstraints = List.of(new Constraint("newField", ConstraintOp.EQ, "newValue"));
-        var update = new SubscriptionUpdate(null, null, newConstraints, null, null, null, null);
+        var newFilters = List.of(
+                (ExpressionEvaluator) new MvelExpressionEvaluator("newField == 'newValue'"));
+        var update = new SubscriptionUpdate(null, null, newFilters, null, null, null, null);
         var updated = store().update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
-        assertThat(updated.get().constraints()).hasSize(1);
-        assertThat(updated.get().constraints().get(0).field()).isEqualTo("newField");
+        assertThat(updated.get().filters()).hasSize(1);
+        assertThat(updated.get().filters().get(0).type()).isEqualTo("mvel");
     }
 
     @Test

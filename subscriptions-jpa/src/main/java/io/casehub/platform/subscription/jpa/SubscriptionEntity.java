@@ -3,7 +3,9 @@ package io.casehub.platform.subscription.jpa;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.api.subscription.Constraint;
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.JQExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
@@ -19,6 +21,7 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "subscription",
@@ -30,7 +33,7 @@ import java.util.List;
        })
 public class SubscriptionEntity extends PanacheEntityBase {
 
-    private static final TypeReference<List<Constraint>>         CONSTRAINT_LIST_TYPE =
+    private static final TypeReference<List<Map<String, String>>> FILTER_LIST_TYPE =
             new TypeReference<>() {};
     private static final TypeReference<List<NotificationTarget>> TARGET_LIST_TYPE     =
             new TypeReference<>() {};
@@ -50,8 +53,8 @@ public class SubscriptionEntity extends PanacheEntityBase {
     @Column(name = "event_type", nullable = false, length = 500)
     public String eventType;
 
-    @Column(name = "constraints_json", columnDefinition = "TEXT")
-    public String constraintsJson;
+    @Column(name = "filters_json", columnDefinition = "TEXT")
+    public String filtersJson;
 
     @Column(name = "targets_json", nullable = false, columnDefinition = "TEXT")
     public String targetsJson;
@@ -85,7 +88,7 @@ public class SubscriptionEntity extends PanacheEntityBase {
         entity.tenancyId       = input.tenancyId();
         entity.name            = input.name();
         entity.eventType       = input.eventType();
-        entity.constraintsJson = serializeConstraints(input.constraints(), mapper);
+        entity.filtersJson     = serializeFilters(input.filters(), mapper);
         entity.targetsJson     = serializeTargets(input.targets(), mapper);
         entity.includeActor    = input.includeActor();
         entity.templateJson    = serializeTemplate(input.template(), mapper);
@@ -97,28 +100,43 @@ public class SubscriptionEntity extends PanacheEntityBase {
         return entity;
     }
 
-    static String serializeConstraints(List<Constraint> constraints, ObjectMapper mapper) {
-        if (constraints == null || constraints.isEmpty()) {
+    static String serializeFilters(List<ExpressionEvaluator> filters, ObjectMapper mapper) {
+        if (filters == null || filters.isEmpty()) {
             return null;
         }
         try {
-            return mapper.writeValueAsString(constraints);
+            var entries = filters.stream()
+                    .map(f -> Map.of("type", f.type(), "expression", extractExpression(f)))
+                    .toList();
+            return mapper.writeValueAsString(entries);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize constraints", e);
+            throw new IllegalStateException("Failed to serialize filters", e);
         }
     }
 
-    // JSON serialization helpers
-
-    static List<Constraint> deserializeConstraints(String json, ObjectMapper mapper) {
+    static List<ExpressionEvaluator> deserializeFilters(String json, ObjectMapper mapper) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
         try {
-            return List.copyOf(mapper.readValue(json, CONSTRAINT_LIST_TYPE));
+            List<Map<String, String>> entries = mapper.readValue(json, FILTER_LIST_TYPE);
+            return List.copyOf(entries.stream()
+                    .map(entry -> (ExpressionEvaluator) switch (entry.get("type")) {
+                        case "mvel" -> new MvelExpressionEvaluator(entry.get("expression"));
+                        case "jq" -> new JQExpressionEvaluator(entry.get("expression"));
+                        default -> throw new IllegalStateException(
+                                "Unknown filter type: " + entry.get("type"));
+                    })
+                    .toList());
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to deserialize constraints", e);
+            throw new IllegalStateException("Failed to deserialize filters", e);
         }
+    }
+
+    private static String extractExpression(ExpressionEvaluator evaluator) {
+        if (evaluator instanceof MvelExpressionEvaluator m) return m.expression();
+        if (evaluator instanceof JQExpressionEvaluator j) return j.expression();
+        throw new IllegalArgumentException("Unknown evaluator type: " + evaluator.type());
     }
 
     static String serializeTemplate(NotificationTemplate template, ObjectMapper mapper) {
@@ -163,7 +181,7 @@ public class SubscriptionEntity extends PanacheEntityBase {
                 tenancyId,
                 name,
                 eventType,
-                deserializeConstraints(constraintsJson, mapper),
+                deserializeFilters(filtersJson, mapper),
                 deserializeTargets(targetsJson, mapper),
                 includeActor,
                 deserializeTemplate(templateJson, mapper),

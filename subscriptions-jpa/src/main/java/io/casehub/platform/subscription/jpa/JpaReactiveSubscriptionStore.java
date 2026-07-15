@@ -235,8 +235,8 @@ public class JpaReactiveSubscriptionStore implements ReactiveSubscriptionStore {
         if (update.eventType() != null) {
             entity.eventType = update.eventType();
         }
-        if (update.constraints() != null) {
-            entity.constraintsJson = SubscriptionEntity.serializeConstraints(update.constraints(), mapper);
+        if (update.filters() != null) {
+            entity.filtersJson = SubscriptionEntity.serializeFilters(update.filters(), mapper);
         }
         if (update.targets() != null) {
             entity.targetsJson = SubscriptionEntity.serializeTargets(update.targets(), mapper);

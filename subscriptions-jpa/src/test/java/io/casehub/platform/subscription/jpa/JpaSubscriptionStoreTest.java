@@ -1,8 +1,8 @@
 package io.casehub.platform.subscription.jpa;
 
 import io.casehub.platform.api.notification.NotificationSeverity;
-import io.casehub.platform.api.subscription.Constraint;
-import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
 import io.casehub.platform.api.subscription.Subscription;
@@ -182,24 +182,20 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
     // Entity mapping verification (blocking store — run on test thread)
 
     @Test
-    void entity_preservesConstraints() {
-        var constraints = List.of(
-                new Constraint("subject", ConstraintOp.EQ, "case-123"),
-                new Constraint("source", ConstraintOp.STARTS_WITH, "/tenants/")
-        );
+    void entity_preservesFilters() {
+        var filters = List.of(
+                (ExpressionEvaluator) new MvelExpressionEvaluator("subject == 'case-123'"),
+                (ExpressionEvaluator) new MvelExpressionEvaluator("source.startsWith('/tenants/')"));
         var input = new SubscriptionInput(
-                "user-1", "tenant-1", "With Constraints", "event-type",
-                constraints, List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                "user-1", "tenant-1", "With Filters", "event-type",
+                filters, List.of(new NotificationTarget(TargetType.USER, "user-1")),
                 false, createTemplate(), true, null);
 
         var subscription = blockingStore.store(input);
 
-        assertThat(subscription.constraints()).hasSize(2);
-        assertThat(subscription.constraints().get(0).field()).isEqualTo("subject");
-        assertThat(subscription.constraints().get(0).op()).isEqualTo(ConstraintOp.EQ);
-        assertThat(subscription.constraints().get(0).value()).isEqualTo("case-123");
-        assertThat(subscription.constraints().get(1).field()).isEqualTo("source");
-        assertThat(subscription.constraints().get(1).op()).isEqualTo(ConstraintOp.STARTS_WITH);
+        assertThat(subscription.filters()).hasSize(2);
+        assertThat(subscription.filters().get(0).type()).isEqualTo("mvel");
+        assertThat(subscription.filters().get(1).type()).isEqualTo("mvel");
     }
 
     @Test
@@ -234,22 +230,22 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
 
         var subscription = blockingStore.store(input);
 
-        assertThat(subscription.constraints()).isEmpty();
+        assertThat(subscription.filters()).isEmpty();
     }
 
     @Test
-    void entity_roundTripsConstraintsOnUpdate() {
+    void entity_roundTripsFiltersOnUpdate() {
         var subscription = blockingStore.store(
                 createTestInput("user-1", "tenant-1", "Name", "event-type"));
 
-        var newConstraints = List.of(new Constraint("newField", ConstraintOp.NEQ, "excluded"));
-        var update = new SubscriptionUpdate(null, null, newConstraints, null, null, null, null);
+        var newFilters = List.of(
+                (ExpressionEvaluator) new MvelExpressionEvaluator("newField != 'excluded'"));
+        var update = new SubscriptionUpdate(null, null, newFilters, null, null, null, null);
         var updated = blockingStore.update(subscription.id(), "user-1", "tenant-1", update);
 
         assertThat(updated).isPresent();
-        assertThat(updated.get().constraints()).hasSize(1);
-        assertThat(updated.get().constraints().get(0).field()).isEqualTo("newField");
-        assertThat(updated.get().constraints().get(0).op()).isEqualTo(ConstraintOp.NEQ);
+        assertThat(updated.get().filters()).hasSize(1);
+        assertThat(updated.get().filters().get(0).type()).isEqualTo("mvel");
     }
 
     // Cursor pagination verification (blocking store — run on test thread)

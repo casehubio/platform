@@ -1,5 +1,7 @@
 package io.casehub.platform.api.subscription;
 
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import org.junit.jupiter.api.Test;
 
@@ -13,39 +15,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Validates SPI record construction, null validation, defensive copies.
  */
 class SubscriptionSpiTest {
-
-    // ConstraintOp enum tests (implicit — enum construction cannot fail)
-
-    // Constraint tests
-
-    @Test
-    void constraint_validConstruction() {
-        var constraint = new Constraint("status", ConstraintOp.EQ, "active");
-        assertThat(constraint.field()).isEqualTo("status");
-        assertThat(constraint.op()).isEqualTo(ConstraintOp.EQ);
-        assertThat(constraint.value()).isEqualTo("active");
-    }
-
-    @Test
-    void constraint_rejectsNullField() {
-        assertThatThrownBy(() -> new Constraint(null, ConstraintOp.EQ, "value"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("field");
-    }
-
-    @Test
-    void constraint_rejectsNullOp() {
-        assertThatThrownBy(() -> new Constraint("field", null, "value"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("op");
-    }
-
-    @Test
-    void constraint_rejectsNullValue() {
-        assertThatThrownBy(() -> new Constraint("field", ConstraintOp.EQ, null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("value");
-    }
 
     // NotificationTemplate tests
 
@@ -201,7 +170,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_validConstruction() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = new NotificationTemplate(
                 "Title",
@@ -218,7 +187,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "My Subscription",
                 "work-item.created",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -230,7 +199,8 @@ class SubscriptionSpiTest {
         assertThat(input.tenancyId()).isEqualTo("tenant-1");
         assertThat(input.name()).isEqualTo("My Subscription");
         assertThat(input.eventType()).isEqualTo("work-item.created");
-        assertThat(input.constraints()).hasSize(1);
+        assertThat(input.filters()).hasSize(1);
+        assertThat(input.filters().get(0).type()).isEqualTo("mvel");
         assertThat(input.targets()).hasSize(1);
         assertThat(input.includeActor()).isFalse();
         assertThat(input.template()).isEqualTo(template);
@@ -239,7 +209,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullOwnerId() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
@@ -247,7 +217,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -260,7 +230,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullTenancyId() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
@@ -268,7 +238,7 @@ class SubscriptionSpiTest {
                 null,
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -281,7 +251,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullName() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
@@ -289,7 +259,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 null,
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -302,7 +272,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullEventType() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
@@ -310,7 +280,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 null,
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -322,7 +292,7 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscriptionInput_rejectsNullConstraints() {
+    void subscriptionInput_rejectsNullFilters() {
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
@@ -338,19 +308,19 @@ class SubscriptionSpiTest {
                 null
         ))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("constraints");
+                .hasMessageContaining("filters");
     }
 
     @Test
     void subscriptionInput_rejectsNullTargets() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var template = createTemplate();
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 null,
                 false,
                 template,
@@ -363,14 +333,14 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_rejectsNullTemplate() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         assertThatThrownBy(() -> new SubscriptionInput(
                 "user-1",
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 null,
@@ -382,8 +352,8 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscriptionInput_makesDefensiveCopyOfConstraints() {
-        var mutableList = new java.util.ArrayList<>(List.of(new Constraint("status", ConstraintOp.EQ, "active")));
+    void subscriptionInput_makesDefensiveCopyOfFilters() {
+        var mutableList = new java.util.ArrayList<ExpressionEvaluator>(List.of(new MvelExpressionEvaluator("status == 'active'")));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var input = new SubscriptionInput(
@@ -403,12 +373,12 @@ class SubscriptionSpiTest {
         mutableList.clear();
 
         // Input's copy is unaffected
-        assertThat(input.constraints()).hasSize(1);
+        assertThat(input.filters()).hasSize(1);
     }
 
     @Test
     void subscriptionInput_makesDefensiveCopyOfTargets() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var mutableTargets = new java.util.ArrayList<>(List.of(new NotificationTarget(TargetType.USER, "user-1")));
         var template = createTemplate();
         var input = new SubscriptionInput(
@@ -416,7 +386,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 mutableTargets,
                 false,
                 template,
@@ -435,7 +405,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscription_validConstruction() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var createdAt = Instant.now();
@@ -447,7 +417,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "My Subscription",
                 "work-item.created",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -462,7 +432,7 @@ class SubscriptionSpiTest {
         assertThat(subscription.tenancyId()).isEqualTo("tenant-1");
         assertThat(subscription.name()).isEqualTo("My Subscription");
         assertThat(subscription.eventType()).isEqualTo("work-item.created");
-        assertThat(subscription.constraints()).hasSize(1);
+        assertThat(subscription.filters()).hasSize(1);
         assertThat(subscription.targets()).hasSize(1);
         assertThat(subscription.includeActor()).isFalse();
         assertThat(subscription.template()).isEqualTo(template);
@@ -473,7 +443,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscription_rejectsNullId() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
@@ -482,7 +452,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -497,7 +467,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscription_rejectsNullCreatedAt() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
@@ -506,7 +476,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -521,7 +491,7 @@ class SubscriptionSpiTest {
 
     @Test
     void subscription_rejectsNullUpdatedAt() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         assertThatThrownBy(() -> new Subscription(
@@ -530,7 +500,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 targets,
                 false,
                 template,
@@ -544,8 +514,8 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscription_makesDefensiveCopyOfConstraints() {
-        var mutableList = new java.util.ArrayList<>(List.of(new Constraint("status", ConstraintOp.EQ, "active")));
+    void subscription_makesDefensiveCopyOfFilters() {
+        var mutableList = new java.util.ArrayList<ExpressionEvaluator>(List.of(new MvelExpressionEvaluator("status == 'active'")));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template = createTemplate();
         var subscription = new Subscription(
@@ -568,12 +538,12 @@ class SubscriptionSpiTest {
         mutableList.clear();
 
         // Subscription's copy is unaffected
-        assertThat(subscription.constraints()).hasSize(1);
+        assertThat(subscription.filters()).hasSize(1);
     }
 
     @Test
     void subscription_makesDefensiveCopyOfTargets() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var mutableTargets = new java.util.ArrayList<>(List.of(new NotificationTarget(TargetType.USER, "user-1")));
         var template = createTemplate();
         var subscription = new Subscription(
@@ -582,7 +552,7 @@ class SubscriptionSpiTest {
                 "tenant-1",
                 "Name",
                 "event-type",
-                constraints,
+                filters,
                 mutableTargets,
                 false,
                 template,
@@ -603,13 +573,13 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionUpdate_validConstruction_allFieldsSet() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets = List.of(new NotificationTarget(TargetType.USER, "user-2"));
         var template = createTemplate();
         var update = new SubscriptionUpdate(
                 "New Name",
                 "new-event-type",
-                constraints,
+                filters,
                 targets,
                 true,
                 template,
@@ -618,7 +588,7 @@ class SubscriptionSpiTest {
 
         assertThat(update.name()).isEqualTo("New Name");
         assertThat(update.eventType()).isEqualTo("new-event-type");
-        assertThat(update.constraints()).hasSize(1);
+        assertThat(update.filters()).hasSize(1);
         assertThat(update.targets()).hasSize(1);
         assertThat(update.includeActor()).isTrue();
         assertThat(update.template()).isEqualTo(template);
@@ -631,7 +601,7 @@ class SubscriptionSpiTest {
 
         assertThat(update.name()).isNull();
         assertThat(update.eventType()).isNull();
-        assertThat(update.constraints()).isNull();
+        assertThat(update.filters()).isNull();
         assertThat(update.targets()).isNull();
         assertThat(update.includeActor()).isNull();
         assertThat(update.template()).isNull();
@@ -639,8 +609,8 @@ class SubscriptionSpiTest {
     }
 
     @Test
-    void subscriptionUpdate_makesDefensiveCopyOfConstraints() {
-        var mutableList = new java.util.ArrayList<>(List.of(new Constraint("status", ConstraintOp.EQ, "active")));
+    void subscriptionUpdate_makesDefensiveCopyOfFilters() {
+        var mutableList = new java.util.ArrayList<ExpressionEvaluator>(List.of(new MvelExpressionEvaluator("status == 'active'")));
         var update = new SubscriptionUpdate(
                 "Name",
                 "event-type",
@@ -655,7 +625,7 @@ class SubscriptionSpiTest {
         mutableList.clear();
 
         // Update's copy is unaffected
-        assertThat(update.constraints()).hasSize(1);
+        assertThat(update.filters()).hasSize(1);
     }
 
     @Test
@@ -986,12 +956,12 @@ class SubscriptionSpiTest {
 
     @Test
     void subscription_rejectsNullScope() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template    = createTemplate();
         assertThatThrownBy(() -> new Subscription(
                 "sub-123", "user-1", "tenant-1", "Name", "event-type",
-                constraints, targets, false, template, true,
+                filters, targets, false, template, true,
                 null, Instant.now(), Instant.now()
         ))
                 .isInstanceOf(NullPointerException.class)
@@ -1000,24 +970,24 @@ class SubscriptionSpiTest {
 
     @Test
     void subscriptionInput_nullScopeDefaultsToUser() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template    = createTemplate();
         var input = new SubscriptionInput(
                 "user-1", "tenant-1", "Name", "event-type",
-                constraints, targets, false, template, true, null
+                filters, targets, false, template, true, null
         );
         assertThat(input.scope()).isEqualTo(SubscriptionScope.USER);
     }
 
     @Test
     void subscriptionInput_explicitSystemScope() {
-        var constraints = List.of(new Constraint("status", ConstraintOp.EQ, "active"));
+        var filters = List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == 'active'"));
         var targets     = List.of(new NotificationTarget(TargetType.USER, "user-1"));
         var template    = createTemplate();
         var input = new SubscriptionInput(
                 "user-1", "tenant-1", "Name", "event-type",
-                constraints, targets, false, template, true,
+                filters, targets, false, template, true,
                 SubscriptionScope.SYSTEM
         );
         assertThat(input.scope()).isEqualTo(SubscriptionScope.SYSTEM);

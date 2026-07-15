@@ -5,8 +5,8 @@ import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionInput;
 import io.casehub.platform.api.subscription.SubscriptionPage;
-import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.SubscriptionQuery;
+import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
@@ -172,7 +172,7 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
                 input.tenancyId(),
                 input.name(),
                 input.eventType(),
-                input.constraints(),
+                input.filters(),
                 input.targets(),
                 input.includeActor(),
                 input.template(),
@@ -190,7 +190,7 @@ public class InMemorySubscriptionStore implements SubscriptionStore {
                 subscription.tenancyId(),
                 update.name() != null ? update.name() : subscription.name(),
                 update.eventType() != null ? update.eventType() : subscription.eventType(),
-                update.constraints() != null ? update.constraints() : subscription.constraints(),
+                update.filters() != null ? update.filters() : subscription.filters(),
                 update.targets() != null ? update.targets() : subscription.targets(),
                 update.includeActor() != null ? update.includeActor() : subscription.includeActor(),
                 update.template() != null ? update.template() : subscription.template(),

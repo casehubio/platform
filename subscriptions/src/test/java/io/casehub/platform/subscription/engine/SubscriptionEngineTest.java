@@ -4,6 +4,8 @@ import io.casehub.platform.api.datasource.ClassObjectType;
 import io.casehub.platform.api.datasource.DataSource;
 import io.casehub.platform.api.datasource.DataSourceDeregistered;
 import io.casehub.platform.api.datasource.DataSourceDescriptor;
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.subscription.NotificationTarget;
@@ -68,8 +70,7 @@ class SubscriptionEngineTest {
 
         var exprRegistry = new io.casehub.platform.expression.DefaultExpressionEngineRegistry();
         exprRegistry.register(new io.casehub.platform.expression.MvelExpressionEngine());
-        var constraintCompiler = new ConstraintCompiler(exprRegistry);
-        engine = new SubscriptionEngine(registry, subStore, matchEvent, constraintCompiler);
+        engine = new SubscriptionEngine(registry, subStore, matchEvent, exprRegistry);
     }
 
     // --- Startup ---
@@ -230,7 +231,7 @@ class SubscriptionEngineTest {
         var updated = new Subscription(
                 original.id(), original.ownerId(), original.tenancyId(), original.name(),
                 "io.casehub.work.workitem.created",
-                original.constraints(), original.targets(), original.includeActor(),
+                original.filters(), original.targets(), original.includeActor(),
                 original.template(), true,
                 SubscriptionScope.USER, original.createdAt(), Instant.now());
 
@@ -256,7 +257,7 @@ class SubscriptionEngineTest {
         var original = subStore.findAllEnabled().toList().get(0);
         var disabled = new Subscription(
                 original.id(), original.ownerId(), original.tenancyId(), original.name(),
-                original.eventType(), original.constraints(), original.targets(),
+                original.eventType(), original.filters(), original.targets(),
                 original.includeActor(), original.template(), false,
                 SubscriptionScope.USER, original.createdAt(), Instant.now());
 
@@ -323,7 +324,7 @@ class SubscriptionEngineTest {
         var updated = new Subscription(
                 original.id(), original.ownerId(), original.tenancyId(), original.name(),
                 "io.casehub.work.workitem.created",
-                original.constraints(), original.targets(), original.includeActor(),
+                original.filters(), original.targets(), original.includeActor(),
                 original.template(), true,
                 SubscriptionScope.USER, original.createdAt(), Instant.now());
 
@@ -434,6 +435,75 @@ class SubscriptionEngineTest {
         assertThat(firedEvents).hasSize(1);
         assertThat(firedEvents.get(0).subscription().scope()).isEqualTo(SubscriptionScope.SYSTEM);
     }
+
+    // --- Expression filter tests ---
+
+    @Test
+    void event_matchesMvelFilterExpression_firesSubscriptionMatched() {
+        var input = new SubscriptionInput("user-1", "tenant-1", "Test sub",
+                "work-item.completed",
+                List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == \"completed\"")),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, defaultTemplate(), true, null);
+        subStore.store(input);
+        engine.onStartup(null);
+
+        pushEvent("work-item.completed", "tenant-1", UUID.randomUUID(), "actor-1");
+
+        assertThat(firedEvents).hasSize(1);
+    }
+
+    @Test
+    void event_doesNotMatchMvelFilter_doesNotFire() {
+        var input = new SubscriptionInput("user-1", "tenant-1", "Test sub",
+                "work-item.completed",
+                List.of((ExpressionEvaluator) new MvelExpressionEvaluator("status == \"pending\"")),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, defaultTemplate(), true, null);
+        subStore.store(input);
+        engine.onStartup(null);
+
+        pushEvent("work-item.completed", "tenant-1", UUID.randomUUID(), "actor-1");
+
+        assertThat(firedEvents).isEmpty();
+    }
+
+    @Test
+    void event_dollarMeVariable_substitutedWithOwnerId() {
+        var input = new SubscriptionInput("actor-1", "tenant-1", "Test sub",
+                "work-item.completed",
+                List.of((ExpressionEvaluator) new MvelExpressionEvaluator("actor == $me")),
+                List.of(new NotificationTarget(TargetType.USER, "actor-1")),
+                false, defaultTemplate(), true, null);
+        subStore.store(input);
+        engine.onStartup(null);
+
+        pushEvent("work-item.completed", "tenant-1", UUID.randomUUID(), "actor-1");
+
+        assertThat(firedEvents).hasSize(1);
+    }
+
+    @Test
+    void event_multipleFilters_allMustMatch() {
+        var input = new SubscriptionInput("user-1", "tenant-1", "Test sub",
+                "work-item.completed",
+                List.of(
+                        (ExpressionEvaluator) new MvelExpressionEvaluator("status == \"completed\""),
+                        (ExpressionEvaluator) new MvelExpressionEvaluator("actor == \"actor-1\"")),
+                List.of(new NotificationTarget(TargetType.USER, "user-1")),
+                false, defaultTemplate(), true, null);
+        subStore.store(input);
+        engine.onStartup(null);
+
+        pushEvent("work-item.completed", "tenant-1", UUID.randomUUID(), "actor-1");
+        assertThat(firedEvents).hasSize(1);
+
+        firedEvents.clear();
+        pushEvent("work-item.completed", "tenant-1", UUID.randomUUID(), "actor-2");
+        assertThat(firedEvents).isEmpty();
+    }
+
+    // --- Helpers ---
 
     private SubscriptionInput subscriptionInput(final String ownerId, final String tenancyId,
                                                 final String eventType, final boolean enabled) {

@@ -1,5 +1,7 @@
 package io.casehub.platform.api.subscription;
 
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -8,7 +10,7 @@ public record SubscriptionInput(
         String tenancyId,
         String name,
         String eventType,
-        List<Constraint> constraints,
+        List<ExpressionEvaluator> filters,
         List<NotificationTarget> targets,
         boolean includeActor,
         NotificationTemplate template,
@@ -20,11 +22,11 @@ public record SubscriptionInput(
         Objects.requireNonNull(tenancyId, "tenancyId");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(eventType, "eventType");
-        Objects.requireNonNull(constraints, "constraints");
+        Objects.requireNonNull(filters, "filters");
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(template, "template");
-        scope       = scope != null ? scope : SubscriptionScope.USER;
-        constraints = List.copyOf(constraints);
-        targets     = List.copyOf(targets);
+        scope   = scope != null ? scope : SubscriptionScope.USER;
+        filters = List.copyOf(filters);
+        targets = List.copyOf(targets);
     }
 }

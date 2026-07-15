@@ -2,8 +2,8 @@ package io.casehub.platform.subscription.rest;
 
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.notification.NotificationSeverity;
-import io.casehub.platform.api.subscription.Constraint;
-import io.casehub.platform.api.subscription.ConstraintOp;
+import io.casehub.platform.api.expression.ExpressionEvaluator;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.ReactiveSubscriptionStore;
@@ -40,12 +40,18 @@ class SubscriptionResourceTest {
     @Inject
     InMemorySubscriptionStore inMemoryStore;
 
+    @Inject
+    com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     @BeforeEach
     void setUp() {
         principal.reset();
         principal.setActorId("user-1");
         principal.setTenancyId(TenancyConstants.DEFAULT_TENANT_ID);
         inMemoryStore.clear();
+        io.restassured.RestAssured.config = io.restassured.RestAssured.config()
+                .objectMapperConfig(io.restassured.config.ObjectMapperConfig.objectMapperConfig()
+                        .jackson2ObjectMapperFactory((type, s) -> objectMapper));
     }
 
     @Test
@@ -66,7 +72,7 @@ class SubscriptionResourceTest {
             TenancyConstants.DEFAULT_TENANT_ID,
             "Work item notifications",
             "io.casehub.work.item.created",
-            List.of(new Constraint("priority", ConstraintOp.EQ, "HIGH")),
+            List.of((ExpressionEvaluator) new MvelExpressionEvaluator("priority == 'HIGH'")),
             List.of(new NotificationTarget(TargetType.USER, "user-1")),
             false,
             template,
@@ -478,7 +484,7 @@ class SubscriptionResourceTest {
         var input = new SubscriptionInput(
                 "user-1", TenancyConstants.DEFAULT_TENANT_ID, "System Alert",
                 "io.casehub.alert.triggered",
-                List.of(new Constraint("assigneeId", ConstraintOp.EQ, "$me")),
+                List.of((ExpressionEvaluator) new MvelExpressionEvaluator("assigneeId == $me")),
                 List.of(new NotificationTarget(TargetType.GROUP, "case-managers")),
                 false, createTestTemplate(), true, SubscriptionScope.SYSTEM
         );

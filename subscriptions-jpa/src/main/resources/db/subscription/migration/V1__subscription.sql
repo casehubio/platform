@@ -4,7 +4,7 @@ CREATE TABLE subscription (
     tenancy_id      VARCHAR(255) NOT NULL,
     name            VARCHAR(500) NOT NULL,
     event_type      VARCHAR(500) NOT NULL,
-    constraints_json TEXT,
+    filters_json    TEXT,
     template_json    TEXT NOT NULL,
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL,

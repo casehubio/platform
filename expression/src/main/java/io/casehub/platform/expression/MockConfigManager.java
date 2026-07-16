@@ -15,12 +15,43 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * {@code @DefaultBean} mock for {@link ConfigManager}.
+ * {@code @DefaultBean} config-backed {@link ConfigManager}.
  *
  * <p>Delegates to SmallRye Config (MicroProfile Config API) — application.properties,
  * env vars, and any registered ConfigSources. This is the appropriate default for
  * Quarkus deployments; no separate implementation is needed unless a non-Quarkus
  * config backend is required.
+ *
+ * <h3>Kubernetes integration</h3>
+ *
+ * <p>Add {@code quarkus-kubernetes-config} to the consumer application classpath and
+ * configure it to read Kubernetes ConfigMaps:
+ *
+ * <pre>{@code
+ * # application.properties (%prod profile)
+ * %prod.quarkus.kubernetes-config.enabled=true
+ * %prod.quarkus.kubernetes-config.config-maps=casehub-config
+ * }</pre>
+ *
+ * <p>ConfigMap entries are injected into SmallRye Config and resolved by
+ * {@link #configMap(String)} automatically. The {@code configMap()} method sweeps
+ * properties with the {@code {configMapName}.} prefix, so ConfigMap keys should
+ * use dotted names:
+ *
+ * <pre>{@code
+ * apiVersion: v1
+ * kind: ConfigMap
+ * metadata:
+ *   name: casehub-config
+ * data:
+ *   app-config.timeout: "5000"
+ *   app-config.retries: "3"
+ *   app-config.database.host: "postgres.default.svc.cluster.local"
+ * }</pre>
+ *
+ * <p>The extension is disabled by default, so dev and test environments are not
+ * affected. See the
+ * <a href="https://quarkus.io/guides/kubernetes-config">Quarkus Kubernetes Config guide</a>.
  *
  * <p>Displaced automatically when a non-default {@code @ApplicationScoped} {@link ConfigManager}
  * is on the classpath.

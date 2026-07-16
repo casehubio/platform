@@ -17,6 +17,7 @@ import org.jboss.logging.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @ApplicationScoped
@@ -121,7 +122,7 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
         String nextCursor = null;
         if (hasMore) {
             var last = page.getLast();
-            nextCursor = last.createdAt.toString() + "|" + last.id;
+            nextCursor = last.createdAt.truncatedTo(ChronoUnit.MICROS).toString() + "|" + last.id;
         }
 
         return new DeliveryAttemptPage(

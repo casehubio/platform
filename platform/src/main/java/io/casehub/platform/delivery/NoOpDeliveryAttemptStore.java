@@ -4,6 +4,7 @@ import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryAttemptPage;
 import io.casehub.platform.api.delivery.DeliveryAttemptQuery;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
+import io.casehub.platform.api.delivery.EngagementEvent;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -21,6 +22,12 @@ public class NoOpDeliveryAttemptStore implements DeliveryAttemptStore {
     public void update(DeliveryAttempt attempt) {}
 
     @Override
+    public DeliveryAttempt findById(String id) {
+        return null;
+    }
+
+
+    @Override
     public List<DeliveryAttempt> claimRetryable(Instant now, int batchSize) {
         return List.of();
     }
@@ -32,6 +39,19 @@ public class NoOpDeliveryAttemptStore implements DeliveryAttemptStore {
 
     @Override
     public List<DeliveryAttempt> findByNotificationId(String notificationId) {
+        return List.of();
+    }
+
+    @Override
+    public void recordEngagement(EngagementEvent event) {}
+
+    @Override
+    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId) {
+        return List.of();
+    }
+
+    @Override
+    public List<EngagementEvent> findEngagementsByNotificationId(String notificationId) {
         return List.of();
     }
 }

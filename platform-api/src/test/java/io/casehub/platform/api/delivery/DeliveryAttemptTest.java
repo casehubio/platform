@@ -14,7 +14,7 @@ class DeliveryAttemptTest {
         assertThatNullPointerException().isThrownBy(() ->
                 new DeliveryAttempt(null, null, "email", "user1", "tenant1",
                         DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
-                        Instant.now(), Instant.now(), Instant.now(), null, null, "{}"));
+                        Instant.now(), Instant.now(), Instant.now(), null, null, "{}", null, null));
     }
 
     @Test
@@ -22,7 +22,7 @@ class DeliveryAttemptTest {
         assertThatNullPointerException().isThrownBy(() ->
                 new DeliveryAttempt("id1", null, null, "user1", "tenant1",
                         DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
-                        Instant.now(), Instant.now(), Instant.now(), null, null, "{}"));
+                        Instant.now(), Instant.now(), Instant.now(), null, null, "{}", null, null));
     }
 
     @Test
@@ -30,7 +30,7 @@ class DeliveryAttemptTest {
         assertThatNullPointerException().isThrownBy(() ->
                 new DeliveryAttempt("id1", null, "email", "user1", "tenant1",
                         DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
-                        Instant.now(), Instant.now(), Instant.now(), null, null, null));
+                        Instant.now(), Instant.now(), Instant.now(), null, null, null, null, null));
     }
 
     @Test
@@ -38,7 +38,7 @@ class DeliveryAttemptTest {
         var attempt = new DeliveryAttempt(
                 "id1", null, "email", "user1", "tenant1",
                 DeliveryType.DIGEST, DeliveryStatus.RETRYING, 0,
-                Instant.now(), null, null, null, null, "{}");
+                Instant.now(), null, null, null, null, "{}", null, null);
         assertThat(attempt.notificationId()).isNull();
         assertThat(attempt.lastAttemptedAt()).isNull();
         assertThat(attempt.deliveredAt()).isNull();
@@ -52,7 +52,7 @@ class DeliveryAttemptTest {
         var attempt = new DeliveryAttempt(
                 "id1", "notif-1", "email", "user1", "tenant1",
                 DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
-                now, now, now, null, null, "{\"title\":\"test\"}");
+                now, now, now, null, null, "{\"title\":\"test\"}", null, null);
         assertThat(attempt.id()).isEqualTo("id1");
         assertThat(attempt.notificationId()).isEqualTo("notif-1");
         assertThat(attempt.channelId()).isEqualTo("email");

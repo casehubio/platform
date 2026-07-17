@@ -61,23 +61,31 @@ public class DeliveryAttemptEntity {
 
     @Column(name = "payload", nullable = false, columnDefinition = "TEXT")
     public String payload;
+    @Column(name = "first_opened_at")
+    public Instant firstOpenedAt;
+
+    @Column(name = "first_clicked_at")
+    public Instant firstClickedAt;
+
 
     public static DeliveryAttemptEntity fromDomain(DeliveryAttempt attempt) {
         var entity = new DeliveryAttemptEntity();
-        entity.id = attempt.id();
-        entity.notificationId = attempt.notificationId();
-        entity.channelId = attempt.channelId();
-        entity.userId = attempt.userId();
-        entity.tenancyId = attempt.tenancyId();
-        entity.deliveryType = attempt.deliveryType();
-        entity.status = attempt.status();
-        entity.attemptCount = attempt.attemptCount();
-        entity.createdAt = attempt.createdAt();
+        entity.id              = attempt.id();
+        entity.notificationId  = attempt.notificationId();
+        entity.channelId       = attempt.channelId();
+        entity.userId          = attempt.userId();
+        entity.tenancyId       = attempt.tenancyId();
+        entity.deliveryType    = attempt.deliveryType();
+        entity.status          = attempt.status();
+        entity.attemptCount    = attempt.attemptCount();
+        entity.createdAt       = attempt.createdAt();
         entity.lastAttemptedAt = attempt.lastAttemptedAt();
-        entity.deliveredAt = attempt.deliveredAt();
-        entity.nextRetryAt = attempt.nextRetryAt();
-        entity.failureReason = attempt.failureReason();
-        entity.payload = attempt.payload();
+        entity.deliveredAt     = attempt.deliveredAt();
+        entity.nextRetryAt     = attempt.nextRetryAt();
+        entity.failureReason   = attempt.failureReason();
+        entity.payload         = attempt.payload();
+        entity.firstOpenedAt   = attempt.firstOpenedAt();
+        entity.firstClickedAt  = attempt.firstClickedAt();
         return entity;
     }
 
@@ -86,6 +94,7 @@ public class DeliveryAttemptEntity {
                 id, notificationId, channelId, userId, tenancyId,
                 deliveryType, status, attemptCount,
                 createdAt, lastAttemptedAt, deliveredAt,
-                nextRetryAt, failureReason, payload);
+                nextRetryAt, failureReason, payload,
+                firstOpenedAt, firstClickedAt);
     }
 }

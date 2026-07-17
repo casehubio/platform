@@ -145,7 +145,7 @@ class DeliveryRetryProcessorTest {
                 DeliveryType.IMMEDIATE, DeliveryStatus.RETRYING, 1,
                 Instant.now(), Instant.now(), null,
                 Instant.now().plus(Duration.ofHours(1)),
-                "timeout", serialize(testInput()));
+                "timeout", serialize(testInput()), null, null);
         store.store(attempt);
 
         processor.tick();
@@ -166,7 +166,7 @@ class DeliveryRetryProcessorTest {
                 type, DeliveryStatus.RETRYING, attemptCount,
                 Instant.now(), Instant.now(), null,
                 Instant.now().minus(Duration.ofMinutes(1)),
-                "previous failure", serialize(testInput()));
+                "previous failure", serialize(testInput()), null, null);
     }
 
     private DeliveryAttempt retryableDigestAttempt() {
@@ -175,7 +175,7 @@ class DeliveryRetryProcessorTest {
                 DeliveryType.DIGEST, DeliveryStatus.RETRYING, 1,
                 Instant.now(), Instant.now(), null,
                 Instant.now().minus(Duration.ofMinutes(1)),
-                "previous failure", serialize(testDigestSummary()));
+                "previous failure", serialize(testDigestSummary()), null, null);
     }
 
     private NotificationInput testInput() {

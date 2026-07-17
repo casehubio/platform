@@ -5,6 +5,8 @@ import io.casehub.platform.api.delivery.DeliveryAttemptPage;
 import io.casehub.platform.api.delivery.DeliveryAttemptQuery;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryStatus;
+import io.casehub.platform.api.delivery.EngagementEvent;
+import io.casehub.platform.api.delivery.EngagementType;
 
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -51,33 +53,42 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
             LOG.warnf("DeliveryAttempt %s not found for update", attempt.id());
             return;
         }
-        entity.notificationId = attempt.notificationId();
-        entity.channelId = attempt.channelId();
-        entity.userId = attempt.userId();
-        entity.tenancyId = attempt.tenancyId();
-        entity.deliveryType = attempt.deliveryType();
-        entity.status = attempt.status();
-        entity.attemptCount = attempt.attemptCount();
+        entity.notificationId  = attempt.notificationId();
+        entity.channelId       = attempt.channelId();
+        entity.userId          = attempt.userId();
+        entity.tenancyId       = attempt.tenancyId();
+        entity.deliveryType    = attempt.deliveryType();
+        entity.status          = attempt.status();
+        entity.attemptCount    = attempt.attemptCount();
         entity.lastAttemptedAt = attempt.lastAttemptedAt();
-        entity.deliveredAt = attempt.deliveredAt();
-        entity.nextRetryAt = attempt.nextRetryAt();
-        entity.failureReason = attempt.failureReason();
-        entity.payload = attempt.payload();
+        entity.deliveredAt     = attempt.deliveredAt();
+        entity.nextRetryAt     = attempt.nextRetryAt();
+        entity.failureReason   = attempt.failureReason();
+        entity.payload         = attempt.payload();
+        entity.firstOpenedAt   = attempt.firstOpenedAt();
+        entity.firstClickedAt  = attempt.firstClickedAt();
     }
+
+    @Override
+    public DeliveryAttempt findById(String id) {
+        var entity = entityManager.find(DeliveryAttemptEntity.class, id);
+        return entity != null ? entity.toDomain() : null;
+    }
+
 
     @Override
     @Transactional
     public List<DeliveryAttempt> claimRetryable(Instant now, int batchSize) {
         List<DeliveryAttemptEntity> entities = entityManager.createQuery(
-                        "SELECT e FROM DeliveryAttemptEntity e " +
-                                "WHERE e.status = :status AND e.nextRetryAt IS NOT NULL AND e.nextRetryAt <= :now " +
-                                "ORDER BY e.nextRetryAt ASC", DeliveryAttemptEntity.class)
-                .setParameter("status", DeliveryStatus.RETRYING)
-                .setParameter("now", now)
-                .setMaxResults(batchSize)
-                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                .setHint("jakarta.persistence.lock.timeout", -2)
-                .getResultList();
+                                                                    "SELECT e FROM DeliveryAttemptEntity e " +
+                                                                    "WHERE e.status = :status AND e.nextRetryAt IS NOT NULL AND e.nextRetryAt <= :now " +
+                                                                    "ORDER BY e.nextRetryAt ASC", DeliveryAttemptEntity.class)
+                                                            .setParameter("status", DeliveryStatus.RETRYING)
+                                                            .setParameter("now", now)
+                                                            .setMaxResults(batchSize)
+                                                            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                                                            .setHint("jakarta.persistence.lock.timeout", -2)
+                                                            .getResultList();
 
         Instant claimExpiry = now.plus(claimTimeout);
         for (DeliveryAttemptEntity entity : entities) {
@@ -91,9 +102,9 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     @Override
     public DeliveryAttemptPage find(DeliveryAttemptQuery query) {
         var sb = new StringBuilder("SELECT e FROM DeliveryAttemptEntity e WHERE e.tenancyId = :tenancyId");
-        if (query.userId() != null) sb.append(" AND e.userId = :userId");
-        if (query.channelId() != null) sb.append(" AND e.channelId = :channelId");
-        if (query.status() != null) sb.append(" AND e.status = :status");
+        if (query.userId() != null) {sb.append(" AND e.userId = :userId");}
+        if (query.channelId() != null) {sb.append(" AND e.channelId = :channelId");}
+        if (query.status() != null) {sb.append(" AND e.status = :status");}
 
         if (query.cursor() != null) {
             String[] parts = query.cursor().split("\\|", 2);
@@ -103,9 +114,9 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
 
         var jpql = entityManager.createQuery(sb.toString(), DeliveryAttemptEntity.class);
         jpql.setParameter("tenancyId", query.tenancyId());
-        if (query.userId() != null) jpql.setParameter("userId", query.userId());
-        if (query.channelId() != null) jpql.setParameter("channelId", query.channelId());
-        if (query.status() != null) jpql.setParameter("status", query.status());
+        if (query.userId() != null) {jpql.setParameter("userId", query.userId());}
+        if (query.channelId() != null) {jpql.setParameter("channelId", query.channelId());}
+        if (query.status() != null) {jpql.setParameter("status", query.status());}
 
         if (query.cursor() != null) {
             String[] parts = query.cursor().split("\\|", 2);
@@ -116,8 +127,8 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
         jpql.setMaxResults(query.limit() + 1);
         List<DeliveryAttemptEntity> results = jpql.getResultList();
 
-        boolean hasMore = results.size() > query.limit();
-        List<DeliveryAttemptEntity> page = hasMore ? results.subList(0, query.limit()) : results;
+        boolean                     hasMore = results.size() > query.limit();
+        List<DeliveryAttemptEntity> page    = hasMore ? results.subList(0, query.limit()) : results;
 
         String nextCursor = null;
         if (hasMore) {
@@ -133,55 +144,106 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     @Override
     public List<DeliveryAttempt> findByNotificationId(String notificationId) {
         return entityManager.createQuery(
-                        "SELECT e FROM DeliveryAttemptEntity e WHERE e.notificationId = :notificationId " +
-                                "ORDER BY e.createdAt ASC", DeliveryAttemptEntity.class)
-                .setParameter("notificationId", notificationId)
-                .getResultList()
-                .stream().map(DeliveryAttemptEntity::toDomain).toList();
+                                    "SELECT e FROM DeliveryAttemptEntity e WHERE e.notificationId = :notificationId " +
+                                    "ORDER BY e.createdAt ASC", DeliveryAttemptEntity.class)
+                            .setParameter("notificationId", notificationId)
+                            .getResultList()
+                            .stream().map(DeliveryAttemptEntity::toDomain).toList();
     }
 
+    // Engagement events are cleaned up by DDL-level ON DELETE CASCADE on engagement_event.attempt_id FK
     @Scheduled(cron = "0 0 3 * * ?")
     @Transactional
     void retentionPurge() {
         Instant deliveredCutoff = Instant.now().minus(Duration.ofDays(retentionDays));
-        Instant failedCutoff = Instant.now().minus(Duration.ofDays(failedRetentionDays));
+        Instant failedCutoff    = Instant.now().minus(Duration.ofDays(failedRetentionDays));
 
         int purgedDelivered = entityManager.createQuery(
-                        "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
-                .setParameter("status", DeliveryStatus.DELIVERED)
-                .setParameter("cutoff", deliveredCutoff)
-                .executeUpdate();
+                                                   "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
+                                           .setParameter("status", DeliveryStatus.DELIVERED)
+                                           .setParameter("cutoff", deliveredCutoff)
+                                           .executeUpdate();
 
         int purgedExpired = entityManager.createQuery(
-                        "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
-                .setParameter("status", DeliveryStatus.EXPIRED)
-                .setParameter("cutoff", deliveredCutoff)
-                .executeUpdate();
+                                                 "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
+                                         .setParameter("status", DeliveryStatus.EXPIRED)
+                                         .setParameter("cutoff", deliveredCutoff)
+                                         .executeUpdate();
 
         int purgedFailed = entityManager.createQuery(
-                        "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
-                .setParameter("status", DeliveryStatus.FAILED)
-                .setParameter("cutoff", failedCutoff)
-                .executeUpdate();
+                                                "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status AND e.createdAt < :cutoff")
+                                        .setParameter("status", DeliveryStatus.FAILED)
+                                        .setParameter("cutoff", failedCutoff)
+                                        .executeUpdate();
 
         int purgedStaleRetrying = entityManager.createQuery(
-                        "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status " +
-                                "AND e.nextRetryAt IS NOT NULL AND e.nextRetryAt < :cutoff")
-                .setParameter("status", DeliveryStatus.RETRYING)
-                .setParameter("cutoff", deliveredCutoff)
-                .executeUpdate();
+                                                       "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status " +
+                                                       "AND e.nextRetryAt IS NOT NULL AND e.nextRetryAt < :cutoff")
+                                               .setParameter("status", DeliveryStatus.RETRYING)
+                                               .setParameter("cutoff", deliveredCutoff)
+                                               .executeUpdate();
 
         int purgedOrphanedPrePersist = entityManager.createQuery(
-                        "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status " +
-                                "AND e.nextRetryAt IS NULL AND e.createdAt < :cutoff")
-                .setParameter("status", DeliveryStatus.RETRYING)
-                .setParameter("cutoff", Instant.now().minus(claimTimeout))
-                .executeUpdate();
+                                                            "DELETE FROM DeliveryAttemptEntity e WHERE e.status = :status " +
+                                                            "AND e.nextRetryAt IS NULL AND e.createdAt < :cutoff")
+                                                    .setParameter("status", DeliveryStatus.RETRYING)
+                                                    .setParameter("cutoff", Instant.now().minus(claimTimeout))
+                                                    .executeUpdate();
 
         int total = purgedDelivered + purgedExpired + purgedFailed + purgedStaleRetrying + purgedOrphanedPrePersist;
         if (total > 0) {
             LOG.infof("Retention purge: %d delivered, %d expired, %d failed, %d stale retrying, %d orphaned pre-persist",
-                    purgedDelivered, purgedExpired, purgedFailed, purgedStaleRetrying, purgedOrphanedPrePersist);
+                      purgedDelivered, purgedExpired, purgedFailed, purgedStaleRetrying, purgedOrphanedPrePersist);
         }
+    }
+
+    @Override
+    @Transactional
+    public void recordEngagement(EngagementEvent event) {
+        entityManager.persist(EngagementEventEntity.fromDomain(event));
+        entityManager.flush();
+        if (event.type() == EngagementType.OPENED) {
+            entityManager.createQuery(
+                                 "UPDATE DeliveryAttemptEntity e SET e.firstOpenedAt = :ts " +
+                                 "WHERE e.id = :id AND e.firstOpenedAt IS NULL")
+                         .setParameter("ts", event.recordedAt())
+                         .setParameter("id", event.attemptId())
+                         .executeUpdate();
+        }
+        if (event.type() == EngagementType.CLICKED) {
+            entityManager.createQuery(
+                                 "UPDATE DeliveryAttemptEntity e SET e.firstClickedAt = :ts " +
+                                 "WHERE e.id = :id AND e.firstClickedAt IS NULL")
+                         .setParameter("ts", event.recordedAt())
+                         .setParameter("id", event.attemptId())
+                         .executeUpdate();
+        }
+        var cached = entityManager.find(DeliveryAttemptEntity.class, event.attemptId());
+        if (cached != null) {
+            entityManager.refresh(cached);
+        }}
+
+    @Override
+    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId) {
+        return entityManager
+                       .createQuery("FROM EngagementEventEntity e WHERE e.attemptId = :attemptId ORDER BY e.recordedAt",
+                                    EngagementEventEntity.class)
+                       .setParameter("attemptId", attemptId)
+                       .getResultList()
+                       .stream()
+                       .map(EngagementEventEntity::toDomain)
+                       .toList();
+    }
+
+    @Override
+    public List<EngagementEvent> findEngagementsByNotificationId(String notificationId) {
+        return entityManager
+                       .createQuery("FROM EngagementEventEntity e WHERE e.notificationId = :notificationId ORDER BY e.recordedAt",
+                                    EngagementEventEntity.class)
+                       .setParameter("notificationId", notificationId)
+                       .getResultList()
+                       .stream()
+                       .map(EngagementEventEntity::toDomain)
+                       .toList();
     }
 }

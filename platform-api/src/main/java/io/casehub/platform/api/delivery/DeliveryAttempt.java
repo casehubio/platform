@@ -17,7 +17,9 @@ public record DeliveryAttempt(
         Instant deliveredAt,
         Instant nextRetryAt,
         String failureReason,
-        String payload
+        String payload,
+        Instant firstOpenedAt,
+        Instant firstClickedAt
 ) {
     public DeliveryAttempt {
         Objects.requireNonNull(id, "id");

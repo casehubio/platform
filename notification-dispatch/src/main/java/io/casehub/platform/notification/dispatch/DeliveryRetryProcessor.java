@@ -1,5 +1,6 @@
 package io.casehub.platform.notification.dispatch;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
@@ -9,8 +10,6 @@ import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.DeliveryType;
 import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.notification.NotificationInput;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -94,7 +93,8 @@ public class DeliveryRetryProcessor {
                         attempt.id(), attempt.notificationId(), attempt.channelId(),
                         attempt.userId(), attempt.tenancyId(), attempt.deliveryType(),
                         DeliveryStatus.DELIVERED, attempt.attemptCount() + 1,
-                        attempt.createdAt(), now, now, null, null, attempt.payload()));
+                        attempt.createdAt(), now, now, null, null, attempt.payload(),
+                        attempt.firstOpenedAt(), attempt.firstClickedAt()));
             } else {
                 advanceOrExpire(attempt, now, result.failureReason());
             }
@@ -115,7 +115,8 @@ public class DeliveryRetryProcessor {
                     attempt.userId(), attempt.tenancyId(), attempt.deliveryType(),
                     DeliveryStatus.RETRYING, newCount,
                     attempt.createdAt(), now, null,
-                    nextRetry, failureReason, attempt.payload()));
+                    nextRetry, failureReason, attempt.payload(),
+                    attempt.firstOpenedAt(), attempt.firstClickedAt()));
         }
     }
 
@@ -125,7 +126,8 @@ public class DeliveryRetryProcessor {
                 attempt.userId(), attempt.tenancyId(), attempt.deliveryType(),
                 DeliveryStatus.EXPIRED, attempt.attemptCount() + 1,
                 attempt.createdAt(), now, null, null,
-                failureReason, attempt.payload());
+                failureReason, attempt.payload(),
+                attempt.firstOpenedAt(), attempt.firstClickedAt());
         store.update(expired);
         exhaustedEvent.fireAsync(new DeliveryExhausted(expired));
     }

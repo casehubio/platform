@@ -1,5 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryStatus;
@@ -8,9 +10,6 @@ import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.util.UUIDv7;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -47,10 +46,10 @@ public class DeliveryTracker {
                     input.userId(), input.tenancyId(),
                     DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
                     now, now, now, null, null,
-                    serialize(input)));
+                    serialize(input), null, null));
         } catch (Exception e) {
             LOG.warnf(e, "Failed to record delivery success for channel '%s', user '%s'",
-                    channelId, input.userId());
+                      channelId, input.userId());
         }
     }
 
@@ -58,7 +57,7 @@ public class DeliveryTracker {
                               NotificationSeverity guaranteedMinSeverity, String failureReason) {
         var now = Instant.now();
         boolean retryEligible = guaranteedMinSeverity != null
-                && input.severity().isAtLeast(guaranteedMinSeverity);
+                                && input.severity().isAtLeast(guaranteedMinSeverity);
         try {
             store.store(new DeliveryAttempt(
                     UUIDv7.generate(), notificationId, channelId,
@@ -68,10 +67,10 @@ public class DeliveryTracker {
                     1, now, now, null,
                     retryEligible ? now.plus(baseDelay) : null,
                     failureReason,
-                    serialize(input)));
+                    serialize(input), null, null));
         } catch (Exception e) {
             LOG.warnf(e, "Failed to record delivery failure for channel '%s', user '%s'",
-                    channelId, input.userId());
+                      channelId, input.userId());
         }
     }
 
@@ -79,12 +78,12 @@ public class DeliveryTracker {
                                            NotificationSeverity guaranteedMinSeverity) {
         var now = Instant.now();
         NotificationSeverity maxSeverity = summary.notifications().stream()
-                .map(NotificationInput::severity)
-                .max(Comparator.comparingInt(Enum::ordinal))
-                .orElse(NotificationSeverity.INFO);
+                                                  .map(NotificationInput::severity)
+                                                  .max(Comparator.comparingInt(Enum::ordinal))
+                                                  .orElse(NotificationSeverity.INFO);
 
         boolean retryEligible = guaranteedMinSeverity != null
-                && maxSeverity.isAtLeast(guaranteedMinSeverity);
+                                && maxSeverity.isAtLeast(guaranteedMinSeverity);
 
         var attempt = new DeliveryAttempt(
                 UUIDv7.generate(), null, channelId,
@@ -94,12 +93,12 @@ public class DeliveryTracker {
                 0, now, null, null,
                 null,
                 null,
-                serialize(summary));
+                serialize(summary), null, null);
         try {
             store.store(attempt);
         } catch (Exception e) {
             LOG.warnf(e, "Failed to pre-record digest delivery for channel '%s', user '%s'",
-                    channelId, summary.userId());
+                      channelId, summary.userId());
         }
         return attempt;
     }
@@ -111,7 +110,8 @@ public class DeliveryTracker {
                     preRecorded.id(), preRecorded.notificationId(), preRecorded.channelId(),
                     preRecorded.userId(), preRecorded.tenancyId(), preRecorded.deliveryType(),
                     DeliveryStatus.DELIVERED, preRecorded.attemptCount() + 1,
-                    preRecorded.createdAt(), now, now, null, null, preRecorded.payload()));
+                    preRecorded.createdAt(), now, now, null, null, preRecorded.payload(),
+                    preRecorded.firstOpenedAt(), preRecorded.firstClickedAt()));
         } catch (Exception e) {
             LOG.warnf(e, "Failed to confirm digest success for attempt '%s'", preRecorded.id());
         }
@@ -126,7 +126,8 @@ public class DeliveryTracker {
                     DeliveryStatus.RETRYING, 1,
                     preRecorded.createdAt(), now, null,
                     now.plus(baseDelay),
-                    failureReason, preRecorded.payload()));
+                    failureReason, preRecorded.payload(),
+                    preRecorded.firstOpenedAt(), preRecorded.firstClickedAt()));
         } catch (Exception e) {
             LOG.warnf(e, "Failed to confirm digest failure for attempt '%s'", preRecorded.id());
         }

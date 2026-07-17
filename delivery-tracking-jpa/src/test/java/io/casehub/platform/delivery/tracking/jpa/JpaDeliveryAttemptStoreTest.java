@@ -5,10 +5,11 @@ import io.casehub.platform.api.delivery.DeliveryAttemptQuery;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.DeliveryType;
+import io.casehub.platform.api.delivery.EngagementEvent;
+import io.casehub.platform.api.delivery.EngagementType;
 import io.casehub.platform.api.util.UUIDv7;
-
-import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.TestTransaction;
+import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +48,7 @@ class JpaDeliveryAttemptStoreTest {
                 attempt.id(), attempt.notificationId(), attempt.channelId(),
                 attempt.userId(), attempt.tenancyId(), attempt.deliveryType(),
                 DeliveryStatus.DELIVERED, 3,
-                attempt.createdAt(), Instant.now(), Instant.now(), null, null, attempt.payload());
+                attempt.createdAt(), Instant.now(), Instant.now(), null, null, attempt.payload(), attempt.firstOpenedAt(), attempt.firstClickedAt());
         store.update(updated);
 
         var found = store.findByNotificationId("notif-1");
@@ -100,6 +101,58 @@ class JpaDeliveryAttemptStoreTest {
 
     // --- helpers ---
 
+
+    @Test
+    @TestTransaction
+    void recordEngagementStoresAndUpdatesSummary() {
+        var attempt = attempt("notif-1", DeliveryStatus.DELIVERED);
+        store.store(attempt);
+        var now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var event = new EngagementEvent(
+                UUIDv7.generate(), attempt.id(), "notif-1", "email", "user-1", "tenant-1",
+                EngagementType.OPENED, now, "{\"source\":\"pixel\"}");
+        store.recordEngagement(event);
+        var found = store.findEngagementsByAttemptId(attempt.id());
+        assertThat(found).hasSize(1);
+        assertThat(found.getFirst().type()).isEqualTo(EngagementType.OPENED);
+        assertThat(found.getFirst().metadata()).isEqualTo("{\"source\":\"pixel\"}");
+        var updated = store.findByNotificationId("notif-1").getFirst();
+        assertThat(updated.firstOpenedAt()).isEqualTo(now);
+    }
+
+    @Test
+    @TestTransaction
+    void recordEngagementFirstWriteWins() {
+        var attempt = attempt("notif-1", DeliveryStatus.DELIVERED);
+        store.store(attempt);
+        var first  = Instant.now().minusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var second = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        store.recordEngagement(new EngagementEvent(
+                UUIDv7.generate(), attempt.id(), "notif-1", "email", "user-1", "tenant-1",
+                EngagementType.OPENED, first, null));
+        store.recordEngagement(new EngagementEvent(
+                UUIDv7.generate(), attempt.id(), "notif-1", "email", "user-1", "tenant-1",
+                EngagementType.OPENED, second, null));
+        var updated = store.findByNotificationId("notif-1").getFirst();
+        assertThat(updated.firstOpenedAt()).isEqualTo(first);
+    }
+
+    @Test
+    @TestTransaction
+    void findEngagementsByNotificationIdAcrossAttempts() {
+        var a1 = attempt("notif-1", DeliveryStatus.DELIVERED);
+        var a2 = attempt("notif-1", "user-2", "tenant-1", "email", DeliveryStatus.DELIVERED);
+        store.store(a1);
+        store.store(a2);
+        store.recordEngagement(new EngagementEvent(
+                UUIDv7.generate(), a1.id(), "notif-1", "email", "user-1", "tenant-1",
+                EngagementType.OPENED, Instant.now(), null));
+        store.recordEngagement(new EngagementEvent(
+                UUIDv7.generate(), a2.id(), "notif-1", "email", "user-2", "tenant-1",
+                EngagementType.CLICKED, Instant.now(), null));
+        assertThat(store.findEngagementsByNotificationId("notif-1")).hasSize(2);
+    }
+
     private DeliveryAttempt attempt(String notificationId, DeliveryStatus status) {
         return attempt(notificationId, "user-1", "tenant-1", "email", status);
     }
@@ -112,6 +165,6 @@ class JpaDeliveryAttemptStoreTest {
                 Instant.now(), Instant.now(),
                 status == DeliveryStatus.DELIVERED ? Instant.now() : null,
                 status == DeliveryStatus.RETRYING ? Instant.now().minus(Duration.ofMinutes(1)) : null,
-                null, "{}");
+                null, "{}", null, null);
     }
 }

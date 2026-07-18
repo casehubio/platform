@@ -6,7 +6,11 @@ import io.casehub.platform.api.view.SubjectViewSpec;
 import io.casehub.platform.api.view.ViewEventType;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
@@ -21,7 +25,7 @@ public class SubjectViewEvaluator {
             .collect(Collectors.toMap(SubjectViewSpec::id, SubjectViewSpec::name));
     }
 
-    public List<SubjectViewEvent> diff(
+    public List<SubjectViewEvent> computeEvents(
             UUID subjectId,
             String tenancyId,
             Map<UUID, String> before,
@@ -29,16 +33,19 @@ public class SubjectViewEvaluator {
         List<SubjectViewEvent> events = new ArrayList<>();
 
         before.forEach((id, name) -> {
-            if (!after.containsKey(id)) {
+            if (after.containsKey(id)) {
+                events.add(new SubjectViewEvent(subjectId, id,
+                                                after.get(id), ViewEventType.CHANGED, tenancyId));
+            } else {
                 events.add(new SubjectViewEvent(subjectId, id, name,
-                    ViewEventType.REMOVED, tenancyId));
+                                                ViewEventType.REMOVED, tenancyId));
             }
         });
 
         after.forEach((id, name) -> {
             if (!before.containsKey(id)) {
                 events.add(new SubjectViewEvent(subjectId, id, name,
-                    ViewEventType.ADDED, tenancyId));
+                                                ViewEventType.ADDED, tenancyId));
             }
         });
 

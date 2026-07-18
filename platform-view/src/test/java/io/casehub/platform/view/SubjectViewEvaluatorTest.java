@@ -48,7 +48,7 @@ class SubjectViewEvaluatorTest {
     @Test
     void evaluateMembership_noMatch() {
         var result = evaluator.evaluateMembership(
-            Set.of("iot/triage/hvac"), List.of(view("legal", "legal/**")));
+                Set.of("iot/triage/hvac"), List.of(view("legal", "legal/**")));
         assertThat(result).isEmpty();
     }
 
@@ -65,13 +65,13 @@ class SubjectViewEvaluatorTest {
     }
 
     @Test
-    void diff_added() {
-        var viewId = UUID.randomUUID();
-        var subjectId = UUID.randomUUID();
-        Map<UUID, String> before = Map.of();
-        Map<UUID, String> after = Map.of(viewId, "iot-triage");
+    void computeEvents_added() {
+        var               viewId    = UUID.randomUUID();
+        var               subjectId = UUID.randomUUID();
+        Map<UUID, String> before    = Map.of();
+        Map<UUID, String> after     = Map.of(viewId, "iot-triage");
 
-        var events = evaluator.diff(subjectId, "t1", before, after);
+        var events = evaluator.computeEvents(subjectId, "t1", before, after);
 
         assertThat(events).hasSize(1);
         assertThat(events.get(0).type()).isEqualTo(ViewEventType.ADDED);
@@ -80,38 +80,76 @@ class SubjectViewEvaluatorTest {
     }
 
     @Test
-    void diff_removed() {
-        var viewId = UUID.randomUUID();
+    void computeEvents_removed() {
+        var               viewId = UUID.randomUUID();
         Map<UUID, String> before = Map.of(viewId, "iot-triage");
-        Map<UUID, String> after = Map.of();
+        Map<UUID, String> after  = Map.of();
 
-        var events = evaluator.diff(UUID.randomUUID(), "t1", before, after);
+        var events = evaluator.computeEvents(UUID.randomUUID(), "t1", before, after);
 
         assertThat(events).hasSize(1);
         assertThat(events.get(0).type()).isEqualTo(ViewEventType.REMOVED);
     }
 
     @Test
-    void diff_noChange() {
-        var viewId = UUID.randomUUID();
-        Map<UUID, String> state = Map.of(viewId, "v");
+    void computeEvents_changed() {
+        var               viewId    = UUID.randomUUID();
+        var               subjectId = UUID.randomUUID();
+        Map<UUID, String> before    = Map.of(viewId, "view-1");
+        Map<UUID, String> after     = Map.of(viewId, "view-1");
 
-        var events = evaluator.diff(UUID.randomUUID(), "t1", state, state);
+        var events = evaluator.computeEvents(subjectId, "t1", before, after);
 
-        assertThat(events).isEmpty();
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).type()).isEqualTo(ViewEventType.CHANGED);
+        assertThat(events.get(0).viewId()).isEqualTo(viewId);
     }
 
     @Test
-    void diff_addedAndRemoved() {
-        var removedId = UUID.randomUUID();
-        var addedId = UUID.randomUUID();
-        Map<UUID, String> before = Map.of(removedId, "old-view");
-        Map<UUID, String> after = Map.of(addedId, "new-view");
+    void computeEvents_changedUsesAfterViewName() {
+        var               viewId = UUID.randomUUID();
+        Map<UUID, String> before = Map.of(viewId, "old-name");
+        Map<UUID, String> after  = Map.of(viewId, "new-name");
 
-        var events = evaluator.diff(UUID.randomUUID(), "t1", before, after);
+        var events = evaluator.computeEvents(UUID.randomUUID(), "t1", before, after);
+
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).type()).isEqualTo(ViewEventType.CHANGED);
+        assertThat(events.get(0).viewName()).isEqualTo("new-name");
+    }
+
+    @Test
+    void computeEvents_mixed() {
+        var               removedId = UUID.randomUUID();
+        var               addedId   = UUID.randomUUID();
+        var               changedId = UUID.randomUUID();
+        Map<UUID, String> before    = Map.of(removedId, "old-view", changedId, "stable");
+        Map<UUID, String> after     = Map.of(addedId, "new-view", changedId, "stable");
+
+        var events = evaluator.computeEvents(UUID.randomUUID(), "t1", before, after);
+
+        assertThat(events).hasSize(3);
+        assertThat(events).extracting(SubjectViewEvent::type)
+                          .containsExactlyInAnyOrder(
+                                  ViewEventType.ADDED, ViewEventType.REMOVED, ViewEventType.CHANGED);
+    }
+
+    @Test
+    void computeEvents_identicalMapsAllChanged() {
+        var               v1    = UUID.randomUUID();
+        var               v2    = UUID.randomUUID();
+        Map<UUID, String> state = Map.of(v1, "a", v2, "b");
+
+        var events = evaluator.computeEvents(UUID.randomUUID(), "t1", state, state);
 
         assertThat(events).hasSize(2);
-        assertThat(events).extracting(SubjectViewEvent::type)
-            .containsExactlyInAnyOrder(ViewEventType.ADDED, ViewEventType.REMOVED);
+        assertThat(events).allMatch(e -> e.type() == ViewEventType.CHANGED);
+    }
+
+    @Test
+    void computeEvents_bothEmpty() {
+        var events = evaluator.computeEvents(
+                UUID.randomUUID(), "t1", Map.of(), Map.of());
+        assertThat(events).isEmpty();
     }
 }

@@ -416,7 +416,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | J4: Endpoint Registry | Named endpoint registry — tenant-scoped, multi-protocol connection config for workers and desired-state management | C17, C18 | ✅ C17–C18 complete |
 | J5: Stream Ingestion | CloudEvent-envelope transports — five classpath-activated stream adapters firing CDI events | C20 | ✅ Complete |
 | J6: Access Control | Flat-grant ACL SPI — resource-level `canAccess` / `grant` / `revoke`, parent-resource hierarchy, JPA and in-memory adapters | C21 | ✅ Complete |
-| J7: Subject Views | Filtered views of any labeled subject — label-pattern matching, membership tracking, ADDED/REMOVED lifecycle events. Generalizes work-queues' QueueView pattern. | C22 | 🔲 In progress (#175) |
+| J7: Subject Views | Filtered views of any labeled subject — label-pattern matching, membership tracking, ADDED/REMOVED lifecycle events. Generalizes work-queues' QueueView pattern. | C22 | ✅ Complete (#175) |
 
 ### §9.2 Chapter Index
 
@@ -489,7 +489,7 @@ flowchart LR
 | 19 | AgentSession Multi-turn + LangChain4j | J3 | L8 | ✅ |
 | 20 | Stream Ingestion | J5 | L10 | ✅ |
 | 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
-| 22 | Subject View Toolkit | J7 | L1, L2, L13 | 🔲 |
+| 22 | Subject View Toolkit | J7 | L1, L2, L13 | ✅ |
 
 **Layer × Chapter matrix**
 

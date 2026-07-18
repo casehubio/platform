@@ -148,6 +148,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
 | L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
 | L12: Digest Buffer Adapters | `digest-inmem/`, `digest-jpa/` | `DigestBuffer` SPI implementations — volatile in-memory or persistent JPA; mutually exclusive per CDI priority tier |
+| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, membership diffing, ADDED/REMOVED lifecycle events. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000 for JPA adapter |
 
 ### Journey and Chapter sequencing rationale
 
@@ -415,6 +416,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | J4: Endpoint Registry | Named endpoint registry — tenant-scoped, multi-protocol connection config for workers and desired-state management | C17, C18 | ✅ C17–C18 complete |
 | J5: Stream Ingestion | CloudEvent-envelope transports — five classpath-activated stream adapters firing CDI events | C20 | ✅ Complete |
 | J6: Access Control | Flat-grant ACL SPI — resource-level `canAccess` / `grant` / `revoke`, parent-resource hierarchy, JPA and in-memory adapters | C21 | ✅ Complete |
+| J7: Subject Views | Filtered views of any labeled subject — label-pattern matching, membership tracking, ADDED/REMOVED lifecycle events. Generalizes work-queues' QueueView pattern. | C22 | 🔲 In progress (#175) |
 
 ### §9.2 Chapter Index
 
@@ -487,6 +489,7 @@ flowchart LR
 | 19 | AgentSession Multi-turn + LangChain4j | J3 | L8 | ✅ |
 | 20 | Stream Ingestion | J5 | L10 | ✅ |
 | 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
+| 22 | Subject View Toolkit | J7 | L1, L2, L13 | 🔲 |
 
 **Layer × Chapter matrix**
 

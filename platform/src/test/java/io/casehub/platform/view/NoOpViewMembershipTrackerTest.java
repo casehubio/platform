@@ -3,6 +3,7 @@ package io.casehub.platform.view;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,5 +25,11 @@ class NoOpViewMembershipTrackerTest {
     @Test
     void removeMembershipDoesNotThrow() {
         tracker.removeMembership(UUID.randomUUID());
+    }
+
+    @Test
+    void bulkGetReturnsEmpty() {
+        assertThat(tracker.getLastKnownMembership(
+                Set.of(UUID.randomUUID(), UUID.randomUUID()))).isEmpty();
     }
 }

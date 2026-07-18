@@ -5,6 +5,7 @@ import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @DefaultBean
@@ -15,6 +16,12 @@ public class NoOpViewMembershipTracker implements ViewMembershipTracker {
     public Map<UUID, String> getLastKnownMembership(UUID subjectId) {
         return Map.of();
     }
+
+    @Override
+    public Map<UUID, Map<UUID, String>> getLastKnownMembership(Set<UUID> subjectIds) {
+        return Map.of();
+    }
+
 
     @Override
     public void updateMembership(UUID subjectId, Map<UUID, String> viewIdToName) {

@@ -13,9 +13,8 @@ class NoOpSubjectViewStoreTest {
 
     @Test
     void saveReturnsInput() {
-        var spec = new SubjectViewSpec(UUID.randomUUID(), "v", "t", "a/**", null, null, null, null);
-        assertThat(store.save(spec)).isSameAs(spec);
-    }
+        var spec = new SubjectViewSpec(UUID.randomUUID(), "v", "t", "a/**", null, null, null, null, null);
+        assertThat(store.save(spec)).isSameAs(spec);}
 
     @Test
     void findByIdReturnsEmpty() {

@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -19,26 +20,41 @@ public class JpaViewMembershipTracker implements ViewMembershipTracker {
     @Override
     public Map<UUID, String> getLastKnownMembership(UUID subjectId) {
         return em.createQuery(
-                "SELECT e FROM ViewMembershipEntity e WHERE e.subjectId = :sid",
-                ViewMembershipEntity.class)
-            .setParameter("sid", subjectId)
-            .getResultList()
-            .stream()
-            .collect(Collectors.toMap(e -> e.viewId, e -> e.viewName));
+                         "SELECT e FROM ViewMembershipEntity e WHERE e.subjectId = :sid",
+                         ViewMembershipEntity.class)
+                 .setParameter("sid", subjectId)
+                 .getResultList()
+                 .stream()
+                 .collect(Collectors.toMap(e -> e.viewId, e -> e.viewName));
     }
+
+    @Override
+    public Map<UUID, Map<UUID, String>> getLastKnownMembership(Set<UUID> subjectIds) {
+        if (subjectIds.isEmpty()) {return Map.of();}
+        return em.createQuery(
+                         "SELECT e FROM ViewMembershipEntity e WHERE e.subjectId IN :sids",
+                         ViewMembershipEntity.class)
+                 .setParameter("sids", subjectIds)
+                 .getResultList()
+                 .stream()
+                 .collect(Collectors.groupingBy(
+                         e -> e.subjectId,
+                         Collectors.toMap(e -> e.viewId, e -> e.viewName)));
+    }
+
 
     @Override
     @Transactional
     public void updateMembership(UUID subjectId, Map<UUID, String> viewIdToName) {
         em.createQuery("DELETE FROM ViewMembershipEntity e WHERE e.subjectId = :sid")
-            .setParameter("sid", subjectId)
-            .executeUpdate();
+          .setParameter("sid", subjectId)
+          .executeUpdate();
 
         viewIdToName.forEach((viewId, viewName) -> {
             var entity = new ViewMembershipEntity();
             entity.subjectId = subjectId;
-            entity.viewId = viewId;
-            entity.viewName = viewName;
+            entity.viewId    = viewId;
+            entity.viewName  = viewName;
             em.persist(entity);
         });
     }
@@ -47,7 +63,7 @@ public class JpaViewMembershipTracker implements ViewMembershipTracker {
     @Transactional
     public void removeMembership(UUID subjectId) {
         em.createQuery("DELETE FROM ViewMembershipEntity e WHERE e.subjectId = :sid")
-            .setParameter("sid", subjectId)
-            .executeUpdate();
+          .setParameter("sid", subjectId)
+          .executeUpdate();
     }
 }

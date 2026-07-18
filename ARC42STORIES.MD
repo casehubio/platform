@@ -148,7 +148,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
 | L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
 | L12: Digest Buffer Adapters | `digest-inmem/`, `digest-jpa/` | `DigestBuffer` SPI implementations — volatile in-memory or persistent JPA; mutually exclusive per CDI priority tier |
-| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, membership diffing, ADDED/REMOVED lifecycle events. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000 for JPA adapter |
+| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
 
 ### Journey and Chapter sequencing rationale
 

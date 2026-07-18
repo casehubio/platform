@@ -51,6 +51,9 @@
         <module>digest-jpa</module>
         <module>delivery-tracking-inmem</module>
         <module>delivery-tracking-jpa</module>
+        <module>platform-view</module>
+        <module>platform-view-inmem</module>
+        <module>platform-view-jpa</module>
     </modules>
 
     <properties>

@@ -152,4 +152,51 @@ class SubjectViewEvaluatorTest {
                 UUID.randomUUID(), "t1", Map.of(), Map.of());
         assertThat(events).isEmpty();
     }
+
+    @Test
+    void evaluateMembership_scopeFiltersIncompatibleViews() {
+        var euView = new SubjectViewSpec(UUID.randomUUID(), "eu-iot", "t1",
+                                         "iot/**", Path.of("eu"), null, null, null, null);
+        var usView = new SubjectViewSpec(UUID.randomUUID(), "us-iot", "t1",
+                                         "iot/**", Path.of("us"), null, null, null, null);
+
+        var result = evaluator.evaluateMembership(
+                Set.of("iot/triage/hvac"), List.of(euView, usView), Path.of("eu", "germany"));
+
+        assertThat(result).containsKey(euView.id());
+        assertThat(result).doesNotContainKey(usView.id());
+    }
+
+    @Test
+    void evaluateMembership_nullScopeViewMatchesAll() {
+        var globalView = new SubjectViewSpec(UUID.randomUUID(), "global", "t1",
+                                             "iot/**", null, null, null, null, null);
+
+        var result = evaluator.evaluateMembership(
+                Set.of("iot/triage/hvac"), List.of(globalView), Path.of("eu", "germany"));
+
+        assertThat(result).containsKey(globalView.id());
+    }
+
+    @Test
+    void evaluateMembership_exactScopeMatchIncludes() {
+        var view = new SubjectViewSpec(UUID.randomUUID(), "de-iot", "t1",
+                                       "iot/**", Path.of("eu", "germany"), null, null, null, null);
+
+        var result = evaluator.evaluateMembership(
+                Set.of("iot/triage/hvac"), List.of(view), Path.of("eu", "germany"));
+
+        assertThat(result).containsKey(view.id());
+    }
+
+    @Test
+    void evaluateMembership_nullSubjectScopeSkipsFiltering() {
+        var scopedView = new SubjectViewSpec(UUID.randomUUID(), "eu-iot", "t1",
+                                             "iot/**", Path.of("eu"), null, null, null, null);
+
+        var result = evaluator.evaluateMembership(
+                Set.of("iot/triage/hvac"), List.of(scopedView), null);
+
+        assertThat(result).containsKey(scopedView.id());
+    }
 }

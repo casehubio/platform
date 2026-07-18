@@ -1,5 +1,6 @@
 package io.casehub.platform.view;
 
+import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.view.LabelPatternMatcher;
 import io.casehub.platform.api.view.SubjectViewEvent;
 import io.casehub.platform.api.view.SubjectViewSpec;
@@ -20,10 +21,26 @@ public class SubjectViewEvaluator {
             Set<String> subjectLabelPaths,
             List<SubjectViewSpec> views) {
         return views.stream()
-            .filter(v -> subjectLabelPaths.stream()
-                .anyMatch(p -> LabelPatternMatcher.matches(v.labelPattern(), p)))
-            .collect(Collectors.toMap(SubjectViewSpec::id, SubjectViewSpec::name));
+                    .filter(v -> subjectLabelPaths.stream()
+                                                  .anyMatch(p -> LabelPatternMatcher.matches(v.labelPattern(), p)))
+                    .collect(Collectors.toMap(SubjectViewSpec::id, SubjectViewSpec::name));
     }
+
+    public Map<UUID, String> evaluateMembership(
+            Set<String> subjectLabelPaths,
+            List<SubjectViewSpec> views,
+            Path subjectScope) {
+        if (subjectScope == null) {
+            return evaluateMembership(subjectLabelPaths, views);
+        }
+        var filtered = views.stream()
+                            .filter(v -> v.scope() == null
+                                         || v.scope().equals(subjectScope)
+                                         || v.scope().isAncestorOf(subjectScope))
+                            .toList();
+        return evaluateMembership(subjectLabelPaths, filtered);
+    }
+
 
     public List<SubjectViewEvent> computeEvents(
             UUID subjectId,

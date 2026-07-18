@@ -6,7 +6,10 @@ import io.casehub.platform.api.view.SubjectViewSpec;
 import io.casehub.platform.api.view.ViewEventType;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,7 +19,7 @@ class SubjectViewEvaluatorTest {
 
     private SubjectViewSpec view(String name, String pattern) {
         return new SubjectViewSpec(UUID.randomUUID(), name, "t1", pattern,
-            Path.root(), null, null, null);
+                                   Path.root(), null, null, null, null);
     }
 
     @Test

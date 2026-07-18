@@ -36,6 +36,9 @@ public class SubjectViewEntity extends PanacheEntityBase {
 
     @Column(name = "sort_direction", length = 4)
     public String sortDirection;
+    @Column(name = "additional_conditions", columnDefinition = "TEXT")
+    public String additionalConditions;
+
 
     @Column(name = "created_at", nullable = false)
     public Instant createdAt;
@@ -54,17 +57,21 @@ public class SubjectViewEntity extends PanacheEntityBase {
             parsedScope = Path.root();
         }
         return new SubjectViewSpec(id, name, tenancyId, labelPattern,
-                                   parsedScope, sortField, sortDirection, createdAt);}
+                                   parsedScope, sortField, sortDirection,
+                                   additionalConditions, createdAt);
+    }
 
     public static SubjectViewEntity fromSpec(SubjectViewSpec spec) {
         var entity = new SubjectViewEntity();
-        entity.id            = spec.id();
-        entity.name          = spec.name();
-        entity.tenancyId     = spec.tenancyId();
-        entity.labelPattern  = spec.labelPattern();
-        entity.scope         = spec.scope() != null ? spec.scope().value() : null;
-        entity.sortField     = spec.sortField();
-        entity.sortDirection = spec.sortDirection();
-        entity.createdAt     = spec.createdAt();
-        return entity;}
+        entity.id                   = spec.id();
+        entity.name                 = spec.name();
+        entity.tenancyId            = spec.tenancyId();
+        entity.labelPattern         = spec.labelPattern();
+        entity.scope                = spec.scope() != null ? spec.scope().value() : null;
+        entity.sortField            = spec.sortField();
+        entity.sortDirection        = spec.sortDirection();
+        entity.additionalConditions = spec.additionalConditions();
+        entity.createdAt            = spec.createdAt();
+        return entity;
+    }
 }

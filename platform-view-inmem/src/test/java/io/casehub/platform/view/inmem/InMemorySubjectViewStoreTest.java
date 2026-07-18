@@ -14,7 +14,7 @@ class InMemorySubjectViewStoreTest {
 
     private SubjectViewSpec spec(String name, String pattern) {
         return new SubjectViewSpec(null, name, "t1", pattern,
-            Path.root(), null, null, null);
+                                   Path.root(), null, null, null, null);
     }
 
     @Test
@@ -27,9 +27,8 @@ class InMemorySubjectViewStoreTest {
     void savePreservesExistingId() {
         var id = UUID.randomUUID();
         var input = new SubjectViewSpec(id, "v", "t1", "iot/**",
-            null, null, null, null);
-        assertThat(store.save(input).id()).isEqualTo(id);
-    }
+                                        null, null, null, null, null);
+        assertThat(store.save(input).id()).isEqualTo(id);}
 
     @Test
     void findByIdAfterSave() {
@@ -48,11 +47,10 @@ class InMemorySubjectViewStoreTest {
         store.save(spec("v1", "a/**"));
         store.save(spec("v2", "b/**"));
         store.save(new SubjectViewSpec(null, "v3", "other-tenant",
-            "c/**", null, null, null, null));
+                                       "c/**", null, null, null, null, null));
 
         assertThat(store.findByTenancy("t1")).hasSize(2);
-        assertThat(store.findByTenancy("other-tenant")).hasSize(1);
-    }
+        assertThat(store.findByTenancy("other-tenant")).hasSize(1);}
 
     @Test
     void delete() {
@@ -70,14 +68,21 @@ class InMemorySubjectViewStoreTest {
     void saveUpdatesExisting() {
         var saved = store.save(spec("v1", "a/**"));
         store.save(new SubjectViewSpec(saved.id(), "v1-updated",
-            "t1", "b/**", null, null, null, null));
+                                       "t1", "b/**", null, null, null, null, null));
         assertThat(store.findById(saved.id())).isPresent()
-            .get().extracting("labelPattern").isEqualTo("b/**");
-    }
+                                              .get().extracting("labelPattern").isEqualTo("b/**");}
 
     @Test
     void saveAssignsCreatedAt() {
         var saved = store.save(spec("v", "iot/**"));
         assertThat(saved.createdAt()).isNotNull();
+    }
+
+    @Test
+    void savePreservesAdditionalConditions() {
+        var input = new SubjectViewSpec(null, "v", "t1", "iot/**",
+                                        null, null, null, "status == 'OPEN'", null);
+        var saved = store.save(input);
+        assertThat(saved.additionalConditions()).isEqualTo("status == 'OPEN'");
     }
 }

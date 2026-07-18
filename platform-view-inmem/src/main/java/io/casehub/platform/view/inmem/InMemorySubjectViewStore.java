@@ -21,11 +21,11 @@ public class InMemorySubjectViewStore implements SubjectViewStore {
 
     @Override
     public SubjectViewSpec save(SubjectViewSpec spec) {
-        UUID id = spec.id() != null ? spec.id() : UUID.randomUUID();
+        UUID    id        = spec.id() != null ? spec.id() : UUID.randomUUID();
         Instant createdAt = spec.createdAt() != null ? spec.createdAt() : Instant.now();
         var persisted = new SubjectViewSpec(id, spec.name(), spec.tenancyId(),
-            spec.labelPattern(), spec.scope(), spec.sortField(),
-            spec.sortDirection(), createdAt);
+                                            spec.labelPattern(), spec.scope(), spec.sortField(),
+                                            spec.sortDirection(), spec.additionalConditions(), createdAt);
         store.put(id, persisted);
         return persisted;
     }

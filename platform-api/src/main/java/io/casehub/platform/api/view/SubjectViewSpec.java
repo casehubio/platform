@@ -7,14 +7,15 @@ import java.util.Objects;
 import java.util.UUID;
 
 public record SubjectViewSpec(
-    UUID id,
-    String name,
-    String tenancyId,
-    String labelPattern,
-    Path scope,
-    String sortField,
-    String sortDirection,
-    Instant createdAt
+        UUID id,
+        String name,
+        String tenancyId,
+        String labelPattern,
+        Path scope,
+        String sortField,
+        String sortDirection,
+        String additionalConditions,
+        Instant createdAt
 ) {
     public SubjectViewSpec {
         Objects.requireNonNull(name, "name must not be null");

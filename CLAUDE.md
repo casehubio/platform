@@ -109,7 +109,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `testing/` | `casehub-platform-testing` | @Alternative identity fixtures — no Quarkus runtime. FixedCurrentPrincipal @Priority(200) beats OidcCurrentPrincipal in tests; InMemoryGroupMembershipProvider @Priority(1) |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
-| `expression/` | `casehub-platform-expression` | Pluggable expression engines — DefaultExpressionEngineRegistry (@ApplicationScoped, CDI-discovers ExpressionEngine beans), MvelExpressionEngine (MVEL3 transpiler, lazy compilation, ConcurrentHashMap cache), JQExpressionEngine (jackson-jq wrapper, Boolean and List result types). Also retains JQEvaluator for backward-compat scope injection ($secret, $config). MVEL3 dep: `org.mvel:mvel3:3.0.0-SNAPSHOT` (JBoss Nexus snapshots) |
+| `expression/` | `casehub-platform-expression` | Pluggable expression engines — DefaultExpressionEngineRegistry (@ApplicationScoped, CDI-discovers ExpressionEngine beans), MvelExpressionEngine (MVEL3 transpiler, lazy compilation, ConcurrentHashMap cache), JQExpressionEngine (jackson-jq wrapper, Boolean and List result types, MapAdaptedJQExpression for Map<String,Object> context — converts via ObjectMapper.valueToTree before delegating to JsonNode-based evaluation). Also retains JQEvaluator for backward-compat scope injection ($secret, $config). MVEL3 dep: `org.mvel:mvel3:3.0.0-SNAPSHOT` (JBoss Nexus snapshots) |
 | `persistence-jpa/` | `casehub-platform-persistence-jpa` | JPA-backed PreferenceProvider — scope-aware, hierarchy-resolved, current-only. Add as compile dep; consumers must add `classpath:db/platform/migration` to Flyway locations |
 | `persistence-mongodb/` | `casehub-platform-persistence-mongodb` | MongoDB-backed PreferenceProvider — @Alternative @Priority(1), beats JPA when co-deployed. No Flyway; startup bean creates scope index |
 | `memory-inmem/` | `casehub-platform-memory-inmem` | @Alternative @Priority(10) volatile CaseMemoryStore — ConcurrentHashMap, constructor-injected CurrentPrincipal, no quarkus:build goal. Add as test scope for @QuarkusTest isolation; compile for ephemeral installs. Do NOT combine with memory-jpa or memory-sqlite in the same scope |
@@ -275,6 +275,9 @@ io.casehub.platform.api
                    DigestSummary (record: userId, tenancyId, channelId, notifications, periodStart, periodEnd)
   .credentials   — CredentialResolver (SPI: resolve(credentialRef) → Map<String, String>),
                    CredentialPropertyKeys (reserved keys: USER, PASSWORD, BEARER_TOKEN, API_KEY, EXPIRES_AT)
+  .label          — LabelAction (sealed: Add | Remove — condition-driven label mutations),
+                   LabelRule (record: name, CompiledExpression<Map<String,Object>,Boolean> condition, List<LabelAction> actions;
+                   static evaluate(rules, context) → List<LabelAction>)
   .util           — UUIDv7 (utility: time-ordered UUID per RFC 9562 §5.7, monotonic within same millisecond)
   .view           — LabelPatternMatcher (static: matches(pattern, path) — exact, /*, /**),
                    SubjectViewSpec (record: id, name, tenancyId, labelPattern, scope, sortField, sortDirection, createdAt),

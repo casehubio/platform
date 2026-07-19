@@ -1,6 +1,7 @@
 package io.casehub.platform.expression;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.expression.CompiledExpression;
 import io.casehub.platform.api.expression.ExpressionCompilationException;
 import io.casehub.platform.api.expression.ExpressionEngine;
@@ -21,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JQExpressionEngine implements ExpressionEngine {
 
     private final Scope                                                 rootScope;
+    private static final ObjectMapper                                   MAPPER = new ObjectMapper();
+
     private final ConcurrentHashMap<String, JsonQuery>                  queryCache      = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<CacheKey, CompiledExpression<?, ?>> expressionCache = new ConcurrentHashMap<>();
 
@@ -45,13 +48,17 @@ public class JQExpressionEngine implements ExpressionEngine {
             Map<String, Object> variables) {
         Objects.requireNonNull(expression, "expression");
 
-        var key = new CacheKey(expression, resultType);
+        var key = new CacheKey(expression, contextType, resultType);
         return (CompiledExpression<C, R>) expressionCache.computeIfAbsent(key, k -> {
             JsonQuery query = compileQuery(expression);
-            if (resultType == Boolean.class) {
-                return new BooleanJQExpression(query, rootScope);
+            CompiledExpression<JsonNode, ?> jqExpr = (resultType == Boolean.class)
+                                                     ? new BooleanJQExpression(query, rootScope)
+                                                     : new ListJQExpression(query, rootScope);
+
+            if (contextType == JsonNode.class) {
+                return jqExpr;
             }
-            return new ListJQExpression(query, rootScope);
+            return new MapAdaptedJQExpression<>(jqExpr, MAPPER);
         });
     }
 
@@ -115,5 +122,20 @@ public class JQExpressionEngine implements ExpressionEngine {
         }
     }
 
-    private record CacheKey(String expression, Class<?> resultType) {}
+
+    private record MapAdaptedJQExpression<R>(
+            CompiledExpression<JsonNode, R> delegate,
+            ObjectMapper mapper)
+            implements CompiledExpression<Map<String, Object>, R> {
+
+        @Override
+        public String type() {return "jq";}
+
+        @Override
+        public R eval(Map<String, Object> context) {
+            return delegate.eval(mapper.valueToTree(context));
+        }
+    }
+
+    private record CacheKey(String expression, Class<?> contextType, Class<?> resultType) {}
 }

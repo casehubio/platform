@@ -46,9 +46,13 @@ public class JpaViewMembershipTracker implements ViewMembershipTracker {
     @Override
     @Transactional
     public void updateMembership(UUID subjectId, Map<UUID, String> viewIdToName) {
-        em.createQuery("DELETE FROM ViewMembershipEntity e WHERE e.subjectId = :sid")
+        em.createQuery(
+                  "SELECT e FROM ViewMembershipEntity e WHERE e.subjectId = :sid",
+                  ViewMembershipEntity.class)
           .setParameter("sid", subjectId)
-          .executeUpdate();
+          .getResultList()
+          .forEach(em::remove);
+        em.flush();
 
         viewIdToName.forEach((viewId, viewName) -> {
             var entity = new ViewMembershipEntity();

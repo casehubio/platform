@@ -74,4 +74,17 @@ class JpaViewMembershipTrackerTest {
     void bulkGetEmptySetReturnsEmpty() {
         assertThat(tracker.getLastKnownMembership(Set.of())).isEmpty();
     }
+
+    @Test
+    void updateTwiceSameViewWithinTransaction() {
+        var subjectId = UUID.randomUUID();
+        var viewId    = UUID.randomUUID();
+        tracker.updateMembership(subjectId, Map.of(viewId, "first"));
+        tracker.updateMembership(subjectId, Map.of(viewId, "second"));
+
+        var result = tracker.getLastKnownMembership(subjectId);
+        assertThat(result).hasSize(1);
+        assertThat(result).containsEntry(viewId, "second");
+    }
+
 }

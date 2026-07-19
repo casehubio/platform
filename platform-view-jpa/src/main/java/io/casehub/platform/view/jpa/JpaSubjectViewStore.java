@@ -50,10 +50,12 @@ public class JpaSubjectViewStore implements SubjectViewStore {
 
     @Override
     @Transactional
-    public void delete(UUID id) {
+    public boolean delete(UUID id) {
         SubjectViewEntity entity = em.find(SubjectViewEntity.class, id);
         if (entity != null) {
             em.remove(entity);
+            return true;
         }
+        return false;
     }
 }

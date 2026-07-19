@@ -43,7 +43,7 @@ public class InMemorySubjectViewStore implements SubjectViewStore {
     }
 
     @Override
-    public void delete(UUID id) {
-        store.remove(id);
+    public boolean delete(UUID id) {
+        return store.remove(id) != null;
     }
 }

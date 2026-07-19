@@ -29,6 +29,7 @@ public class NoOpSubjectViewStore implements SubjectViewStore {
     }
 
     @Override
-    public void delete(UUID id) {
+    public boolean delete(UUID id) {
+        return false;
     }
 }

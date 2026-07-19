@@ -98,10 +98,11 @@ public class SubjectViewOrchestrator {
         return saved;
     }
 
-    public void deleteView(UUID viewId) {
-        var spec = viewStore.findById(viewId);
-        viewStore.delete(viewId);
+    public boolean deleteView(UUID viewId) {
+        var     spec    = viewStore.findById(viewId);
+        boolean deleted = viewStore.delete(viewId);
         spec.ifPresent(s -> invalidateViewCache(s.tenancyId()));
+        return deleted;
     }
 
     private List<SubjectViewSpec> getViews(String tenancyId) {

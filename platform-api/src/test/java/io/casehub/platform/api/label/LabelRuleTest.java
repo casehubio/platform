@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -156,5 +157,83 @@ class LabelRuleTest {
         var rule3 = new LabelRule("r3", ALWAYS_TRUE, List.of(new LabelAction.Add("c")));
         var actions = LabelRule.evaluate(List.of(rule1, rule2, rule3), EMPTY_CONTEXT);
         assertThat(actions).extracting(LabelAction::label).containsExactly("a", "b", "c");
+    }
+
+// --- triggerEvents ---
+
+    @Test
+    void constructor_3arg_defaultsTriggerEventsToEmpty() {
+        var rule = new LabelRule("r1", ALWAYS_TRUE, List.of());
+        assertThat(rule.triggerEvents()).isEmpty();
+    }
+
+    @Test
+    void constructor_4arg_copiesTriggerEvents() {
+        var mutableSet = new java.util.HashSet<>(Set.of("ADD", "UPDATE"));
+        var rule       = new LabelRule("r1", ALWAYS_TRUE, List.of(), mutableSet);
+        mutableSet.add("REMOVE");
+        assertThat(rule.triggerEvents()).containsExactlyInAnyOrder("ADD", "UPDATE");
+    }
+
+    @Test
+    void constructor_nullTriggerEvents_defaultsToEmpty() {
+        var rule = new LabelRule("r1", ALWAYS_TRUE, List.of(), null);
+        assertThat(rule.triggerEvents()).isEmpty();
+    }
+
+    @Test
+    void constructor_triggerEventsImmutable() {
+        var rule = new LabelRule("r1", ALWAYS_TRUE, List.of(), Set.of("ADD"));
+        assertThatThrownBy(() -> rule.triggerEvents().add("REMOVE"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+// --- evaluate(rules, context, event) ---
+
+    @Test
+    void evaluateWithEvent_matchingEvent_actionsReturned() {
+        var rule = new LabelRule("r1", ALWAYS_TRUE,
+                                 List.of(new LabelAction.Add("a")), Set.of("ADD"));
+        var actions = LabelRule.evaluate(List.of(rule), EMPTY_CONTEXT, "ADD");
+        assertThat(actions).containsExactly(new LabelAction.Add("a"));
+    }
+
+    @Test
+    void evaluateWithEvent_nonMatchingEvent_skipped() {
+        var rule = new LabelRule("r1", ALWAYS_TRUE,
+                                 List.of(new LabelAction.Add("a")), Set.of("ADD"));
+        var actions = LabelRule.evaluate(List.of(rule), EMPTY_CONTEXT, "REMOVE");
+        assertThat(actions).isEmpty();
+    }
+
+    @Test
+    void evaluateWithEvent_emptyTriggerEvents_matchesAllEvents() {
+        var rule    = new LabelRule("r1", ALWAYS_TRUE, List.of(new LabelAction.Add("a")));
+        var actions = LabelRule.evaluate(List.of(rule), EMPTY_CONTEXT, "REMOVE");
+        assertThat(actions).containsExactly(new LabelAction.Add("a"));
+    }
+
+    @Test
+    void evaluateWithEvent_mixedRules_onlyMatchingEventAndCondition() {
+        var ruleAddOnly = new LabelRule("r1", ALWAYS_TRUE,
+                                        List.of(new LabelAction.Add("a")), Set.of("ADD"));
+        var ruleAllEvents = new LabelRule("r2", ALWAYS_TRUE,
+                                          List.of(new LabelAction.Add("b")));
+        var ruleRemoveOnly = new LabelRule("r3", ALWAYS_TRUE,
+                                           List.of(new LabelAction.Add("c")), Set.of("REMOVE"));
+
+        var actions = LabelRule.evaluate(
+                List.of(ruleAddOnly, ruleAllEvents, ruleRemoveOnly), EMPTY_CONTEXT, "ADD");
+        assertThat(actions).containsExactly(
+                new LabelAction.Add("a"),
+                new LabelAction.Add("b"));
+    }
+
+    @Test
+    void evaluateWithEvent_conditionFalse_notReturned() {
+        var rule = new LabelRule("r1", ALWAYS_FALSE,
+                                 List.of(new LabelAction.Add("a")), Set.of("ADD"));
+        var actions = LabelRule.evaluate(List.of(rule), EMPTY_CONTEXT, "ADD");
+        assertThat(actions).isEmpty();
     }
 }

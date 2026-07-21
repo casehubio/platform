@@ -105,7 +105,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | Module | Artifact | Purpose |
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
-| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `BlockingToReactiveBridge` + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) |
+| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `BlockingToReactiveBridge` + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) + `CloudEventTypeDispatcher @ApplicationScoped` (re-fires CloudEvents with `@CloudEventType` qualifier for type-specific CDI observers) |
 | `testing/` | `casehub-platform-testing` | @Alternative identity fixtures — no Quarkus runtime. FixedCurrentPrincipal @Priority(200) beats OidcCurrentPrincipal in tests; InMemoryGroupMembershipProvider @Priority(1) |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
@@ -253,9 +253,11 @@ io.casehub.platform.api
                    MuteRule (record: id, userId, tenancyId, scope, scopeId, entityType, createdAt, expiresAt),
                    MuteScope (enum: ENTITY/CATEGORY), MuteRuleInput, Snooze (record: userId, tenancyId, until, createdAt),
                    SnoozeInput, SuppressionResult (record: isMuted, isSnoozed, quietHoursActive)
+  .event         — CloudEventType (CDI @Qualifier: type-based CloudEvent observer filtering)
   .delivery      — DeliveryChannelRegistry (SPI: register descriptor+deliverer/resolve/discover),
+                   DestinationResolver (SPI: resolve userId → channel-specific destination address),
                    DeliveryChannelDescriptor (record: channelId, displayName, external, defaultEnabled, defaultMinSeverity, defaultDigestSchedule, guaranteedMinSeverity),
-                   DeliveryChannels (constants: IN_APP, EMAIL, SMS, PUSH),
+                   DeliveryChannels (constants: IN_APP, EMAIL, SMS, PUSH, WHATSAPP),
                    NotificationDeliverer (SPI: channelId + deliver → DeliveryResult + default deliverDigest(DigestSummary)),
                    DeliveryResult (record: success, failureReason),
                    DeliveryType (enum: IMMEDIATE/DIGEST), DeliveryStatus (enum: DELIVERED/FAILED/RETRYING/EXPIRED),

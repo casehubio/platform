@@ -31,36 +31,12 @@ import java.util.Map;
 @ApplicationScoped
 public class JpaPreferenceProvider implements PreferenceProvider {
 
-    @Override
-    @Transactional(TxType.SUPPORTS)
-    public Preferences resolve(final SettingsScope scope) {
-        final List<String> ancestors = ancestors(scope.scope());
-        final List<PreferenceEntry> rows = PreferenceEntry.findByScopes(ancestors);
-
-        // Build index map for O(1) scope priority lookup; shortest scope = lowest priority
-        final Map<String, Integer> scopeOrder = new HashMap<>();
-        for (int i = 0; i < ancestors.size(); i++) {
-            scopeOrder.put(ancestors.get(i), i);
-        }
-        rows.sort((a, b) -> Integer.compare(
-                scopeOrder.getOrDefault(a.scope, -1),
-                scopeOrder.getOrDefault(b.scope, -1)));
-
-        final Map<String, Object> merged = new HashMap<>();
-        for (final PreferenceEntry row : rows) {
-            final String mapKey = row.subKey.isEmpty()
-                    ? row.namespace + "." + row.name
-                    : row.namespace + "." + row.name + "." + row.subKey;
-            merged.put(mapKey, row.value);
-        }
-
-        return new MapPreferences(merged);
-    }
-
-    /** Returns ancestor scope strings shortest-first (root first), ending with the target scope. */
+    /**
+     * Returns ancestor scope strings shortest-first (root first), ending with the target scope.
+     */
     private static List<String> ancestors(final Path path) {
-        final List<String> result = new ArrayList<>();
-        Path current = path;
+        final List<String> result  = new ArrayList<>();
+        Path               current = path;
         while (current != null) {
             result.add(0, current.value());
             current = current.parent();
@@ -72,5 +48,30 @@ public class JpaPreferenceProvider implements PreferenceProvider {
             result.add(0, Path.root().value());
         }
         return result;
+    }
+
+    @Override
+    @Transactional(TxType.SUPPORTS)
+    public Preferences resolve(final SettingsScope scope) {
+        final List<String>          ancestors = ancestors(scope.scope());
+        final List<PreferenceEntry> rows      = PreferenceEntry.findByScopes(scope.tenancyId(), ancestors);
+
+        final Map<String, Integer> scopeOrder = new HashMap<>();
+        for (int i = 0; i < ancestors.size(); i++) {
+            scopeOrder.put(ancestors.get(i), i);
+        }
+        rows.sort((a, b) -> Integer.compare(
+                scopeOrder.getOrDefault(a.scope, -1),
+                scopeOrder.getOrDefault(b.scope, -1)));
+
+        final Map<String, Object> merged = new HashMap<>();
+        for (final PreferenceEntry row : rows) {
+            final String mapKey = row.subKey.isEmpty()
+                                  ? row.namespace + "." + row.name
+                                  : row.namespace + "." + row.name + "." + row.subKey;
+            merged.put(mapKey, row.value);
+        }
+
+        return new MapPreferences(merged);
     }
 }

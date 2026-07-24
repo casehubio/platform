@@ -5,7 +5,8 @@ import io.restassured.http.ContentType;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.is;
 
 @QuarkusTest
 class PreferenceResourceTest {
@@ -139,4 +140,37 @@ class PreferenceResourceTest {
             .body("size()", is(1))
             .body("[0].value", is("second"));
     }
+
+    @Test
+    void list_without_scope_returns_all_records_across_scopes() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"namespace": "bulk-all", "name": "root-pref", "subKey": "", "value": "r"}
+                      """)
+                .queryParam("scope", "")
+                .when()
+                .put("/preferences")
+                .then()
+                .statusCode(204);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"namespace": "bulk-all", "name": "child-pref", "subKey": "", "value": "c"}
+                      """)
+                .queryParam("scope", "casehubio/alltest")
+                .when()
+                .put("/preferences")
+                .then()
+                .statusCode(204);
+
+        given()
+                .when()
+                .get("/preferences")
+                .then()
+                .statusCode(200)
+                .body("findAll { it.namespace == 'bulk-all' }.size()", greaterThanOrEqualTo(2));
+    }
+
 }

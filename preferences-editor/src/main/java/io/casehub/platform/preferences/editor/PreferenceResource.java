@@ -63,9 +63,8 @@ public class PreferenceResource {
 
     @GET
     public List<PreferenceRecord> list(@QueryParam("scope") String scopeParam) {
-        Path scope = parseScopePath(scopeParam);
-        return store.list(new PreferenceQuery(principal.tenancyId(), scope, null));
-    }
+        Path scope = (scopeParam == null || scopeParam.isBlank()) ? null : parseScopePath(scopeParam);
+        return store.list(new PreferenceQuery(principal.tenancyId(), scope, null));}
 
     @GET
     @jakarta.ws.rs.Path("/resolved")

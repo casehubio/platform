@@ -24,12 +24,18 @@ class MongoPreferenceProviderTest {
     record Count(int value) implements SingleValuePreference {
         static final PreferenceKey<Count> KEY = new PreferenceKey<>(
                 "test", "count", new Count(0), s -> new Count(Integer.parseInt(s)));
+
+        @Override
+        public String toSerializedValue() {return String.valueOf(value);}
     }
 
     record Threshold(String role, int value) implements MultiValuePreference {
         static final PreferenceKey<Threshold> KEY = new PreferenceKey<>(
                 "test", "threshold", new Threshold("default", 0),
                 s -> new Threshold("parsed", Integer.parseInt(s)));
+
+        @Override
+        public String toSerializedValue() {return String.valueOf(value);}
     }
 
     @BeforeEach

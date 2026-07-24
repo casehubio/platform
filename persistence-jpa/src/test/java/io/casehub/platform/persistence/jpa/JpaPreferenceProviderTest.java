@@ -20,10 +20,12 @@ class JpaPreferenceProviderTest {
 
     @Inject PreferenceProvider preferenceProvider;
 
-    // Minimal test preference type
     record Count(int value) implements SingleValuePreference {
         static final PreferenceKey<Count> KEY = new PreferenceKey<>(
                 "test", "count", new Count(0), s -> new Count(Integer.parseInt(s)));
+
+        @Override
+        public String toSerializedValue() {return String.valueOf(value);}
     }
 
     @BeforeEach

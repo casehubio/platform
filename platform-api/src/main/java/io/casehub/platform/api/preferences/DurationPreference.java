@@ -7,4 +7,9 @@ public record DurationPreference(Duration duration) implements MultiValuePrefere
     public DurationPreference {
         Objects.requireNonNull(duration, "duration must not be null");
     }
+
+    @Override
+    public String toSerializedValue() {
+        return duration.toString();
+    }
 }

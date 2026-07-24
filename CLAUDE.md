@@ -105,7 +105,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | Module | Artifact | Purpose |
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
-| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `NoOpPreferenceStore @DefaultBean` + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) + `CloudEventTypeDispatcher @ApplicationScoped` (re-fires CloudEvents with `@CloudEventType` qualifier for type-specific CDI observers) |
+| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `NoOpPreferenceStore @DefaultBean` + `NoOpPreferenceSchemaRegistry @DefaultBean` + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) + `CloudEventTypeDispatcher @ApplicationScoped` (re-fires CloudEvents with `@CloudEventType` qualifier for type-specific CDI observers) |
 | `testing/` | `casehub-platform-testing` | @Alternative identity fixtures — no Quarkus runtime. FixedCurrentPrincipal @Priority(200) beats OidcCurrentPrincipal in tests; InMemoryGroupMembershipProvider @Priority(1) |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
@@ -152,7 +152,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `streams-webhook/` | `casehub-platform-streams-webhook` | @Startup @ApplicationScoped JAX-RS receiver — POST /streams/webhook/{tenancyId}/{streamId}, structured CloudEvents HTTP binding (application/cloudevents+json), preserves incoming CloudEvent fields, enriches tenancyid from descriptor. Requires casehub.streams.webhook.public-url config. |
 | `streams-poll/` | `casehub-platform-streams-poll` | @Startup @ApplicationScoped @Scheduled HTTP GET poller — java.net.http.HttpClient field, explicit status code check (HttpClient.send() does not throw for 4xx/5xx), per-endpoint exception handling. |
 | `streams-camel/` | `casehub-platform-streams-camel` | @ApplicationScoped dynamic Camel route builder — @Observes StartupEvent discovers pre-startup CAMEL endpoints, @ObservesAsync EndpointRegistered for runtime additions (idempotent via routedUris set). P0: URI change requires restart. |
-| `preferences-editor/` | `casehub-platform-preferences-editor` | REST API (`@Path("/preferences")`) for writing preferences to any backend. Depends on `PreferenceStore` SPI (writes) and `PreferenceProvider` SPI (resolved view). Scope via `@QueryParam`, tenancyId from `CurrentPrincipal`. Separate DELETE endpoints for single-delete vs namespace-delete (accidental bulk prevention). No quarkus:build goal |
+| `preferences-editor/` | `casehub-platform-preferences-editor` | REST API (`@Path("/preferences")`) for writing preferences to any backend + `GET /preferences/schema` (read-only type metadata for UI editors). `InMemoryPreferenceSchemaRegistry @ApplicationScoped` (ConcurrentHashMap, displaces `NoOpPreferenceSchemaRegistry @DefaultBean`). Depends on `PreferenceStore` SPI (writes), `PreferenceProvider` SPI (resolved view), and `PreferenceSchemaRegistry` SPI (schema metadata). Scope via `@QueryParam`, tenancyId from `CurrentPrincipal`. Separate DELETE endpoints for single-delete vs namespace-delete (accidental bulk prevention). No quarkus:build goal |
 | `governance/` | `casehub-platform-governance` | `PolicyEnforcer @ApplicationScoped` — generic retry/timeout/backoff enforcement for blocking operations. `ExecutionPolicy(timeoutMs, RetryPolicy)` + `BackoffStrategy` (FIXED/EXPONENTIAL/EXPONENTIAL_WITH_JITTER) in platform-api. `DefaultPolicyEnforcer` shares a virtual-thread executor (`Executors.newVirtualThreadPerTaskExecutor()`) with `@PreDestroy` shutdown — do NOT create per-call executors. Must not be called from Vert.x event-loop threads; callers are responsible for worker-thread execution context. No Flyway. No quarkus:build goal. |
 
 ## Package Structure (platform-api)
@@ -189,12 +189,17 @@ io.casehub.platform.api
                    EventFieldDescriptor (record: name, displayName, type)
   .path          — Path, hierarchical scope/label paths
   .preferences   — PreferenceProvider, Preferences, PreferenceKey<T> (carries defaultValue + parser),
-                   SettingsScope (tenancyId, scope, effectiveAt), MapPreferences, Preference, SingleValuePreference, MultiValuePreference,
+                   SettingsScope (tenancyId, scope, effectiveAt), MapPreferences,
+                   Preference (interface: toSerializedValue()), SingleValuePreference, MultiValuePreference,
+                   IntPreference, DoublePreference, BooleanPreference, DurationPreference (typed preference records),
                    PreferenceStore (SPI: blocking set/delete/list/deleteAll — upsert by tenancyId+scope+namespace+name+subKey),
                    PreferenceRecord (record: tenancyId, scope, namespace, name, subKey, value),
                    PreferenceQuery (record: tenancyId, scope, namespace),
                    PreferencePermissions (static tenant assertion utility),
-                   PreferenceChanged (CDI event record: tenancyId, scope, namespace — fired async after writes)
+                   PreferenceChanged (CDI event record: tenancyId, scope, namespace — fired async after writes),
+                   PreferenceSchemaRegistry (SPI: register/resolve/discover preference key metadata),
+                   PreferenceSchemaDescriptor (record+builder: namespace, name, qualifiedName, type, label, description, defaultValue, multiValue, constraints, options — built from PreferenceKey with type inference),
+                   EnumOption (record: value, label), PreferenceConstraintKeys (constants: MIN, MAX, PATTERN, MIN_LENGTH, MAX_LENGTH)
   .identity      — CurrentPrincipal, GroupMembershipProvider, MissingTenancyException (thrown by tenancyId() when tenancy unresolvable), DIDMethod (CDI @Qualifier for DIDResolver method implementations),
                    ActorDIDProvider (SPI: didFor(actorId) → Optional<String>, default invalidate(actorId)),
                    ActorDIDSource (CDI @Qualifier for ActorDIDProvider source implementations),

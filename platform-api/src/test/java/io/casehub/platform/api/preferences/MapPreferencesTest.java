@@ -1,20 +1,32 @@
 package io.casehub.platform.api.preferences;
 
 import org.junit.jupiter.api.Test;
+
 import java.util.HashMap;
 import java.util.Map;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MapPreferencesTest {
 
     record TestSinglePref(String value) implements SingleValuePreference {
-        static final TestSinglePref DEFAULT = new TestSinglePref("default");
-        static final PreferenceKey<TestSinglePref> KEY = new PreferenceKey<>("test", "single", DEFAULT, TestSinglePref::new);
+        static final TestSinglePref                DEFAULT = new TestSinglePref("default");
+        static final PreferenceKey<TestSinglePref> KEY     = new PreferenceKey<>("test", "single", DEFAULT, TestSinglePref::new);
+
+        @Override
+        public String toSerializedValue() {return value;}
     }
 
     record TestMultiPref(String subKey, String value) implements MultiValuePreference {
-        static final TestMultiPref DEFAULT = new TestMultiPref("default", "default");
-        static final PreferenceKey<TestMultiPref> KEY = new PreferenceKey<>("test", "multi", DEFAULT, s -> new TestMultiPref("parsed", s));
+        static final TestMultiPref                DEFAULT = new TestMultiPref("default", "default");
+        static final PreferenceKey<TestMultiPref> KEY     = new PreferenceKey<>("test", "multi", DEFAULT, s -> new TestMultiPref("parsed", s));
+
+        @Override
+        public String toSerializedValue() {return value;}
     }
 
     @Test

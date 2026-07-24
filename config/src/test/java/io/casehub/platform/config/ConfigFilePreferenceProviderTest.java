@@ -11,7 +11,9 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 class ConfigFilePreferenceProviderTest {
@@ -20,23 +22,32 @@ class ConfigFilePreferenceProviderTest {
     PreferenceProvider provider;
 
     record Threshold(int value) implements SingleValuePreference {
-        static final Threshold DEFAULT = new Threshold(-1);
-        static final PreferenceKey<Threshold> KEY =
-            new PreferenceKey<>("devtown", "humanApprovalThreshold", DEFAULT,
-                s -> new Threshold(Integer.parseInt(s)));
+        static final Threshold                DEFAULT = new Threshold(-1);
+        static final PreferenceKey<Threshold> KEY     =
+                new PreferenceKey<>("devtown", "humanApprovalThreshold", DEFAULT,
+                                    s -> new Threshold(Integer.parseInt(s)));
+
+        @Override
+        public String toSerializedValue() {return String.valueOf(value);}
     }
 
     record SecReview(boolean value) implements SingleValuePreference {
-        static final SecReview DEFAULT = new SecReview(false);
-        static final PreferenceKey<SecReview> KEY =
-            new PreferenceKey<>("devtown", "securityReviewRequired", DEFAULT,
-                s -> new SecReview(Boolean.parseBoolean(s)));
+        static final SecReview                DEFAULT = new SecReview(false);
+        static final PreferenceKey<SecReview> KEY     =
+                new PreferenceKey<>("devtown", "securityReviewRequired", DEFAULT,
+                                    s -> new SecReview(Boolean.parseBoolean(s)));
+
+        @Override
+        public String toSerializedValue() {return String.valueOf(value);}
     }
 
     record BaseDefault(String value) implements SingleValuePreference {
-        static final BaseDefault DEFAULT = new BaseDefault("none");
-        static final PreferenceKey<BaseDefault> KEY =
-            new PreferenceKey<>("devtown", "baseDefault", DEFAULT, BaseDefault::new);
+        static final BaseDefault                DEFAULT = new BaseDefault("none");
+        static final PreferenceKey<BaseDefault> KEY     =
+                new PreferenceKey<>("devtown", "baseDefault", DEFAULT, BaseDefault::new);
+
+        @Override
+        public String toSerializedValue() {return value;}
     }
 
     @Test

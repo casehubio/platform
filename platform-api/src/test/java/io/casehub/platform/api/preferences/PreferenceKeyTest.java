@@ -1,12 +1,19 @@
 package io.casehub.platform.api.preferences;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PreferenceKeyTest {
 
     record TestPref(String value) implements SingleValuePreference {
         static final TestPref DEFAULT = new TestPref("default");
+
+        @Override
+        public String toSerializedValue() {return value;}
     }
 
     static PreferenceKey<TestPref> key(String ns, String name) {

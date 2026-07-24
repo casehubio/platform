@@ -1,0 +1,37 @@
+package io.casehub.platform.preferences.editor;
+
+import io.casehub.platform.api.preferences.PreferenceSchemaDescriptor;
+import io.casehub.platform.api.preferences.PreferenceSchemaRegistry;
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+@ApplicationScoped
+public class InMemoryPreferenceSchemaRegistry implements PreferenceSchemaRegistry {
+
+    private static final Logger LOG = Logger.getLogger(InMemoryPreferenceSchemaRegistry.class.getName());
+
+    private final ConcurrentHashMap<String, PreferenceSchemaDescriptor> entries = new ConcurrentHashMap<>();
+
+    @Override
+    public void register(PreferenceSchemaDescriptor descriptor) {
+        PreferenceSchemaDescriptor existing = entries.put(descriptor.qualifiedName(), descriptor);
+        if (existing != null && !existing.equals(descriptor)) {
+            LOG.log(Level.WARNING, "PreferenceSchemaDescriptor overwritten for ''{0}''", descriptor.qualifiedName());
+        }
+    }
+
+    @Override
+    public Optional<PreferenceSchemaDescriptor> resolve(String qualifiedName) {
+        return Optional.ofNullable(entries.get(qualifiedName));
+    }
+
+    @Override
+    public Set<PreferenceSchemaDescriptor> discover() {
+        return Set.copyOf(entries.values());
+    }
+}

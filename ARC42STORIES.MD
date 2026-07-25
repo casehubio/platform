@@ -17,7 +17,7 @@
 
 Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure: `platform-api` (SPIs, zero heavy deps — includes CompiledExpression/ExpressionEngine/ExpressionEngineRegistry expression SPI), `platform` (@DefaultBean mocks + reactive bridges + NoOpExpressionEngineRegistry), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3 transpiler) + JQExpressionEngine + JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI + AgentSession multi-turn), `agent-claude/` (Claude subprocess + ClaudeAgentSession), `agent-langchain4j/` (bidirectional LangChain4j interop), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
+Module structure: `platform-api` (SPIs, zero heavy deps — includes CompiledExpression/ExpressionEngine/ExpressionEngineRegistry expression SPI), `platform` (@DefaultBean mocks + NoOpExpressionEngineRegistry), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3 transpiler) + JQExpressionEngine + JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider SPI + AgentSession multi-turn), `agent-claude/` (Claude subprocess + ClaudeAgentSession), `agent-langchain4j/` (bidirectional LangChain4j interop), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
 
 ### Artifact Schema
 
@@ -129,7 +129,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 - **`@DefaultBean` CDI displacement** — every SPI has a mock default; any non-default `@ApplicationScoped` bean on the classpath displaces it automatically with no exclusion config
 - **`@Alternative @Priority(N)` ladder** — when multiple implementations compete (e.g. MongoDB vs JPA), the higher priority wins; test overrides land at `@Priority(10+)` to beat all production adapters
 - **Optional module activation** — opt-in capabilities (oidc/, scim/, memory-jpa/) activate by classpath presence; removing the dependency reverts to the mock with zero config change
-- **Blocking SPI + reactive bridge** — `CaseMemoryStore` is blocking; `BlockingToReactiveBridge` wraps it as `ReactiveCaseMemoryStore @DefaultBean`, so reactive callers need not care which adapter is active
+- **Blocking SPI + virtual threads** — all SPIs are blocking; REST endpoints use `@RunOnVirtualThread` for non-blocking execution
 - **Typed preference keys** — `PreferenceKey<T>` carries `defaultValue` and `parser` colocated at key definition, following the Drools `OptionKey<T>` pattern; type-safe, null-free call sites via `getOrDefault(key)`
 
 ### Layer taxonomy
@@ -137,7 +137,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | Layer | Module(s) | Responsibility |
 |---|---|---|
 | L1: API Tier | `platform-api` | Zero-dep Java SPIs, records, enums, types |
-| L2: Default Implementations | `platform` | `@DefaultBean` CDI mocks + reactive bridge |
+| L2: Default Implementations | `platform` | `@DefaultBean` CDI mocks |
 | L3: Testing Infrastructure | `testing` | `@Alternative @Priority(1)` test fixtures |
 | L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/` | Opt-in non-mock implementations — expression/ provides MvelExpressionEngine (MVEL3 transpiler), JQExpressionEngine, DefaultExpressionEngineRegistry |
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
@@ -220,7 +220,7 @@ C4Container
   }
   Container_Boundary(l11, "L11: ACL Adapters — mutually exclusive per priority tier") {
     Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
-    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate Reactive + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM Panache + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
   }
   Container_Boundary(l12, "L12: Digest Buffer Adapters — mutually exclusive per priority tier") {
     Container(digestInmem, "casehub-platform-digest-inmem", "Java", "@Alternative @Priority(100) InMemoryDigestBuffer — volatile, ConcurrentHashMap")

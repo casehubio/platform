@@ -4,7 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AccessControlProviderSpiTest {
 
@@ -12,31 +13,31 @@ class AccessControlProviderSpiTest {
 
     @Test
     void canAccess_defaultReturnsTrue() {
-        assertTrue(spi.canAccess("actor", "case:abc", AclAction.READ).toCompletableFuture().join());
+        assertTrue(spi.canAccess("actor", "case:abc", AclAction.READ));
     }
 
     @Test
     void grant_defaultIsNoOp() {
-        assertDoesNotThrow(() -> spi.grant("actor", "case:abc", AclAction.READ, Instant.now()).toCompletableFuture().join());
+        assertDoesNotThrow(() -> spi.grant("actor", "case:abc", AclAction.READ, Instant.now()));
     }
 
     @Test
     void revoke_defaultIsNoOp() {
-        assertDoesNotThrow(() -> spi.revoke("actor", "case:abc", AclAction.READ).toCompletableFuture().join());
+        assertDoesNotThrow(() -> spi.revoke("actor", "case:abc", AclAction.READ));
     }
 
     @Test
     void revokeAll_defaultIsNoOp() {
-        assertDoesNotThrow(() -> spi.revokeAll("actor", "case:abc").toCompletableFuture().join());
+        assertDoesNotThrow(() -> spi.revokeAll("actor", "case:abc"));
     }
 
     @Test
     void registerParent_defaultIsNoOp() {
-        assertDoesNotThrow(() -> spi.registerParent("child:1", "parent:1").toCompletableFuture().join());
+        assertDoesNotThrow(() -> spi.registerParent("child:1", "parent:1"));
     }
 
     @Test
     void accessibleResources_defaultReturnsEmpty() {
-        assertTrue(spi.accessibleResources("actor", AclResourceType.CASE, AclAction.READ).toCompletableFuture().join().isEmpty());
+        assertTrue(spi.accessibleResources("actor", AclResourceType.CASE, AclAction.READ).isEmpty());
     }
 }

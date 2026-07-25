@@ -1,7 +1,7 @@
 package io.casehub.platform.acl.jpa;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

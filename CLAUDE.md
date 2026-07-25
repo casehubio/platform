@@ -146,7 +146,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `subscriptions-jpa/` | `casehub-platform-subscriptions-jpa` | @ApplicationScoped JPA SubscriptionStore — Hibernate ORM + @Transactional. PostgreSQL, Flyway V1 (`classpath:db/subscription/migration`). JSON columns for filters + template. CDI events via fireAsync(). No quarkus:build goal. Do NOT combine with subscriptions-inmem in production scope |
 | `subscriptions/` | `casehub-platform-subscriptions` | SubscriptionEngine (@ApplicationScoped) + REST API (@Path("/subscriptions") CRUD + enable/disable + `GET /subscriptions/event-types` discovery). InMemoryEventTypeRegistry (@ApplicationScoped ConcurrentHashMap). Registers platform-global notification DataSource, wires subscriptions into alpha network via EventTypeObjectType (supports glob patterns: `io.casehub.work.workitem.*`) + ExpressionEngineRegistry-compiled filters (SubscribableEvent-based tenant check, $me variable binding). Fires SubscriptionMatched CDI event (async) — delivery delegated to NotificationDispatcher in notification-dispatch/. POJOs must implement SubscribableEvent. ExpressionEvaluator-based filters (MVEL, JQ). Jackson ExpressionEvaluatorModule for polymorphic filter serialization. No quarkus:build goal |
 | `acl-inmem/` | `casehub-platform-acl-inmem` | @Alternative @Priority(10) volatile AccessControlProvider — ConcurrentHashMap, constructor-injected GroupMembershipProvider, no quarkus:build goal. Add as test scope for @QuarkusTest isolation. Do NOT combine with acl-jpa in the same scope |
-| `acl-jpa/` | `casehub-platform-acl-jpa` | @ApplicationScoped JPA AccessControlProvider — Hibernate Reactive Panache, PostgreSQL, Flyway V1 (`classpath:db/acl/migration`). Group-based grants via GroupMembershipProvider.groupsOf(). Resource parent inheritance with depth guard (20). Audit logging (GRANT/REVOKE) with tenancy. No quarkus:build goal. Do NOT combine with acl-inmem in the same scope |
+| `acl-jpa/` | `casehub-platform-acl-jpa` | @ApplicationScoped JPA AccessControlProvider — Hibernate ORM Panache (blocking-only), PostgreSQL, Flyway V1 (`classpath:db/acl/migration`). Group-based grants via GroupMembershipProvider.groupsOf(). Resource parent inheritance with depth guard (20). Audit logging (GRANT/REVOKE) with tenancy. No quarkus:build goal. Do NOT combine with acl-inmem in the same scope |
 | `streams-kafka/` | `casehub-platform-streams-kafka` | @Startup @ApplicationScoped static Kafka channel ingestion — @Incoming("casehub-kafka-stream"), always raw byte[], builds CloudEvent from STREAM_EVENT_TYPE; sets datacontenttype when STREAM_DATA_CONTENT_TYPE present on descriptor. Does NOT observe EndpointRegistered. CAMEL and KAFKA are mutually exclusive for same topic. |
 | `streams-amqp/` | `casehub-platform-streams-amqp` | @Startup @ApplicationScoped static AMQP channel ingestion — single address per channel (no multi-address; for multi-queue fan-in use streams-camel). Does NOT observe EndpointRegistered. |
 | `streams-webhook/` | `casehub-platform-streams-webhook` | @Startup @ApplicationScoped JAX-RS receiver — POST /streams/webhook/{tenancyId}/{streamId}, structured CloudEvents HTTP binding (application/cloudevents+json), preserves incoming CloudEvent fields, enriches tenancyid from descriptor. Requires casehub.streams.webhook.public-url config. |
@@ -159,7 +159,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 
 ```
 io.casehub.platform.api
-  .acl           — AccessControlProvider (SPI: async CompletionStage grant/revoke/canAccess/revokeAll/registerParent/accessibleResources),
+  .acl           — AccessControlProvider (SPI: blocking grant/revoke/canAccess/revokeAll/registerParent/accessibleResources),
                    AclAction (enum: READ/WRITE/ADMIN/CLAIM), AclResourceType (constants: CASE/PLAN_ITEM/WORK_ITEM/EVENT_LOG/CASE_DEFINITION),
                    AclEntry (record: actorId, resourceId, action, grantedAt, expiresAt, tenancyId),
                    AccessDeniedException (extends SecurityException: actorId, resourceId, action)
@@ -239,7 +239,6 @@ io.casehub.platform.api
                    EndpointQuery (record: tenancyId, type, protocol, requiredCapabilities),
                    EndpointPropertyKeys (reserved cross-protocol property keys: URL, TOPIC, STREAM_EVENT_TYPE, STREAM_DATA_CONTENT_TYPE)
   .memory        — CaseMemoryStore (blocking SPI) + GraphCaseMemoryStore (graph-native extension: graphQuery(GraphMemoryQuery)),
-                   ReactiveCaseMemoryStore (Mutiny SPI),
                    MemoryCapability (enum: declared adapter capabilities), MemoryCapabilityException,
                    MemoryResultType (DEFAULT/FACTS), GraphMemoryQuery (graph-native query: tenantId, entityIds, domain,
                    question, limit, since, validAt, entityTypes, resultType),

@@ -7,30 +7,40 @@ import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
 import io.casehub.platform.api.preferences.SingleValuePreference;
-import io.casehub.platform.api.identity.TenancyConstants;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 class MockBeansTest {
 
-    @Inject CurrentPrincipal principal;
-    @Inject GroupMembershipProvider groupMembership;
-    @Inject PreferenceProvider preferenceProvider;
-    @Inject AccessControlProvider accessControl;
-    @Inject EndpointRegistry endpointRegistry;
-    @Inject CredentialResolver credentialResolver;
+    @Inject
+    CurrentPrincipal        principal;
+    @Inject
+    GroupMembershipProvider groupMembership;
+    @Inject
+    PreferenceProvider      preferenceProvider;
+    @Inject
+    AccessControlProvider   accessControl;
+    @Inject
+    EndpointRegistry        endpointRegistry;
+    @Inject
+    CredentialResolver      credentialResolver;
 
     @Test
     void currentPrincipal_defaults_to_system() {
@@ -74,10 +84,13 @@ class MockBeansTest {
     @Test
     void preferenceProvider_typed_get_returns_parsed_value() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of(TenancyConstants.DEFAULT_TENANT_ID, Path.parse("acme/backend")));
-        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference { @Override public String toSerializedValue() { return value; } }
+        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {
+            @Override
+            public String toSerializedValue() {return value;}
+        }
         PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label",
-                new LabelPref("fallback"),
-                LabelPref::new);
+                                                           new LabelPref("fallback"),
+                                                           LabelPref::new);
         LabelPref result = prefs.get(key);
         assertNotNull(result);
         assertEquals("hello", result.value());
@@ -86,20 +99,26 @@ class MockBeansTest {
     @Test
     void preferenceProvider_getOrDefault_returns_parsed_value_when_configured() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of(TenancyConstants.DEFAULT_TENANT_ID, Path.parse("acme/backend")));
-        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference { @Override public String toSerializedValue() { return value; } }
+        record LabelPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {
+            @Override
+            public String toSerializedValue() {return value;}
+        }
         PreferenceKey<LabelPref> key = new PreferenceKey<>("test", "label",
-                new LabelPref("fallback"),
-                LabelPref::new);
+                                                           new LabelPref("fallback"),
+                                                           LabelPref::new);
         assertEquals("hello", prefs.getOrDefault(key).value());
     }
 
     @Test
     void preferenceProvider_getOrDefault_returns_key_default_when_absent() {
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of(TenancyConstants.DEFAULT_TENANT_ID, Path.parse("acme/backend")));
-        record MissingPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference { @Override public String toSerializedValue() { return value; } }
+        record MissingPref(String value) implements io.casehub.platform.api.preferences.SingleValuePreference {
+            @Override
+            public String toSerializedValue() {return value;}
+        }
         PreferenceKey<MissingPref> key = new PreferenceKey<>("test", "missing",
-                new MissingPref("fallback"),
-                MissingPref::new);
+                                                             new MissingPref("fallback"),
+                                                             MissingPref::new);
         assertEquals("fallback", prefs.getOrDefault(key).value());
     }
 
@@ -110,10 +129,13 @@ class MockBeansTest {
         // getOrDefault() then returns key.defaultValue().
         Preferences prefs = preferenceProvider.resolve(SettingsScope.of(TenancyConstants.DEFAULT_TENANT_ID, Path.parse("acme/backend")));
         assertEquals(42, prefs.asMap().get("test.count"));          // Integer in asMap ✓
-        record CountPref(int value) implements SingleValuePreference { @Override public String toSerializedValue() { return String.valueOf(value); } }
+        record CountPref(int value) implements SingleValuePreference {
+            @Override
+            public String toSerializedValue() {return String.valueOf(value);}
+        }
         PreferenceKey<CountPref> key = new PreferenceKey<>("test", "count",
-                new CountPref(-1),
-                s -> new CountPref(Integer.parseInt(s)));
+                                                           new CountPref(-1),
+                                                           s -> new CountPref(Integer.parseInt(s)));
         assertNull(prefs.get(key));                                   // null — Integer, not String
         assertEquals(-1, prefs.getOrDefault(key).value());            // falls to defaultValue
     }
@@ -129,14 +151,10 @@ class MockBeansTest {
     }
 
     @Test
-    void accessControl_noOp_allows_all() {
-        assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ).toCompletableFuture().join());
-    }
+    void accessControl_noOp_allows_all() {assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ));}
 
     @Test
-    void accessControl_noOp_accessibleResources_returns_empty() {
-        assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).toCompletableFuture().join().isEmpty());
-    }
+    void accessControl_noOp_accessibleResources_returns_empty() {assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).isEmpty());}
 
     @Test
     void endpointRegistry_noop_resolve_returns_empty() {
@@ -147,8 +165,8 @@ class MockBeansTest {
     @Test
     void endpointRegistry_noop_discover_returns_empty_list() {
         assertTrue(endpointRegistry.discover(
-                new EndpointQuery(TenancyConstants.DEFAULT_TENANT_ID, null, null, java.util.Set.of()))
-                .isEmpty());
+                                           new EndpointQuery(TenancyConstants.DEFAULT_TENANT_ID, null, null, java.util.Set.of()))
+                                   .isEmpty());
     }
 
     @Test

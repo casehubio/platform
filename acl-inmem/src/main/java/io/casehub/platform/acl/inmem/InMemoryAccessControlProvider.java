@@ -15,8 +15,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Alternative
@@ -24,9 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 public class InMemoryAccessControlProvider implements AccessControlProvider {
 
-    private final ConcurrentHashMap<GrantKey, AclEntry> grants = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> parents = new ConcurrentHashMap<>();
-    private final GroupMembershipProvider groupMembership;
+    private final ConcurrentHashMap<GrantKey, AclEntry> grants  = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String>     parents = new ConcurrentHashMap<>();
+    private final GroupMembershipProvider               groupMembership;
 
     @Inject
     public InMemoryAccessControlProvider(GroupMembershipProvider groupMembership) {
@@ -34,52 +32,48 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> canAccess(String actorId, String resourceId, AclAction action) {
+    public boolean canAccess(String actorId, String resourceId, AclAction action) {
         Set<String> candidates = buildCandidateSet(actorId);
-        return CompletableFuture.completedFuture(canAccessWithCandidates(candidates, resourceId, action, 0));
+        return canAccessWithCandidates(candidates, resourceId, action, 0);
     }
 
     @Override
-    public CompletionStage<Void> grant(String actorId, String resourceId, AclAction action, Instant expires) {
+    public void grant(String actorId, String resourceId, AclAction action, Instant expires) {
         var key = new GrantKey(actorId, resourceId, action);
         grants.put(key, new AclEntry(actorId, resourceId, action, Instant.now(), expires, ""));
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Void> revoke(String actorId, String resourceId, AclAction action) {
+    public void revoke(String actorId, String resourceId, AclAction action) {
         grants.remove(new GrantKey(actorId, resourceId, action));
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Void> revokeAll(String actorId, String resourceId) {
+    public void revokeAll(String actorId, String resourceId) {
         for (AclAction action : AclAction.values()) {
             grants.remove(new GrantKey(actorId, resourceId, action));
         }
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Void> registerParent(String childResourceId, String parentResourceId) {
+    public void registerParent(String childResourceId, String parentResourceId) {
         parents.put(childResourceId, parentResourceId);
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<List<String>> accessibleResources(String actorId, String resourceType, AclAction action) {
+    public List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
         Set<String> candidates = buildCandidateSet(actorId);
-        String prefix = resourceType + ":";
-        Set<String> seen = new LinkedHashSet<>();
+        String      prefix     = resourceType + ":";
+        Set<String> seen       = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
-                    && entry.action() == action
-                    && entry.resourceId().startsWith(prefix)
-                    && !entry.isExpired()) {
+                && entry.action() == action
+                && entry.resourceId().startsWith(prefix)
+                && !entry.isExpired()) {
                 seen.add(entry.resourceId());
             }
         }
-        return CompletableFuture.completedFuture(new ArrayList<>(seen));
+        return new ArrayList<>(seen);
     }
 
     private Set<String> buildCandidateSet(String actorId) {
@@ -93,10 +87,10 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
 
     private boolean canAccessWithCandidates(Set<String> candidates, String resourceId,
                                             AclAction action, int depth) {
-        if (depth > 20) return false;
+        if (depth > 20) {return false;}
         for (String candidate : candidates) {
             AclEntry entry = grants.get(new GrantKey(candidate, resourceId, action));
-            if (entry != null && !entry.isExpired()) return true;
+            if (entry != null && !entry.isExpired()) {return true;}
         }
         String parent = parents.get(resourceId);
         if (parent != null) {

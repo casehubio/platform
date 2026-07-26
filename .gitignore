@@ -2,3 +2,5 @@ target/
 .claude/settings.local.json
 .idea/
 wksp
+.claude
+package-lock.json

@@ -30,7 +30,7 @@ class InMemoryDeliveryAttemptStoreTest {
         var attempt = attempt("notif-1", DeliveryStatus.DELIVERED);
         store.store(attempt);
 
-        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found).hasSize(1);
         assertThat(found.getFirst().id()).isEqualTo(attempt.id());
         assertThat(found.getFirst().channelId()).isEqualTo("email");
@@ -102,7 +102,7 @@ class InMemoryDeliveryAttemptStoreTest {
                 attempt.firstOpenedAt(), attempt.firstClickedAt());
         store.update(updated);
 
-        var found = store.findBySource("src-1", DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource("src-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found.getFirst().status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(found.getFirst().attemptCount()).isEqualTo(2);
     }
@@ -120,7 +120,7 @@ class InMemoryDeliveryAttemptStoreTest {
 
     @Test
     void findBySourceReturnsEmptyForUnknown() {
-        var all = store.findBySource("unknown", DeliverySourceType.NOTIFICATION);
+        var all = store.findBySource("unknown", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(all).isEmpty();
     }
 
@@ -165,7 +165,7 @@ class InMemoryDeliveryAttemptStoreTest {
                 "eng-1", attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.OPENED, Instant.now(), null);
         store.recordEngagement(event);
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().type()).isEqualTo(EngagementType.OPENED);
     }
@@ -178,7 +178,7 @@ class InMemoryDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 "eng-1", attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.OPENED, now, null));
-        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION).getFirst();
+        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1").getFirst();
         assertThat(updated.firstOpenedAt()).isEqualTo(now);
         assertThat(updated.firstClickedAt()).isNull();
     }
@@ -191,7 +191,7 @@ class InMemoryDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 "eng-1", attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.CLICKED, now, null));
-        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION).getFirst();
+        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1").getFirst();
         assertThat(updated.firstClickedAt()).isEqualTo(now);
         assertThat(updated.firstOpenedAt()).isNull();
     }
@@ -208,9 +208,9 @@ class InMemoryDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 "eng-2", attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.OPENED, second, null));
-        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION).getFirst();
+        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1").getFirst();
         assertThat(updated.firstOpenedAt()).isEqualTo(first);
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(2);
     }
 
@@ -226,7 +226,7 @@ class InMemoryDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 "eng-2", a2.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-2", "tenant-1",
                 EngagementType.CLICKED, Instant.now(), null));
-        var events = store.findEngagementsBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var events = store.findEngagementsBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(events).hasSize(2);
     }
 
@@ -240,7 +240,7 @@ class InMemoryDeliveryAttemptStoreTest {
                 EngagementType.OPENED, Instant.now(), null));
         var a2 = attempt("notif-2", DeliveryStatus.DELIVERED);
         smallStore.store(a2);
-        assertThat(smallStore.findEngagementsByAttemptId(a1.id())).isEmpty();
+        assertThat(smallStore.findEngagementsByAttemptId(a1.id(), "tenant-1")).isEmpty();
     }
 
     @Test
@@ -263,7 +263,7 @@ class InMemoryDeliveryAttemptStoreTest {
         }
         latch.countDown();
         for (var t : threads) { t.join(5000); }
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(threadCount);
     }
 

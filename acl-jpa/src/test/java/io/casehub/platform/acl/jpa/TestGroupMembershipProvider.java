@@ -15,13 +15,13 @@ import java.util.Set;
 public class TestGroupMembershipProvider implements GroupMembershipProvider {
 
     @Override
-    public Set<GroupMember> membersOf(String groupName) {
+    public Set<GroupMember> membersOf(String groupName, String tenancyId) {
         return Set.of();
     }
 
     @Override
-    public List<String> groupsOf(String actorId) {
-        if ("actor1".equals(actorId)) return List.of("managers");
+    public List<String> groupsOf(String actorId, String tenancyId) {
+        if ("actor1".equals(actorId)) {return List.of("managers");}
         return List.of();
     }
 }

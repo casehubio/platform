@@ -17,7 +17,7 @@ import java.time.Instant;
 @Table(name = "acl_entry",
         uniqueConstraints = @UniqueConstraint(
                 name = "uq_acl_entry",
-                columnNames = {"actor_id", "resource_id", "action"}),
+                columnNames = {"actor_id", "resource_id", "action", "tenancy_id"}),
         indexes = {
                 @Index(name = "idx_acl_actor_resource", columnList = "actor_id, resource_id"),
                 @Index(name = "idx_acl_resource", columnList = "resource_id"),

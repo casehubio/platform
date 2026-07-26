@@ -25,21 +25,20 @@ public class ScimGroupMembershipProvider implements GroupMembershipProvider {
 
     @Override
     @CacheResult(cacheName = "scim-group-members")
-    public Set<GroupMember> membersOf(String groupName) {
+    public Set<GroupMember> membersOf(String groupName, String tenancyId) {
         String safeGroupName = groupName.replace("\\", "\\\\").replace("\"", "\\\"");
-        String filter = "displayName eq \"" + safeGroupName + "\"";
+        String filter        = "displayName eq \"" + safeGroupName + "\"";
         ScimListResponse<ScimGroupResource> response =
-            scimClient.listGroups(filter, "id,displayName,members");
+                scimClient.listGroups(filter, "id,displayName,members");
 
         if (response.resources() == null || response.resources().isEmpty()) {
             return Set.of();
         }
 
-        ScimGroupResource group = response.resources().get(0);
+        ScimGroupResource   group   = response.resources().get(0);
         List<ScimMemberRef> members = group.members();
 
         if (members == null || members.isEmpty() || members.size() >= memberPageSize()) {
-            // members absent OR possibly truncated at server page size — fetch with pagination
             members = fetchAllMembers(group.id());
         }
 
@@ -48,8 +47,8 @@ public class ScimGroupMembershipProvider implements GroupMembershipProvider {
         }
 
         return members.stream()
-            .map(m -> new GroupMember(m.value(), m.display()))
-            .collect(Collectors.toUnmodifiableSet());
+                      .map(m -> new GroupMember(m.value(), m.display()))
+                      .collect(Collectors.toUnmodifiableSet());
     }
 
     private List<ScimMemberRef> fetchAllMembers(String groupId) {

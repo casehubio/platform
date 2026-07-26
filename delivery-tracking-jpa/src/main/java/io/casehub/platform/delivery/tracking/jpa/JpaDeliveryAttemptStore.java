@@ -83,6 +83,13 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
         return entity != null ? entity.toDomain() : null;
     }
 
+    @Override
+    public DeliveryAttempt findById(String id, String tenancyId) {
+        var entity = entityManager.find(DeliveryAttemptEntity.class, id);
+        if (entity == null || !entity.tenancyId.equals(tenancyId)) {return null;}
+        return entity.toDomain();
+    }
+
 
     @Override
     @Transactional
@@ -152,13 +159,15 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     }
 
     @Override
-    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return entityManager.createQuery(
                                     "SELECT e FROM DeliveryAttemptEntity e " +
                                     "WHERE e.sourceId = :sourceId AND e.sourceType = :sourceType " +
+                                    "AND e.tenancyId = :tenancyId " +
                                     "ORDER BY e.createdAt ASC", DeliveryAttemptEntity.class)
                             .setParameter("sourceId", sourceId)
                             .setParameter("sourceType", sourceType)
+                            .setParameter("tenancyId", tenancyId)
                             .getResultList()
                             .stream().map(DeliveryAttemptEntity::toDomain).toList();
     }
@@ -272,11 +281,12 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
         }}
 
     @Override
-    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId) {
+    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId, String tenancyId) {
         return entityManager
-                       .createQuery("FROM EngagementEventEntity e WHERE e.attemptId = :attemptId ORDER BY e.recordedAt",
+                       .createQuery("FROM EngagementEventEntity e WHERE e.attemptId = :attemptId AND e.tenancyId = :tenancyId ORDER BY e.recordedAt",
                                     EngagementEventEntity.class)
                        .setParameter("attemptId", attemptId)
+                       .setParameter("tenancyId", tenancyId)
                        .getResultList()
                        .stream()
                        .map(EngagementEventEntity::toDomain)
@@ -284,14 +294,16 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     }
 
     @Override
-    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return entityManager
                        .createQuery("FROM EngagementEventEntity e " +
                                     "WHERE e.sourceId = :sourceId AND e.sourceType = :sourceType " +
+                                    "AND e.tenancyId = :tenancyId " +
                                     "ORDER BY e.recordedAt",
                                     EngagementEventEntity.class)
                        .setParameter("sourceId", sourceId)
                        .setParameter("sourceType", sourceType)
+                       .setParameter("tenancyId", tenancyId)
                        .getResultList()
                        .stream()
                        .map(EngagementEventEntity::toDomain)

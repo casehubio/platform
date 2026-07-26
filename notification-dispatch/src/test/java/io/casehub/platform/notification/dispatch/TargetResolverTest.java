@@ -29,7 +29,7 @@ class TargetResolverTest {
             null, "work-item", "entityId", "actorId");
 
     // Stub GroupMembershipProvider that returns configurable members
-    private final GroupMembershipProvider groupProvider = groupName -> {
+    private final GroupMembershipProvider groupProvider = (groupName, tenancyId) -> {
         if ("engineers".equals(groupName)) {
             return Set.of(
                     new GroupMember("user-1", "Alice"),

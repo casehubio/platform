@@ -76,7 +76,7 @@ class NotificationDispatcherTest {
                         false, true, NotificationSeverity.INFO, null, null),
                 new CapturingDeliverer(DeliveryChannels.IN_APP, deliveredNotifications));
 
-        final GroupMembershipProvider groupProvider = groupName -> {
+        final GroupMembershipProvider groupProvider = (groupName, tenancyId) -> {
             if ("team-alpha".equals(groupName)) {
                 return Set.of(
                         new GroupMember("user-alice", "Alice"),

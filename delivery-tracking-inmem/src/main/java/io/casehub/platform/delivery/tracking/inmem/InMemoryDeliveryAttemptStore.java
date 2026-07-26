@@ -57,6 +57,15 @@ public class InMemoryDeliveryAttemptStore implements DeliveryAttemptStore {
         return store.get(id);
     }
 
+    @Override
+    public DeliveryAttempt findById(String id, String tenancyId) {
+        DeliveryAttempt attempt = store.get(id);
+        if (attempt != null && attempt.tenancyId().equals(tenancyId)) {
+            return attempt;
+        }
+        return null;
+    }
+
 
     @Override
     public synchronized List<DeliveryAttempt> claimRetryable(Instant now, int batchSize) {
@@ -108,9 +117,9 @@ public class InMemoryDeliveryAttemptStore implements DeliveryAttemptStore {
     }
 
     @Override
-    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return store.values().stream()
-                    .filter(a -> sourceId.equals(a.sourceId()) && sourceType == a.sourceType())
+                    .filter(a -> sourceId.equals(a.sourceId()) && sourceType == a.sourceType() && tenancyId.equals(a.tenancyId()))
                     .sorted(Comparator.comparing(DeliveryAttempt::createdAt))
                     .toList();
     }
@@ -155,15 +164,17 @@ public class InMemoryDeliveryAttemptStore implements DeliveryAttemptStore {
     }
 
     @Override
-    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId) {
-        return List.copyOf(engagementStore.getOrDefault(attemptId, List.of()));
+    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId, String tenancyId) {
+        return engagementStore.getOrDefault(attemptId, List.of()).stream()
+                              .filter(e -> tenancyId.equals(e.tenancyId()))
+                              .toList();
     }
 
     @Override
-    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return engagementStore.values().stream()
                               .flatMap(List::stream)
-                              .filter(e -> sourceId.equals(e.sourceId()) && sourceType == e.sourceType())
+                              .filter(e -> sourceId.equals(e.sourceId()) && sourceType == e.sourceType() && tenancyId.equals(e.tenancyId()))
                               .sorted(Comparator.comparing(EngagementEvent::recordedAt))
                               .toList();
     }

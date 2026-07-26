@@ -38,7 +38,7 @@ class DeliveryTrackerTest {
         var input = testInput(NotificationSeverity.INFO);
         tracker.recordSuccess("email", input, "notif-1", DeliverySourceType.NOTIFICATION);
 
-        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(attempts).hasSize(1);
         assertThat(attempts.getFirst().status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(attempts.getFirst().deliveredAt()).isNotNull();
@@ -53,7 +53,7 @@ class DeliveryTrackerTest {
         tracker.recordFailure("email", input, "notif-1", DeliverySourceType.NOTIFICATION,
                 NotificationSeverity.WARNING, "connection refused");
 
-        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(attempts).hasSize(1);
         assertThat(attempts.getFirst().status()).isEqualTo(DeliveryStatus.RETRYING);
         assertThat(attempts.getFirst().nextRetryAt()).isNotNull();
@@ -67,7 +67,7 @@ class DeliveryTrackerTest {
         tracker.recordFailure("email", input, "notif-1", DeliverySourceType.NOTIFICATION,
                 NotificationSeverity.WARNING, "connection refused");
 
-        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(attempts).hasSize(1);
         assertThat(attempts.getFirst().status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(attempts.getFirst().nextRetryAt()).isNull();
@@ -79,7 +79,7 @@ class DeliveryTrackerTest {
         tracker.recordFailure("email", input, "notif-1", DeliverySourceType.NOTIFICATION,
                 null, "connection refused");
 
-        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(attempts).hasSize(1);
         assertThat(attempts.getFirst().status()).isEqualTo(DeliveryStatus.FAILED);
     }
@@ -153,7 +153,7 @@ class DeliveryTrackerTest {
         var input = testInput(NotificationSeverity.WARNING);
         tracker.recordSuccess("email", input, "notif-1", DeliverySourceType.NOTIFICATION);
 
-        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(attempts.getFirst().payload()).contains("Test Notification");
     }
 

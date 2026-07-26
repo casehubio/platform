@@ -38,7 +38,7 @@ class EngagementRecorderTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         recorder.record(attempt, EngagementType.OPENED, null);
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().type()).isEqualTo(EngagementType.OPENED);
         assertThat(events.getFirst().attemptId()).isEqualTo(attempt.id());
@@ -55,7 +55,7 @@ class EngagementRecorderTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         recorder.record(attempt, EngagementType.CLICKED, "{\"url\":\"https://example.com\"}");
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events.getFirst().metadata()).isEqualTo("{\"url\":\"https://example.com\"}");
     }
 
@@ -65,7 +65,7 @@ class EngagementRecorderTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         disabledRecorder.record(attempt, EngagementType.OPENED, null);
-        assertThat(store.findEngagementsByAttemptId(attempt.id())).isEmpty();
+        assertThat(store.findEngagementsByAttemptId(attempt.id(), "tenant-1")).isEmpty();
         assertThat(firedEvents).isEmpty();
     }
 

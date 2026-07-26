@@ -13,6 +13,8 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -26,11 +28,14 @@ public class EngagementCallbackResource {
 
     private static final Logger LOG = Logger.getLogger(EngagementCallbackResource.class);
 
-    private final DeliveryAttemptStore store;
-    private final EngagementRecorder recorder;
-    private final CurrentPrincipal principal;
+    private final DeliveryAttemptStore                   store;
+    private final EngagementRecorder                     recorder;
+    private final CurrentPrincipal                       principal;
     private final Map<String, EngagementCallbackHandler> handlers;
-    private final boolean enabled;
+    private final boolean                                enabled;
+
+    @Context
+    HttpHeaders httpHeaders;
 
     @Inject
     public EngagementCallbackResource(DeliveryAttemptStore store,
@@ -39,24 +44,26 @@ public class EngagementCallbackResource {
                                       Instance<EngagementCallbackHandler> handlerInstances,
                                       @ConfigProperty(name = "casehub.delivery.engagement.enabled", defaultValue = "false")
                                       boolean enabled) {
-        this.store = store;
-        this.recorder = recorder;
+        this.store     = store;
+        this.recorder  = recorder;
         this.principal = principal;
-        this.handlers = handlerInstances.stream()
-                .collect(Collectors.toMap(EngagementCallbackHandler::channelId, h -> h));
-        this.enabled = enabled;
+        this.handlers  = handlerInstances.stream()
+                                         .collect(Collectors.toMap(EngagementCallbackHandler::channelId, h -> h));
+        this.enabled   = enabled;
     }
 
     EngagementCallbackResource(DeliveryAttemptStore store,
                                EngagementRecorder recorder,
                                CurrentPrincipal principal,
                                Map<String, EngagementCallbackHandler> handlers,
-                               boolean enabled) {
-        this.store = store;
-        this.recorder = recorder;
-        this.principal = principal;
-        this.handlers = handlers;
-        this.enabled = enabled;
+                               boolean enabled,
+                               HttpHeaders httpHeaders) {
+        this.store       = store;
+        this.recorder    = recorder;
+        this.principal   = principal;
+        this.handlers    = handlers;
+        this.enabled     = enabled;
+        this.httpHeaders = httpHeaders;
     }
 
     @POST
@@ -71,7 +78,7 @@ public class EngagementCallbackResource {
             return Response.status(404).build();
         }
         try {
-            var rawEvents = handler.translate(rawPayload);
+            var rawEvents = handler.translate(rawPayload, extractHeaders());
             if (rawEvents != null) {
                 for (var raw : rawEvents) {
                     DeliveryAttempt attempt = store.findById(raw.attemptId());
@@ -82,6 +89,9 @@ public class EngagementCallbackResource {
                     recorder.record(attempt, raw.type(), raw.metadata());
                 }
             }
+        } catch (SecurityException e) {
+            LOG.warnf("Engagement callback handler '%s' rejected payload: %s", channelId, e.getMessage());
+            return Response.status(401).build();
         } catch (Exception e) {
             LOG.warnf(e, "Engagement callback handler '%s' failed to translate payload", channelId);
         }
@@ -99,15 +109,21 @@ public class EngagementCallbackResource {
         if (request.type() == null) {
             return Response.status(400).build();
         }
-        DeliveryAttempt attempt = store.findById(attemptId);
+        DeliveryAttempt attempt = store.findById(attemptId, principal.tenancyId());
         if (attempt == null) {
             return Response.status(404).build();
         }
-        if (!attempt.tenancyId().equals(principal.tenancyId())) {
-            return Response.status(403).build();
-        }
         recorder.record(attempt, request.type(), request.metadata());
         return Response.ok().build();
+    }
+
+    private Map<String, String> extractHeaders() {
+        if (httpHeaders == null) {return Map.of();}
+        Map<String, String> result = new java.util.HashMap<>();
+        for (var key : httpHeaders.getRequestHeaders().keySet()) {
+            result.put(key, httpHeaders.getHeaderString(key));
+        }
+        return result;
     }
 
     public record DirectEngagementRequest(EngagementType type, String metadata) {}

@@ -64,8 +64,8 @@ class MockBeansTest {
 
     @Test
     void groupMembership_always_returns_empty_set() {
-        assertTrue(groupMembership.membersOf("any-group").isEmpty());
-        assertTrue(groupMembership.membersOf("admin").isEmpty());
+        assertTrue(groupMembership.membersOf("any-group", "any-tenant").isEmpty());
+        assertTrue(groupMembership.membersOf("admin", "any-tenant").isEmpty());
     }
 
     @Test

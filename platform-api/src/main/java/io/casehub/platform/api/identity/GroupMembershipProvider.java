@@ -4,11 +4,9 @@ import java.util.List;
 import java.util.Set;
 
 public interface GroupMembershipProvider {
-    /** Returns members for the given group name. Empty set = group unknown or has no members. */
-    Set<GroupMember> membersOf(String groupName);
+    Set<GroupMember> membersOf(String groupName, String tenancyId);
 
-    /** Returns the groups that actorId belongs to. Empty list = actor has no groups. */
-    default List<String> groupsOf(String actorId) {
+    default List<String> groupsOf(String actorId, String tenancyId) {
         return List.of();
     }
 }

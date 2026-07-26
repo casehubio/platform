@@ -39,7 +39,7 @@ class ScimGroupMembershipProviderTest {
             "[{ \"value\": \"alice-uuid\", \"display\": \"Alice Smith\" }," +
             " { \"value\": \"bob-uuid\",   \"display\": \"Bob Jones\"  }]");
 
-        Set<GroupMember> members = provider.membersOf("inline-reviewers");
+        Set<GroupMember> members = provider.membersOf("inline-reviewers", "t1");
 
         assertEquals(2, members.size());
         assertTrue(members.contains(new GroupMember("alice-uuid", "Alice Smith")));
@@ -60,7 +60,7 @@ class ScimGroupMembershipProviderTest {
                 "{ \"id\": \"group-g2\", \"displayName\": \"second-call-reviewers\"," +
                 "  \"members\": [{ \"value\": \"carol-uuid\", \"display\": \"Carol White\" }] }")));
 
-        Set<GroupMember> members = provider.membersOf("second-call-reviewers");
+        Set<GroupMember> members = provider.membersOf("second-call-reviewers", "t1");
 
         assertEquals(1, members.size());
         assertTrue(members.contains(new GroupMember("carol-uuid", "Carol White")));
@@ -74,7 +74,7 @@ class ScimGroupMembershipProviderTest {
             .withQueryParam("filter", equalTo("displayName eq \"nonexistent-group\""))
             .willReturn(okJson("{ \"totalResults\": 0, \"Resources\": [] }")));
 
-        assertEquals(Set.of(), provider.membersOf("nonexistent-group"));
+        assertEquals(Set.of(), provider.membersOf("nonexistent-group", "t1"));
     }
 
     @Test
@@ -83,7 +83,7 @@ class ScimGroupMembershipProviderTest {
             .withQueryParam("filter", equalTo("displayName eq \"error-group\""))
             .willReturn(serverError()));
 
-        assertThrows(RuntimeException.class, () -> provider.membersOf("error-group"));
+        assertThrows(RuntimeException.class, () -> provider.membersOf("error-group", "t1"));
     }
 
     @Test
@@ -91,7 +91,7 @@ class ScimGroupMembershipProviderTest {
         stubScimGroup("auditors", "group-g3",
             "[{ \"value\": \"uuid-stable-123\", \"display\": \"Could Change Display\" }]");
 
-        GroupMember member = provider.membersOf("auditors").iterator().next();
+        GroupMember member = provider.membersOf("auditors", "t1").iterator().next();
 
         assertEquals("uuid-stable-123", member.actorId());
         assertEquals("Could Change Display", member.displayName());
@@ -102,8 +102,8 @@ class ScimGroupMembershipProviderTest {
         stubScimGroup("cached-group", "group-g4",
             "[{ \"value\": \"dave-uuid\", \"display\": \"Dave\" }]");
 
-        provider.membersOf("cached-group");
-        provider.membersOf("cached-group");
+        provider.membersOf("cached-group", "t1");
+        provider.membersOf("cached-group", "t1");
 
         wireMock().verify(1, getRequestedFor(urlPathEqualTo("/Groups")));
     }
@@ -132,7 +132,7 @@ class ScimGroupMembershipProviderTest {
                 "{ \"value\": \"u4\", \"display\": \"User Four\" }," +
                 "{ \"value\": \"u5\", \"display\": \"User Five\" }] }")));
 
-        Set<GroupMember> members = provider.membersOf("paginated-group");
+        Set<GroupMember> members = provider.membersOf("paginated-group", "t1");
 
         assertEquals(5, members.size());
         for (int i = 1; i <= 5; i++) {

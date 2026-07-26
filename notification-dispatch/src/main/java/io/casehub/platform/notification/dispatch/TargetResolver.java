@@ -55,10 +55,10 @@ public class TargetResolver {
                 case USER -> recipients.add(target.id());
 
                 case GROUP -> {
-                    final Set<GroupMember> members = groupMembershipProvider.membersOf(target.id());
+                    final Set<GroupMember> members = groupMembershipProvider.membersOf(target.id(), subscription.tenancyId());
                     if (members.isEmpty()) {
                         LOG.warnf("GROUP target '%s' resolved to empty membership for subscription '%s'",
-                                target.id(), subscription.id());
+                                  target.id(), subscription.id());
                     }
                     for (final GroupMember member : members) {
                         recipients.add(member.actorId());
@@ -69,7 +69,7 @@ public class TargetResolver {
                     final String userId = TemplateResolver.extractField(pojo, target.id());
                     if (userId == null) {
                         LOG.warnf("EVENT_FIELD target '%s' resolved to null on %s for subscription '%s'",
-                                target.id(), pojo.getClass().getSimpleName(), subscription.id());
+                                  target.id(), pojo.getClass().getSimpleName(), subscription.id());
                     } else {
                         recipients.add(userId);
                     }
@@ -77,35 +77,33 @@ public class TargetResolver {
 
                 case ENTITY_WATCHERS -> {
                     final String entityType = target.id().isBlank()
-                            ? subscription.template().entityType()
-                            : target.id();
+                                              ? subscription.template().entityType()
+                                              : target.id();
                     final String entityId = TemplateResolver.extractField(pojo,
-                            subscription.template().entityIdField());
+                                                                          subscription.template().entityIdField());
                     if (entityId != null) {
                         final Set<String> watchers = entityWatcherProvider.watchersOf(
                                 entityType, entityId, subscription.tenancyId());
                         if (watchers.isEmpty()) {
                             LOG.debugf("ENTITY_WATCHERS for %s/%s resolved to no watchers",
-                                    entityType, entityId);
+                                       entityType, entityId);
                         }
                         recipients.addAll(watchers);
                     } else {
                         LOG.warnf("ENTITY_WATCHERS target: entityIdField '%s' resolved to null on %s",
-                                subscription.template().entityIdField(), pojo.getClass().getSimpleName());
+                                  subscription.template().entityIdField(), pojo.getClass().getSimpleName());
                     }
                 }
             }
         }
 
-        // Exclude the triggering actor unless includeActor is true
         if (!subscription.includeActor()) {
             final String actorId = TemplateResolver.extractField(pojo,
-                    subscription.template().actorIdField());
+                                                                 subscription.template().actorIdField());
             if (actorId != null) {
                 recipients.remove(actorId);
             }
         }
 
-        return recipients;
-    }
+        return recipients;}
 }

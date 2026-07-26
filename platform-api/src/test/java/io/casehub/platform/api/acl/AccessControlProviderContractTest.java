@@ -19,6 +19,11 @@ public abstract class AccessControlProviderContractTest {
 
     protected abstract GroupMembershipProvider groupMembership();
 
+    protected abstract String tenancyId();
+
+    protected abstract void setTenancyId(String tenancyId);
+
+
     @BeforeEach
     void setUp() {
         clearState();
@@ -226,5 +231,46 @@ public abstract class AccessControlProviderContractTest {
                                                              AclResourceType.CASE, AclAction.READ);
         assertEquals(1, result.size());
         assertTrue(result.contains("case:abc"));
+    }
+
+    @Test
+    void canAccess_differentTenant_returnsFalse() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        setTenancyId("other-tenant");
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        setTenancyId(tenancyId());
+    }
+
+    @Test
+    void revoke_differentTenant_doesNotDelete() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        setTenancyId("other-tenant");
+        provider().revoke("actor1", "case:abc", AclAction.READ);
+        setTenancyId(tenancyId());
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void accessibleResources_filteredByTenant() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        setTenancyId("other-tenant");
+        provider().grant("actor1", "case:def", AclAction.READ, null);
+        List<String> result = provider().accessibleResources("actor1", AclResourceType.CASE, AclAction.READ);
+        assertEquals(1, result.size());
+        assertTrue(result.contains("case:def"));
+        setTenancyId(tenancyId());
+        result = provider().accessibleResources("actor1", AclResourceType.CASE, AclAction.READ);
+        assertEquals(1, result.size());
+        assertTrue(result.contains("case:abc"));
+    }
+
+    @Test
+    void grant_sameTupleDifferentTenant_bothStored() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        setTenancyId("other-tenant");
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        setTenancyId(tenancyId());
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
     }
 }

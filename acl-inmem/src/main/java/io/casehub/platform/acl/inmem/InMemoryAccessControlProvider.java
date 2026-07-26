@@ -3,6 +3,7 @@ package io.casehub.platform.acl.inmem;
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
 import io.casehub.platform.api.acl.AclEntry;
+import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,12 +24,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryAccessControlProvider implements AccessControlProvider {
 
     private final ConcurrentHashMap<GrantKey, AclEntry> grants  = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String>     parents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ParentKey, String>  parents = new ConcurrentHashMap<>();
     private final GroupMembershipProvider               groupMembership;
+    private final CurrentPrincipal                      principal;
 
     @Inject
-    public InMemoryAccessControlProvider(GroupMembershipProvider groupMembership) {
+    public InMemoryAccessControlProvider(GroupMembershipProvider groupMembership, CurrentPrincipal principal) {
         this.groupMembership = groupMembership;
+        this.principal       = principal;
     }
 
     @Override
@@ -39,37 +42,43 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
 
     @Override
     public void grant(String actorId, String resourceId, AclAction action, Instant expires) {
-        var key = new GrantKey(actorId, resourceId, action);
-        grants.put(key, new AclEntry(actorId, resourceId, action, Instant.now(), expires, ""));
+        String tenancyId = principal.tenancyId();
+        var    key       = new GrantKey(actorId, resourceId, action, tenancyId);
+        grants.put(key, new AclEntry(actorId, resourceId, action, Instant.now(), expires, tenancyId));
     }
 
     @Override
     public void revoke(String actorId, String resourceId, AclAction action) {
-        grants.remove(new GrantKey(actorId, resourceId, action));
+        String tenancyId = principal.tenancyId();
+        grants.remove(new GrantKey(actorId, resourceId, action, tenancyId));
     }
 
     @Override
     public void revokeAll(String actorId, String resourceId) {
+        String tenancyId = principal.tenancyId();
         for (AclAction action : AclAction.values()) {
-            grants.remove(new GrantKey(actorId, resourceId, action));
+            grants.remove(new GrantKey(actorId, resourceId, action, tenancyId));
         }
     }
 
     @Override
     public void registerParent(String childResourceId, String parentResourceId) {
-        parents.put(childResourceId, parentResourceId);
+        parents.put(new ParentKey(childResourceId, principal.tenancyId()), parentResourceId);
     }
 
     @Override
     public List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
-        Set<String> candidates = buildCandidateSet(actorId);
-        String      prefix     = resourceType + ":";
-        Set<String> seen       = new LinkedHashSet<>();
+        Set<String> candidates   = buildCandidateSet(actorId);
+        String      prefix       = resourceType + ":";
+        boolean     filterTenant = shouldFilterByTenant();
+        String      tenancyId    = principal.tenancyId();
+        Set<String> seen         = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
                 && entry.action() == action
                 && entry.resourceId().startsWith(prefix)
-                && !entry.isExpired()) {
+                && !entry.isExpired()
+                && (!filterTenant || tenancyId.equals(entry.tenancyId()))) {
                 seen.add(entry.resourceId());
             }
         }
@@ -79,7 +88,7 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
         candidates.add(actorId);
-        for (String group : groupMembership.groupsOf(actorId)) {
+        for (String group : groupMembership.groupsOf(actorId, principal.tenancyId())) {
             candidates.add("group:" + group);
         }
         return candidates;
@@ -88,16 +97,34 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     private boolean canAccessWithCandidates(Set<String> candidates, String resourceId,
                                             AclAction action, int depth) {
         if (depth > 20) {return false;}
+        boolean filterTenant = shouldFilterByTenant();
+        String  tenancyId    = principal.tenancyId();
         for (String candidate : candidates) {
-            AclEntry entry = grants.get(new GrantKey(candidate, resourceId, action));
-            if (entry != null && !entry.isExpired()) {return true;}
+            if (filterTenant) {
+                AclEntry entry = grants.get(new GrantKey(candidate, resourceId, action, tenancyId));
+                if (entry != null && !entry.isExpired()) {return true;}
+            } else {
+                for (var entry : grants.entrySet()) {
+                    var k = entry.getKey();
+                    if (k.actorId().equals(candidate) && k.resourceId().equals(resourceId)
+                        && k.action() == action && entry.getValue() != null && !entry.getValue().isExpired()) {
+                        return true;
+                    }
+                }
+            }
         }
-        String parent = parents.get(resourceId);
+        String parent = parents.get(new ParentKey(resourceId, tenancyId));
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent, action, depth + 1);
         }
         return false;
     }
 
-    private record GrantKey(String actorId, String resourceId, AclAction action) {}
+    private boolean shouldFilterByTenant() {
+        return !principal.isCrossTenantAdmin();
+    }
+
+    private record GrantKey(String actorId, String resourceId, AclAction action, String tenancyId) {}
+
+    private record ParentKey(String childResourceId, String tenancyId) {}
 }

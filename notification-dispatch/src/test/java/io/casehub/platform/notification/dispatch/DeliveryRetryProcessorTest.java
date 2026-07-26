@@ -73,7 +73,7 @@ class DeliveryRetryProcessorTest {
 
         processor.tick();
 
-        var found = store.findBySource(attempt.sourceId(), DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource(attempt.sourceId(), DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found.getFirst().attemptCount()).isEqualTo(2);
         assertThat(found.getFirst().status()).isEqualTo(DeliveryStatus.RETRYING);
         assertThat(found.getFirst().nextRetryAt()).isAfter(Instant.now());
@@ -87,7 +87,7 @@ class DeliveryRetryProcessorTest {
 
         processor.tick();
 
-        var found = store.findBySource(attempt.sourceId(), DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource(attempt.sourceId(), DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found.getFirst().status()).isEqualTo(DeliveryStatus.EXPIRED);
     }
 
@@ -151,7 +151,7 @@ class DeliveryRetryProcessorTest {
 
         processor.tick();
 
-        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found.getFirst().status()).isEqualTo(DeliveryStatus.RETRYING);
     }
 

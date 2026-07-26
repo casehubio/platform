@@ -27,6 +27,10 @@ public class NoOpDeliveryAttemptStore implements DeliveryAttemptStore {
         return null;
     }
 
+    @Override
+    public DeliveryAttempt findById(String id, String tenancyId) {
+        return null;
+    }
 
     @Override
     public List<DeliveryAttempt> claimRetryable(Instant now, int batchSize) {
@@ -39,7 +43,7 @@ public class NoOpDeliveryAttemptStore implements DeliveryAttemptStore {
     }
 
     @Override
-    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<DeliveryAttempt> findBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return List.of();
     }
 
@@ -47,12 +51,12 @@ public class NoOpDeliveryAttemptStore implements DeliveryAttemptStore {
     public void recordEngagement(EngagementEvent event) {}
 
     @Override
-    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId) {
+    public List<EngagementEvent> findEngagementsByAttemptId(String attemptId, String tenancyId) {
         return List.of();
     }
 
     @Override
-    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType) {
+    public List<EngagementEvent> findEngagementsBySource(String sourceId, DeliverySourceType sourceType, String tenancyId) {
         return List.of();
     }
 }

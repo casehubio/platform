@@ -44,7 +44,7 @@ class InAppEngagementBridgeTest {
         store.store(attempt);
         var notification = testNotification("notif-1", NotificationStatus.READ);
         bridge.onStatusChanged(new NotificationStatusChanged(notification, NotificationStatus.UNREAD));
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().type()).isEqualTo(EngagementType.OPENED);
     }
@@ -55,7 +55,7 @@ class InAppEngagementBridgeTest {
         store.store(attempt);
         var notification = testNotification("notif-1", NotificationStatus.DISMISSED);
         bridge.onStatusChanged(new NotificationStatusChanged(notification, NotificationStatus.READ));
-        var events = store.findEngagementsByAttemptId(attempt.id());
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().type()).isEqualTo(EngagementType.DISMISSED);
     }
@@ -77,7 +77,7 @@ class InAppEngagementBridgeTest {
         store.store(emailAttempt);
         var notification = testNotification("notif-1", NotificationStatus.READ);
         bridge.onStatusChanged(new NotificationStatusChanged(notification, NotificationStatus.UNREAD));
-        assertThat(store.findEngagementsByAttemptId(emailAttempt.id())).isEmpty();
+        assertThat(store.findEngagementsByAttemptId(emailAttempt.id(), "tenant-1")).isEmpty();
     }
 
     @Test
@@ -89,7 +89,7 @@ class InAppEngagementBridgeTest {
         store.store(attempt);
         var notification = testNotification("notif-1", NotificationStatus.READ);
         disabledBridge.onStatusChanged(new NotificationStatusChanged(notification, NotificationStatus.UNREAD));
-        assertThat(store.findEngagementsByAttemptId(attempt.id())).isEmpty();
+        assertThat(store.findEngagementsByAttemptId(attempt.id(), "tenant-1")).isEmpty();
     }
 
     @Test
@@ -102,8 +102,8 @@ class InAppEngagementBridgeTest {
                 testNotification("notif-1", NotificationStatus.READ), NotificationStatus.UNREAD));
         bridge.onStatusChanged(new NotificationStatusChanged(
                 testNotification("notif-2", NotificationStatus.READ), NotificationStatus.UNREAD));
-        assertThat(store.findEngagementsByAttemptId(attempt1.id())).hasSize(1);
-        assertThat(store.findEngagementsByAttemptId(attempt2.id())).hasSize(1);
+        assertThat(store.findEngagementsByAttemptId(attempt1.id(), "tenant-1")).hasSize(1);
+        assertThat(store.findEngagementsByAttemptId(attempt2.id(), "tenant-1")).hasSize(1);
         assertThat(firedEvents).hasSize(2);
     }
 

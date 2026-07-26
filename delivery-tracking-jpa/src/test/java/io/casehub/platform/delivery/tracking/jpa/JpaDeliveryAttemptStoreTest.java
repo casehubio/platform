@@ -31,7 +31,7 @@ class JpaDeliveryAttemptStoreTest {
         var attempt = attempt("notif-1", DeliveryStatus.DELIVERED);
         store.store(attempt);
 
-        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found).hasSize(1);
         assertThat(found.getFirst().id()).isEqualTo(attempt.id());
         assertThat(found.getFirst().channelId()).isEqualTo("email");
@@ -53,7 +53,7 @@ class JpaDeliveryAttemptStoreTest {
                 attempt.firstOpenedAt(), attempt.firstClickedAt());
         store.update(updated);
 
-        var found = store.findBySource("src-1", DeliverySourceType.NOTIFICATION);
+        var found = store.findBySource("src-1", DeliverySourceType.NOTIFICATION, "tenant-1");
         assertThat(found.getFirst().status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(found.getFirst().attemptCount()).isEqualTo(3);
         assertThat(found.getFirst().deliveredAt()).isNotNull();
@@ -98,7 +98,7 @@ class JpaDeliveryAttemptStoreTest {
     @Test
     @TestTransaction
     void findBySourceReturnsEmptyForUnknown() {
-        assertThat(store.findBySource("unknown", DeliverySourceType.NOTIFICATION)).isEmpty();
+        assertThat(store.findBySource("unknown", DeliverySourceType.NOTIFICATION, "tenant-1")).isEmpty();
     }
 
     // --- helpers ---
@@ -114,11 +114,11 @@ class JpaDeliveryAttemptStoreTest {
                 UUIDv7.generate(), attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.OPENED, now, "{\"source\":\"pixel\"}");
         store.recordEngagement(event);
-        var found = store.findEngagementsByAttemptId(attempt.id());
+        var found = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
         assertThat(found).hasSize(1);
         assertThat(found.getFirst().type()).isEqualTo(EngagementType.OPENED);
         assertThat(found.getFirst().metadata()).isEqualTo("{\"source\":\"pixel\"}");
-        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION).getFirst();
+        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1").getFirst();
         assertThat(updated.firstOpenedAt()).isEqualTo(now);
     }
 
@@ -135,7 +135,7 @@ class JpaDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 UUIDv7.generate(), attempt.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-1", "tenant-1",
                 EngagementType.OPENED, second, null));
-        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION).getFirst();
+        var updated = store.findBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1").getFirst();
         assertThat(updated.firstOpenedAt()).isEqualTo(first);
     }
 
@@ -152,7 +152,7 @@ class JpaDeliveryAttemptStoreTest {
         store.recordEngagement(new EngagementEvent(
                 UUIDv7.generate(), a2.id(), "notif-1", DeliverySourceType.NOTIFICATION, "email", "user-2", "tenant-1",
                 EngagementType.CLICKED, Instant.now(), null));
-        assertThat(store.findEngagementsBySource("notif-1", DeliverySourceType.NOTIFICATION)).hasSize(2);
+        assertThat(store.findEngagementsBySource("notif-1", DeliverySourceType.NOTIFICATION, "tenant-1")).hasSize(2);
     }
 
     private DeliveryAttempt attempt(String sourceId, DeliveryStatus status) {

@@ -1,12 +1,11 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
-import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.DeliveryChannels;
+import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.EngagementType;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
@@ -36,8 +35,8 @@ public class InAppEngagementBridge {
         if (!enabled) {
             return;
         }
-        var notification = event.notification();
-        var newStatus = notification.status();
+        var            notification = event.notification();
+        var            newStatus    = notification.status();
         EngagementType type;
         if (newStatus == NotificationStatus.READ) {
             type = EngagementType.OPENED;
@@ -46,16 +45,15 @@ public class InAppEngagementBridge {
         } else {
             return;
         }
-        var attempts = store.findBySource(notification.id(), DeliverySourceType.NOTIFICATION);
+        var attempts = store.findBySource(notification.id(), DeliverySourceType.NOTIFICATION, notification.tenancyId());
         var inAppAttempt = attempts.stream()
-                .filter(a -> DeliveryChannels.IN_APP.equals(a.channelId()))
-                .findFirst()
-                .orElse(null);
+                                   .filter(a -> DeliveryChannels.IN_APP.equals(a.channelId()))
+                                   .findFirst()
+                                   .orElse(null);
         if (inAppAttempt == null) {
             LOG.debugf("No in-app delivery attempt for notification '%s' — skipping engagement bridge",
-                    notification.id());
+                       notification.id());
             return;
         }
-        recorder.record(inAppAttempt, type, null);
-    }
+        recorder.record(inAppAttempt, type, null);}
 }

@@ -40,18 +40,18 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true);
+                fixedPrincipal("tenant-1"), Map.of(), true, null);
 
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(store.findEngagementsByAttemptId(attempt.id())).hasSize(1);
+        assertThat(store.findEngagementsByAttemptId(attempt.id(), "tenant-1")).hasSize(1);
     }
 
     @Test
     void directPathReturns404ForMissingAttempt() {
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true);
+                fixedPrincipal("tenant-1"), Map.of(), true, null);
 
         var response = resource.recordDirect("nonexistent",
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -59,15 +59,15 @@ class EngagementCallbackResourceTest {
     }
 
     @Test
-    void directPathReturns403ForTenantMismatch() {
+    void directPathReturns404ForTenantMismatch() {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("other-tenant"), Map.of(), true);
+                fixedPrincipal("other-tenant"), Map.of(), true, null);
 
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
-        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getStatus()).isEqualTo(404);
     }
 
     @Test
@@ -76,17 +76,17 @@ class EngagementCallbackResourceTest {
         store.store(attempt);
         var handler = new TestCallbackHandler(attempt.id());
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
 
         var response = resource.handleCallback("email", "{\"event\":\"open\"}");
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(store.findEngagementsByAttemptId(attempt.id())).hasSize(1);
+        assertThat(store.findEngagementsByAttemptId(attempt.id(), "tenant-1")).hasSize(1);
     }
 
     @Test
     void callbackPathReturns404ForUnknownChannel() {
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true);
+                fixedPrincipal("tenant-1"), Map.of(), true, null);
 
         var response = resource.handleCallback("unknown", "{}");
         assertThat(response.getStatus()).isEqualTo(404);
@@ -96,7 +96,7 @@ class EngagementCallbackResourceTest {
     void callbackPathSkipsNonexistentAttempts() {
         var handler = new TestCallbackHandler("nonexistent-attempt");
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
 
         var response = resource.handleCallback("email", "{}");
         assertThat(response.getStatus()).isEqualTo(200);
@@ -108,7 +108,7 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), false);
+                fixedPrincipal("tenant-1"), Map.of(), false, null);
 
         var directResponse = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -122,12 +122,12 @@ class EngagementCallbackResourceTest {
     void callbackPathReturns200WhenTranslateThrows() {
         EngagementCallbackHandler handler = new EngagementCallbackHandler() {
             @Override public String channelId() { return "email"; }
-            @Override public List<RawEngagement> translate(String rawPayload) {
+            @Override public List<RawEngagement> translate(String rawPayload, Map<String, String> headers) {
                 throw new RuntimeException("Bad payload");
             }
         };
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
         var response = resource.handleCallback("email", "bad-payload");
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
@@ -137,23 +137,42 @@ class EngagementCallbackResourceTest {
     void callbackPathReturns200WhenTranslateReturnsNull() {
         EngagementCallbackHandler handler = new EngagementCallbackHandler() {
             @Override public String channelId() { return "email"; }
-            @Override public List<RawEngagement> translate(String rawPayload) {
+            @Override public List<RawEngagement> translate(String rawPayload, Map<String, String> headers) {
                 return null;
             }
         };
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
         var response = resource.handleCallback("email", "{}");
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
     }
 
     @Test
+    void callbackPathReturns401WhenTranslateThrowsSecurityException() {
+        EngagementCallbackHandler handler = new EngagementCallbackHandler() {
+            @Override
+            public String channelId() {return "email";}
+
+            @Override
+            public List<RawEngagement> translate(String rawPayload, Map<String, String> headers) {
+                throw new SecurityException("Invalid HMAC signature");
+            }
+        };
+        var resource = new EngagementCallbackResource(store, recorder,
+                                                      fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+        var response = resource.handleCallback("email", "forged-payload");
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(firedEvents).isEmpty();
+    }
+
+
+    @Test
     void directPathReturns400ForNullType() {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true);
+                fixedPrincipal("tenant-1"), Map.of(), true, null);
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(null, null));
         assertThat(response.getStatus()).isEqualTo(400);
@@ -180,7 +199,7 @@ class EngagementCallbackResourceTest {
         private final String attemptId;
         TestCallbackHandler(String attemptId) { this.attemptId = attemptId; }
         @Override public String channelId() { return "email"; }
-        @Override public List<RawEngagement> translate(String rawPayload) {
+        @Override public List<RawEngagement> translate(String rawPayload, Map<String, String> headers) {
             return List.of(new RawEngagement(attemptId, EngagementType.OPENED, null));
         }
     }

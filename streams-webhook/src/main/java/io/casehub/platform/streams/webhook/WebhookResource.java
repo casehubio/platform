@@ -1,5 +1,7 @@
 package io.casehub.platform.streams.webhook;
 
+import io.casehub.platform.api.credentials.CredentialPropertyKeys;
+import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.endpoints.EndpointCapability;
 import io.casehub.platform.api.endpoints.EndpointDescriptor;
 import io.casehub.platform.api.endpoints.EndpointPropertyKeys;
@@ -21,6 +23,8 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -29,29 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * CloudEvents HTTP binding receiver.
- *
- * <p>Accepts structured CloudEvents ({@code application/cloudevents+json}) only (P0).
- * Binary CloudEvents (ce-* headers) deferred to P1+.
- *
- * <p>{@link #publicUrl} is required — Quarkus throws {@code DeploymentException} at
- * startup if {@code casehub.streams.webhook.public-url} is absent.
- *
- * <p>Incoming CloudEvent fields are preserved; only {@code tenancyid} is set/replaced
- * from the registered {@link EndpointDescriptor} (caller-supplied value is overridden).
- *
- * <p>{@code @Startup} forces eager {@code @PostConstruct} so the EventFormat is resolved and
- * the physical receiver is registered before the first HTTP request arrives.
- *
- * <p><b>P0 URL path note:</b> {@code PLATFORM_TENANT_ID = "platform"} (the literal
- * string, not a UUID). For standard single-tenant deployments where desiredstate
- * registers endpoints under {@code DEFAULT_TENANT_ID} (a UUID), the webhook URL
- * includes that UUID as the {@code {tenancyId}} segment
- * (e.g. {@code .../webhook/278776f9-.../my-stream}). For platform-global descriptors,
- * the URL includes the string {@code platform}. Per-tenant webhook routing with cleaner
- * URLs is P1+.
- */
 @Startup
 @ApplicationScoped
 @jakarta.ws.rs.Path("/streams/webhook")
@@ -65,30 +46,36 @@ public class WebhookResource {
     @Inject
     EndpointRegistry endpointRegistry;
 
+    @Inject
+    CredentialResolver credentialResolver;
+
     @ConfigProperty(name = "casehub.streams.webhook.public-url")
-    String publicUrl;   // required — Quarkus DeploymentException at startup if absent
+    String publicUrl;
+
+    @ConfigProperty(name = "casehub.streams.webhook.require-auth", defaultValue = "true")
+    boolean requireAuth;
+
+    @Context
+    HttpHeaders httpHeaders;
 
     private EventFormat eventFormat;
 
     @PostConstruct
     void init() {
-        // Validate CloudEvents format registration
         eventFormat = EventFormatProvider.getInstance().resolveFormat(JsonFormat.CONTENT_TYPE);
         if (eventFormat == null) {
             throw new IllegalStateException(
-                "CloudEvents JSON format not registered — cloudevents-json-jackson missing from classpath");
+                    "CloudEvents JSON format not registered — cloudevents-json-jackson missing from classpath");
         }
 
-        // Self-register the physical webhook receiver as a platform-global endpoint.
-        // PLATFORM_TENANT_ID makes it visible in all tenant-scoped discover() calls.
         endpointRegistry.register(new EndpointDescriptor(
-            Path.of("platform", "streams", "webhook"),
-            TenancyConstants.PLATFORM_TENANT_ID,
-            EndpointType.SERVICE,
-            EndpointProtocol.HTTP,
-            Map.of(EndpointPropertyKeys.URL, publicUrl),
-            null,
-            Set.of(EndpointCapability.RECEIVE)));
+                Path.of("platform", "streams", "webhook"),
+                TenancyConstants.PLATFORM_TENANT_ID,
+                EndpointType.SERVICE,
+                EndpointProtocol.HTTP,
+                Map.of(EndpointPropertyKeys.URL, publicUrl),
+                null,
+                Set.of(EndpointCapability.RECEIVE)));
     }
 
     @POST
@@ -104,26 +91,49 @@ public class WebhookResource {
             incoming = eventFormat.deserialize(body);
         } catch (RuntimeException e) {
             return Response.status(400)
-                .entity("Invalid CloudEvent body: " + e.getMessage())
-                .build();
+                           .entity("Invalid CloudEvent body: " + e.getMessage())
+                           .build();
         }
 
         Optional<EndpointDescriptor> descriptor =
-            endpointRegistry.resolve(Path.of("streams", streamId), tenancyIdFromPath);
+                endpointRegistry.resolve(Path.of("streams", streamId), tenancyIdFromPath);
         if (descriptor.isEmpty()) {
             return Response.status(404).build();
         }
 
-        // Preserve all incoming fields; set/replace tenancyid from operator-authoritative descriptor.
+        Response authFailure = validateCredentials(descriptor.get(), streamId);
+        if (authFailure != null) {
+            return authFailure;
+        }
+
         CloudEvent enriched = CloudEventBuilder.from(incoming)
-            .withExtension("tenancyid", descriptor.get().tenancyId())
-            .build();
+                                               .withExtension("tenancyid", descriptor.get().tenancyId())
+                                               .build();
 
         cloudEventBus.fireAsync(enriched)
-            .whenComplete((e, t) -> {
-                if (t != null) LOG.warnf(t, "CloudEvent observer failed for stream %s", streamId);
-            });
+                     .whenComplete((e, t) -> {
+                         if (t != null) {LOG.warnf(t, "CloudEvent observer failed for stream %s", streamId);}
+                     });
 
         return Response.accepted().build();
+    }
+
+    private Response validateCredentials(EndpointDescriptor descriptor, String streamId) {
+        if (descriptor.credentialRef() != null) {
+            Map<String, String> creds         = credentialResolver.resolve(descriptor.credentialRef());
+            String              expectedToken = creds.get(CredentialPropertyKeys.BEARER_TOKEN);
+            if (expectedToken != null) {
+                String authHeader = httpHeaders.getHeaderString("Authorization");
+                if (authHeader == null || !authHeader.equals("Bearer " + expectedToken)) {
+                    return Response.status(401).build();
+                }
+            }
+        } else if (requireAuth) {
+            LOG.warnf("Webhook endpoint streams/%s has no credentialRef — rejected (require-auth=true). " +
+                      "Set credentialRef on the EndpointDescriptor or set casehub.streams.webhook.require-auth=false",
+                      streamId);
+            return Response.status(401).build();
+        }
+        return null;
     }
 }

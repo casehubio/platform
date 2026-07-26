@@ -31,11 +31,12 @@ public class JpaAccessControlProvider implements AccessControlProvider {
     @Override
     @Transactional
     public void grant(String actorId, String resourceId, AclAction action, Instant expires) {
-        Instant now = Instant.now();
+        Instant now       = Instant.now();
+        String  tenancyId = principal.tenancyId();
 
         List<AclEntryEntity> existing = AclEntryEntity.list(
-                "actorId = ?1 and resourceId = ?2 and action = ?3",
-                actorId, resourceId, action.name());
+                "actorId = ?1 and resourceId = ?2 and action = ?3 and tenancyId = ?4",
+                actorId, resourceId, action.name(), tenancyId);
         if (!existing.isEmpty()) {
             AclEntryEntity entry = existing.getFirst();
             entry.expiresAt = expires;
@@ -48,7 +49,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
             entry.action     = action.name();
             entry.grantedAt  = now;
             entry.expiresAt  = expires;
-            entry.tenancyId  = principal.tenancyId();
+            entry.tenancyId  = tenancyId;
             entry.persist();
         }
 
@@ -60,16 +61,17 @@ public class JpaAccessControlProvider implements AccessControlProvider {
         log.performedBy = principal.actorId();
         log.performedAt = now;
         log.expiresAt   = expires;
-        log.tenancyId   = principal.tenancyId();
+        log.tenancyId   = tenancyId;
         log.persist();
     }
 
     @Override
     @Transactional
     public void revoke(String actorId, String resourceId, AclAction action) {
+        String tenancyId = principal.tenancyId();
         long count = AclEntryEntity.delete(
-                "actorId = ?1 and resourceId = ?2 and action = ?3",
-                actorId, resourceId, action.name());
+                "actorId = ?1 and resourceId = ?2 and action = ?3 and tenancyId = ?4",
+                actorId, resourceId, action.name(), tenancyId);
         if (count > 0) {
             AclAuditLogEntity log = new AclAuditLogEntity();
             log.actorId     = actorId;
@@ -78,7 +80,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
             log.operation   = "REVOKE";
             log.performedBy = principal.actorId();
             log.performedAt = Instant.now();
-            log.tenancyId   = principal.tenancyId();
+            log.tenancyId   = tenancyId;
             log.persist();
         }
     }
@@ -86,9 +88,11 @@ public class JpaAccessControlProvider implements AccessControlProvider {
     @Override
     @Transactional
     public void revokeAll(String actorId, String resourceId) {
-        Instant now = Instant.now();
+        Instant now       = Instant.now();
+        String  tenancyId = principal.tenancyId();
         List<AclEntryEntity> entries = AclEntryEntity.list(
-                "actorId = ?1 and resourceId = ?2", actorId, resourceId);
+                "actorId = ?1 and resourceId = ?2 and tenancyId = ?3",
+                actorId, resourceId, tenancyId);
         for (AclEntryEntity entry : entries) {
             AclAuditLogEntity log = new AclAuditLogEntity();
             log.actorId     = actorId;
@@ -97,21 +101,24 @@ public class JpaAccessControlProvider implements AccessControlProvider {
             log.operation   = "REVOKE";
             log.performedBy = principal.actorId();
             log.performedAt = now;
-            log.tenancyId   = principal.tenancyId();
+            log.tenancyId   = tenancyId;
             log.persist();
         }
-        AclEntryEntity.delete("actorId = ?1 and resourceId = ?2", actorId, resourceId);
+        AclEntryEntity.delete("actorId = ?1 and resourceId = ?2 and tenancyId = ?3",
+                              actorId, resourceId, tenancyId);
     }
 
     @Override
     @Transactional
     public void registerParent(String childResourceId, String parentResourceId) {
-        ResourceParentEntity existing = ResourceParentEntity.findById(childResourceId);
+        String tenancyId = principal.tenancyId();
+        ResourceParentEntity existing = ResourceParentEntity.findById(
+                new ResourceParentKey(childResourceId, tenancyId));
         if (existing == null) {
             ResourceParentEntity rp = new ResourceParentEntity();
             rp.childResourceId  = childResourceId;
             rp.parentResourceId = parentResourceId;
-            rp.tenancyId        = principal.tenancyId();
+            rp.tenancyId        = tenancyId;
             rp.persist();
         } else {
             existing.parentResourceId = parentResourceId;
@@ -124,6 +131,18 @@ public class JpaAccessControlProvider implements AccessControlProvider {
         Set<String> candidates = buildCandidateSet(actorId);
         String      escaped    = resourceType.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         String      prefix     = escaped + ":%";
+        if (shouldFilterByTenant()) {
+            return AclEntryEntity.find(
+                                         "select distinct e.resourceId from AclEntryEntity e " +
+                                         "where e.action = ?1 " +
+                                         "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                         "and e.actorId in ?3 " +
+                                         "and e.resourceId like ?4 escape '\\' " +
+                                         "and e.tenancyId = ?5",
+                                         action.name(), Instant.now(), candidates, prefix, principal.tenancyId())
+                                 .project(String.class)
+                                 .list();
+        }
         return AclEntryEntity.find(
                                      "select distinct e.resourceId from AclEntryEntity e " +
                                      "where e.action = ?1 " +
@@ -138,7 +157,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
         candidates.add(actorId);
-        for (String group : groupMembership.groupsOf(actorId)) {
+        for (String group : groupMembership.groupsOf(actorId, principal.tenancyId())) {
             candidates.add("group:" + group);
         }
         return candidates;
@@ -148,16 +167,29 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                             AclAction action, int depth) {
         if (depth > 20) {return false;}
 
-        long count = AclEntryEntity.count(
-                "actorId in ?1 and resourceId = ?2 and action = ?3 " +
-                "and (expiresAt is null or expiresAt > ?4)",
-                candidates, resourceId, action.name(), Instant.now());
-        if (count > 0) {return true;}
+        if (shouldFilterByTenant()) {
+            long count = AclEntryEntity.count(
+                    "actorId in ?1 and resourceId = ?2 and action = ?3 " +
+                    "and (expiresAt is null or expiresAt > ?4) and tenancyId = ?5",
+                    candidates, resourceId, action.name(), Instant.now(), principal.tenancyId());
+            if (count > 0) {return true;}
+        } else {
+            long count = AclEntryEntity.count(
+                    "actorId in ?1 and resourceId = ?2 and action = ?3 " +
+                    "and (expiresAt is null or expiresAt > ?4)",
+                    candidates, resourceId, action.name(), Instant.now());
+            if (count > 0) {return true;}
+        }
 
-        ResourceParentEntity parent = ResourceParentEntity.findById(resourceId);
+        ResourceParentEntity parent = ResourceParentEntity.findById(
+                new ResourceParentKey(resourceId, principal.tenancyId()));
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent.parentResourceId, action, depth + 1);
         }
         return false;
+    }
+
+    private boolean shouldFilterByTenant() {
+        return !principal.isCrossTenantAdmin();
     }
 }

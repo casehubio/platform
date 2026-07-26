@@ -29,6 +29,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Inject
     TestDataCleaner cleaner;
+    @Inject
+    TestCurrentPrincipal testCurrentPrincipal;
+
 
     @Override
     protected AccessControlProvider provider() {
@@ -41,9 +44,20 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     }
 
     @Override
-    protected void clearState() {
-        cleaner.deleteAll();
+    protected String tenancyId() {
+        return "test-tenant";
     }
+
+    @Override
+    protected void setTenancyId(String tenancyId) {
+        testCurrentPrincipal.setTenancyId(tenancyId);
+    }
+
+
+    @Override
+    protected void clearState() {
+        testCurrentPrincipal.setTenancyId("test-tenant");
+        cleaner.deleteAll();}
 
     @Test
     void grant_createsAuditLogEntry() {

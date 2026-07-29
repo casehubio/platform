@@ -68,22 +68,22 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
 
     @Override
     public List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
-        Set<String> candidates   = buildCandidateSet(actorId);
-        String      prefix       = resourceType + ":";
-        boolean     filterTenant = shouldFilterByTenant();
-        String      tenancyId    = principal.tenancyId();
-        Set<String> seen         = new LinkedHashSet<>();
+        Set<String>    candidates    = buildCandidateSet(actorId);
+        String         prefix        = resourceType + ":";
+        boolean        filterTenant  = shouldFilterByTenant();
+        String         tenancyId     = principal.tenancyId();
+        Set<AclAction> satisfyingSet = action.satisfiedBy();
+        Set<String>    seen          = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
-                && entry.action() == action
+                && satisfyingSet.contains(entry.action())
                 && entry.resourceId().startsWith(prefix)
                 && !entry.isExpired()
                 && (!filterTenant || tenancyId.equals(entry.tenancyId()))) {
                 seen.add(entry.resourceId());
             }
         }
-        return new ArrayList<>(seen);
-    }
+        return new ArrayList<>(seen);}
 
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
@@ -100,15 +100,17 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         boolean filterTenant = shouldFilterByTenant();
         String  tenancyId    = principal.tenancyId();
         for (String candidate : candidates) {
-            if (filterTenant) {
-                AclEntry entry = grants.get(new GrantKey(candidate, resourceId, action, tenancyId));
-                if (entry != null && !entry.isExpired()) {return true;}
-            } else {
-                for (var entry : grants.entrySet()) {
-                    var k = entry.getKey();
-                    if (k.actorId().equals(candidate) && k.resourceId().equals(resourceId)
-                        && k.action() == action && entry.getValue() != null && !entry.getValue().isExpired()) {
-                        return true;
+            for (AclAction satisfying : action.satisfiedBy()) {
+                if (filterTenant) {
+                    AclEntry entry = grants.get(new GrantKey(candidate, resourceId, satisfying, tenancyId));
+                    if (entry != null && !entry.isExpired()) {return true;}
+                } else {
+                    for (var entry : grants.entrySet()) {
+                        var k = entry.getKey();
+                        if (k.actorId().equals(candidate) && k.resourceId().equals(resourceId)
+                            && k.action() == satisfying && entry.getValue() != null && !entry.getValue().isExpired()) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -117,8 +119,7 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent, action, depth + 1);
         }
-        return false;
-    }
+        return false;}
 
     private boolean shouldFilterByTenant() {
         return !principal.isCrossTenantAdmin();

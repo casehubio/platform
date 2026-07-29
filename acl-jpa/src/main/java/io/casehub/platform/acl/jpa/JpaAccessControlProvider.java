@@ -128,31 +128,31 @@ public class JpaAccessControlProvider implements AccessControlProvider {
 
     @Override
     public List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
-        Set<String> candidates = buildCandidateSet(actorId);
-        String      escaped    = resourceType.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-        String      prefix     = escaped + ":%";
+        Set<String>  candidates        = buildCandidateSet(actorId);
+        String       escaped           = resourceType.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String       prefix            = escaped + ":%";
+        List<String> satisfyingActions = action.satisfiedBy().stream().map(Enum::name).toList();
         if (shouldFilterByTenant()) {
             return AclEntryEntity.find(
                                          "select distinct e.resourceId from AclEntryEntity e " +
-                                         "where e.action = ?1 " +
+                                         "where e.action in ?1 " +
                                          "and (e.expiresAt is null or e.expiresAt > ?2) " +
                                          "and e.actorId in ?3 " +
                                          "and e.resourceId like ?4 escape '\\' " +
                                          "and e.tenancyId = ?5",
-                                         action.name(), Instant.now(), candidates, prefix, principal.tenancyId())
+                                         satisfyingActions, Instant.now(), candidates, prefix, principal.tenancyId())
                                  .project(String.class)
                                  .list();
         }
         return AclEntryEntity.find(
                                      "select distinct e.resourceId from AclEntryEntity e " +
-                                     "where e.action = ?1 " +
+                                     "where e.action in ?1 " +
                                      "and (e.expiresAt is null or e.expiresAt > ?2) " +
                                      "and e.actorId in ?3 " +
                                      "and e.resourceId like ?4 escape '\\'",
-                                     action.name(), Instant.now(), candidates, prefix)
+                                     satisfyingActions, Instant.now(), candidates, prefix)
                              .project(String.class)
-                             .list();
-    }
+                             .list();}
 
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
@@ -167,17 +167,19 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                             AclAction action, int depth) {
         if (depth > 20) {return false;}
 
+        List<String> satisfyingActions = action.satisfiedBy().stream().map(Enum::name).toList();
+
         if (shouldFilterByTenant()) {
             long count = AclEntryEntity.count(
-                    "actorId in ?1 and resourceId = ?2 and action = ?3 " +
+                    "actorId in ?1 and resourceId = ?2 and action in ?3 " +
                     "and (expiresAt is null or expiresAt > ?4) and tenancyId = ?5",
-                    candidates, resourceId, action.name(), Instant.now(), principal.tenancyId());
+                    candidates, resourceId, satisfyingActions, Instant.now(), principal.tenancyId());
             if (count > 0) {return true;}
         } else {
             long count = AclEntryEntity.count(
-                    "actorId in ?1 and resourceId = ?2 and action = ?3 " +
+                    "actorId in ?1 and resourceId = ?2 and action in ?3 " +
                     "and (expiresAt is null or expiresAt > ?4)",
-                    candidates, resourceId, action.name(), Instant.now());
+                    candidates, resourceId, satisfyingActions, Instant.now());
             if (count > 0) {return true;}
         }
 
@@ -186,8 +188,7 @@ public class JpaAccessControlProvider implements AccessControlProvider {
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent.parentResourceId, action, depth + 1);
         }
-        return false;
-    }
+        return false;}
 
     private boolean shouldFilterByTenant() {
         return !principal.isCrossTenantAdmin();

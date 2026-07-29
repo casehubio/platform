@@ -147,9 +147,10 @@ public abstract class AccessControlProviderContractTest {
 
         List<String> readable = provider().accessibleResources("actor1",
                                                                AclResourceType.CASE, AclAction.READ);
-        assertEquals(2, readable.size());
+        assertEquals(3, readable.size());
         assertTrue(readable.contains("case:abc"));
         assertTrue(readable.contains("case:def"));
+        assertTrue(readable.contains("case:ghi"));
     }
 
     @Test
@@ -186,18 +187,32 @@ public abstract class AccessControlProviderContractTest {
     }
 
     @Test
-    void canAccess_adminAction_worksLikeOtherActions() {
+    void canAccess_adminAction_impliesWriteAndRead() {
         provider().grant("actor1", "case:abc", AclAction.ADMIN, null);
         assertTrue(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
-        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
     }
 
     @Test
-    void canAccess_claimAction_worksLikeOtherActions() {
+    void canAccess_claimAction_isOrthogonal() {
         provider().grant("actor1", "case:abc", AclAction.CLAIM, null);
         assertTrue(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
         assertFalse(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
     }
+
+    @Test
+    void canAccess_writeAction_impliesRead() {
+        provider().grant("actor1", "case:abc", AclAction.WRITE, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
+    }
+
 
     @Test
     void registerParent_depthGuardAt20_returnsFalse() {

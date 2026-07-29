@@ -4,5 +4,19 @@ public enum AclAction {
     READ,
     WRITE,
     ADMIN,
-    CLAIM
+    CLAIM;
+
+    private static final java.util.Set<AclAction> READ_SATISFIED_BY  = java.util.Set.of(READ, WRITE, ADMIN);
+    private static final java.util.Set<AclAction> WRITE_SATISFIED_BY = java.util.Set.of(WRITE, ADMIN);
+    private static final java.util.Set<AclAction> ADMIN_SATISFIED_BY = java.util.Set.of(ADMIN);
+    private static final java.util.Set<AclAction> CLAIM_SATISFIED_BY = java.util.Set.of(CLAIM);
+
+    public java.util.Set<AclAction> satisfiedBy() {
+        return switch (this) {
+            case READ -> READ_SATISFIED_BY;
+            case WRITE -> WRITE_SATISFIED_BY;
+            case ADMIN -> ADMIN_SATISFIED_BY;
+            case CLAIM -> CLAIM_SATISFIED_BY;
+        };
+    }
 }

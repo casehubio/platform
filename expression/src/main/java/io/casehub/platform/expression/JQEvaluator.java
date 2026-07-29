@@ -73,7 +73,8 @@ public class JQEvaluator {
                 for (String name : secretNames) {
                     secretsMap.put(name, secretManager.secret(name));
                 }
-                childScope.setValue("secret", (JsonNode) MAPPER.valueToTree(secretsMap));
+                JsonNode secretsNode = MAPPER.valueToTree(secretsMap);
+                childScope.setValue("secret", secretsNode);
             }
 
             if (!configMapNames.isEmpty()) {
@@ -81,7 +82,8 @@ public class JQEvaluator {
                 for (String name : configMapNames) {
                     configsMap.put(name, configManager.configMap(name));
                 }
-                childScope.setValue("config", (JsonNode) MAPPER.valueToTree(configsMap));
+                JsonNode configsNode = MAPPER.valueToTree(configsMap);
+                childScope.setValue("config", configsNode);
             }
 
             JsonQuery query = queryCache.computeIfAbsent(jqExpr,

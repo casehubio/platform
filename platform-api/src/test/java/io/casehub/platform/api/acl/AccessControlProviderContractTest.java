@@ -11,6 +11,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public abstract class AccessControlProviderContractTest {
@@ -287,6 +289,62 @@ public abstract class AccessControlProviderContractTest {
         assertEquals(1, result.size());
         assertTrue(result.contains("case:abc"));
     }
+
+    @Test
+    void accessibleResources_paginated_returnsFirstPage() {
+        provider().grant("actor1", "case:aaa", AclAction.READ, null);
+        provider().grant("actor1", "case:bbb", AclAction.READ, null);
+        provider().grant("actor1", "case:ccc", AclAction.READ, null);
+
+        AclPage page = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 2));
+        assertEquals(2, page.resourceIds().size());
+        assertNotNull(page.nextCursor());
+    }
+
+    @Test
+    void accessibleResources_paginated_cursorContinuation() {
+        provider().grant("actor1", "case:aaa", AclAction.READ, null);
+        provider().grant("actor1", "case:bbb", AclAction.READ, null);
+        provider().grant("actor1", "case:ccc", AclAction.READ, null);
+
+        AclPage page1 = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 2));
+        AclPage page2 = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, page1.nextCursor(), 2));
+        assertEquals(1, page2.resourceIds().size());
+        assertNull(page2.nextCursor());
+    }
+
+    @Test
+    void accessibleResources_paginated_emptyResult() {
+        AclPage page = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+        assertTrue(page.resourceIds().isEmpty());
+        assertNull(page.nextCursor());
+    }
+
+    @Test
+    void accessibleResources_paginated_allFitInOnePage() {
+        provider().grant("actor1", "case:aaa", AclAction.READ, null);
+        provider().grant("actor1", "case:bbb", AclAction.READ, null);
+
+        AclPage page = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+        assertEquals(2, page.resourceIds().size());
+        assertNull(page.nextCursor());
+    }
+
+    @Test
+    void accessibleResources_paginated_respectsActionHierarchy() {
+        provider().grant("actor1", "case:aaa", AclAction.ADMIN, null);
+        provider().grant("actor1", "case:bbb", AclAction.READ, null);
+
+        AclPage page = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+        assertEquals(2, page.resourceIds().size());
+    }
+
 
     @Test
     void canAccess_differentTenant_returnsFalse() {

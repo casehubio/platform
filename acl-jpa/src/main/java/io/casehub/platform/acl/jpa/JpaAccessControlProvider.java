@@ -2,6 +2,8 @@ package io.casehub.platform.acl.jpa;
 
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
+import io.casehub.platform.api.acl.AclPage;
+import io.casehub.platform.api.acl.AclQuery;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -167,6 +169,78 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                      satisfyingActions, Instant.now(), candidates, prefix)
                              .project(String.class)
                              .list();}
+
+    @Override
+    public AclPage accessibleResources(AclQuery query) {
+        Set<String>  candidates        = buildCandidateSet(query.actorId());
+        String       escaped           = query.resourceType().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String       prefix            = escaped + ":%";
+        List<String> satisfyingActions = query.action().satisfiedBy().stream().map(Enum::name).toList();
+        int          fetchLimit        = query.limit() + 1;
+
+        List<String> results;
+        if (query.cursor() != null) {
+            if (shouldFilterByTenant()) {
+                results = AclEntryEntity.find(
+                                                "select distinct e.resourceId from AclEntryEntity e " +
+                                                "where e.action in ?1 " +
+                                                "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                "and e.actorId in ?3 " +
+                                                "and e.resourceId like ?4 escape '\\' " +
+                                                "and e.tenancyId = ?5 " +
+                                                "and e.resourceId > ?6 " +
+                                                "order by e.resourceId",
+                                                satisfyingActions, Instant.now(), candidates, prefix,
+                                                principal.tenancyId(), query.cursor())
+                                        .page(0, fetchLimit)
+                                        .project(String.class).list();
+            } else {
+                results = AclEntryEntity.find(
+                                                "select distinct e.resourceId from AclEntryEntity e " +
+                                                "where e.action in ?1 " +
+                                                "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                "and e.actorId in ?3 " +
+                                                "and e.resourceId like ?4 escape '\\' " +
+                                                "and e.resourceId > ?5 " +
+                                                "order by e.resourceId",
+                                                satisfyingActions, Instant.now(), candidates, prefix, query.cursor())
+                                        .page(0, fetchLimit)
+                                        .project(String.class).list();
+            }
+        } else {
+            if (shouldFilterByTenant()) {
+                results = AclEntryEntity.find(
+                                                "select distinct e.resourceId from AclEntryEntity e " +
+                                                "where e.action in ?1 " +
+                                                "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                "and e.actorId in ?3 " +
+                                                "and e.resourceId like ?4 escape '\\' " +
+                                                "and e.tenancyId = ?5 " +
+                                                "order by e.resourceId",
+                                                satisfyingActions, Instant.now(), candidates, prefix, principal.tenancyId())
+                                        .page(0, fetchLimit)
+                                        .project(String.class).list();
+            } else {
+                results = AclEntryEntity.find(
+                                                "select distinct e.resourceId from AclEntryEntity e " +
+                                                "where e.action in ?1 " +
+                                                "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                "and e.actorId in ?3 " +
+                                                "and e.resourceId like ?4 escape '\\' " +
+                                                "order by e.resourceId",
+                                                satisfyingActions, Instant.now(), candidates, prefix)
+                                        .page(0, fetchLimit)
+                                        .project(String.class).list();
+            }
+        }
+
+        if (results.size() > query.limit()) {
+            List<String> page = results.subList(0, query.limit());
+            return new AclPage(page, page.getLast());
+        }
+        return new AclPage(results, null);
+    }
+
 
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();

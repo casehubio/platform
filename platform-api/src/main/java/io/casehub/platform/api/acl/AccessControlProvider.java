@@ -34,4 +34,19 @@ public interface AccessControlProvider {
     default List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
         return List.of();
     }
+
+    default AclPage accessibleResources(AclQuery query) {
+        java.util.List<String> all    = accessibleResources(query.actorId(), query.resourceType(), query.action());
+        java.util.List<String> sorted = all.stream().sorted().toList();
+        java.util.List<String> filtered = query.cursor() == null
+                                          ? sorted
+                                          : sorted.stream().filter(id -> id.compareTo(query.cursor()) > 0).toList();
+        int limit = query.limit();
+        if (filtered.size() <= limit) {
+            return new AclPage(filtered, null);
+        }
+        java.util.List<String> page = filtered.subList(0, limit);
+        return new AclPage(page, page.getLast());
+    }
+
 }

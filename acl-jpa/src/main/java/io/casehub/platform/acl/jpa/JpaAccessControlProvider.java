@@ -67,6 +67,13 @@ public class JpaAccessControlProvider implements AccessControlProvider {
 
     @Override
     @Transactional
+    public void grantBatch(java.util.Collection<io.casehub.platform.api.acl.GrantRequest> requests) {
+        requests.forEach(r -> grant(r.actorId(), r.resourceId(), r.action(), r.expiresAt()));
+    }
+
+
+    @Override
+    @Transactional
     public void revoke(String actorId, String resourceId, AclAction action) {
         String tenancyId = principal.tenancyId();
         long count = AclEntryEntity.delete(
@@ -84,6 +91,13 @@ public class JpaAccessControlProvider implements AccessControlProvider {
             log.persist();
         }
     }
+
+    @Override
+    @Transactional
+    public void revokeBatch(java.util.Collection<io.casehub.platform.api.acl.GrantRequest> requests) {
+        requests.forEach(r -> revoke(r.actorId(), r.resourceId(), r.action()));
+    }
+
 
     @Override
     @Transactional

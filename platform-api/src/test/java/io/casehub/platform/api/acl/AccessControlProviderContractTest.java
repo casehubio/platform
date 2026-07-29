@@ -213,6 +213,46 @@ public abstract class AccessControlProviderContractTest {
         assertFalse(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
     }
 
+    @Test
+    void grantBatch_grantsAllEntries() {
+        var requests = List.of(
+                new GrantRequest("actor1", "case:abc", AclAction.READ, null),
+                new GrantRequest("actor1", "case:def", AclAction.WRITE, null),
+                new GrantRequest("group:managers", "case:ghi", AclAction.ADMIN, null));
+        provider().grantBatch(requests);
+
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertTrue(provider().canAccess("actor1", "case:def", AclAction.WRITE));
+        assertTrue(provider().canAccess("actor1", "case:ghi", AclAction.ADMIN));
+    }
+
+    @Test
+    void revokeBatch_revokesAllEntries() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().grant("actor1", "case:def", AclAction.WRITE, null);
+
+        var requests = List.of(
+                new GrantRequest("actor1", "case:abc", AclAction.READ, null),
+                new GrantRequest("actor1", "case:def", AclAction.WRITE, null));
+        provider().revokeBatch(requests);
+
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:def", AclAction.WRITE));
+    }
+
+    @Test
+    void grantBatch_withExpiry_honoured() {
+        var requests = List.of(
+                new GrantRequest("actor1", "case:abc", AclAction.READ,
+                                 Instant.now().plus(1, ChronoUnit.HOURS)),
+                new GrantRequest("actor1", "case:def", AclAction.READ,
+                                 Instant.now().minus(1, ChronoUnit.HOURS)));
+        provider().grantBatch(requests);
+
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:def", AclAction.READ));
+    }
+
 
     @Test
     void registerParent_depthGuardAt20_returnsFalse() {

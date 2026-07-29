@@ -40,4 +40,17 @@ class AccessControlProviderSpiTest {
     void accessibleResources_defaultReturnsEmpty() {
         assertTrue(spi.accessibleResources("actor", AclResourceType.CASE, AclAction.READ).isEmpty());
     }
+
+    @Test
+    void grantBatch_defaultIsNoOp() {
+        assertDoesNotThrow(() -> spi.grantBatch(java.util.List.of(
+                new GrantRequest("actor", "case:abc", AclAction.READ, null))));
+    }
+
+    @Test
+    void revokeBatch_defaultIsNoOp() {
+        assertDoesNotThrow(() -> spi.revokeBatch(java.util.List.of(
+                new GrantRequest("actor", "case:abc", AclAction.READ, null))));
+    }
+
 }

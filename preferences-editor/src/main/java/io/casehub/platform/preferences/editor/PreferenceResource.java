@@ -5,6 +5,8 @@ import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.PreferenceQuery;
 import io.casehub.platform.api.preferences.PreferenceRecord;
+import io.casehub.platform.api.preferences.PreferenceSchemaDescriptor;
+import io.casehub.platform.api.preferences.PreferenceSchemaRegistry;
 import io.casehub.platform.api.preferences.PreferenceStore;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
@@ -19,6 +21,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @ApplicationScoped
 @jakarta.ws.rs.Path("/preferences")
@@ -26,11 +29,21 @@ public class PreferenceResource {
 
     @Inject PreferenceStore store;
     @Inject PreferenceProvider provider;
+    @Inject PreferenceSchemaRegistry schemaRegistry;
+    @Inject PreferenceValidator validator;
     @Inject CurrentPrincipal principal;
 
     @PUT
     public Response set(@QueryParam("scope") String scopeParam, PreferenceInput input) {
         Path scope = parseScopePath(scopeParam);
+        String qualifiedName = input.namespace() + "." + input.name();
+        Optional<PreferenceSchemaDescriptor> descriptor = schemaRegistry.resolve(qualifiedName);
+        if (descriptor.isPresent()) {
+            List<String> violations = validator.validate(descriptor.get(), input.value());
+            if (!violations.isEmpty()) {
+                return Response.status(400).entity(Map.of("violations", violations)).build();
+            }
+        }
         store.set(principal.tenancyId(), scope, input.namespace(), input.name(), input.subKey(), input.value());
         return Response.noContent().build();
     }

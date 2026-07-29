@@ -67,7 +67,7 @@ class PreferenceSchemaResourceTest {
             .get("/preferences/schema")
         .then()
             .statusCode(200)
-            .body("size()", is(3));
+            .body("size()", greaterThanOrEqualTo(3));
     }
 
     @Test

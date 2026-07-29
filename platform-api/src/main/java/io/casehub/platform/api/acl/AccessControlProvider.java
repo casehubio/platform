@@ -49,4 +49,9 @@ public interface AccessControlProvider {
         return new AclPage(page, page.getLast());
     }
 
+    default java.util.List<String> accessibleResourcesIncludingInherited(String actorId, String resourceType, AclAction action) {
+        return accessibleResources(actorId, resourceType, action);
+    }
+
+
 }

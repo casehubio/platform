@@ -83,7 +83,54 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
                 seen.add(entry.resourceId());
             }
         }
-        return new ArrayList<>(seen);}
+        return new ArrayList<>(seen);
+    }
+
+    @Override
+    public List<String> accessibleResourcesIncludingInherited(String actorId, String resourceType, AclAction action) {
+        Set<String>    candidates    = buildCandidateSet(actorId);
+        String         prefix        = resourceType + ":";
+        boolean        filterTenant  = shouldFilterByTenant();
+        String         tenancyId     = principal.tenancyId();
+        Set<AclAction> satisfyingSet = action.satisfiedBy();
+
+        Set<String> directlyGranted = new LinkedHashSet<>();
+        for (var entry : grants.values()) {
+            if (candidates.contains(entry.actorId())
+                && satisfyingSet.contains(entry.action())
+                && !entry.isExpired()
+                && (!filterTenant || tenancyId.equals(entry.tenancyId()))) {
+                directlyGranted.add(entry.resourceId());
+            }
+        }
+
+        Set<String> result = new LinkedHashSet<>();
+        for (String resourceId : directlyGranted) {
+            if (resourceId.startsWith(prefix)) {
+                result.add(resourceId);
+            }
+            collectChildren(resourceId, prefix, tenancyId, filterTenant, result, 0);
+        }
+
+        return new ArrayList<>(result);
+    }
+
+    private void collectChildren(String parentResourceId, String prefix, String tenancyId,
+                                 boolean filterTenant, Set<String> result, int depth) {
+        if (depth > 20) {return;}
+        for (var entry : parents.entrySet()) {
+            ParentKey key = entry.getKey();
+            if (entry.getValue().equals(parentResourceId)
+                && (!filterTenant || tenancyId.equals(key.tenancyId()))) {
+                String childId = key.childResourceId();
+                if (childId.startsWith(prefix)) {
+                    result.add(childId);
+                }
+                collectChildren(childId, prefix, tenancyId, filterTenant, result, depth + 1);
+            }
+        }
+    }
+
 
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
@@ -119,7 +166,8 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent, action, depth + 1);
         }
-        return false;}
+        return false;
+    }
 
     private boolean shouldFilterByTenant() {
         return !principal.isCrossTenantAdmin();

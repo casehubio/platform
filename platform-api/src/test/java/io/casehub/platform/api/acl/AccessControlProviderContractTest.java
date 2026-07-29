@@ -345,6 +345,72 @@ public abstract class AccessControlProviderContractTest {
         assertEquals(2, page.resourceIds().size());
     }
 
+    @Test
+    void accessibleResourcesIncludingInherited_returnsDirectAndInherited() {
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:child1", "case:parent");
+        provider().registerParent("planitem:child2", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertTrue(result.contains("planitem:child1"));
+        assertTrue(result.contains("planitem:child2"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_includesDirectGrants() {
+        provider().grant("actor1", "planitem:direct", AclAction.READ, null);
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:inherited", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertTrue(result.contains("planitem:direct"));
+        assertTrue(result.contains("planitem:inherited"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_respectsActionHierarchy() {
+        provider().grant("actor1", "case:parent", AclAction.ADMIN, null);
+        provider().registerParent("planitem:child", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertTrue(result.contains("planitem:child"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_excludesExpiredParentGrants() {
+        provider().grant("actor1", "case:parent", AclAction.READ,
+                         Instant.now().minus(1, ChronoUnit.HOURS));
+        provider().registerParent("planitem:child", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertFalse(result.contains("planitem:child"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_groupGrantOnParent() {
+        provider().grant("group:managers", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertTrue(result.contains("planitem:child"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_deduplicatesDirectAndInherited() {
+        provider().grant("actor1", "planitem:pi1", AclAction.READ, null);
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:pi1", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+        assertEquals(1, result.stream().filter("planitem:pi1"::equals).count());
+    }
+
 
     @Test
     void canAccess_differentTenant_returnsFalse() {

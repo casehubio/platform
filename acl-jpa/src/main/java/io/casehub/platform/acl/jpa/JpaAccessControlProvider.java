@@ -22,7 +22,10 @@ public class JpaAccessControlProvider implements AccessControlProvider {
     GroupMembershipProvider groupMembership;
 
     @Inject
-    CurrentPrincipal principal;
+    CurrentPrincipal                  principal;
+    @Inject
+    jakarta.persistence.EntityManager entityManager;
+
 
     @Override
     public boolean canAccess(String actorId, String resourceId, AclAction action) {
@@ -168,7 +171,8 @@ public class JpaAccessControlProvider implements AccessControlProvider {
                                      "and e.resourceId like ?4 escape '\\'",
                                      satisfyingActions, Instant.now(), candidates, prefix)
                              .project(String.class)
-                             .list();}
+                             .list();
+    }
 
     @Override
     public AclPage accessibleResources(AclQuery query) {
@@ -241,6 +245,69 @@ public class JpaAccessControlProvider implements AccessControlProvider {
         return new AclPage(results, null);
     }
 
+    @Override
+    public List<String> accessibleResourcesIncludingInherited(String actorId, String resourceType, AclAction action) {
+        Set<String>  candidates        = buildCandidateSet(actorId);
+        String       escaped           = resourceType.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String       prefix            = escaped + ":%";
+        List<String> satisfyingActions = action.satisfiedBy().stream().map(Enum::name).toList();
+
+        List<String> directResources = accessibleResources(actorId, resourceType, action);
+
+        String nativeSql =
+                "WITH RECURSIVE children AS (" +
+                "  SELECT rp.child_resource_id FROM resource_parent rp " +
+                "  WHERE rp.parent_resource_id IN (:grantedResources)" +
+                (shouldFilterByTenant() ? " AND rp.tenancy_id = :tenancyId" : "") +
+                "  UNION " +
+                "  SELECT rp2.child_resource_id FROM resource_parent rp2 " +
+                "  JOIN children c ON rp2.parent_resource_id = c.child_resource_id" +
+                (shouldFilterByTenant() ? " WHERE rp2.tenancy_id = :tenancyId" : "") +
+                ") " +
+                "SELECT child_resource_id FROM children " +
+                "WHERE child_resource_id LIKE :prefix";
+
+        Set<String> allGrantedResources = new java.util.LinkedHashSet<>();
+        if (shouldFilterByTenant()) {
+            List<String> tenantFilteredGrants = AclEntryEntity.find(
+                                                                      "select distinct e.resourceId from AclEntryEntity e " +
+                                                                      "where e.action in ?1 " +
+                                                                      "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                                      "and e.actorId in ?3 " +
+                                                                      "and e.tenancyId = ?4",
+                                                                      satisfyingActions, Instant.now(), candidates, principal.tenancyId())
+                                                              .project(String.class).list();
+            allGrantedResources.addAll(tenantFilteredGrants);
+        } else {
+            List<String> allGrants = AclEntryEntity.find(
+                                                           "select distinct e.resourceId from AclEntryEntity e " +
+                                                           "where e.action in ?1 " +
+                                                           "and (e.expiresAt is null or e.expiresAt > ?2) " +
+                                                           "and e.actorId in ?3",
+                                                           satisfyingActions, Instant.now(), candidates)
+                                                   .project(String.class).list();
+            allGrantedResources.addAll(allGrants);
+        }
+
+        if (allGrantedResources.isEmpty()) {
+            return directResources;
+        }
+
+        @SuppressWarnings("unchecked")
+        jakarta.persistence.Query query = entityManager.createNativeQuery(nativeSql);
+        query.setParameter("grantedResources", allGrantedResources);
+        query.setParameter("prefix", escaped + ":%");
+        if (shouldFilterByTenant()) {
+            query.setParameter("tenancyId", principal.tenancyId());
+        }
+
+        List<String> inheritedChildren = query.getResultList();
+
+        Set<String> result = new java.util.LinkedHashSet<>(directResources);
+        result.addAll(inheritedChildren);
+        return new java.util.ArrayList<>(result);
+    }
+
 
     private Set<String> buildCandidateSet(String actorId) {
         Set<String> candidates = new HashSet<>();
@@ -276,7 +343,8 @@ public class JpaAccessControlProvider implements AccessControlProvider {
         if (parent != null) {
             return canAccessWithCandidates(candidates, parent.parentResourceId, action, depth + 1);
         }
-        return false;}
+        return false;
+    }
 
     private boolean shouldFilterByTenant() {
         return !principal.isCrossTenantAdmin();

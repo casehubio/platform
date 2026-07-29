@@ -1,8 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
-import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
-
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestBuffer;
@@ -28,6 +27,7 @@ import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
 import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.TargetType;
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -73,7 +73,7 @@ class NotificationDispatcherTest {
         // Register in-app channel with capturing deliverer
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO, null, null),
+                        false, true, NotificationSeverity.INFO, null, null, null),
                 new CapturingDeliverer(DeliveryChannels.IN_APP, deliveredNotifications));
 
         final GroupMembershipProvider groupProvider = (groupName, tenancyId) -> {
@@ -231,7 +231,7 @@ class NotificationDispatcherTest {
         var failingDeliverer = new FailingDeliverer("email");
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.INFO, null, null),
+                        true, true, NotificationSeverity.INFO, null, null, null),
                 failingDeliverer);
 
         var sub = subscription(
@@ -251,7 +251,7 @@ class NotificationDispatcherTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null, null),
                 new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
 
         var sub = subscription(
@@ -275,7 +275,7 @@ class NotificationDispatcherTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null),
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null, null),
                 new CapturingDeliverer(DeliveryChannels.EMAIL, deliveredNotifications));
 
         var urgentTemplate = new NotificationTemplate(
@@ -293,6 +293,92 @@ class NotificationDispatcherTest {
         assertThat(deliveredNotifications).hasSize(2);
         assertThat(digestBuffer.buffered).isEmpty();
     }
+
+    @Test
+    void dispatch_perTenantChannel_deliversOnceForMultipleRecipients() {
+        var slackCaptured = new ArrayList<NotificationInput>();
+        channelRegistry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO, null, null,
+                                              DestinationScope.PER_TENANT),
+                new CapturingDeliverer("slack", slackCaptured));
+
+        var targets = List.of(
+                new NotificationTarget(TargetType.USER, "user1"),
+                new NotificationTarget(TargetType.USER, "user2"),
+                new NotificationTarget(TargetType.USER, "user3"));
+        var sub = subscription(targets, true);
+        dispatcher.onMatch(new SubscriptionMatched(sub,
+                                                   new TestEvent("E1", "actor1", "open")));
+
+        assertThat(slackCaptured).hasSize(1);
+        assertThat(deliveredNotifications).hasSize(3);
+    }
+
+    @Test
+    void dispatch_perTenantChannel_mixedWithPerUser_bothWork() {
+        var slackCaptured = new ArrayList<NotificationInput>();
+        var emailCaptured = new ArrayList<NotificationInput>();
+        channelRegistry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO, null, null,
+                                              DestinationScope.PER_TENANT),
+                new CapturingDeliverer("slack", slackCaptured));
+        channelRegistry.register(
+                new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email", true, true,
+                                              NotificationSeverity.INFO, null, null, null),
+                new CapturingDeliverer(DeliveryChannels.EMAIL, emailCaptured));
+
+        var targets = List.of(
+                new NotificationTarget(TargetType.USER, "user1"),
+                new NotificationTarget(TargetType.USER, "user2"));
+        dispatcher.onMatch(new SubscriptionMatched(subscription(targets, true),
+                                                   new TestEvent("E1", "actor1", "open")));
+
+        assertThat(slackCaptured).hasSize(1);
+        assertThat(emailCaptured).hasSize(2);
+    }
+
+    @Test
+    void dispatch_perTenantChannel_deliveryFailure_propagatesFailure() {
+        channelRegistry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO, null, null,
+                                              DestinationScope.PER_TENANT),
+                new FailingDeliverer("slack"));
+
+        var targets = List.of(
+                new NotificationTarget(TargetType.USER, "user1"),
+                new NotificationTarget(TargetType.USER, "user2"));
+        dispatcher.onMatch(new SubscriptionMatched(subscription(targets, true),
+                                                   new TestEvent("E1", "actor1", "open")));
+
+        assertThat(deliveredNotifications).hasSize(2);
+    }
+
+    @Test
+    void dispatch_perTenantChannel_suppressedUserSkipped_nextUserDelivers() {
+        var slackCaptured = new ArrayList<NotificationInput>();
+        channelRegistry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO, null, null,
+                                              DestinationScope.PER_TENANT),
+                new CapturingDeliverer("slack", slackCaptured));
+
+        suppressionStore.snooze = new Snooze(
+                "user1", TENANT,
+                NOW.plus(1, ChronoUnit.HOURS), NOW);
+
+        var targets = List.of(
+                new NotificationTarget(TargetType.USER, "user1"),
+                new NotificationTarget(TargetType.USER, "user2"));
+        dispatcher.onMatch(new SubscriptionMatched(subscription(targets, true),
+                                                   new TestEvent("E1", "actor1", "open")));
+
+        assertThat(slackCaptured).hasSize(1);
+        assertThat(slackCaptured.getFirst().userId()).isEqualTo("user2");
+    }
+
 
     // --- helpers ---
 

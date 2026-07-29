@@ -11,7 +11,7 @@ class DeliveryChannelDescriptorTest {
     void acceptsNullGuaranteedMinSeverity() {
         var desc = new DeliveryChannelDescriptor(
                 "in_app", "In-App", false, true,
-                NotificationSeverity.INFO, null, null);
+                NotificationSeverity.INFO, null, null, null);
         assertThat(desc.guaranteedMinSeverity()).isNull();
     }
 
@@ -19,7 +19,23 @@ class DeliveryChannelDescriptorTest {
     void carriesGuaranteedMinSeverity() {
         var desc = new DeliveryChannelDescriptor(
                 "email", "Email", true, true,
-                NotificationSeverity.INFO, null, NotificationSeverity.WARNING);
+                NotificationSeverity.INFO, null, NotificationSeverity.WARNING, null);
         assertThat(desc.guaranteedMinSeverity()).isEqualTo(NotificationSeverity.WARNING);
+    }
+
+    @Test
+    void defaultDestinationScopeIsPerUser() {
+        var desc = new DeliveryChannelDescriptor(
+                "test", "Test", true, false,
+                NotificationSeverity.WARNING, null, null, null);
+        assertThat(desc.destinationScope()).isEqualTo(DestinationScope.PER_USER);
+    }
+
+    @Test
+    void carriesDestinationScope() {
+        var desc = new DeliveryChannelDescriptor(
+                "test", "Test", true, false,
+                NotificationSeverity.WARNING, null, null, DestinationScope.PER_TENANT);
+        assertThat(desc.destinationScope()).isEqualTo(DestinationScope.PER_TENANT);
     }
 }

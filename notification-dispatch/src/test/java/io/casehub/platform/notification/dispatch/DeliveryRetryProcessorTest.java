@@ -202,7 +202,7 @@ class DeliveryRetryProcessorTest {
 
     private DeliveryChannelDescriptor emailDescriptor() {
         return new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                true, true, NotificationSeverity.INFO, null, NotificationSeverity.WARNING);
+                true, true, NotificationSeverity.INFO, null, NotificationSeverity.WARNING, null);
     }
 
     private static class SuccessDeliverer implements NotificationDeliverer {

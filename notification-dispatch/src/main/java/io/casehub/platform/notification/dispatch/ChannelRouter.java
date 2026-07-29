@@ -2,16 +2,15 @@ package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.NotificationDeliverer;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.settings.ChannelPreference;
 import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.SuppressionResult;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-
 import org.jboss.logging.Logger;
 
 import java.util.LinkedHashSet;
@@ -47,10 +46,10 @@ public class ChannelRouter {
     /**
      * Route a notification to eligible channels.
      *
-     * @param channelDefaults  user's per-channel preferences (keyed by channelId)
+     * @param channelDefaults   user's per-channel preferences (keyed by channelId)
      * @param suppressionResult suppression evaluation result
-     * @param severity         notification severity
-     * @param quietHoursAction action to take during quiet hours (null = SUPPRESS)
+     * @param severity          notification severity
+     * @param quietHoursAction  action to take during quiet hours (null = SUPPRESS)
      * @return set of resolved channels with deliverer references and suppression flags
      */
     public Set<ResolvedChannel> route(final Map<String, ChannelPreference> channelDefaults,
@@ -62,37 +61,32 @@ public class ChannelRouter {
         for (final DeliveryChannelDescriptor descriptor : channelRegistry.discover()) {
             final String channelId = descriptor.channelId();
 
-            // Determine effective preference: user preference takes priority over channel default
-            final ChannelPreference userPref = channelDefaults.get(channelId);
-            final boolean enabled;
+            final ChannelPreference    userPref = channelDefaults.get(channelId);
+            final boolean              enabled;
             final NotificationSeverity minSeverity;
 
             if (userPref != null) {
-                enabled = userPref.enabled();
+                enabled     = userPref.enabled();
                 minSeverity = userPref.minSeverity();
             } else {
-                enabled = descriptor.defaultEnabled();
+                enabled     = descriptor.defaultEnabled();
                 minSeverity = descriptor.defaultMinSeverity();
             }
 
-            // Skip disabled channels
             if (!enabled) {
                 continue;
             }
 
-            // Skip if severity is below minimum threshold
             if (!severity.isAtLeast(minSeverity)) {
                 continue;
             }
 
-            // Resolve deliverer
             final NotificationDeliverer deliverer = channelRegistry.resolveDeliverer(channelId)
-                    .orElse(null);
+                                                                   .orElse(null);
             if (deliverer == null) {
                 continue;
             }
 
-            // Determine effective digest schedule: user preference overrides channel default
             final DigestSchedule effectiveDigest;
             if (userPref != null && userPref.digestSchedule() != null) {
                 effectiveDigest = userPref.digestSchedule();
@@ -100,33 +94,29 @@ public class ChannelRouter {
                 effectiveDigest = descriptor.defaultDigestSchedule();
             }
 
-            // Quiet hours buffering: if BUFFER_FOR_DIGEST and quiet hours active, route to digest
             final boolean quietHoursBuffering = suppressionResult.quietHoursActive()
-                    && quietHoursAction == QuietHoursAction.BUFFER_FOR_DIGEST
-                    && effectiveDigest != null;
+                                                && quietHoursAction == QuietHoursAction.BUFFER_FOR_DIGEST
+                                                && effectiveDigest != null
+                                                && descriptor.destinationScope() != DestinationScope.PER_TENANT;
 
-            // Log warning if BUFFER_FOR_DIGEST requested but no digest schedule available
             if (suppressionResult.quietHoursActive()
-                    && quietHoursAction == QuietHoursAction.BUFFER_FOR_DIGEST
-                    && effectiveDigest == null) {
+                && quietHoursAction == QuietHoursAction.BUFFER_FOR_DIGEST
+                && effectiveDigest == null) {
                 LOG.warnf("BUFFER_FOR_DIGEST on channel %s but no digest schedule — notification suppressed",
-                        channelId);
+                          channelId);
             }
 
-            // Determine suppression: external channels suppressed during snooze OR
-            // (quiet hours AND NOT buffering)
             final boolean suppressed = descriptor.external()
-                    && (suppressionResult.isSnoozed()
-                        || (suppressionResult.quietHoursActive() && !quietHoursBuffering));
+                                       && (suppressionResult.isSnoozed()
+                                           || (suppressionResult.quietHoursActive() && !quietHoursBuffering));
 
-            // Determine digested: external, has digest schedule, AND
-            // (severity < URGENT OR quiet hours buffering)
             final boolean digested = descriptor.external()
-                    && effectiveDigest != null
-                    && (!severity.isAtLeast(NotificationSeverity.URGENT) || quietHoursBuffering);
+                                     && effectiveDigest != null
+                                     && (!severity.isAtLeast(NotificationSeverity.URGENT) || quietHoursBuffering)
+                                     && descriptor.destinationScope() != DestinationScope.PER_TENANT;
 
             result.add(new ResolvedChannel(channelId, deliverer, suppressed, digested,
-                    descriptor.guaranteedMinSeverity()));
+                                           descriptor.guaranteedMinSeverity(), descriptor.destinationScope()));
         }
 
         return result;

@@ -1,7 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
-import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
 import io.casehub.platform.api.delivery.DigestSchedule;
@@ -11,7 +11,7 @@ import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.settings.ChannelPreference;
 import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.SuppressionResult;
-
+import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,20 +36,20 @@ class ChannelRouterTest {
         // Register in-app: internal, default enabled, INFO
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App Inbox",
-                        false, true, NotificationSeverity.INFO, null, null),
+                        false, true, NotificationSeverity.INFO, null, null, null),
                 IN_APP_DELIVERER);
 
         // Register email: external, default enabled, WARNING, with digest schedule
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.WARNING,
-                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null, null),
                 EMAIL_DELIVERER);
 
         // Register SMS: external, default disabled, URGENT, no digest
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.SMS, "SMS",
-                        true, false, NotificationSeverity.URGENT, null, null),
+                        true, false, NotificationSeverity.URGENT, null, null, null),
                 SMS_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -206,7 +206,7 @@ class ChannelRouterTest {
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null, null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -228,7 +228,7 @@ class ChannelRouterTest {
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null, null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -249,7 +249,7 @@ class ChannelRouterTest {
         registry = new InMemoryDeliveryChannelRegistry();
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.IN_APP, "In-App",
-                        false, true, NotificationSeverity.INFO, null, null),
+                        false, true, NotificationSeverity.INFO, null, null, null),
                 IN_APP_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -270,7 +270,7 @@ class ChannelRouterTest {
         registry = new InMemoryDeliveryChannelRegistry();
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
-                        true, true, NotificationSeverity.INFO, null, null),
+                        true, true, NotificationSeverity.INFO, null, null, null),
                 EMAIL_DELIVERER);
 
         router = new ChannelRouter(registry);
@@ -313,7 +313,7 @@ class ChannelRouterTest {
         registry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO, null,
-                        NotificationSeverity.WARNING),
+                        NotificationSeverity.WARNING, null),
                 EMAIL_DELIVERER);
         router = new ChannelRouter(registry);
 
@@ -391,6 +391,67 @@ class ChannelRouterTest {
         assertThat(email.get().digested()).isTrue();
         assertThat(email.get().suppressed()).isTrue();
     }
+
+    @Test
+    void route_propagatesDestinationScope() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO, null, null,
+                                              DestinationScope.PER_TENANT),
+                new StubDeliverer("slack"));
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                                  new SuppressionResult(false, false, false),
+                                  NotificationSeverity.INFO, null);
+
+        assertThat(result).filteredOn(rc -> rc.channelId().equals("slack"))
+                          .extracting(ResolvedChannel::destinationScope)
+                          .containsExactly(DestinationScope.PER_TENANT);
+    }
+
+    @Test
+    void route_perTenantChannel_neverDigested() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO,
+                                              new DigestSchedule.Interval(Duration.ofHours(1)),
+                                              null, DestinationScope.PER_TENANT),
+                new StubDeliverer("slack"));
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                                  new SuppressionResult(false, false, false),
+                                  NotificationSeverity.INFO, null);
+
+        assertThat(result).filteredOn(rc -> rc.channelId().equals("slack"))
+                          .extracting(ResolvedChannel::digested)
+                          .containsExactly(false);
+    }
+
+    @Test
+    void route_perTenantChannel_quietHoursBuffering_stillSuppressed() {
+        registry = new InMemoryDeliveryChannelRegistry();
+        registry.register(
+                new DeliveryChannelDescriptor("slack", "Slack", true, true,
+                                              NotificationSeverity.INFO,
+                                              new DigestSchedule.Interval(Duration.ofHours(1)),
+                                              null, DestinationScope.PER_TENANT),
+                new StubDeliverer("slack"));
+        router = new ChannelRouter(registry);
+
+        var result = router.route(Map.of(),
+                                  new SuppressionResult(false, false, true),
+                                  NotificationSeverity.INFO,
+                                  QuietHoursAction.BUFFER_FOR_DIGEST);
+
+        assertThat(result).filteredOn(rc -> rc.channelId().equals("slack"))
+                          .extracting(ResolvedChannel::suppressed)
+                          .containsExactly(true);
+    }
+
 
     // --- helpers ---
 

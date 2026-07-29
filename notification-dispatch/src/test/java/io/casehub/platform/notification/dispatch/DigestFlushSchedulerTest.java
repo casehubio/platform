@@ -66,7 +66,7 @@ class DigestFlushSchedulerTest {
         channelRegistry.register(
                 new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
                         true, true, NotificationSeverity.INFO,
-                        new DigestSchedule.Interval(Duration.ofHours(4)), null),
+                        new DigestSchedule.Interval(Duration.ofHours(4)), null, null),
                 emailDeliverer);
 
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,

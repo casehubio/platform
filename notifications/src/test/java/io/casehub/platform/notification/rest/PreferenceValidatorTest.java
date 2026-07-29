@@ -69,7 +69,7 @@ class PreferenceValidatorTest {
         var descriptor = new DeliveryChannelDescriptor(
                 "email", "Email", true, true,
                 NotificationSeverity.INFO,
-                new DigestSchedule.Interval(Duration.ofHours(1)), null);
+                new DigestSchedule.Interval(Duration.ofHours(1)), null, null);
         when(channelRegistry.discover()).thenReturn(Set.of(descriptor));
 
         var quietHours = new QuietHours(

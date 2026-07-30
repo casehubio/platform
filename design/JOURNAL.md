@@ -1,1 +1,1 @@
-# Design Journal — issue-210-acl-completion-s-batch
+# Design Journal — issue-198-preference-schema-versioning

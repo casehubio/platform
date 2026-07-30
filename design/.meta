@@ -1,9 +1,9 @@
-branch: issue-210-acl-completion-s-batch
-project-sha: 10a4b9b70ee1f0df9701194b57023bce8b0ff6b0
+branch: issue-198-preference-schema-versioning
+project-sha: edeaf916aedd06f66b10ec5ebb9911b28b117c8a
 date: 2026-07-30
-issue: 
-issue-repo: 
-covers: 
-flyway-next-v: unknown
+issue: 198
+issue-repo: casehubio/platform
+covers: 198
+flyway-next-v: none
 design-repo: project
-design-section-hashes: 
+design-section-hashes:

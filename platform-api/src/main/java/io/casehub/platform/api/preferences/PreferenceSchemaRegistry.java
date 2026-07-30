@@ -10,4 +10,6 @@ public interface PreferenceSchemaRegistry {
     Optional<PreferenceSchemaDescriptor> resolve(String qualifiedName);
 
     Set<PreferenceSchemaDescriptor> discover();
+
+    default long version() { return 0L; }
 }

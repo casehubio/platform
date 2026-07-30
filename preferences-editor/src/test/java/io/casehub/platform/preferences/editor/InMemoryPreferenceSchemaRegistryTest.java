@@ -59,4 +59,25 @@ class InMemoryPreferenceSchemaRegistryTest {
         assertEquals(1, registry.discover().size());
         assertEquals("Second", registry.resolve("test.count").get().label());
     }
+
+    @Test
+    void version_starts_at_zero() {
+        assertEquals(0L, registry.version());
+    }
+
+    @Test
+    void version_increments_on_register() {
+        registry.register(PreferenceSchemaDescriptor.of(KEY_A).label("A").build());
+        assertEquals(1L, registry.version());
+        registry.register(PreferenceSchemaDescriptor.of(KEY_B).label("B").build());
+        assertEquals(2L, registry.version());
+    }
+
+    @Test
+    void version_increments_on_overwrite() {
+        registry.register(PreferenceSchemaDescriptor.of(KEY_A).label("First").build());
+        assertEquals(1L, registry.version());
+        registry.register(PreferenceSchemaDescriptor.of(KEY_A).label("Second").build());
+        assertEquals(2L, registry.version());
+    }
 }

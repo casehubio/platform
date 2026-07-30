@@ -20,6 +20,7 @@ import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
 class PreferenceSchemaResourceTest {
@@ -155,5 +156,75 @@ class PreferenceSchemaResourceTest {
         .then()
             .statusCode(200)
             .body("find { it.qualifiedName == 'casehub.platform.debug.enabled' }.description", nullValue());
+    }
+
+    @Test
+    void get_schema_returns_etag_header() {
+        given()
+        .when()
+            .get("/preferences/schema")
+        .then()
+            .statusCode(200)
+            .header("ETag", notNullValue());
+    }
+
+    @Test
+    void get_schema_with_matching_if_none_match_returns_304() {
+        String etag = given()
+            .when()
+                .get("/preferences/schema")
+            .then()
+                .statusCode(200)
+                .extract().header("ETag");
+
+        given()
+            .header("If-None-Match", etag)
+        .when()
+            .get("/preferences/schema")
+        .then()
+            .statusCode(304);
+    }
+
+    @Test
+    void get_schema_with_stale_if_none_match_returns_200() {
+        given()
+            .header("If-None-Match", "\"stale-value\"")
+        .when()
+            .get("/preferences/schema")
+        .then()
+            .statusCode(200)
+            .header("ETag", notNullValue())
+            .body("size()", greaterThanOrEqualTo(3));
+    }
+
+    @Test
+    void get_schema_without_if_none_match_returns_200_with_etag() {
+        given()
+        .when()
+            .get("/preferences/schema")
+        .then()
+            .statusCode(200)
+            .header("ETag", notNullValue())
+            .body("size()", greaterThanOrEqualTo(3));
+    }
+
+    @Test
+    void etag_is_same_regardless_of_namespace_filter() {
+        String etagAll = given()
+            .when()
+                .get("/preferences/schema")
+            .then()
+                .statusCode(200)
+                .extract().header("ETag");
+
+        String etagFiltered = given()
+            .queryParam("namespace", "casehub.work")
+        .when()
+            .get("/preferences/schema")
+        .then()
+            .statusCode(200)
+            .extract().header("ETag");
+
+        assertEquals(etagAll, etagFiltered);
     }
 }

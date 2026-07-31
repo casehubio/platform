@@ -30,6 +30,7 @@
         <module>agent-langchain4j</module>
         <module>acl-inmem</module>
         <module>acl-jpa</module>
+        <module>acl-admin</module>
         <module>notifications-inmem</module>
         <module>notifications-jpa</module>
         <module>notifications</module>

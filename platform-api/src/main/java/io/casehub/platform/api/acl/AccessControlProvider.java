@@ -12,7 +12,7 @@ public interface AccessControlProvider {
     default void grant(String actorId, String resourceId, AclAction action, Instant expires) {
     }
 
-    default void grantBatch(java.util.Collection<GrantRequest> requests) {
+    default void grantBatch(java.util.Collection<AclEntryRequest> requests) {
         requests.forEach(r -> grant(r.actorId(), r.resourceId(), r.action(), r.expiresAt()));
     }
 
@@ -20,8 +20,22 @@ public interface AccessControlProvider {
     default void revoke(String actorId, String resourceId, AclAction action) {
     }
 
-    default void revokeBatch(java.util.Collection<GrantRequest> requests) {
+    default void revokeBatch(java.util.Collection<AclEntryRequest> requests) {
         requests.forEach(r -> revoke(r.actorId(), r.resourceId(), r.action()));
+    }
+
+    default void deny(String actorId, String resourceId, AclAction action, Instant expires) {
+    }
+
+    default void removeDeny(String actorId, String resourceId, AclAction action) {
+    }
+
+    default void denyBatch(java.util.Collection<AclEntryRequest> requests) {
+        requests.forEach(r -> deny(r.actorId(), r.resourceId(), r.action(), r.expiresAt()));
+    }
+
+    default void removeDenyBatch(java.util.Collection<AclEntryRequest> requests) {
+        requests.forEach(r -> removeDeny(r.actorId(), r.resourceId(), r.action()));
     }
 
 

@@ -15,14 +15,15 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "acl_entry",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_acl_entry",
-                columnNames = {"actor_id", "resource_id", "action", "tenancy_id"}),
-        indexes = {
-                @Index(name = "idx_acl_actor_resource", columnList = "actor_id, resource_id"),
-                @Index(name = "idx_acl_resource", columnList = "resource_id"),
-                @Index(name = "idx_acl_tenancy", columnList = "tenancy_id")
-        })
+       uniqueConstraints = @UniqueConstraint(
+               name = "uq_acl_entry",
+               columnNames = {"actor_id", "resource_id", "action", "tenancy_id", "entry_type"}),
+       indexes = {
+               @Index(name = "idx_acl_actor_resource", columnList = "actor_id, resource_id"),
+               @Index(name = "idx_acl_resource", columnList = "resource_id"),
+               @Index(name = "idx_acl_tenancy", columnList = "tenancy_id"),
+               @Index(name = "idx_acl_entry_type", columnList = "entry_type")
+       })
 public class AclEntryEntity extends PanacheEntityBase {
 
     @Id
@@ -38,6 +39,9 @@ public class AclEntryEntity extends PanacheEntityBase {
 
     @Column(nullable = false)
     public String action;
+
+    @Column(name = "entry_type", nullable = false)
+    public String entryType = "ALLOW";
 
     @Column(name = "condition")
     public String condition;

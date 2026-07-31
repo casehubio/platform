@@ -19,4 +19,19 @@ public enum AclAction {
             case CLAIM -> CLAIM_SATISFIED_BY;
         };
     }
+
+    private static final java.util.Set<AclAction> READ_DENIED_BY  = java.util.Set.of(READ);
+    private static final java.util.Set<AclAction> WRITE_DENIED_BY = java.util.Set.of(READ, WRITE);
+    private static final java.util.Set<AclAction> ADMIN_DENIED_BY = java.util.Set.of(READ, WRITE, ADMIN);
+    private static final java.util.Set<AclAction> CLAIM_DENIED_BY = java.util.Set.of(CLAIM);
+
+    public java.util.Set<AclAction> deniedBy() {
+        return switch (this) {
+            case READ -> READ_DENIED_BY;
+            case WRITE -> WRITE_DENIED_BY;
+            case ADMIN -> ADMIN_DENIED_BY;
+            case CLAIM -> CLAIM_DENIED_BY;
+        };
+    }
+
 }

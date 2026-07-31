@@ -218,9 +218,9 @@ public abstract class AccessControlProviderContractTest {
     @Test
     void grantBatch_grantsAllEntries() {
         var requests = List.of(
-                new GrantRequest("actor1", "case:abc", AclAction.READ, null),
-                new GrantRequest("actor1", "case:def", AclAction.WRITE, null),
-                new GrantRequest("group:managers", "case:ghi", AclAction.ADMIN, null));
+                new AclEntryRequest("actor1", "case:abc", AclAction.READ, null),
+                new AclEntryRequest("actor1", "case:def", AclAction.WRITE, null),
+                new AclEntryRequest("group:managers", "case:ghi", AclAction.ADMIN, null));
         provider().grantBatch(requests);
 
         assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
@@ -234,8 +234,8 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:def", AclAction.WRITE, null);
 
         var requests = List.of(
-                new GrantRequest("actor1", "case:abc", AclAction.READ, null),
-                new GrantRequest("actor1", "case:def", AclAction.WRITE, null));
+                new AclEntryRequest("actor1", "case:abc", AclAction.READ, null),
+                new AclEntryRequest("actor1", "case:def", AclAction.WRITE, null));
         provider().revokeBatch(requests);
 
         assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
@@ -245,10 +245,10 @@ public abstract class AccessControlProviderContractTest {
     @Test
     void grantBatch_withExpiry_honoured() {
         var requests = List.of(
-                new GrantRequest("actor1", "case:abc", AclAction.READ,
-                                 Instant.now().plus(1, ChronoUnit.HOURS)),
-                new GrantRequest("actor1", "case:def", AclAction.READ,
-                                 Instant.now().minus(1, ChronoUnit.HOURS)));
+                new AclEntryRequest("actor1", "case:abc", AclAction.READ,
+                                    Instant.now().plus(1, ChronoUnit.HOURS)),
+                new AclEntryRequest("actor1", "case:def", AclAction.READ,
+                                    Instant.now().minus(1, ChronoUnit.HOURS)));
         provider().grantBatch(requests);
 
         assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
@@ -452,4 +452,308 @@ public abstract class AccessControlProviderContractTest {
         setTenancyId(tenancyId());
         assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
     }
+// --- Wildcard grants ---
+
+    @Test
+    void canAccess_wildcardGrant_matchesInstance() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_doesNotMatchDifferentType() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "planitem:pi1", AclAction.READ));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_respectsActionHierarchy() {
+        provider().grant("actor1", "case:*", AclAction.ADMIN, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_respectsExpiry() {
+        provider().grant("actor1", "case:*", AclAction.READ,
+                         Instant.now().minus(1, ChronoUnit.HOURS));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_respectsGroupMembership() {
+        provider().grant("group:managers", "case:*", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_respectsTenantIsolation() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        setTenancyId("other-tenant");
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        setTenancyId(tenancyId());
+    }
+
+    @Test
+    void canAccess_noColonInResourceId_noWildcardCheck() {
+        provider().grant("actor1", "foobar", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "foobar", AclAction.READ));
+        provider().grant("actor1", "*", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "anything", AclAction.READ));
+    }
+
+    @Test
+    void accessibleResources_wildcardGrant_includesWildcardInResults() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        List<String> result = provider().accessibleResources("actor1",
+                                                             AclResourceType.CASE, AclAction.READ);
+        assertTrue(result.contains("case:*"));
+        assertTrue(result.contains("case:abc"));
+    }
+
+    @Test
+    void accessibleResources_wildcardGrant_paginatedIncludesWildcard() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().grant("actor1", "case:aaa", AclAction.READ, null);
+        provider().grant("actor1", "case:bbb", AclAction.READ, null);
+
+        AclPage page = provider().accessibleResources(
+                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+        assertTrue(page.resourceIds().contains("case:*"));
+    }
+
+    @Test
+    void accessibleResourcesIncludingInherited_wildcardGrant_passesThrough() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().registerParent("planitem:child1", "case:parent");
+
+        List<String> result = provider().accessibleResourcesIncludingInherited(
+                "actor1", AclResourceType.CASE, AclAction.READ);
+        assertTrue(result.contains("case:*"));
+    }
+
+    @Test
+    void canAccess_wildcardGrant_claimAction_satisfiesOnlyClaim() {
+        provider().grant("actor1", "case:*", AclAction.CLAIM, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
+    }
+// --- Deny entries ---
+
+    @Test
+    void deny_blocksInstanceGrant() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void deny_blocksWildcardGrant() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertTrue(provider().canAccess("actor1", "case:def", AclAction.READ));
+    }
+
+    @Test
+    void deny_wildcardDeny_blocksAllOfType() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:*", AclAction.READ, null);
+        // instance grant overrides wildcard deny (specificity wins)
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        // no instance grant for def, wildcard deny blocks wildcard grant
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:def", AclAction.READ));
+    }
+
+    @Test
+    void deny_actionSpecific_claimDenyDoesNotBlockRead() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.CLAIM, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.CLAIM));
+    }
+
+    @Test
+    void deny_cascadesViadeniedBy_readDenyBlocksWriteAndAdmin() {
+        provider().grant("actor1", "case:abc", AclAction.ADMIN, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
+    }
+
+    @Test
+    void deny_cascadesViadeniedBy_writeDenyBlocksAdminNotRead() {
+        provider().grant("actor1", "case:abc", AclAction.ADMIN, null);
+        provider().deny("actor1", "case:abc", AclAction.WRITE, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.WRITE));
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.ADMIN));
+    }
+
+    @Test
+    void deny_respectsExpiry() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ,
+                        Instant.now().minus(1, ChronoUnit.HOURS));
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void deny_respectsTenantIsolation() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        setTenancyId("other-tenant");
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        setTenancyId(tenancyId());
+    }
+
+    @Test
+    void deny_respectsGroupMembership() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("group:managers", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void removeDeny_restoresAccess() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        provider().removeDeny("actor1", "case:abc", AclAction.READ);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void revokeAll_alsoClearsDenies() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        provider().revokeAll("actor1", "case:abc");
+        // both grant and deny removed — default behavior (canAccess returns false for real impls)
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        // re-grant should work (deny was cleared)
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+    }
+
+    @Test
+    void denyBatch_deniesAll() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().grant("actor1", "case:def", AclAction.WRITE, null);
+        var requests = List.of(
+                new AclEntryRequest("actor1", "case:abc", AclAction.READ, null),
+                new AclEntryRequest("actor1", "case:def", AclAction.WRITE, null));
+        provider().denyBatch(requests);
+        assertFalse(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertFalse(provider().canAccess("actor1", "case:def", AclAction.WRITE));
+    }
+
+    @Test
+    void removeDenyBatch_restoresAll() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().grant("actor1", "case:def", AclAction.WRITE, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:def", AclAction.WRITE, null);
+        var requests = List.of(
+                new AclEntryRequest("actor1", "case:abc", AclAction.READ, null),
+                new AclEntryRequest("actor1", "case:def", AclAction.WRITE, null));
+        provider().removeDenyBatch(requests);
+        assertTrue(provider().canAccess("actor1", "case:abc", AclAction.READ));
+        assertTrue(provider().canAccess("actor1", "case:def", AclAction.WRITE));
+    }
+
+    @Test
+    void accessibleResources_excludesDeniedInstances() {
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().grant("actor1", "case:def", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        List<String> result = provider().accessibleResources("actor1",
+                                                             AclResourceType.CASE, AclAction.READ);
+        assertFalse(result.contains("case:abc"));
+        assertTrue(result.contains("case:def"));
+    }
+
+    @Test
+    void accessibleResources_wildcardGrantWithDeny_wildcardPlusDeniedExcluded() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        provider().deny("actor1", "case:abc", AclAction.READ, null);
+        List<String> result = provider().accessibleResources("actor1",
+                                                             AclResourceType.CASE, AclAction.READ);
+        assertTrue(result.contains("case:*"));
+        assertFalse(result.contains("case:abc"));
+    }
+
+    @Test
+    void accessibleResources_wildcardDeny_suppressesWildcardGrant() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().deny("actor1", "case:*", AclAction.READ, null);
+        provider().grant("actor1", "case:abc", AclAction.READ, null);
+        List<String> result = provider().accessibleResources("actor1",
+                                                             AclResourceType.CASE, AclAction.READ);
+        assertFalse(result.contains("case:*"));
+        assertTrue(result.contains("case:abc"));
+    }
+
+    @Test
+    void deny_wildcardDenyPlusWildcardGrant_denyWinsAtSameLevel() {
+        provider().grant("actor1", "case:*", AclAction.READ, null);
+        provider().deny("actor1", "case:*", AclAction.READ, null);
+        assertFalse(provider().canAccess("actor1", "case:def", AclAction.READ));
+    }
+// --- Deny + parent chain interaction ---
+
+    @Test
+    void deny_onParent_blocksChildInheritance() {
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().deny("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+        assertFalse(provider().canAccess("actor1", "planitem:child", AclAction.READ));
+    }
+
+    @Test
+    void deny_onParent_directGrantOnChild_allowed() {
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().deny("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+        provider().grant("actor1", "planitem:child", AclAction.READ, null);
+        assertTrue(provider().canAccess("actor1", "planitem:child", AclAction.READ));
+    }
+
+    @Test
+    void deny_wildcardOnParentType_blocksChildInheritance() {
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().deny("actor1", "case:*", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+        // instance grant on parent overrides wildcard deny on parent type (specificity)
+        assertTrue(provider().canAccess("actor1", "planitem:child", AclAction.READ));
+    }
+
+    @Test
+    void deny_wildcardOnParentType_instanceGrantOnParent_childInherits() {
+        provider().grant("actor1", "case:parent", AclAction.READ, null);
+        provider().deny("actor1", "case:*", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+        // parent has instance grant (specificity > wildcard deny) → child inherits
+        assertTrue(provider().canAccess("actor1", "planitem:child", AclAction.READ));
+    }
+
+    @Test
+    void deny_onParent_groupGrantOnParent_actorDenied() {
+        provider().grant("group:managers", "case:parent", AclAction.READ, null);
+        provider().deny("actor1", "case:parent", AclAction.READ, null);
+        provider().registerParent("planitem:child", "case:parent");
+        // both instance-level on parent: deny wins over grant (same specificity, deny first)
+        assertFalse(provider().canAccess("actor1", "planitem:child", AclAction.READ));
+    }
+
+
 }

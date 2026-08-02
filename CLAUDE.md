@@ -70,6 +70,20 @@ git push --force mdproctor main   # --force on first push after fork creation
 Living docs — check for drift after significant changes:
 - `ARC42STORIES.MD` — primary architecture record; check §4 (layer taxonomy), §5 (building block view), §8 (new layers), §13 (glossary) after module, SPI, or structural changes
 
+## Platform Docs
+- [Platform Index](https://raw.githubusercontent.com/casehubio/parent/main/docs/INDEX.md) — discovery index (start here)
+- [Building Platform](https://raw.githubusercontent.com/casehubio/parent/main/docs/guides/building-platform.md) — platform contributor guide
+
+## Repo Guide
+
+This repo owns its own documentation, synced to parent via CI:
+- `docs/guides/consumer-guide.md` — for app builders: modules, APIs, quick start
+- `docs/guides/contributor-guide.md` — for platform builders: architecture, SPIs, internals
+
+Update the relevant guide in the same session when implementation changes modules, SPIs, or public APIs. Do not defer — drift compounds.
+
+Read `docs/guides/consumer-guide.md` for app-level work. Only read `docs/guides/contributor-guide.md` when modifying this repo's internals or extension points.
+
 ## Rules
 
 - `platform-api/` must remain zero-dependency — no Quarkus, no JPA, no casehubio imports. Pure Java only.

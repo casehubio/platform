@@ -238,6 +238,7 @@ Both implementations share the same resolution algorithm:
 - `PreferenceSchemaDescriptor` -- carries type, constraints, enum options. Builder infers type from `PreferenceKey.defaultValue()` class.
 - `PreferenceValidator` -- validates values against schema constraints at write time. Returns `List<String>` violations. Supports integer, number, boolean, duration, string (with minLength/maxLength/pattern), and enum validation.
 - Schema versioning via `version()` monotonic counter -- `PreferenceSchemaResource` returns ETag based on version, supports 304 Not Modified via `request.evaluatePreconditions()`.
+- `PlatformPreferenceRegistrar` (`@ApplicationScoped` in platform/) -- canonical `@Observes StartupEvent` registrar. Registers 6 retention `PreferenceSchemaDescriptor` entries from `PlatformPreferenceKeys`. Domain modules follow the same pattern with their own keys class + registrar bean.
 
 ### Subject View Architecture
 

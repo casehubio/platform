@@ -159,6 +159,25 @@ SmallRye Config is for deployment configuration (DB URLs, pool sizes). `Preferen
 
 **PreferenceValidator:** Server-side validation against schema constraints. Validates type parsing (integer, number, boolean, duration) and constraint checking (`min`, `max`, `minLength`, `maxLength`, `pattern` regex, enum options). Constraint keys are constants in `PreferenceConstraintKeys`.
 
+**Registering preference schemas:** Each module registers its preference key metadata at startup so UIs can discover and render editors. Define `PreferenceKey<T>` constants in a keys class, then create an `@ApplicationScoped` registrar bean:
+
+```java
+@ApplicationScoped
+public class MyPreferenceRegistrar {
+    @Inject PreferenceSchemaRegistry registry;
+
+    void onStart(@Observes StartupEvent event) {
+        registry.register(PreferenceSchemaDescriptor.of(MyPreferenceKeys.RETENTION_DAYS)
+                .label("Retention (days)")
+                .description("Days to retain records before purge")
+                .constraints(Map.of(PreferenceConstraintKeys.MIN, 1, PreferenceConstraintKeys.MAX, 3650))
+                .build());
+    }
+}
+```
+
+`PlatformPreferenceRegistrar` in `platform/` is the canonical example — it registers 6 retention preference schemas. Type is inferred from the key's `defaultValue` (`IntPreference` → `"integer"`, `BooleanPreference` → `"boolean"`). When `preferences-editor/` is on the classpath, `InMemoryPreferenceSchemaRegistry` captures registrations; otherwise `NoOpPreferenceSchemaRegistry` silently drops them.
+
 ### DataSource and Alpha Network
 
 Rete-style event routing: `DataSource<T>` ingests objects, `ObjectType<T>` discriminates by type, `FilterExpression<T>` evaluates predicates. Four `subscribe()` overloads with increasing specificity. Self-pruning deregistration lifecycle handles shutdown gracefully.

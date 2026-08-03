@@ -8,10 +8,10 @@ import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceSchemaDescriptor;
 import io.casehub.platform.api.preferences.PreferenceSchemaRegistry;
 import io.casehub.platform.api.preferences.SingleValuePreference;
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import io.quarkus.runtime.StartupEvent;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +19,10 @@ import java.util.List;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
@@ -73,15 +76,15 @@ class PreferenceSchemaResourceTest {
 
     @Test
     void get_schema_sorted_by_qualifiedName() {
-        given()
-        .when()
-            .get("/preferences/schema")
-        .then()
-            .statusCode(200)
-            .body("[0].qualifiedName", is("casehub.platform.debug.enabled"))
-            .body("[1].qualifiedName", is("casehub.work.delegation.decline-target"))
-            .body("[2].qualifiedName", is("casehub.work.sla.default-hours"));
-    }
+        var names = given()
+                            .when()
+                            .get("/preferences/schema")
+                            .then()
+                            .statusCode(200)
+                            .extract().jsonPath().getList("qualifiedName", String.class);
+
+        var sorted = names.stream().sorted().toList();
+        assertEquals(sorted, names);}
 
     @Test
     void get_schema_entry_has_correct_shape() {

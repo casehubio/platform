@@ -1,11 +1,14 @@
 package io.casehub.platform.acl.jpa;
 
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
@@ -19,8 +22,8 @@ public class AclRetentionPurge {
     @Inject
     EntityManager entityManager;
 
-    @ConfigProperty(name = "casehub.acl.retention.audit-days", defaultValue = "365")
-    int auditRetentionDays;
+    @Inject
+    PreferenceProvider preferenceProvider;
 
     @Scheduled(cron = "${casehub.acl.retention.expired-purge-cron:0 0 3 * * ?}")
     @Transactional
@@ -38,6 +41,9 @@ public class AclRetentionPurge {
     @Scheduled(cron = "${casehub.acl.retention.audit-purge-cron:0 30 3 * * ?}")
     @Transactional
     void purgeAuditLog() {
+        int auditRetentionDays = preferenceProvider.resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                                                   .getOrDefault(PlatformPreferenceKeys.ACL_AUDIT_RETENTION_DAYS).value();
+
         Instant cutoff = Instant.now().minus(Duration.ofDays(auditRetentionDays));
         int purged = entityManager.createQuery(
                                           "DELETE FROM AclAuditLogEntity e " +

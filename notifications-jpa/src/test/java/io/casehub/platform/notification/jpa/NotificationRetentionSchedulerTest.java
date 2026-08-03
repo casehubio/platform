@@ -18,8 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @QuarkusTest
 class NotificationRetentionSchedulerTest {
 
-    @Inject NotificationRetentionScheduler scheduler;
-    @Inject EntityManager em;
+    @Inject
+    NotificationRetentionScheduler scheduler;
+    @Inject
+    EntityManager                  em;
 
     @BeforeEach
     @Transactional
@@ -94,5 +96,6 @@ class NotificationRetentionSchedulerTest {
         entity.sourceActorId    = "actor-1";
         entity.status           = status;
         entity.createdAt        = createdAt;
-        em.persist(entity);}
+        em.persist(entity);
+    }
 }

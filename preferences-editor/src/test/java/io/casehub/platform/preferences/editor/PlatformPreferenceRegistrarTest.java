@@ -16,15 +16,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @QuarkusTest
 class PlatformPreferenceRegistrarTest {
 
-    @Inject PreferenceSchemaRegistry registry;
+    @Inject
+    PreferenceSchemaRegistry registry;
 
     @Test
     void all_platform_keys_are_registered() {
         Set<PreferenceSchemaDescriptor> all = registry.discover();
         var qualifiedNames = all.stream()
-                .map(PreferenceSchemaDescriptor::qualifiedName)
-                .filter(n -> n.startsWith("casehub.platform."))
-                .toList();
+                                .map(PreferenceSchemaDescriptor::qualifiedName)
+                                .filter(n -> n.startsWith("casehub.platform."))
+                                .toList();
 
         assertTrue(qualifiedNames.contains("casehub.platform.notification.retention-days"));
         assertTrue(qualifiedNames.contains("casehub.platform.notification.unread-retention-days"));
@@ -64,5 +65,6 @@ class PlatformPreferenceRegistrarTest {
             if (!expectedKeys.contains(d.qualifiedName())) {continue;}
             assertNotNull(d.label(), d.qualifiedName() + " missing label");
             assertFalse(d.constraints().isEmpty(), d.qualifiedName() + " missing constraints");
-        }}
+        }
+    }
 }

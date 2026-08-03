@@ -8,7 +8,12 @@ import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.EngagementEvent;
 import io.casehub.platform.api.delivery.EngagementType;
-
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.preferences.IntPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceKey;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -34,14 +39,8 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     @ConfigProperty(name = "casehub.delivery.retry.claim-timeout", defaultValue = "5m")
     Duration claimTimeout;
 
-    @ConfigProperty(name = "casehub.delivery.retention.attempt-days", defaultValue = "30")
-    int defaultAttemptDays;
-
-    @ConfigProperty(name = "casehub.delivery.retention.failed-attempt-days", defaultValue = "365")
-    int defaultFailedAttemptDays;
-
-    @ConfigProperty(name = "casehub.delivery.retention.engagement-days", defaultValue = "90")
-    int defaultEngagementDays;
+    @Inject
+    PreferenceProvider preferenceProvider;
 
     @Inject
     org.eclipse.microprofile.config.Config config;
@@ -176,8 +175,8 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     @Transactional
     void attemptRetentionPurge() {
         for (DeliverySourceType sourceType : DeliverySourceType.values()) {
-            int attemptDays = resolveRetentionConfig(sourceType, "attempt-days", defaultAttemptDays);
-            int failedDays  = resolveRetentionConfig(sourceType, "failed-attempt-days", defaultFailedAttemptDays);
+            int attemptDays = resolveRetentionConfig(sourceType, "attempt-days", PlatformPreferenceKeys.DELIVERY_ATTEMPT_RETENTION_DAYS);
+            int failedDays  = resolveRetentionConfig(sourceType, "failed-attempt-days", PlatformPreferenceKeys.DELIVERY_FAILED_RETENTION_DAYS);
 
             Instant attemptCutoff = Instant.now().minus(Duration.ofDays(attemptDays));
             Instant failedCutoff  = Instant.now().minus(Duration.ofDays(failedDays));
@@ -199,7 +198,7 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
     @Transactional
     void engagementRetentionPurge() {
         for (DeliverySourceType sourceType : DeliverySourceType.values()) {
-            int     engagementDays = resolveRetentionConfig(sourceType, "engagement-days", defaultEngagementDays);
+            int     engagementDays = resolveRetentionConfig(sourceType, "engagement-days", PlatformPreferenceKeys.DELIVERY_ENGAGEMENT_RETENTION_DAYS);
             Instant cutoff         = Instant.now().minus(Duration.ofDays(engagementDays));
 
             int purged = entityManager.createQuery(
@@ -248,9 +247,11 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
         }
     }
 
-    private int resolveRetentionConfig(DeliverySourceType sourceType, String suffix, int defaultValue) {
+    private int resolveRetentionConfig(DeliverySourceType sourceType, String suffix, PreferenceKey<IntPreference> defaultKey) {
         String key = "casehub.delivery.retention.\"" + sourceType.name().toLowerCase() + "\"." + suffix;
-        return config.getOptionalValue(key, Integer.class).orElse(defaultValue);
+        int prefDefault = preferenceProvider.resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                                            .getOrDefault(defaultKey).value();
+        return config.getOptionalValue(key, Integer.class).orElse(prefDefault);
     }
 
 

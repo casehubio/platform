@@ -1,12 +1,15 @@
 package io.casehub.platform.notification.jpa;
 
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.notification.NotificationStatus;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
@@ -20,15 +23,16 @@ public class NotificationRetentionScheduler {
     @Inject
     EntityManager em;
 
-    @ConfigProperty(name = "casehub.notification.jpa.retention-days", defaultValue = "90")
-    int retentionDays;
-
-    @ConfigProperty(name = "casehub.notification.jpa.unread-retention-days", defaultValue = "365")
-    int unreadRetentionDays;
+    @Inject
+    PreferenceProvider preferenceProvider;
 
     @Scheduled(every = "${casehub.notification.jpa.retention-check-interval:24h}")
     @Transactional
     void purge() {
+        var prefs               = preferenceProvider.resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID));
+        int retentionDays       = prefs.getOrDefault(PlatformPreferenceKeys.NOTIFICATION_RETENTION_DAYS).value();
+        int unreadRetentionDays = prefs.getOrDefault(PlatformPreferenceKeys.NOTIFICATION_UNREAD_RETENTION_DAYS).value();
+
         Instant readDismissedCutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
         Instant unreadCutoff        = Instant.now().minus(unreadRetentionDays, ChronoUnit.DAYS);
 

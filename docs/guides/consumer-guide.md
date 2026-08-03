@@ -1,6 +1,6 @@
-# casehub-platform — Consumer Guide
+# casehub-platform -- Consumer Guide
 
-> Zero-dependency SPIs and types shared across all casehub modules — the foundation layer every app builds on.
+> Zero-dependency SPIs and types shared across all casehub modules -- the foundation layer every app builds on.
 
 **Repo:** [`casehubio/platform`](https://github.com/casehubio/platform)
 **Tier:** Foundation (first in build order, zero casehubio dependencies)
@@ -9,9 +9,9 @@
 
 ## Purpose
 
-casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, and governance. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
+casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, governance, labels, subject views, and agent infrastructure. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
 
-This repo is not a parallel framework to Quarkus — it is a thin domain layer that Quarkus-specific code implements. `CurrentPrincipal` wraps `SecurityIdentity`, `PreferenceProvider` complements `@ConfigMapping`, and `Path` replaces `java.nio.file.Path` with domain semantics. They solve different problems and belong together.
+This repo is not a parallel framework to Quarkus -- it is a thin domain layer that Quarkus-specific code implements. `CurrentPrincipal` wraps `SecurityIdentity`, `PreferenceProvider` complements `@ConfigMapping`, and `Path` replaces `java.nio.file.Path` with domain semantics. They solve different problems and belong together.
 
 ---
 
@@ -21,34 +21,42 @@ This repo is not a parallel framework to Quarkus — it is a thin domain layer t
 
 | Artifact | What it gives you |
 |----------|-------------------|
-| `casehub-platform-api` | All SPIs and value types — zero deps, pure Java |
-| `casehub-platform` | `@DefaultBean` mocks and no-ops — safe dev/test defaults |
-| `casehub-platform-testing` (test scope) | `FixedCurrentPrincipal`, `InMemoryGroupMembershipProvider` — programmatic test control |
+| `casehub-platform-api` | All SPIs and value types -- zero deps, pure Java |
+| `casehub-platform` | `@DefaultBean` mocks and no-ops -- safe dev/test defaults; `DataSourceRouter`; `CloudEventTypeDispatcher` |
+| `casehub-platform-testing` (test scope) | `FixedCurrentPrincipal`, `InMemoryGroupMembershipProvider` -- programmatic test control |
 
 ### Activate by adding as compile dependency
 
-Each displaces its `@DefaultBean` mock automatically — no exclusion config needed.
+Each displaces its `@DefaultBean` mock automatically -- no exclusion config needed.
 
 | Artifact | What it activates |
 |----------|-------------------|
 | `casehub-platform-config` | Scope-aware YAML preference provider (replaces mock) |
 | `casehub-platform-oidc` | OIDC-backed `CurrentPrincipal` from JWT (replaces mock) |
 | `casehub-platform-scim` | SCIM 2.0 `GroupMembershipProvider` (replaces mock) |
-| `casehub-platform-persistence-jpa` | JPA-backed scoped preference overrides |
-| `casehub-platform-persistence-mongodb` | MongoDB preference backend (beats JPA when co-deployed) |
+| `casehub-platform-expression` | JQ + MVEL3 + JEXL3 expression engines; `DefaultExpressionEngineRegistry`; `ConfigManager`; `SecretManager` |
+| `casehub-platform-persistence-jpa` | JPA-backed scoped preference overrides (`JpaPreferenceProvider`, `JpaPreferenceStore`) |
+| `casehub-platform-persistence-mongodb` | MongoDB preference backend (beats JPA when co-deployed via CDI priority) |
 | `casehub-platform-credentials-quarkus` | Bridge `CredentialResolver` to Quarkus `CredentialsProvider` (Vault/AWS/GCP) |
 
 ### Notification system (add what you need)
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-notifications` | REST + SSE presentation layer |
+| `casehub-platform-notifications` | REST + SSE presentation layer -- list, mark-read, dismiss, unread-count |
 | `casehub-platform-notifications-inmem` | In-memory notification store (test/ephemeral) |
-| `casehub-platform-notifications-jpa` | JPA notification store (production) |
-| `casehub-platform-notification-dispatch` | Three-path delivery pipeline (digest/suppress/immediate) |
-| `casehub-platform-subscriptions` | Subscription matching engine + REST |
+| `casehub-platform-notifications-jpa` | JPA notification store (production) -- keyset pagination, retention scheduler |
+| `casehub-platform-notification-dispatch` | Three-path delivery pipeline (digest/suppress/immediate); `DigestFlushScheduler`; `DeliveryRetryProcessor` |
+| `casehub-platform-notification-settings-inmem` | In-memory preference/suppression store |
+| `casehub-platform-notification-settings-jpa` | JPA preference/suppression store -- JSON TEXT columns, retention scheduler |
+| `casehub-platform-subscriptions` | Subscription matching engine + REST -- alpha network wiring, expression compilation |
 | `casehub-platform-subscriptions-inmem` | In-memory subscription store (test/ephemeral) |
-| `casehub-platform-subscriptions-jpa` | JPA subscription store (production) |
+| `casehub-platform-subscriptions-jpa` | JPA subscription store (production) -- OR-disjunction scope queries |
+| `casehub-platform-delivery-channel-inmem` | Channel-to-deliverer registry -- **production implementation** (channels are static) |
+| `casehub-platform-delivery-tracking-inmem` | In-memory `DeliveryAttemptStore` |
+| `casehub-platform-delivery-tracking-jpa` | JPA `DeliveryAttemptStore` -- `SKIP LOCKED` claims, retention purge |
+| `casehub-platform-digest-inmem` | In-memory `DigestBuffer` |
+| `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- drain via SELECT+DELETE in transaction |
 
 ### Data source and event streams
 
@@ -56,30 +64,44 @@ Each displaces its `@DefaultBean` mock automatically — no exclusion config nee
 |----------|------------------|
 | `casehub-platform-datasource-alpha` | Rete-style alpha network for event routing |
 | `casehub-platform-datasource-inmem` | In-memory DataSource registry (test/ephemeral) |
-| `casehub-platform-datasource-jpa` | JPA DataSource registry (production) |
+| `casehub-platform-datasource-jpa` | JPA DataSource registry (production) -- startup reconciliation |
 | `casehub-platform-endpoints-memory` | In-memory endpoint registry |
-| `casehub-platform-endpoints-config` | YAML-backed endpoint populator |
-| `casehub-platform-streams-kafka` | Kafka event stream connector |
-| `casehub-platform-streams-amqp` | AMQP event stream connector |
-| `casehub-platform-streams-webhook` | Webhook event stream connector |
-| `casehub-platform-streams-poll` | Polling event stream connector |
+| `casehub-platform-endpoints-config` | YAML-backed endpoint populator -- `${VAR}` interpolation, multi-file |
+| `casehub-platform-streams-kafka` | Kafka event stream connector -- static `@Incoming`, CloudEvent builder |
+| `casehub-platform-streams-amqp` | AMQP event stream connector -- single address per channel |
+| `casehub-platform-streams-webhook` | Webhook event stream connector -- structured CloudEvents HTTP binding |
+| `casehub-platform-streams-poll` | Polling event stream connector -- `@Scheduled`, per-endpoint failure isolation |
 | `casehub-platform-streams-camel` | Apache Camel event stream connector (runtime-dynamic routes) |
 
 ### Agent infrastructure
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-agent-api` | `AgentProvider` SPI — single-shot and multi-turn (Mutiny only, no Quarkus) |
-| `casehub-platform-agent-claude` | Claude CLI subprocess integration (autonomous agent) |
-| `casehub-platform-agent-langchain4j` | Bidirectional LangChain4j interop (any ChatModel, any provider) |
+| `casehub-platform-agent-api` | `AgentProvider` SPI -- single-shot and multi-turn; `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
+| `casehub-platform-agent-claude` | Claude CLI subprocess integration (autonomous agent) via Spring AI Community `claude-code-sdk` |
+| `casehub-platform-agent-langchain4j` | Bidirectional LangChain4j interop -- any `ChatModel` as `AgentProvider`, any `AgentProvider` as `ChatModel` |
 
 ### Access control
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-acl-inmem` | In-memory ACL store (test/ephemeral) |
-| `casehub-platform-acl-jpa` | JPA ACL store with audit logging (production) |
-| `casehub-platform-acl-admin` | REST API for ACL administration |
+| `casehub-platform-acl-inmem` | In-memory ACL store (test/ephemeral) -- group-based grants, parent-child hierarchy, deny entries |
+| `casehub-platform-acl-jpa` | JPA ACL store with audit logging (production) -- recursive CTE hierarchy, tenant isolation, retention purge |
+| `casehub-platform-acl-admin` | REST API for ACL administration -- `@RunOnVirtualThread`, `@RolesAllowed("admin")` |
+
+### Subject views and labels
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-view` | `SubjectViewEvaluator` + `SubjectViewOrchestrator` -- label-path view evaluation with caching |
+| `casehub-platform-view-inmem` | In-memory view store + membership tracker |
+| `casehub-platform-view-jpa` | JPA view store -- `JpaLabelPatternQuerySupport` for domain consumers |
+
+### Preference management
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-preferences-editor` | REST API for preference writes + schema discovery + validation; `PreferenceValidator`; `InMemoryPreferenceSchemaRegistry` |
 
 ---
 
@@ -89,25 +111,32 @@ Each displaces its `@DefaultBean` mock automatically — no exclusion config nee
 
 | SPI | Purpose | Mock behaviour |
 |-----|---------|----------------|
-| `CurrentPrincipal` | Who is acting — `actorId()`, `groups()`, `tenancyId()` | `@ApplicationScoped` with `@ConfigProperty` values |
-| `GroupMembershipProvider` | Inverse membership — "who is in group X?" | Returns configured groups |
+| `CurrentPrincipal` | Who is acting -- `actorId()`, `groups()`, `roles()`, `tenancyId()`, `actorType()`, `isSystem()`, `isAuthenticated()`, `isCrossTenantAdmin()` | `@ApplicationScoped` with `@ConfigProperty` values |
+| `GroupMembershipProvider` | Inverse membership -- "who is in group X?" | Returns configured groups |
 
 `CurrentPrincipal` is not `SecurityIdentity`. casehub actors include AI agents, system actors, and internal services that operate outside HTTP request context. Real implementations are `@RequestScoped` and delegate to `SecurityIdentity`; the mock is `@ApplicationScoped` (no request context in dev/test).
 
-**Tenancy:** `tenancyId()` is abstract — every implementor must provide it. Single-tenant deployments return `TenancyConstants.DEFAULT_TENANT_ID`. `isCrossTenantAdmin()` controls cross-tenant data access.
+`GroupMembershipProvider.membersOf(groupName, tenancyId)` is tenant-scoped -- every call requires a `tenancyId` parameter for tenant isolation. `groupsOf(actorId, tenancyId)` provides the reverse lookup.
+
+**Tenancy:** `tenancyId()` is abstract -- every implementor must provide it. Single-tenant deployments return `TenancyConstants.DEFAULT_TENANT_ID`. `isCrossTenantAdmin()` controls cross-tenant data access.
+
+**Actor types:** `ActorType` enum with `HUMAN`, `AGENT`, `SYSTEM`. `ActorTypeResolver.resolve(actorId)` derives the type from the actor ID string. `actorType()` and `isSystem()` use this.
 
 ### Path
 
-Hierarchical, scope-labelling type for case types, preference scopes, label paths. Not a filesystem path — strict validation, no empty segments, no leading/trailing slashes.
+Hierarchical, scope-labelling type for case types, preference scopes, label paths. Not a filesystem path -- strict validation, no empty segments, no leading/trailing slashes.
 
 ```java
 Path.of("casehubio", "devtown", "pr-review")  // explicit construction
 Path.parse("casehubio/devtown/pr-review")      // uses configured separator
+Path.root()                                     // root scope
+path.parent()                                   // parent scope
+path.isAncestorOf(other)                        // hierarchy check
 ```
 
 Convention: org segment / app segment / case-type segment. Scope inheritance follows the hierarchy.
 
-JAX-RS integration: `@PathParam` and `@QueryParam` of type `Path` work directly — converters ship in `platform/`.
+JAX-RS integration: `@PathParam` and `@QueryParam` of type `Path` work directly -- converters ship in `platform/`.
 
 ### Preferences
 
@@ -120,39 +149,143 @@ JAX-RS integration: `@PathParam` and `@QueryParam` of type `Path` work directly 
 
 SmallRye Config is for deployment configuration (DB URLs, pool sizes). `PreferenceProvider` is for business configuration (rules that vary per case type and installation). They complement each other.
 
-`PreferenceKey<T>` carries a parser — `key.parse(raw)` converts strings from any source. Use `key.qualifiedName()` as map keys, never the `PreferenceKey` object (records with `Function` components have identity-only equality).
+`PreferenceKey<T>` carries a parser -- `key.parse(raw)` converts strings from any source. Use `key.qualifiedName()` as map keys, never the `PreferenceKey` object (records with `Function` components have identity-only equality).
+
+**Built-in preference types:** `BooleanPreference`, `IntPreference`, `DoublePreference` (all `SingleValuePreference`), `DurationPreference`, `MultiValuePreference`, `MapPreferences`.
+
+**PreferenceStore SPI:** The write path for preferences. Methods: `set(tenancyId, scope, namespace, name, subKey, value)`, `delete(...)`, `list(PreferenceQuery)`, `deleteAll(tenancyId, scope, namespace)`. Implementations in `persistence-jpa/` (JPA) and `persistence-mongodb/` (MongoDB).
+
+**PreferenceSchemaRegistry:** Register, resolve, and discover preference schemas at runtime. `register(PreferenceSchemaDescriptor)`, `resolve(qualifiedName)`, `discover()`, `version()` (monotonic counter for ETag support). `PreferenceSchemaDescriptor` carries namespace, name, type (string/integer/number/boolean/duration/enum), label, description, defaultValue, constraints, and enum options.
+
+**PreferenceValidator:** Server-side validation against schema constraints. Validates type parsing (integer, number, boolean, duration) and constraint checking (`min`, `max`, `minLength`, `maxLength`, `pattern` regex, enum options). Constraint keys are constants in `PreferenceConstraintKeys`.
 
 ### DataSource and Alpha Network
 
 Rete-style event routing: `DataSource<T>` ingests objects, `ObjectType<T>` discriminates by type, `FilterExpression<T>` evaluates predicates. Four `subscribe()` overloads with increasing specificity. Self-pruning deregistration lifecycle handles shutdown gracefully.
 
-`DataSourceRegistry` is tenant-scoped — `resolve(Path, tenancyId)` returns tenant-specific before platform-global.
+`DataSourceRegistry` is tenant-scoped -- `resolve(Path, tenancyId)` returns tenant-specific before platform-global. `DataSourceDescriptor` carries `path`, `tenancyId`, `objectType`, and `acceptedEventTypes` for CloudEvent pre-filtering.
+
+**DataSourceRouter** (in `platform/`): CDI bridge that routes `@ObservesAsync CloudEvent` events to registered DataSources. Extracts `tenancyid` extension from CloudEvents for tenant routing. Convergent event-handler design -- correct wiring state regardless of CDI event processing order.
+
+**CloudEventTypeDispatcher** (in `platform/`): Routes unqualified `@ObservesAsync CloudEvent` events to observers qualified with `@CloudEventType("io.casehub.some.type")`. Enables type-specific CloudEvent handling without raw type string comparisons.
 
 ### Notifications and Subscriptions
 
 Domain modules produce `SubscribableEvent` objects into the notification DataSource. The subscription engine evaluates them against the alpha network, fires `SubscriptionMatched`, and the dispatch pipeline handles delivery (immediate, digest, or suppressed). REST + SSE endpoints expose notifications to clients.
 
+**SubscribableEvent interface:** Compile-time contract for subscription POJOs. Must implement `type()` (reverse-DNS event type string, e.g. `"io.casehub.work.workitem.completed"`) and `tenancyId()`. POJOs not implementing this interface are silently rejected by the subscription engine.
+
+**SubscriptionScope:** `USER` (per-user subscriptions) or `SYSTEM` (admin-managed, system-wide subscriptions with admin authorization).
+
+**Event type glob matching:** Subscription `eventType` fields support prefix patterns (e.g. `"io.casehub.work.*"`) for matching groups of event types.
+
+### Notification Delivery
+
+**Delivery channels:** Well-known constants in `DeliveryChannels`: `IN_APP`, `EMAIL`, `SMS`, `PUSH`, `WHATSAPP`.
+
+**NotificationDeliverer SPI:** Implement to deliver notifications via a specific channel. Methods: `channelId()`, `deliver(NotificationInput)`, `deliverDigest(DigestSummary)`. Self-registers its `DeliveryChannelDescriptor` in the `DeliveryChannelRegistry` at `@PostConstruct`.
+
+**DestinationResolver SPI:** Resolves a user's delivery destination for a specific channel. Methods: `channelId()`, `resolve(userId, tenancyId)`. One implementation per channel type.
+
+**DestinationScope:** `PER_USER` (email, SMS, WhatsApp -- resolves to user contact attribute) or `PER_TENANT` (future -- Slack, Teams -- resolves to shared webhook URL).
+
+**Digest system:** Configurable digest schedules via `DigestSchedule` sealed interface:
+- `DigestSchedule.Interval(Duration period)` -- fixed period (minimum 1 minute)
+- `DigestSchedule.DailyAt(LocalTime time, ZoneId timezone)` -- once per day
+- `DigestSchedule.WeeklyAt(DayOfWeek day, LocalTime time, ZoneId timezone)` -- once per week
+
+**DigestGroupBy:** `FLAT` (no grouping), `CATEGORY` (by notification category), `ENTITY` (by entity type and ID).
+
+**Engagement tracking:** `EngagementType` enum: `OPENED`, `CLICKED`, `DISMISSED`, `REPLIED`, `CONVERTED`. `EngagementCallbackHandler` SPI translates provider-specific webhook payloads into platform engagement events (must verify request signatures via provider-specific headers).
+
 ### Expression Evaluation
 
-`ExpressionEngineRegistry` dispatches by type key — `"jq"` (jackson-jq, `JsonNode` context) and `"mvel"` (MVEL3, `Map<String, Object>` context). Used by the subscription engine for filter compilation.
+`ExpressionEngineRegistry` dispatches by type key. Three engines are available:
+
+| Engine | Type Key | Backend | Context Type | Notes |
+|--------|----------|---------|-------------|-------|
+| `JQExpressionEngine` | `"jq"` | jackson-jq 1.6 | `JsonNode` or `Map<String, Object>` (auto-adapted) | Boolean, List, and Scalar result types. `$config` and `$secret` scope injection. |
+| `MvelExpressionEngine` | `"mvel"` | MVEL3 3.0.0-SNAPSHOT | `Map<String, Object>` or POJO (auto-adapted via BeanInfo) | Block expressions (semicolon-delimited). Lazy compilation on first eval. |
+| `JexlExpressionEngine` | `"jexl"` | Commons JEXL 3.4.0 | `Map<String, Object>` | MapContext-based. Strict mode off, silent mode off. Cached compilation. |
+
+**ConfigManager SPI:** Provides access to configuration properties in JQ expressions via `$config.{configMapName}.{property}`. Default implementation reads from SmallRye Config (MicroProfile Config API). Supports Kubernetes ConfigMaps via optional `quarkus-kubernetes-config` dependency.
+
+**SecretManager SPI:** Resolves secrets in JQ expressions via `$secret.{secretName}.{property}`. Default reads from `casehub.platform.secrets.{secretName}.{property}` config keys. Supports Kubernetes Secrets via optional `quarkus-kubernetes-config`.
+
+**StringExpressionEvaluator:** Sub-interface of `ExpressionEvaluator` for string-based evaluators (carries `expression()` string). Concrete records: `JQExpressionEvaluator`, `MvelExpressionEvaluator`.
 
 ### Access Control
 
-`AccessControlProvider` provides async access control with resource hierarchy inheritance. Group-based grants resolve via `GroupMembershipProvider`. Parent-child hierarchy with depth guard of 20. Deny entries with specificity-based resolution (instance deny/grant -> wildcard deny/grant -> parent chain).
+`AccessControlProvider` provides blocking access control with resource hierarchy inheritance. Group-based grants resolve via `GroupMembershipProvider`. Parent-child hierarchy with depth guard of 20.
+
+**Action hierarchy:** `AclAction` enum: `READ`, `WRITE`, `ADMIN`, `CLAIM`. ADMIN implies WRITE implies READ -- a WRITE grant satisfies a READ check; an ADMIN grant satisfies both READ and WRITE. CLAIM is independent. `satisfiedBy()` and `deniedBy()` methods encode this hierarchy.
+
+**Deny entries:** `deny(actorId, resourceId, action, expires)` creates explicit deny entries. Resolution order: instance deny -> instance grant -> wildcard deny -> wildcard grant -> parent chain. Deny wins at each specificity level.
+
+**Wildcard type-level grants:** Grant `"case:*"` to give an actor access to all resources of type `case`. Checked after instance-level entries.
+
+**Bulk operations:** `grantBatch(Collection<AclEntryRequest>)`, `revokeBatch(...)`, `denyBatch(...)`, `removeDenyBatch(...)`.
+
+**Paginated queries:** `accessibleResources(AclQuery)` returns `AclPage` with cursor-based pagination (default limit 100, max 500).
+
+**Inherited children:** `accessibleResourcesIncludingInherited(actorId, resourceType, action)` walks the parent-child hierarchy to surface children of directly-granted resources.
+
+**Well-known resource types:** Constants in `AclResourceType`: `CASE`, `PLAN_ITEM`, `WORK_ITEM`, `EVENT_LOG`, `CASE_DEFINITION`.
+
+### Subject Views and Labels
+
+**SubjectViewSpec:** A view definition with `id`, `name`, `tenancyId`, `labelPattern` (supports glob patterns `/**` and `/*`), `scope` (Path, optional), `sortField`, `sortDirection`, `additionalConditions`, and `createdAt`.
+
+**SubjectViewEvaluator:** Evaluates subject membership in views by matching label paths against view label patterns. Scope-aware overload filters views by subject scope hierarchy. `computeEvents()` diffs before/after membership to produce `SubjectViewEvent` records with `ADDED`, `REMOVED`, or `CHANGED` types.
+
+**SubjectViewOrchestrator:** High-level coordinator with optional view caching (`casehub.view.cache.ttl-seconds`). Methods: `evaluateAndTrack(subjectId, tenancyId, labelPaths)` (single subject), `evaluateAndTrackBatch(subjectLabelPaths, tenancyId)` (bulk), scope-aware variants, `saveView(spec)`, `deleteView(viewId)` (with proactive membership cleanup and REMOVED events).
+
+**ViewMembershipTracker:** Tracks which subjects belong to which views. `getLastKnownMembership(subjectId)` (single), `getLastKnownMembership(Set<UUID> subjectIds)` (bulk), `updateMembership(...)`, `removeMembership(...)`, `getSubjectsByView(viewId)`, `removeMembershipByView(viewId)`.
+
+**CrossTenantSubjectViewStore:** `findDistinctTenancyIds()` -- for cross-tenant operations.
+
+**LabelPatternMatcher:** Utility for matching label paths against patterns. Supports exact match, single-level wildcard (`status/*`), and recursive wildcard (`status/**`).
+
+**Label infrastructure:** `LabelRule` record with `name`, `condition` (CompiledExpression), `actions` (List<LabelAction>), `triggerEvents` (Set<String>, optional). Static `evaluate(rules, context)` and `evaluate(rules, context, event)` methods. `LabelAction` is a sealed interface with `Add(label)` and `Remove(label)` variants.
 
 ### CaseMemoryStore
 
-Cross-case semantic recall. `CaseMemoryStore` (blocking) provides `store`, `query`, `erase`. Domain isolation via `MemoryDomain` — facts do not cross domain boundaries. `MemoryPermissions` enforces tenant access at the SPI layer. `@DefaultBean` is a silent no-op — the system functions correctly without memory.
+Cross-case semantic recall. `CaseMemoryStore` (blocking) provides `store`, `query`, `erase`. Domain isolation via `MemoryDomain` -- facts do not cross domain boundaries. `MemoryPermissions` enforces tenant access at the SPI layer. `@DefaultBean` is a silent no-op -- the system functions correctly without memory.
 
 Backend implementations live in casehub-neocortex, not this repo.
 
 ### Credentials
 
-`CredentialResolver` resolves outbound endpoint credentials by logical reference name. Returns `Map<String, String>` keyed by `CredentialPropertyKeys` constants. Distinct from inbound Verifiable Credential validation in identity.
+`CredentialResolver` resolves outbound endpoint credentials by logical reference name. Returns `Map<String, String>` keyed by `CredentialPropertyKeys` constants: `USER`, `PASSWORD`, `BEARER_TOKEN`, `API_KEY`, `EXPIRES_AT`, `SIGNING_SECRET`. Distinct from inbound Verifiable Credential validation in identity.
 
 ### Governance
 
-`ExecutionPolicy` + `RetryPolicy` + `BackoffStrategy` — generic retry/timeout/backoff for blocking operations via `PolicyEnforcer`.
+`ExecutionPolicy` + `RetryPolicy` + `BackoffStrategy` -- generic retry/timeout/backoff for blocking operations via `PolicyEnforcer.execute(policy, action)`.
+
+`BackoffStrategy` enum: `FIXED`, `EXPONENTIAL`, `EXPONENTIAL_WITH_JITTER`. `RetryPolicy` record: `maxAttempts`, `delayMs`, `backoffStrategy`, `maxDelayMs`. The `DefaultPolicyEnforcer` runs on a virtual-thread executor.
+
+### Actor State
+
+`ActorStateContributor` SPI: domain modules implement this to contribute to a unified actor state view. `sourceName()` identifies the source; `contribute(actorId, accumulator)` feeds data into the `ActorStateAccumulator`. The accumulator collects `trustScore`, `capabilityScore`, `workItem`, `commitment`, and `engineActiveCaseId` data from multiple backends concurrently. Contributors must be atomic -- all-or-nothing per source.
+
+### Strategy Resolution
+
+`StrategyResolver` discovers `NamedStrategy` beans by type and ID. `resolve(type, id)`, `find(type, id)`, `defaultStrategy(type)`, `available(type)`. Used for pluggable strategy selection across the platform.
+
+### Agent Infrastructure
+
+`AgentProvider` SPI with two execution paths:
+- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers` (List<AgentMcpServer>), `timeout`, and `correlationId`.
+- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). Semaphore held for session lifetime. Sessions are serial -- one turn at a time. Must close via try-with-resources.
+
+`AgentEvent` is a sealed interface with variants: `TextDelta`, `ThinkingDelta`, `ToolCallDelta`, `ToolCallComplete`, `ToolResult`, `InvocationComplete` (terminal with cost/usage/timing metadata including `inputTokens`, `outputTokens`, `thinkingTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalCostUsd`, `durationMs`, `apiDurationMs`, `sessionId`, `numTurns`, `isError`).
+
+`AgentMcpServer` is a sealed interface with three transport variants:
+- `Stdio(command, args, env)` -- subprocess MCP server
+- `Sse(url, headers)` -- legacy HTTP Server-Sent Events transport
+- `Http(url, headers)` -- current streamable HTTP MCP transport (preferred for new servers)
+
+`agent-claude/` wraps the Claude Code CLI via the Spring AI Community `claude-code-sdk`. `agent-langchain4j/` provides bidirectional interop: any `ChatModel` as `AgentProvider`, any `AgentProvider` as `ChatModel`. These are not interchangeable -- `agent-claude/` runs an autonomous agent; LangChain4j runs a chat completion with caller-managed tool loop.
 
 ---
 
@@ -163,24 +296,37 @@ Backend implementations live in casehub-neocortex, not this repo.
 | Property | Purpose | Default |
 |----------|---------|---------|
 | `casehub.tenancy.default-id` | Default tenant ID for single-tenant deployments | (TenancyConstants value) |
-| `casehub.platform.scim.token` | Static SCIM auth token | — |
-| `quarkus.oidc-client.scim.*` | SCIM client-credentials auth | — |
-| `casehub.identity.dids."actorId"` | Static actor-to-DID mapping | — |
-| `casehub.identity.credentials."actorId"` | VC JWT file paths | — |
+| `casehub.platform.scim.token` | Static SCIM auth token | -- |
+| `quarkus.oidc-client.scim.*` | SCIM client-credentials auth | -- |
+| `casehub.identity.dids."actorId"` | Static actor-to-DID mapping | -- |
+| `casehub.identity.credentials."actorId"` | VC JWT file paths | -- |
 
 ### Preferences
 
 | Property | Purpose | Default |
 |----------|---------|---------|
 | `casehub.platform.path.separator` | Path separator character | `/` |
-| `casehub.platform.endpoints.files` | YAML endpoint definition files | — |
+| `casehub.platform.endpoints.files` | YAML endpoint definition files | -- |
 
 ### Agent
 
 | Property | Purpose | Default |
 |----------|---------|---------|
+| `casehub.platform.agent.claude.binaryPath` | Path to Claude CLI binary | (resolved from PATH) |
+| `casehub.platform.agent.claude.defaultTimeout` | Default wall-clock timeout | PT5M |
+| `casehub.platform.agent.claude.maxConcurrentSessions` | Concurrent Claude session limit | 4 |
 | `casehub.platform.agent.langchain4j.closeTimeout` | Session close timeout | PT30S |
-| `casehub.platform.agent.langchain4j.max-concurrent-sessions` | Concurrent session limit | 10 |
+| `casehub.platform.agent.langchain4j.sessionMemoryWindowSize` | Conversation memory window | 20 |
+| `casehub.platform.agent.langchain4j.max-concurrent-sessions` | Concurrent LangChain4j session limit | 10 |
+
+### Expression
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `casehub.platform.secrets.{name}.{property}` | Secret values accessible as `$secret.{name}.{property}` in JQ | -- |
+| `%prod.quarkus.kubernetes-config.enabled` | Enable Kubernetes ConfigMap/Secret integration | false |
+| `%prod.quarkus.kubernetes-config.config-maps` | Kubernetes ConfigMaps to read | -- |
+| `%prod.quarkus.kubernetes-config.secrets` | Kubernetes Secrets to read | -- |
 
 ### Streams
 
@@ -196,9 +342,15 @@ Backend implementations live in casehub-neocortex, not this repo.
 | `casehub.notification.digest.max-buffer-size` | Digest buffer size (0 = no eviction) | 0 |
 | `casehub.delivery.tracking.inmem.max-size` | In-memory delivery attempt store size | 10000 |
 | `casehub.delivery.engagement.enabled` | Enable engagement event recording | false |
-| `casehub.delivery.retention.attempt-days` | Delivery attempt retention | — |
-| `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | — |
-| `casehub.delivery.retention.engagement-days` | Engagement event retention | — |
+| `casehub.delivery.retention.attempt-days` | Delivery attempt retention | -- |
+| `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | -- |
+| `casehub.delivery.retention.engagement-days` | Engagement event retention | -- |
+
+### Subject Views
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `casehub.view.cache.ttl-seconds` | View cache TTL (0 = disabled) | 0 |
 
 ### ACL
 
@@ -223,10 +375,44 @@ Backend implementations live in casehub-neocortex, not this repo.
 
 ---
 
+## REST APIs
+
+### Preference Management (`preferences-editor/`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `PUT` | `/preferences` | -- | Set a preference (validates against schema if registered) |
+| `DELETE` | `/preferences` | -- | Delete a single preference by namespace/name/subKey |
+| `DELETE` | `/preferences/by-namespace` | -- | Delete all preferences in a namespace |
+| `GET` | `/preferences` | -- | List all preference records for current tenant |
+| `GET` | `/preferences/resolved` | -- | Resolve preferences with full ancestor-chain inheritance |
+| `GET` | `/preferences/schema` | -- | List registered schema descriptors (ETag conditional GET) |
+
+### ACL Administration (`acl-admin/`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/acl/grants` | `@RolesAllowed("admin")` | Grant single entry |
+| `POST` | `/acl/grants/batch` | `@RolesAllowed("admin")` | Bulk grant |
+| `DELETE` | `/acl/grants` | `@RolesAllowed("admin")` | Revoke single |
+| `DELETE` | `/acl/grants/batch` | `@RolesAllowed("admin")` | Bulk revoke |
+| `DELETE` | `/acl/grants/all` | `@RolesAllowed("admin")` | Revoke all for actor+resource |
+| `POST` | `/acl/denies` | `@RolesAllowed("admin")` | Deny single entry |
+| `POST` | `/acl/denies/batch` | `@RolesAllowed("admin")` | Bulk deny |
+| `DELETE` | `/acl/denies` | `@RolesAllowed("admin")` | Remove single deny |
+| `DELETE` | `/acl/denies/batch` | `@RolesAllowed("admin")` | Bulk remove deny |
+| `POST` | `/acl/parents` | `@RolesAllowed("admin")` | Register parent-child relationship |
+| `GET` | `/acl/check` | self or admin | Check access (returns `{allowed: true/false}`) |
+| `GET` | `/acl/accessible` | self or admin | Paginated accessible resources (cursor-based) |
+
+---
+
 ## What This Repo Does NOT Do
 
 - **Domain logic.** No case definitions, work items, or business rules. Those live in consumer repos (ledger, work, engine, devtown, etc.).
 - **Memory backends.** `CaseMemoryStore` SPI is here; implementations (in-mem, JPA, SQLite, Mem0, Graphiti) live in casehub-neocortex.
-- **Preference writes.** `PreferenceProvider` is permanently read-only. The `preferences-editor/` module provides the write path, but the provider never owns writes.
+- **Preference writes without the editor module.** `PreferenceProvider` is permanently read-only. The `preferences-editor/` module provides the write path via `PreferenceStore`.
 - **Security enforcement beyond tenancy.** `CurrentPrincipal` provides identity. `@RolesAllowed` and full RBAC are Quarkus concerns, not platform concerns.
 - **Orchestration.** Event routing and subscription matching happen here. Case orchestration, planning, and execution live in casehub-engine.
+- **Notification delivery implementations.** The dispatch pipeline routes to `NotificationDeliverer` and `DestinationResolver` SPIs -- concrete channel implementations (email, SMS, push) live in casehub-connectors.
+- **Label storage.** `LabelRule` evaluation and `LabelAction` generation happen here. Persisting labels on domain entities is the consumer's responsibility.

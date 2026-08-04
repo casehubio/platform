@@ -537,9 +537,7 @@ PropagationContext.createRoot(traceId, identity, budget);
 
 ## 14. CaseInstance Identity Gap
 
-`CaseHubReactor.java:147` calls `caseInstanceRepository.save(instance, currentPrincipal.tenancyId())` — the `actorId` from `currentPrincipal` is discarded immediately after save. The case then has no record of who created it.
-
-Resolution: store `actorId` on `CaseInstance` at creation or carry it exclusively via `PropagationContext` — decision to be made in Phase 2 design session.
+**Resolved:** Store `actorId` on `CaseInstance` at creation. `CaseHubReactor` populates `instance.actorId` from `currentPrincipal.actorId()` at save time. CaseInstance is the durable identity record; PropagationContext carries identity for runtime propagation during active execution. Both are needed — CaseInstance for persistence (queryable after execution), PropagationContext for cross-scope propagation (during active execution). See engine issues for implementation.
 
 ## 15. Sub-Case rootCaseId
 

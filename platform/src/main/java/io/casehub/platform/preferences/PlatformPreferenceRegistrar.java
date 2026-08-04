@@ -53,5 +53,28 @@ public class PlatformPreferenceRegistrar {
                 .description("Days to retain engagement events before purge")
                 .constraints(Map.of(PreferenceConstraintKeys.MIN, 1, PreferenceConstraintKeys.MAX, 3650))
                 .build());
+
+        registry.register(PreferenceSchemaDescriptor.of(PlatformPreferenceKeys.ENGAGEMENT_ENABLED)
+                .label("Engagement tracking")
+                .description("Enable engagement event recording for delivery tracking")
+                .build());
+
+        registry.register(PreferenceSchemaDescriptor.of(PlatformPreferenceKeys.DELIVERY_RETRY_MAX_RETRIES)
+                .label("Delivery retry limit")
+                .description("Maximum retry attempts before marking delivery as expired")
+                .constraints(Map.of(PreferenceConstraintKeys.MIN, 0, PreferenceConstraintKeys.MAX, 20))
+                .build());
+
+        registry.register(PreferenceSchemaDescriptor.of(PlatformPreferenceKeys.DIGEST_RETENTION_DAYS)
+                .label("Digest buffer retention (days)")
+                .description("Days to retain digest buffer entries before purge")
+                .constraints(Map.of(PreferenceConstraintKeys.MIN, 1, PreferenceConstraintKeys.MAX, 3650))
+                .build());
+
+        registry.register(PreferenceSchemaDescriptor.of(PlatformPreferenceKeys.VIEW_CACHE_TTL_SECONDS)
+                .label("View cache TTL (seconds)")
+                .description("Time-to-live for cached view definitions (0 = disabled)")
+                .constraints(Map.of(PreferenceConstraintKeys.MIN, 0, PreferenceConstraintKeys.MAX, 3600))
+                .build());
     }
 }

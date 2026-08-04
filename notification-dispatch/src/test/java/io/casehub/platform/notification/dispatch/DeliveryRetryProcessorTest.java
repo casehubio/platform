@@ -1,5 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.api.preferences.IntPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,7 +50,9 @@ class DeliveryRetryProcessorTest {
         processor = new DeliveryRetryProcessor(
                 store, channelRegistry, objectMapper,
                 new CapturingEvent(exhaustedEvents),
-                5, Duration.ofSeconds(30), Duration.ofMinutes(30),
+                EngagementRecorderTest.providerWith(
+                        PlatformPreferenceKeys.DELIVERY_RETRY_MAX_RETRIES, IntPreference.of(5)),
+                Duration.ofSeconds(30), Duration.ofMinutes(30),
                 5000, 50);
     }
 

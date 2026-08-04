@@ -2,7 +2,11 @@ package io.casehub.platform.delivery.digest.inmem;
 
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
@@ -26,22 +30,24 @@ public class InMemoryDigestBuffer implements DigestBuffer {
 
     private final ConcurrentHashMap<DigestBufferKey, BufferEntry> buffers   = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Set<DigestBufferKey>> userIndex = new ConcurrentHashMap<>();
-    private final int                                             maxBufferSize;
-    private final long                                            retentionMs;
+    private final int                maxBufferSize;
+    private final PreferenceProvider preferenceProvider;
+    private final long               fixedRetentionMs;
 
     @Inject
     public InMemoryDigestBuffer(
             @ConfigProperty(name = "casehub.notification.digest.max-buffer-size", defaultValue = "500")
             int maxBufferSize,
-            @ConfigProperty(name = "casehub.notification.digest.retention-days", defaultValue = "90")
-            int retentionDays) {
-        this.maxBufferSize = maxBufferSize;
-        this.retentionMs   = retentionDays * 86_400_000L;
+            PreferenceProvider preferenceProvider) {
+        this.maxBufferSize      = maxBufferSize;
+        this.preferenceProvider = preferenceProvider;
+        this.fixedRetentionMs   = -1;
     }
 
-    InMemoryDigestBuffer(int maxBufferSize, long retentionMs) {
-        this.maxBufferSize = maxBufferSize;
-        this.retentionMs   = retentionMs;
+    InMemoryDigestBuffer(int maxBufferSize, long fixedRetentionMs) {
+        this.maxBufferSize      = maxBufferSize;
+        this.preferenceProvider = null;
+        this.fixedRetentionMs   = fixedRetentionMs;
     }
 
     private static String userKey(String userId, String tenancyId) {
@@ -49,7 +55,19 @@ public class InMemoryDigestBuffer implements DigestBuffer {
     }
 
     private boolean isExpired(BufferEntry entry) {
+        long retentionMs = retentionMs();
         return retentionMs > 0 && entry.lastModified().toEpochMilli() + retentionMs < System.currentTimeMillis();
+    }
+
+    private long retentionMs() {
+        if (fixedRetentionMs >= 0) {
+            return fixedRetentionMs;
+        }
+        int days = preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.DIGEST_RETENTION_DAYS)
+                .value();
+        return days * 86_400_000L;
     }
 
     @Override

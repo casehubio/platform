@@ -176,7 +176,22 @@ public class MyPreferenceRegistrar {
 }
 ```
 
-`PlatformPreferenceRegistrar` in `platform/` is the canonical example — it registers 6 retention preference schemas. Type is inferred from the key's `defaultValue` (`IntPreference` → `"integer"`, `BooleanPreference` → `"boolean"`). When `preferences-editor/` is on the classpath, `InMemoryPreferenceSchemaRegistry` captures registrations; otherwise `NoOpPreferenceSchemaRegistry` silently drops them.
+`PlatformPreferenceRegistrar` in `platform/` is the canonical example — it registers 10 preference schemas (6 retention + engagement toggle + retry limit + digest retention + view cache TTL). Type is inferred from the key's `defaultValue` (`IntPreference` → `"integer"`, `BooleanPreference` → `"boolean"`). When `preferences-editor/` is on the classpath, `InMemoryPreferenceSchemaRegistry` captures registrations; otherwise `NoOpPreferenceSchemaRegistry` silently drops them.
+
+**Platform preference keys** (all namespace `casehub.platform`):
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `notification.retention-days` | integer | 90 | Days to retain read/dismissed notifications |
+| `notification.unread-retention-days` | integer | 365 | Days to retain unread notifications |
+| `acl.audit-retention-days` | integer | 365 | Days to retain ACL audit log entries |
+| `delivery.attempt-retention-days` | integer | 30 | Days to retain delivery attempts |
+| `delivery.failed-retention-days` | integer | 365 | Days to retain failed delivery attempts |
+| `delivery.engagement-retention-days` | integer | 90 | Days to retain engagement events |
+| `delivery.engagement-enabled` | boolean | false | Enable engagement event recording |
+| `delivery.retry-max-retries` | integer | 5 | Max retry attempts before delivery expiry |
+| `notification.digest-retention-days` | integer | 90 | Days to retain digest buffer entries |
+| `view.cache-ttl-seconds` | integer | 0 | View cache TTL (0 = disabled) |
 
 ### DataSource and Alpha Network
 

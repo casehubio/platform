@@ -25,6 +25,22 @@ public final class PlatformPreferenceKeys {
     public static final PreferenceKey<IntPreference> DELIVERY_ENGAGEMENT_RETENTION_DAYS =
             new PreferenceKey<>("casehub.platform", "delivery.engagement-retention-days",
                     IntPreference.of(90), IntPreference::parse);
+    public static final PreferenceKey<BooleanPreference> ENGAGEMENT_ENABLED =
+            new PreferenceKey<>("casehub.platform", "delivery.engagement-enabled",
+                    BooleanPreference.of(false), BooleanPreference::parse);
+
+    public static final PreferenceKey<IntPreference> DELIVERY_RETRY_MAX_RETRIES =
+            new PreferenceKey<>("casehub.platform", "delivery.retry-max-retries",
+                    IntPreference.of(5), IntPreference::parse);
+
+    public static final PreferenceKey<IntPreference> DIGEST_RETENTION_DAYS =
+            new PreferenceKey<>("casehub.platform", "notification.digest-retention-days",
+                    IntPreference.of(90), IntPreference::parse);
+
+    public static final PreferenceKey<IntPreference> VIEW_CACHE_TTL_SECONDS =
+            new PreferenceKey<>("casehub.platform", "view.cache-ttl-seconds",
+                    IntPreference.of(0), IntPreference::parse);
+
 
     private PlatformPreferenceKeys() {}
 }

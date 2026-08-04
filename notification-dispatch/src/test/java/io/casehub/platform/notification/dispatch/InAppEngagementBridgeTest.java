@@ -1,5 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.api.preferences.BooleanPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliverySourceType;
@@ -33,9 +35,11 @@ class InAppEngagementBridgeTest {
     void setUp() {
         store = new InMemoryDeliveryAttemptStore(10000);
         firedEvents = new ArrayList<>();
+        var enabledProvider = EngagementRecorderTest.providerWith(
+                PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(true));
         var recorder = new EngagementRecorder(store,
-                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), true);
-        bridge = new InAppEngagementBridge(store, recorder, true);
+                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), enabledProvider);
+        bridge = new InAppEngagementBridge(store, recorder, enabledProvider);
     }
 
     @Test
@@ -82,9 +86,11 @@ class InAppEngagementBridgeTest {
 
     @Test
     void skipsWhenDisabled() {
+        var disabledProvider = EngagementRecorderTest.providerWith(
+                PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(false));
         var disabledRecorder = new EngagementRecorder(store,
-                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), false);
-        var disabledBridge = new InAppEngagementBridge(store, disabledRecorder, false);
+                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), disabledProvider);
+        var disabledBridge = new InAppEngagementBridge(store, disabledRecorder, disabledProvider);
         var attempt = inAppAttempt("notif-1");
         store.store(attempt);
         var notification = testNotification("notif-1", NotificationStatus.READ);

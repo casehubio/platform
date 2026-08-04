@@ -10,6 +10,10 @@ import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.DeliveryType;
 import io.casehub.platform.api.delivery.DigestSummary;
 import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -30,7 +34,7 @@ public class DeliveryRetryProcessor {
     private final DeliveryChannelRegistry channelRegistry;
     private final ObjectMapper objectMapper;
     private final Event<DeliveryExhausted> exhaustedEvent;
-    private final int maxRetries;
+    private final PreferenceProvider preferenceProvider;
     private final Duration baseDelay;
     private final Duration maxDelay;
     private final int jitterMs;
@@ -41,8 +45,7 @@ public class DeliveryRetryProcessor {
                                   DeliveryChannelRegistry channelRegistry,
                                   ObjectMapper objectMapper,
                                   Event<DeliveryExhausted> exhaustedEvent,
-                                  @ConfigProperty(name = "casehub.delivery.retry.max-retries", defaultValue = "5")
-                                  int maxRetries,
+                                  PreferenceProvider preferenceProvider,
                                   @ConfigProperty(name = "casehub.delivery.retry.base-delay", defaultValue = "30s")
                                   Duration baseDelay,
                                   @ConfigProperty(name = "casehub.delivery.retry.max-delay", defaultValue = "30m")
@@ -55,7 +58,7 @@ public class DeliveryRetryProcessor {
         this.channelRegistry = channelRegistry;
         this.objectMapper = objectMapper;
         this.exhaustedEvent = exhaustedEvent;
-        this.maxRetries = maxRetries;
+        this.preferenceProvider = preferenceProvider;
         this.baseDelay = baseDelay;
         this.maxDelay = maxDelay;
         this.jitterMs = jitterMs;
@@ -105,6 +108,10 @@ public class DeliveryRetryProcessor {
     }
 
     private void advanceOrExpire(DeliveryAttempt attempt, Instant now, String failureReason) {
+        int maxRetries = preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.DELIVERY_RETRY_MAX_RETRIES)
+                .value();
         int newCount = attempt.attemptCount() + 1;
         if (newCount > maxRetries) {
             expire(attempt, now, failureReason);

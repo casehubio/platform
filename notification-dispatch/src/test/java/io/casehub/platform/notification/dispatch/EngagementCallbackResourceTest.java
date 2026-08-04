@@ -1,5 +1,8 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.api.preferences.BooleanPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.DeliveryStatus;
@@ -31,8 +34,10 @@ class EngagementCallbackResourceTest {
     void setUp() {
         store = new InMemoryDeliveryAttemptStore(10000);
         firedEvents = new ArrayList<>();
+        var enabledProvider = EngagementRecorderTest.providerWith(
+                PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(true));
         recorder = new EngagementRecorder(store,
-                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), true);
+                new EngagementRecorderTest.CapturingEngagementEvent(firedEvents), enabledProvider);
     }
 
     @Test
@@ -40,7 +45,7 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true, null);
+                fixedPrincipal("tenant-1"), Map.of(), enabledProvider(), null);
 
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -51,7 +56,7 @@ class EngagementCallbackResourceTest {
     @Test
     void directPathReturns404ForMissingAttempt() {
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true, null);
+                fixedPrincipal("tenant-1"), Map.of(), enabledProvider(), null);
 
         var response = resource.recordDirect("nonexistent",
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -63,7 +68,7 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("other-tenant"), Map.of(), true, null);
+                fixedPrincipal("other-tenant"), Map.of(), enabledProvider(), null);
 
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -76,7 +81,7 @@ class EngagementCallbackResourceTest {
         store.store(attempt);
         var handler = new TestCallbackHandler(attempt.id());
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider(), null);
 
         var response = resource.handleCallback("email", "{\"event\":\"open\"}");
         assertThat(response.getStatus()).isEqualTo(200);
@@ -86,7 +91,7 @@ class EngagementCallbackResourceTest {
     @Test
     void callbackPathReturns404ForUnknownChannel() {
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true, null);
+                fixedPrincipal("tenant-1"), Map.of(), enabledProvider(), null);
 
         var response = resource.handleCallback("unknown", "{}");
         assertThat(response.getStatus()).isEqualTo(404);
@@ -96,7 +101,7 @@ class EngagementCallbackResourceTest {
     void callbackPathSkipsNonexistentAttempts() {
         var handler = new TestCallbackHandler("nonexistent-attempt");
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider(), null);
 
         var response = resource.handleCallback("email", "{}");
         assertThat(response.getStatus()).isEqualTo(200);
@@ -108,7 +113,7 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), false, null);
+                fixedPrincipal("tenant-1"), Map.of(), disabledProvider(), null);
 
         var directResponse = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(EngagementType.OPENED, null));
@@ -127,7 +132,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider(), null);
         var response = resource.handleCallback("email", "bad-payload");
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
@@ -142,7 +147,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+                fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider(), null);
         var response = resource.handleCallback("email", "{}");
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
@@ -160,7 +165,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = new EngagementCallbackResource(store, recorder,
-                                                      fixedPrincipal("tenant-1"), Map.of("email", handler), true, null);
+                                                      fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider(), null);
         var response = resource.handleCallback("email", "forged-payload");
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(firedEvents).isEmpty();
@@ -172,7 +177,7 @@ class EngagementCallbackResourceTest {
         var attempt = deliveredAttempt();
         store.store(attempt);
         var resource = new EngagementCallbackResource(store, recorder,
-                fixedPrincipal("tenant-1"), Map.of(), true, null);
+                fixedPrincipal("tenant-1"), Map.of(), enabledProvider(), null);
         var response = resource.recordDirect(attempt.id(),
                 new EngagementCallbackResource.DirectEngagementRequest(null, null));
         assertThat(response.getStatus()).isEqualTo(400);
@@ -184,6 +189,16 @@ class EngagementCallbackResourceTest {
                 DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
                 Instant.now(), Instant.now(), Instant.now(), null, null, "{}",
                 null, null);
+    }
+
+    private static PreferenceProvider enabledProvider() {
+        return EngagementRecorderTest.providerWith(
+                PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(true));
+    }
+
+    private static PreferenceProvider disabledProvider() {
+        return EngagementRecorderTest.providerWith(
+                PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(false));
     }
 
     private CurrentPrincipal fixedPrincipal(String tenancyId) {

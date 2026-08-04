@@ -6,10 +6,13 @@ import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.EngagementType;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 @ApplicationScoped
@@ -19,19 +22,22 @@ public class InAppEngagementBridge {
 
     private final DeliveryAttemptStore store;
     private final EngagementRecorder recorder;
-    private final boolean enabled;
+    private final PreferenceProvider preferenceProvider;
 
     @Inject
     public InAppEngagementBridge(DeliveryAttemptStore store,
                                  EngagementRecorder recorder,
-                                 @ConfigProperty(name = "casehub.delivery.engagement.enabled", defaultValue = "false")
-                                 boolean enabled) {
+                                 PreferenceProvider preferenceProvider) {
         this.store = store;
         this.recorder = recorder;
-        this.enabled = enabled;
+        this.preferenceProvider = preferenceProvider;
     }
 
     void onStatusChanged(@ObservesAsync NotificationStatusChanged event) {
+        boolean enabled = preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.ENGAGEMENT_ENABLED)
+                .value();
         if (!enabled) {
             return;
         }

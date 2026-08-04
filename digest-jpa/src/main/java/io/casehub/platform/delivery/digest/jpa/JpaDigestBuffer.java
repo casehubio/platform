@@ -2,7 +2,11 @@ package io.casehub.platform.delivery.digest.jpa;
 
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,8 +33,8 @@ public class JpaDigestBuffer implements DigestBuffer {
 
     @ConfigProperty(name = "casehub.notification.digest.max-buffer-size", defaultValue = "0")
     int maxBufferSize;
-    @ConfigProperty(name = "casehub.notification.digest.retention-days", defaultValue = "90")
-    int retentionDays;
+    @Inject
+    PreferenceProvider preferenceProvider;
 
 
     // CDI no-arg constructor
@@ -171,6 +175,10 @@ public class JpaDigestBuffer implements DigestBuffer {
     @Scheduled(cron = "0 0 3 * * ?")
     @Transactional
     void retentionPurge() {
+        int retentionDays = preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.DIGEST_RETENTION_DAYS)
+                .value();
         Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
         int purged = entityManager.createQuery(
                                           "DELETE FROM DigestBufferEntity e WHERE e.bufferedAt < :cutoff " +

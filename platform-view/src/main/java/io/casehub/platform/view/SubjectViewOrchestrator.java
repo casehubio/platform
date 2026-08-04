@@ -1,6 +1,10 @@
 package io.casehub.platform.view;
 
+import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.path.Path;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import io.casehub.platform.api.view.SubjectViewEvent;
 import io.casehub.platform.api.view.SubjectViewSpec;
 import io.casehub.platform.api.view.SubjectViewStore;
@@ -8,7 +12,6 @@ import io.casehub.platform.api.view.ViewEventType;
 import io.casehub.platform.api.view.ViewMembershipTracker;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -31,8 +34,8 @@ public class SubjectViewOrchestrator {
     @Inject
     ViewMembershipTracker tracker;
 
-    @ConfigProperty(name = "casehub.view.cache.ttl-seconds", defaultValue = "0")
-    int cacheTtlSeconds;
+    @Inject
+    PreferenceProvider preferenceProvider;
 
     private final ConcurrentHashMap<String, CachedViews> viewCache = new ConcurrentHashMap<>();
 
@@ -117,6 +120,10 @@ public class SubjectViewOrchestrator {
     }
 
     private List<SubjectViewSpec> getViews(String tenancyId) {
+        int cacheTtlSeconds = preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.VIEW_CACHE_TTL_SECONDS)
+                .value();
         if (cacheTtlSeconds <= 0) {
             return viewStore.findByTenancy(tenancyId);
         }

@@ -6,6 +6,12 @@ import io.casehub.platform.api.delivery.DeliveryStatus;
 import io.casehub.platform.api.delivery.DeliveryType;
 import io.casehub.platform.api.delivery.EngagementRecorded;
 import io.casehub.platform.api.delivery.EngagementType;
+import io.casehub.platform.api.preferences.BooleanPreference;
+import io.casehub.platform.api.preferences.MapPreferences;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceKey;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SingleValuePreference;
 import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore;
 import jakarta.enterprise.event.Event;
@@ -15,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -30,7 +37,8 @@ class EngagementRecorderTest {
     void setUp() {
         store = new InMemoryDeliveryAttemptStore(10000);
         firedEvents = new ArrayList<>();
-        recorder = new EngagementRecorder(store, new CapturingEngagementEvent(firedEvents), true);
+        recorder = new EngagementRecorder(store, new CapturingEngagementEvent(firedEvents),
+                providerWith(PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(true)));
     }
 
     @Test
@@ -61,7 +69,8 @@ class EngagementRecorderTest {
 
     @Test
     void noOpWhenDisabled() {
-        var disabledRecorder = new EngagementRecorder(store, new CapturingEngagementEvent(firedEvents), false);
+        var disabledRecorder = new EngagementRecorder(store, new CapturingEngagementEvent(firedEvents),
+                providerWith(PlatformPreferenceKeys.ENGAGEMENT_ENABLED, BooleanPreference.of(false)));
         var attempt = deliveredAttempt();
         store.store(attempt);
         disabledRecorder.record(attempt, EngagementType.OPENED, null);
@@ -75,6 +84,10 @@ class EngagementRecorderTest {
                 DeliveryType.IMMEDIATE, DeliveryStatus.DELIVERED, 1,
                 Instant.now(), Instant.now(), Instant.now(), null, null, "{}",
                 null, null);
+    }
+
+    static PreferenceProvider providerWith(PreferenceKey<?> key, SingleValuePreference value) {
+        return scope -> new MapPreferences(Map.of(key.qualifiedName(), value));
     }
 
     static class CapturingEngagementEvent implements Event<EngagementRecorded> {

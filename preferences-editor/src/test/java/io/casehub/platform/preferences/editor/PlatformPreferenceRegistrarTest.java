@@ -33,6 +33,10 @@ class PlatformPreferenceRegistrarTest {
         assertTrue(qualifiedNames.contains("casehub.platform.delivery.attempt-retention-days"));
         assertTrue(qualifiedNames.contains("casehub.platform.delivery.failed-retention-days"));
         assertTrue(qualifiedNames.contains("casehub.platform.delivery.engagement-retention-days"));
+        assertTrue(qualifiedNames.contains("casehub.platform.delivery.engagement-enabled"));
+        assertTrue(qualifiedNames.contains("casehub.platform.delivery.retry-max-retries"));
+        assertTrue(qualifiedNames.contains("casehub.platform.notification.digest-retention-days"));
+        assertTrue(qualifiedNames.contains("casehub.platform.view.cache-ttl-seconds"));
     }
 
     @Test
@@ -52,6 +56,21 @@ class PlatformPreferenceRegistrarTest {
     }
 
     @Test
+    void engagement_enabled_descriptor_has_boolean_type() {
+        var descriptor = registry.resolve("casehub.platform.delivery.engagement-enabled");
+        assertTrue(descriptor.isPresent());
+        var d = descriptor.get();
+        assertEquals("casehub.platform", d.namespace());
+        assertEquals("delivery.engagement-enabled", d.name());
+        assertEquals("boolean", d.type());
+        assertEquals("false", d.defaultValue());
+        assertFalse(d.multiValue());
+        assertNotNull(d.label());
+        assertNotNull(d.description());
+        assertTrue(d.constraints().isEmpty());
+    }
+
+    @Test
     void all_descriptors_have_labels_and_constraints() {
         var expectedKeys = Set.of(
                 "casehub.platform.notification.retention-days",
@@ -59,7 +78,10 @@ class PlatformPreferenceRegistrarTest {
                 "casehub.platform.acl.audit-retention-days",
                 "casehub.platform.delivery.attempt-retention-days",
                 "casehub.platform.delivery.failed-retention-days",
-                "casehub.platform.delivery.engagement-retention-days"
+                "casehub.platform.delivery.engagement-retention-days",
+                "casehub.platform.delivery.retry-max-retries",
+                "casehub.platform.notification.digest-retention-days",
+                "casehub.platform.view.cache-ttl-seconds"
                                  );
         for (var d : registry.discover()) {
             if (!expectedKeys.contains(d.qualifiedName())) {continue;}

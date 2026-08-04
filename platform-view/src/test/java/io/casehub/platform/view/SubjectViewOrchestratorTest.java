@@ -1,6 +1,10 @@
 package io.casehub.platform.view;
 
 import io.casehub.platform.api.path.Path;
+import io.casehub.platform.api.preferences.IntPreference;
+import io.casehub.platform.api.preferences.MapPreferences;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.view.SubjectViewEvent;
 import io.casehub.platform.api.view.SubjectViewSpec;
 import io.casehub.platform.api.view.SubjectViewStore;
@@ -36,7 +40,12 @@ class SubjectViewOrchestratorTest {
         orchestrator.evaluator = evaluator;
         orchestrator.viewStore = viewStore;
         orchestrator.tracker = tracker;
-        orchestrator.cacheTtlSeconds = 0;
+        orchestrator.preferenceProvider = ttlProvider(0);
+    }
+
+    private static PreferenceProvider ttlProvider(int seconds) {
+        return scope -> new MapPreferences(java.util.Map.of(
+                PlatformPreferenceKeys.VIEW_CACHE_TTL_SECONDS.qualifiedName(), IntPreference.of(seconds)));
     }
 
     private SubjectViewSpec view(String name, String pattern) {
@@ -159,7 +168,7 @@ class SubjectViewOrchestratorTest {
 
     @Test
     void deleteView_invalidatesViewCache() {
-        orchestrator.cacheTtlSeconds = 60;
+        orchestrator.preferenceProvider = ttlProvider(60);
         var saved = orchestrator.saveView(new SubjectViewSpec(null, "cached-view", "t1",
                                                               "iot/**", null, null, null, null, null));
         var s = UUID.randomUUID();
@@ -193,7 +202,7 @@ class SubjectViewOrchestratorTest {
 
     @Test
     void caching_viewsCachedWhenTtlPositive() {
-        orchestrator.cacheTtlSeconds = 60;
+        orchestrator.preferenceProvider = ttlProvider(60);
         view("iot-all", "iot/**");
         var s = UUID.randomUUID();
 
@@ -209,7 +218,7 @@ class SubjectViewOrchestratorTest {
 
     @Test
     void caching_saveViewInvalidatesCache() {
-        orchestrator.cacheTtlSeconds = 60;
+        orchestrator.preferenceProvider = ttlProvider(60);
         view("iot-all", "iot/**");
         var s = UUID.randomUUID();
 

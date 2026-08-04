@@ -6,6 +6,10 @@ import io.casehub.platform.api.delivery.EngagementCallbackHandler;
 import io.casehub.platform.api.delivery.EngagementType;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.preferences.SettingsScope;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -16,7 +20,6 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.util.Map;
@@ -32,7 +35,7 @@ public class EngagementCallbackResource {
     private final EngagementRecorder                     recorder;
     private final CurrentPrincipal                       principal;
     private final Map<String, EngagementCallbackHandler> handlers;
-    private final boolean                                enabled;
+    private final PreferenceProvider                     preferenceProvider;
 
     @Context
     HttpHeaders httpHeaders;
@@ -42,35 +45,34 @@ public class EngagementCallbackResource {
                                       EngagementRecorder recorder,
                                       CurrentPrincipal principal,
                                       Instance<EngagementCallbackHandler> handlerInstances,
-                                      @ConfigProperty(name = "casehub.delivery.engagement.enabled", defaultValue = "false")
-                                      boolean enabled) {
-        this.store     = store;
-        this.recorder  = recorder;
-        this.principal = principal;
-        this.handlers  = handlerInstances.stream()
-                                         .collect(Collectors.toMap(EngagementCallbackHandler::channelId, h -> h));
-        this.enabled   = enabled;
+                                      PreferenceProvider preferenceProvider) {
+        this.store              = store;
+        this.recorder           = recorder;
+        this.principal          = principal;
+        this.handlers           = handlerInstances.stream()
+                                                   .collect(Collectors.toMap(EngagementCallbackHandler::channelId, h -> h));
+        this.preferenceProvider = preferenceProvider;
     }
 
     EngagementCallbackResource(DeliveryAttemptStore store,
                                EngagementRecorder recorder,
                                CurrentPrincipal principal,
                                Map<String, EngagementCallbackHandler> handlers,
-                               boolean enabled,
+                               PreferenceProvider preferenceProvider,
                                HttpHeaders httpHeaders) {
-        this.store       = store;
-        this.recorder    = recorder;
-        this.principal   = principal;
-        this.handlers    = handlers;
-        this.enabled     = enabled;
-        this.httpHeaders = httpHeaders;
+        this.store              = store;
+        this.recorder           = recorder;
+        this.principal          = principal;
+        this.handlers           = handlers;
+        this.preferenceProvider = preferenceProvider;
+        this.httpHeaders        = httpHeaders;
     }
 
     @POST
     @Path("/callback/{channelId}")
     @Consumes({"application/json", "application/x-www-form-urlencoded"})
     public Response handleCallback(@PathParam("channelId") String channelId, String rawPayload) {
-        if (!enabled) {
+        if (!isEngagementEnabled()) {
             return Response.status(404).build();
         }
         var handler = handlers.get(channelId);
@@ -103,7 +105,7 @@ public class EngagementCallbackResource {
     @Consumes("application/json")
     public Response recordDirect(@PathParam("attemptId") String attemptId,
                                  DirectEngagementRequest request) {
-        if (!enabled) {
+        if (!isEngagementEnabled()) {
             return Response.status(404).build();
         }
         if (request.type() == null) {
@@ -115,6 +117,13 @@ public class EngagementCallbackResource {
         }
         recorder.record(attempt, request.type(), request.metadata());
         return Response.ok().build();
+    }
+
+    private boolean isEngagementEnabled() {
+        return preferenceProvider
+                .resolve(SettingsScope.root(TenancyConstants.PLATFORM_TENANT_ID))
+                .getOrDefault(PlatformPreferenceKeys.ENGAGEMENT_ENABLED)
+                .value();
     }
 
     private Map<String, String> extractHeaders() {

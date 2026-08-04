@@ -4,9 +4,14 @@ import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.NotificationSource;
+import io.casehub.platform.api.preferences.IntPreference;
+import io.casehub.platform.api.preferences.MapPreferences;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
+import io.casehub.platform.api.preferences.PreferenceProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +23,8 @@ class InMemoryDigestBufferTest {
 
     @BeforeEach
     void setUp() {
-        buffer = new InMemoryDigestBuffer(500, 90);
+        buffer = new InMemoryDigestBuffer(500,
+                retentionProvider(90));
     }
 
     @Test
@@ -75,7 +81,8 @@ class InMemoryDigestBufferTest {
 
     @Test
     void eviction_dropsOldestWhenMaxExceeded() {
-        buffer = new InMemoryDigestBuffer(3, 90);
+        buffer = new InMemoryDigestBuffer(3,
+                retentionProvider(90));
         buffer.add(KEY, sampleInput("Item 1"));
         buffer.add(KEY, sampleInput("Item 2"));
         buffer.add(KEY, sampleInput("Item 3"));
@@ -140,6 +147,11 @@ class InMemoryDigestBufferTest {
         ttlBuffer.add(KEY, sampleInput("expiring"));
         Thread.sleep(100);
         assertThat(ttlBuffer.oldestPendingTimestamp(KEY)).isEmpty();
+    }
+
+    private static PreferenceProvider retentionProvider(int days) {
+        return scope -> new MapPreferences(Map.of(
+                PlatformPreferenceKeys.DIGEST_RETENTION_DAYS.qualifiedName(), IntPreference.of(days)));
     }
 
     private static NotificationInput sampleInput(String title) {

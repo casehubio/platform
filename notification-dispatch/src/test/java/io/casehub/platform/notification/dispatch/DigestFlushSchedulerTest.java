@@ -1,5 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.api.preferences.IntPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
@@ -57,7 +59,9 @@ class DigestFlushSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        buffer = new InMemoryDigestBuffer(500, 90);
+        buffer = new InMemoryDigestBuffer(500,
+                EngagementRecorderTest.providerWith(
+                        PlatformPreferenceKeys.DIGEST_RETENTION_DAYS, IntPreference.of(90)));
         preferenceStore = new StubPreferenceStore();
         suppressionStore = new StubSuppressionStore();
         channelRegistry = new InMemoryDeliveryChannelRegistry();

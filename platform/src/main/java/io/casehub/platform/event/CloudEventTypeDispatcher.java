@@ -1,6 +1,8 @@
 package io.casehub.platform.event;
 
 import io.cloudevents.CloudEvent;
+import io.quarkus.arc.Arc;
+import io.quarkus.arc.ArcContainer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.ObservesAsync;
@@ -22,6 +24,10 @@ public class CloudEventTypeDispatcher {
     public void onCloudEvent(@ObservesAsync CloudEvent event) {
         String type = event.getType();
         if (type == null || type.isBlank()) {
+            return;
+        }
+        ArcContainer container = Arc.container();
+        if (container != null && !container.isRunning()) {
             return;
         }
         cloudEventBus.select(new CloudEventTypeLiteral(type))

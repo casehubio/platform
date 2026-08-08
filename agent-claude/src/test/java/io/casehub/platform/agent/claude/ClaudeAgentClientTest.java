@@ -133,11 +133,9 @@ class ClaudeAgentClientTest {
     }
 
     @Test
-    void constructor_zeroMaxConcurrentSessions_throwsIllegalState() {
-        assertThatThrownBy(() -> new ClaudeAgentClient(props(0), c -> Multi.createFrom().empty()))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("max-concurrent-sessions")
-            .hasMessageContaining("0");
+    void constructor_zeroMaxConcurrentSessions_createsAlwaysPermitSemaphore() {
+        var client = new ClaudeAgentClient(props(0), c -> Multi.createFrom().empty());
+        assertThat(client.availablePermits()).isEqualTo(Integer.MAX_VALUE);
     }
 
     @Test

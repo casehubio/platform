@@ -305,16 +305,15 @@ class ChatModelAgentProviderTest {
     }
 
     @Test
-    void init_withZeroMaxConcurrentSessions_throws() {
+    void init_withZeroMaxConcurrentSessions_createsAlwaysPermitSemaphore() {
         when(properties.maxConcurrentSessions()).thenReturn(0);
         ChatModel chatModel = mock(ChatModel.class);
         Instance<ChatModel> instance = instanceOf(chatModel);
         provider.chatModels = instance;
         provider.properties = properties;
 
-        assertThatThrownBy(() -> provider.init())
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("max-concurrent-sessions must be >= 1");
+        provider.init();
+        assertThat(provider.availablePermits()).isEqualTo(Integer.MAX_VALUE);
     }
 
     @Test
@@ -327,7 +326,7 @@ class ChatModelAgentProviderTest {
 
         assertThatThrownBy(() -> provider.init())
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("max-concurrent-sessions must be >= 1");
+            .hasMessageContaining("max-concurrent-sessions must be >= 0");
     }
 
     @Test

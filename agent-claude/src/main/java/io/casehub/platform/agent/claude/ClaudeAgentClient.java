@@ -69,11 +69,11 @@ public class ClaudeAgentClient {
     public ClaudeAgentClient(ClaudeAgentProperties properties) {
         this.properties = properties;
         int maxSessions = properties.maxConcurrentSessions();
-        if (maxSessions < 1) {
+        if (maxSessions < 0) {
             throw new IllegalStateException(
-                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 1, got " + maxSessions);
+                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 0, got " + maxSessions);
         }
-        this.semaphore = new Semaphore(maxSessions);
+        this.semaphore = new Semaphore(maxSessions == 0 ? Integer.MAX_VALUE : maxSessions);
         this.activeSessions = new CopyOnWriteArraySet<>();
         this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "casehub-agent-timeout");
@@ -102,11 +102,11 @@ public class ClaudeAgentClient {
                              Function<AgentSessionConfig, Multi<AgentEvent>> streamFactory) {
         this.properties = properties;
         int maxSessions = properties.maxConcurrentSessions();
-        if (maxSessions < 1) {
+        if (maxSessions < 0) {
             throw new IllegalStateException(
-                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 1, got " + maxSessions);
+                "casehub.platform.agent.claude.max-concurrent-sessions must be >= 0, got " + maxSessions);
         }
-        this.semaphore = new Semaphore(maxSessions);
+        this.semaphore = new Semaphore(maxSessions == 0 ? Integer.MAX_VALUE : maxSessions);
         this.activeSessions = new CopyOnWriteArraySet<>();
         this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "casehub-agent-timeout");

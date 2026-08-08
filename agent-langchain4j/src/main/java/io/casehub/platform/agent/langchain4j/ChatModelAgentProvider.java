@@ -47,11 +47,11 @@ public class ChatModelAgentProvider implements AgentProvider {
     @PostConstruct
     void init() {
         int maxSessions = properties.maxConcurrentSessions();
-        if (maxSessions < 1) {
+        if (maxSessions < 0) {
             throw new IllegalStateException(
-                "casehub.platform.agent.langchain4j.max-concurrent-sessions must be >= 1, got " + maxSessions);
+                "casehub.platform.agent.langchain4j.max-concurrent-sessions must be >= 0, got " + maxSessions);
         }
-        semaphore = new Semaphore(maxSessions);
+        semaphore = new Semaphore(maxSessions == 0 ? Integer.MAX_VALUE : maxSessions);
 
         List<ChatModel> candidates = chatModels.select(Default.Literal.INSTANCE).stream()
             .filter(m -> !(m instanceof AgentProviderChatModel))

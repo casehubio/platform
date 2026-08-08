@@ -47,8 +47,9 @@ public interface AgentProvider {
      * <p>{@code init.systemPrompt} is configured at session-open time and transmitted to the
      * subprocess on the first {@link AgentSession#query(String)} call.
      *
-     * @throws AgentSessionLimitException immediately (not via onFailure) if the concurrent-session
-     *         cap is reached
+     * @throws AgentSessionLimitException (not via onFailure) if concurrent-session
+     *         admission fails — may block up to the configured admission timeout
+     *         when a gate decorator is present
      */
     AgentSession openSession(AgentSessionInit init);
 }

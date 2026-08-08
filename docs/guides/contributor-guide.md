@@ -45,6 +45,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `scim/` | `casehub-platform-scim` | `@ApplicationScoped` | SCIM 2.0 `GroupMembershipProvider` |
 | `agent-claude/` | `casehub-platform-agent-claude` | `@Alternative @Priority(10)` | Claude CLI subprocess via Spring AI Community `claude-code-sdk` 1.0.0 -- semaphore-gated, wall-clock timeout |
 | `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@Alternative @Priority(1)` | Bidirectional LangChain4j interop -- any ChatModel as AgentProvider, any AgentProvider as ChatModel |
+| `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps any AgentProvider, deferred admission, per-query session limiting |
 | `endpoints-memory/` | `casehub-platform-endpoints-memory` | `@Alternative @Priority(100)` | In-memory `EndpointRegistry` -- volatile, Tier 4 CDI |
 | `endpoints-config/` | `casehub-platform-endpoints-config` | `@Startup @ApplicationScoped` | YAML endpoint populator -- `${VAR}` interpolation, multi-file |
 | `notifications/` | `casehub-platform-notifications` | `@ApplicationScoped` | REST + SSE -- list, mark-read, dismiss, unread-count, preferences, suppression |
@@ -188,6 +189,7 @@ CDI tier for `AgentProvider`:
 - Tier 0: `NoOpAgentProvider @DefaultBean` (platform/) -- fallback
 - Tier 1: `ChatModelAgentProvider @Alternative @Priority(1)` (agent-langchain4j/) -- any LangChain4j ChatModel
 - Tier 10: `ClaudeAgentProvider @Alternative @Priority(10)` (agent-claude/) -- native Claude CLI
+- Decorator: `GatedAgentProvider @Decorator @Priority(APPLICATION)` (agent-gate/) -- token bucket + concurrency gate, wraps any provider
 
 `AgentEvent` sealed interface variants: `TextDelta`, `ThinkingDelta`, `ToolCallDelta`, `ToolCallComplete`, `ToolResult`, `InvocationComplete` (terminal with cost/usage/timing metadata).
 

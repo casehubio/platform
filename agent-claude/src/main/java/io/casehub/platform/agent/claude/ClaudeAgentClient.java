@@ -8,13 +8,13 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
+import io.quarkus.runtime.Startup;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import io.quarkus.runtime.Startup;
 import org.jboss.logging.Logger;
 import org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient;
 import org.springaicommunity.claude.agent.sdk.ClaudeClient;
@@ -64,6 +64,8 @@ public class ClaudeAgentClient {
     private final ScheduledExecutorService timeoutScheduler;
     // Non-null in tests only — set by test constructor, checked in buildEventStream()
     private final Function<AgentSessionConfig, Multi<AgentEvent>> streamFactory;
+    private volatile boolean                                      binaryAvailable = true;
+
 
     @Inject
     public ClaudeAgentClient(ClaudeAgentProperties properties) {
@@ -125,35 +127,33 @@ public class ClaudeAgentClient {
     void validateBinary() {
         String binary = properties.binaryPath().orElse("claude");
         try {
-            Process process = new ProcessBuilder(binary, "--version").start();
-            // 10-second bound: --version completes in milliseconds.
-            // A hung probe means something is wrong with the install — fail fast.
+            Process process  = new ProcessBuilder(binary, "--version").start();
             boolean finished = process.waitFor(10, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                throw new IllegalStateException(
-                    "claude binary probe timed out after 10s: " + binary);
+                LOG.warnf("claude binary probe timed out after 10s: %s — agent features disabled", binary);
+                binaryAvailable = false;
+                return;
             }
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                throw new IllegalStateException(
-                    "claude binary at '" + binary + "' exited with code " + exitCode
-                    + " — possible broken installation");
+                LOG.warnf("claude binary at '%s' exited with code %d — agent features disabled", binary, exitCode);
+                binaryAvailable = false;
+                return;
             }
-        } catch (IllegalStateException e) {
-            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(
-                "Interrupted while probing claude binary: " + binary, e);
+            LOG.warnf("Interrupted while probing claude binary: %s — agent features disabled", binary);
+            binaryAvailable = false;
+            return;
         } catch (IOException e) {
-            throw new IllegalStateException(
-                "claude binary not found or not executable: " + binary
-                + " — configure casehub.platform.agent.claude.binary-path "
-                + "or ensure 'claude' is on PATH", e);
+            LOG.warnf("claude binary not found at '%s' — agent features disabled. " +
+                      "Install Claude Code CLI or set casehub.platform.agent.claude.binary-path", binary);
+            binaryAvailable = false;
+            return;
         }
-        LOG.infof("claude binary resolved at '%s'. Authentication not verified — "
-                  + "AgentProcessException will surface on first invocation if unauthenticated.",
+        LOG.infof("claude binary resolved at '%s'. Authentication not verified — " +
+                  "AgentProcessException will surface on first invocation if unauthenticated.",
                   binary);
     }
 
@@ -173,20 +173,20 @@ public class ClaudeAgentClient {
      * subscription blocks the Vert.x IO thread.
      */
     public Multi<AgentEvent> run(AgentSessionConfig config) {
-        if (!semaphore.tryAcquire()) {
-            // Semaphore not acquired — return failure directly. No termination handlers
-            // registered on this Multi because there is nothing to release.
+        if (!binaryAvailable) {
             return Multi.createFrom().failure(
-                new AgentSessionLimitException(properties.maxConcurrentSessions()));
+                    new IllegalStateException("Claude CLI binary not available — agent features are disabled"));
+        }
+        if (!semaphore.tryAcquire()) {
+            return Multi.createFrom().failure(
+                    new AgentSessionLimitException(properties.maxConcurrentSessions()));
         }
         try {
-            // buildEventStream() returns a Multi with cleanup handlers already wired.
-            // run() adds semaphore release as the outer layer on top.
             return buildEventStream(config)
-                .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
-                .onCompletion().invoke(semaphore::release)
-                .onFailure().invoke(t -> semaphore.release())
-                .onCancellation().invoke(semaphore::release);
+                           .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+                           .onCompletion().invoke(semaphore::release)
+                           .onFailure().invoke(t -> semaphore.release())
+                           .onCancellation().invoke(semaphore::release);
         } catch (Exception e) {
             semaphore.release();
             return Multi.createFrom().failure(e);

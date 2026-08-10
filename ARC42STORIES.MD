@@ -1637,7 +1637,7 @@ What this layer adds:
 - **`JpaAccessControlProvider @ApplicationScoped`** — Flyway V2000; `AclEntryEntity` + `ResourceParentEntity` (for `registerParent`/hierarchy traversal); parent walks up the hierarchy checking for inherited grants
 - **`GroupMembershipProvider.groupsOf(actorId)`** — inverse lookup added to `platform-api` SPI (#93): "which groups is actorId a member of?" — enables group-based ACL grant queries
 
-Not closed here: ACL Phase 2 (identity propagation from DID/VC assertions into ACL context), ACL Phase 3 (worker rights roadmap).
+ACL Phase 2 (identity propagation) closed by platform#220 + engine#768. ACL Phase 3 (worker rights) closed by platform#221 + engine#833 — `WorkerAction`, `WorkerCredentialStore`, `WorkerGrantOrchestrator`, `WorkerCredentialFilter` in casehub-engine; `permissionIntent` on `Binding`, `serviceAccountId` on `Worker`.
 
 #### Accountability gaps closed
 

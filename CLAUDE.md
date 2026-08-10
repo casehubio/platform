@@ -59,13 +59,12 @@ git push --force mdproctor main   # --force on first push after fork creation
 | adr        | project     | lands in `adr/` |
 | protocols  | garden      | `/Users/mdproctor/claude/casehub/garden/docs/protocols/` — never create local protocol files |
 | specs      | project     | lands in `docs/` |
-| blog       | workspace   | staged; published to mdproctor.github.io via publish-blog |
+| blog       | project     | lands in `docs/blog/` — promoted at work end |
 | plans      | workspace   | stay in workspace permanently |
 | design     | workspace   | epic journal stays in workspace |
 | snapshots  | workspace   | |
 | handover   | workspace   | |
 
-**Blog directory:** `/Users/mdproctor/claude/public/casehub/platform/blog/`
 
 Living docs — check for drift after significant changes:
 - `ARC42STORIES.MD` — primary architecture record; check §4 (layer taxonomy), §5 (building block view), §8 (new layers), §13 (glossary) after module, SPI, or structural changes

@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,7 +73,7 @@ public abstract class SubscriptionStoreContractTest {
         assertThat(found.get())
                 .usingRecursiveComparison()
                 .withComparatorForType(
-                        Comparator.comparing(a -> a.truncatedTo(ChronoUnit.MICROS)),
+                        (a, b) -> Math.abs(ChronoUnit.MICROS.between(a, b)) <= 1 ? 0 : a.compareTo(b),
                         Instant.class)
                 .isEqualTo(subscription);
     }

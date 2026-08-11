@@ -1,4 +1,5 @@
--- ACL flat-grant tables for AccessControlProvider (platform#68)
+-- Consolidated initial schema for ACL.
+-- Replaces V1–V3 incremental migrations (no production database exists).
 
 CREATE SEQUENCE IF NOT EXISTS acl_entry_seq START WITH 1 INCREMENT BY 50;
 
@@ -7,28 +8,29 @@ CREATE TABLE IF NOT EXISTS acl_entry (
     actor_id    VARCHAR(255) NOT NULL,
     resource_id VARCHAR(255) NOT NULL,
     action      VARCHAR(50)  NOT NULL,
+    entry_type  VARCHAR(5)   NOT NULL DEFAULT 'ALLOW',
     condition   TEXT,
-    granted_at  TIMESTAMP WITH TIME ZONE    NOT NULL,
+    granted_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     expires_at  TIMESTAMP WITH TIME ZONE,
     tenancy_id  VARCHAR(64)  NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uq_acl_entry UNIQUE (actor_id, resource_id, action)
+    CONSTRAINT uq_acl_entry UNIQUE (actor_id, resource_id, action, tenancy_id, entry_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_acl_actor_resource ON acl_entry (actor_id, resource_id);
 CREATE INDEX IF NOT EXISTS idx_acl_resource       ON acl_entry (resource_id);
 CREATE INDEX IF NOT EXISTS idx_acl_tenancy        ON acl_entry (tenancy_id);
+CREATE INDEX IF NOT EXISTS idx_acl_entry_type     ON acl_entry (entry_type);
 
 CREATE TABLE IF NOT EXISTS resource_parent (
     child_resource_id  VARCHAR(255) NOT NULL,
     parent_resource_id VARCHAR(255) NOT NULL,
     tenancy_id         VARCHAR(64)  NOT NULL,
-    PRIMARY KEY (child_resource_id)
+    PRIMARY KEY (child_resource_id, tenancy_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rp_parent ON resource_parent (parent_resource_id);
 
--- ACL audit log — tracks GRANT/REVOKE operations
 CREATE SEQUENCE IF NOT EXISTS acl_audit_log_seq START WITH 1 INCREMENT BY 50;
 
 CREATE TABLE IF NOT EXISTS acl_audit_log (
@@ -38,15 +40,15 @@ CREATE TABLE IF NOT EXISTS acl_audit_log (
     action        VARCHAR(50)   NOT NULL,
     operation     VARCHAR(20)   NOT NULL,
     performed_by  VARCHAR(255)  NOT NULL,
-    performed_at  TIMESTAMP WITH TIME ZONE     NOT NULL DEFAULT now(),
+    performed_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     expires_at    TIMESTAMP WITH TIME ZONE,
     metadata      JSONB,
     tenancy_id    VARCHAR(64)   NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_resource    ON acl_audit_log (resource_id);
-CREATE INDEX IF NOT EXISTS idx_audit_actor       ON acl_audit_log (actor_id);
-CREATE INDEX IF NOT EXISTS idx_audit_performed   ON acl_audit_log (performed_by);
+CREATE INDEX IF NOT EXISTS idx_audit_resource     ON acl_audit_log (resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_actor        ON acl_audit_log (actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_performed    ON acl_audit_log (performed_by);
 CREATE INDEX IF NOT EXISTS idx_audit_performed_at ON acl_audit_log (performed_at);
 CREATE INDEX IF NOT EXISTS idx_audit_tenancy      ON acl_audit_log (tenancy_id);

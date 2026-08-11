@@ -3,14 +3,14 @@ package io.casehub.platform.api.acl;
 public class WorkerAuthorizationDeniedException extends SecurityException {
 
     private final String actorId;
-    private final String caseDefinitionId;
+    private final String definitionId;
     private final String reason;
 
-    public WorkerAuthorizationDeniedException(String actorId, String caseDefinitionId, String reason) {
+    public WorkerAuthorizationDeniedException(String actorId, String definitionId, String reason) {
         super("Worker authorization denied: actor=" + actorId
-              + " caseDefinition=" + caseDefinitionId + " reason=" + reason);
+              + " definition=" + definitionId + " reason=" + reason);
         this.actorId = actorId;
-        this.caseDefinitionId = caseDefinitionId;
+        this.definitionId = definitionId;
         this.reason = reason;
     }
 
@@ -18,8 +18,8 @@ public class WorkerAuthorizationDeniedException extends SecurityException {
         return actorId;
     }
 
-    public String caseDefinitionId() {
-        return caseDefinitionId;
+    public String definitionId() {
+        return definitionId;
     }
 
     public String reason() {

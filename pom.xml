@@ -31,6 +31,7 @@
         <module>acl-inmem</module>
         <module>acl-jpa</module>
         <module>acl-admin</module>
+        <module>acl-worker</module>
         <module>notifications-inmem</module>
         <module>notifications-jpa</module>
         <module>notifications</module>

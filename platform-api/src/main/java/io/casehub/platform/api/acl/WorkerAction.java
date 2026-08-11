@@ -1,22 +1,13 @@
 package io.casehub.platform.api.acl;
 
-public enum WorkerAction {
-    READ_CONTEXT(AclAction.READ),
-    WRITE_CONTEXT(AclAction.WRITE),
-    SIGNAL_CASE(AclAction.WRITE),
-    READ_EVENT_LOG(AclAction.READ),
-    READ_PLAN_ITEMS(AclAction.READ),
-    SPAWN_SUB_CASE(AclAction.WRITE),
-    CLAIM_WORK_ITEM(AclAction.CLAIM),
-    ADMIN(AclAction.ADMIN);
+public record WorkerAction(String name, AclAction aclAction) {
 
-    private final AclAction aclAction;
-
-    WorkerAction(AclAction aclAction) {
-        this.aclAction = aclAction;
-    }
-
-    public AclAction aclAction() {
-        return aclAction;
+    public WorkerAction {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("name must not be blank");
+        }
+        if (aclAction == null) {
+            throw new IllegalArgumentException("aclAction must not be null");
+        }
     }
 }

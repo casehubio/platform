@@ -5,7 +5,7 @@ import java.util.Set;
 public record WorkerPermissionRequest(
     String actorId,
     String resourceType,
-    Set<WorkerAction> workerActions,
-    String caseDefinitionId,
+    Set<WorkerAction> actions,
+    WorkerAuthorizationContext context,
     String tenancyId) {
 }

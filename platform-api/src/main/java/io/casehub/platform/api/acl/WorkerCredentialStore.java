@@ -2,7 +2,6 @@ package io.casehub.platform.api.acl;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public interface WorkerCredentialStore {
 
@@ -16,7 +15,7 @@ public interface WorkerCredentialStore {
     default void revoke(String token) {
     }
 
-    default List<WorkerCredential> revokeByCase(UUID caseId) {
+    default List<WorkerCredential> revokeByResource(ResourceId resourceId) {
         return List.of();
     }
 
@@ -24,7 +23,8 @@ public interface WorkerCredentialStore {
         return List.of();
     }
 
-    default List<WorkerCredential> findActiveByActorAndCase(String actorId, UUID caseId) {
+    default List<WorkerCredential> findActiveByActorAndResource(
+        String actorId, ResourceId resourceId) {
         return List.of();
     }
 }

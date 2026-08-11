@@ -1,5 +1,6 @@
 package io.casehub.platform.acl.inmem;
 
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.acl.WorkerCredential;
 import io.casehub.platform.api.acl.WorkerCredentialStore;
 import jakarta.annotation.Priority;
@@ -7,7 +8,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Alternative
@@ -35,23 +35,26 @@ public class InMemoryWorkerCredentialStore implements WorkerCredentialStore {
     }
 
     @Override
-    public List<WorkerCredential> revokeByCase(UUID caseId) {
-        var revoked = store.values().stream().filter(c -> c.caseId().equals(caseId)).toList();
+    public List<WorkerCredential> revokeByResource(ResourceId resourceId) {
+        var revoked = store.values().stream()
+            .filter(c -> c.resourceId().equals(resourceId)).toList();
         revoked.forEach(c -> store.remove(c.token()));
         return revoked;
     }
 
     @Override
     public List<WorkerCredential> revokeByActor(String actorId) {
-        var revoked = store.values().stream().filter(c -> c.actorId().equals(actorId)).toList();
+        var revoked = store.values().stream()
+            .filter(c -> c.actorId().equals(actorId)).toList();
         revoked.forEach(c -> store.remove(c.token()));
         return revoked;
     }
 
     @Override
-    public List<WorkerCredential> findActiveByActorAndCase(String actorId, UUID caseId) {
+    public List<WorkerCredential> findActiveByActorAndResource(String actorId, ResourceId resourceId) {
         return store.values().stream()
-            .filter(c -> c.actorId().equals(actorId) && c.caseId().equals(caseId) && !c.isExpired())
+            .filter(c -> c.actorId().equals(actorId)
+                && c.resourceId().equals(resourceId) && !c.isExpired())
             .toList();
     }
 

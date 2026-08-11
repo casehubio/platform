@@ -2,12 +2,11 @@ package io.casehub.platform.api.acl;
 
 import java.time.Instant;
 import java.util.Set;
-import java.util.UUID;
 
 public record WorkerCredential(
     String token,
     String actorId,
-    UUID caseId,
+    ResourceId resourceId,
     String tenancyId,
     Set<WorkerAction> actions,
     Instant expiresAt,

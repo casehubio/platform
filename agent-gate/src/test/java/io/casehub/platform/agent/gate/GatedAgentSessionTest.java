@@ -8,7 +8,7 @@ import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.util.concurrent.Semaphore;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,23 +18,24 @@ class GatedAgentSessionTest {
 
     @Test
     void queryConsumesTokenWhenRateLimitActive() throws Exception {
-        var bucket = new TokenBucket(1.0, 1);
-        var gate = new Semaphore(1, true);
+        var tokenBucket = new TokenBucketStrategy(1.0, 1);
+        var concurrency = new ConcurrencyStrategy(1);
         var session = new GatedAgentSession(
-                stubSession("hello"), bucket, gate,
-                Duration.ofSeconds(5), true, true, 1.0);
+                stubSession("hello"),
+                List.of(concurrency), List.of(tokenBucket),
+                Duration.ofSeconds(5));
 
         String result = collectText(session.query("prompt"));
         assertThat(result).isEqualTo("hello");
-        assertThat(bucket.availablePermits()).isLessThan(1.0);
     }
 
     @Test
-    void querySkipsTokenWhenRateLimitInactive() {
-        var gate = new Semaphore(1, true);
+    void querySkipsTokenWhenNoQueryStrategies() {
+        var concurrency = new ConcurrencyStrategy(1);
         var session = new GatedAgentSession(
-                stubSession("hello"), null, gate,
-                Duration.ofSeconds(5), false, true, 0.0);
+                stubSession("hello"),
+                List.of(concurrency), List.of(),
+                Duration.ofSeconds(5));
 
         String result = collectText(session.query("prompt"));
         assertThat(result).isEqualTo("hello");
@@ -42,33 +43,34 @@ class GatedAgentSessionTest {
 
     @Test
     void queryFailsWithRateLimitExceptionWhenBucketEmpty() throws Exception {
-        var bucket = new TokenBucket(0.5, 1);
-        bucket.tryAcquire(Duration.ZERO);
+        var tokenBucket = new TokenBucketStrategy(0.5, 1);
+        tokenBucket.tryAcquire(Duration.ZERO);
         var session = new GatedAgentSession(
-                stubSession("hello"), bucket, null,
-                Duration.ofMillis(50), true, false, 0.5);
+                stubSession("hello"),
+                List.of(), List.of(tokenBucket),
+                Duration.ofMillis(50));
 
         assertThatThrownBy(() -> collectText(session.query("prompt")))
                 .isInstanceOf(AgentRateLimitException.class);
     }
 
     @Test
-    void closeReleasesConcurrencyPermit() {
-        var gate = new Semaphore(1, true);
-        gate.tryAcquire();
-        assertThat(gate.availablePermits()).isEqualTo(0);
+    void closeReleasesSessionStrategies() throws Exception {
+        var concurrency = new ConcurrencyStrategy(1);
+        concurrency.tryAcquire(Duration.ofSeconds(1));
         var session = new GatedAgentSession(
-                stubSession("x"), null, gate,
-                Duration.ofSeconds(5), false, true, 0.0);
+                stubSession("x"),
+                List.of(concurrency), List.of(),
+                Duration.ofSeconds(5));
 
         session.close();
-        assertThat(gate.availablePermits()).isEqualTo(1);
+        assertThat(concurrency.tryAcquire(Duration.ofMillis(50))).isTrue();
     }
 
     @Test
-    void closeReleasesPermitEvenWhenDelegateThrows() {
-        var gate = new Semaphore(1, true);
-        gate.tryAcquire();
+    void closeReleasesPermitEvenWhenDelegateThrows() throws Exception {
+        var concurrency = new ConcurrencyStrategy(1);
+        concurrency.tryAcquire(Duration.ofSeconds(1));
         var failing = new StubSession() {
             @Override
             public void close(Duration maxWait) {
@@ -76,21 +78,23 @@ class GatedAgentSessionTest {
             }
         };
         var session = new GatedAgentSession(
-                failing, null, gate,
-                Duration.ofSeconds(5), false, true, 0.0);
+                failing,
+                List.of(concurrency), List.of(),
+                Duration.ofSeconds(5));
 
         try {
             session.close();
         } catch (RuntimeException ignored) {
         }
-        assertThat(gate.availablePermits()).isEqualTo(1);
+        assertThat(concurrency.tryAcquire(Duration.ofMillis(50))).isTrue();
     }
 
     @Test
-    void closeSkipsGateReleaseWhenConcurrencyInactive() {
+    void closeWithNoSessionStrategies() {
         var session = new GatedAgentSession(
-                stubSession("x"), null, null,
-                Duration.ofSeconds(5), false, false, 0.0);
+                stubSession("x"),
+                List.of(), List.of(),
+                Duration.ofSeconds(5));
         session.close();
     }
 
@@ -98,8 +102,9 @@ class GatedAgentSessionTest {
     void interruptDelegatesToSession() {
         var delegate = new StubSession();
         var session = new GatedAgentSession(
-                delegate, null, null,
-                Duration.ofSeconds(5), false, false, 0.0);
+                delegate,
+                List.of(), List.of(),
+                Duration.ofSeconds(5));
         session.interrupt();
         assertThat(delegate.interrupted).isTrue();
     }

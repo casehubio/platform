@@ -8,18 +8,34 @@ import java.time.Duration;
 @ConfigMapping(prefix = "casehub.platform.agent.gate")
 public interface AgentGateProperties {
 
-    @WithDefault("0")
-    int maxConcurrent();
-
-    @WithDefault("0.0")
-    double permitsPerSecond();
-
-    @WithDefault("0")
-    int burstCapacity();
-
     @WithDefault("PT30S")
     Duration acquireTimeout();
 
     @WithDefault("PT5S")
     Duration queryAcquireTimeout();
+
+    Concurrency concurrency();
+    TokenBucketConfig tokenBucket();
+    SlidingWindow slidingWindow();
+
+    interface Concurrency {
+        @WithDefault("0")
+        int max();
+    }
+
+    interface TokenBucketConfig {
+        @WithDefault("0.0")
+        double permitsPerSecond();
+
+        @WithDefault("0")
+        int burstCapacity();
+    }
+
+    interface SlidingWindow {
+        @WithDefault("0")
+        int maxActions();
+
+        @WithDefault("60")
+        int windowSeconds();
+    }
 }

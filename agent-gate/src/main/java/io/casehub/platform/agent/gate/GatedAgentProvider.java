@@ -18,8 +18,8 @@ import jakarta.inject.Inject;
 import jakarta.interceptor.Interceptor;
 
 import java.time.Duration;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 @Decorator
 @Priority(Interceptor.Priority.APPLICATION)
@@ -28,76 +28,57 @@ public class GatedAgentProvider implements AgentProvider {
     @Inject @Delegate @Any AgentProvider delegate;
     @Inject AgentGateProperties properties;
 
-    private TokenBucket tokenBucket;
-    private Semaphore concurrencyGate;
+    private List<AdmissionStrategy> strategies = List.of();
+    private List<AdmissionStrategy> sessionStrategies = List.of();
+    private List<AdmissionStrategy> invocationStrategies = List.of();
     private Duration acquireTimeout;
     private Duration queryAcquireTimeout;
-    private boolean rateLimitActive;
-    private boolean concurrencyActive;
     private boolean active;
-    private double configuredPermitsPerSecond;
-    private int configuredMaxConcurrent;
 
     protected GatedAgentProvider() {}
 
-    GatedAgentProvider(AgentProvider delegate, int maxConcurrent,
-                       double permitsPerSecond, int burstCapacity,
+    GatedAgentProvider(AgentProvider delegate, List<AdmissionStrategy> strategies,
                        Duration acquireTimeout, Duration queryAcquireTimeout) {
         this.delegate = delegate;
         this.acquireTimeout = acquireTimeout;
         this.queryAcquireTimeout = queryAcquireTimeout;
-        this.configuredPermitsPerSecond = permitsPerSecond;
-        this.configuredMaxConcurrent = maxConcurrent;
-        this.rateLimitActive = permitsPerSecond > 0;
-        this.concurrencyActive = maxConcurrent > 0;
-        this.active = rateLimitActive || concurrencyActive;
-        if (rateLimitActive) {
-            int burst = burstCapacity > 0 ? burstCapacity
-                    : (int) Math.ceil(permitsPerSecond);
-            this.tokenBucket = new TokenBucket(permitsPerSecond, burst);
-        }
-        if (concurrencyActive) {
-            this.concurrencyGate = new Semaphore(maxConcurrent, true);
-        }
+        setStrategies(strategies);
     }
 
     @PostConstruct
     void init() {
         if (properties == null) return;
-        int maxConcurrent = properties.maxConcurrent();
-        double permitsPerSecond = properties.permitsPerSecond();
-        int burstCapacity = properties.burstCapacity();
         this.acquireTimeout = properties.acquireTimeout();
         this.queryAcquireTimeout = properties.queryAcquireTimeout();
-        this.configuredPermitsPerSecond = permitsPerSecond;
-        this.configuredMaxConcurrent = maxConcurrent;
 
-        if (maxConcurrent < 0) {
-            throw new IllegalStateException(
-                    "casehub.platform.agent.gate.max-concurrent must be >= 0");
+        var built = new ArrayList<AdmissionStrategy>();
+        var sw = properties.slidingWindow();
+        if (sw.maxActions() > 0) {
+            built.add(new SlidingWindowStrategy(sw.maxActions(),
+                    Duration.ofSeconds(sw.windowSeconds())));
         }
-        if (permitsPerSecond < 0) {
-            throw new IllegalStateException(
-                    "casehub.platform.agent.gate.permits-per-second must be >= 0");
+        var tb = properties.tokenBucket();
+        if (tb.permitsPerSecond() > 0) {
+            int burst = tb.burstCapacity() > 0 ? tb.burstCapacity()
+                    : (int) Math.ceil(tb.permitsPerSecond());
+            built.add(new TokenBucketStrategy(tb.permitsPerSecond(), burst));
         }
-        if (burstCapacity > 0 && permitsPerSecond <= 0) {
-            throw new IllegalStateException(
-                    "casehub.platform.agent.gate.burst-capacity > 0 requires "
-                    + "permits-per-second > 0");
+        var cc = properties.concurrency();
+        if (cc.max() > 0) {
+            built.add(new ConcurrencyStrategy(cc.max()));
         }
+        setStrategies(built);
+    }
 
-        this.rateLimitActive = permitsPerSecond > 0;
-        this.concurrencyActive = maxConcurrent > 0;
-        this.active = rateLimitActive || concurrencyActive;
-
-        if (rateLimitActive) {
-            int burst = burstCapacity > 0 ? burstCapacity
-                    : (int) Math.ceil(permitsPerSecond);
-            this.tokenBucket = new TokenBucket(permitsPerSecond, burst);
-        }
-        if (concurrencyActive) {
-            this.concurrencyGate = new Semaphore(maxConcurrent, true);
-        }
+    private void setStrategies(List<AdmissionStrategy> all) {
+        this.strategies = List.copyOf(all);
+        this.sessionStrategies = all.stream()
+                .filter(s -> s.scope() == AdmissionStrategy.Scope.SESSION)
+                .toList();
+        this.invocationStrategies = all.stream()
+                .filter(s -> s.scope() == AdmissionStrategy.Scope.INVOCATION)
+                .toList();
+        this.active = !all.isEmpty();
     }
 
     @Override
@@ -106,46 +87,13 @@ public class GatedAgentProvider implements AgentProvider {
             return delegate.invoke(config);
         }
         return Multi.createFrom().<AgentEvent>deferred(() -> {
-            long deadlineNanos = System.nanoTime() + acquireTimeout.toNanos();
-
-            if (rateLimitActive) {
-                try {
-                    Duration remaining = durationUntil(deadlineNanos);
-                    if (!tokenBucket.tryAcquire(remaining)) {
-                        throw new AgentRateLimitException(configuredPermitsPerSecond);
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(
-                            "Interrupted during rate limit acquisition", e);
-                }
-            }
-
-            if (concurrencyActive) {
-                try {
-                    Duration remaining = durationUntil(deadlineNanos);
-                    if (!concurrencyGate.tryAcquire(
-                            remaining.toMillis(), TimeUnit.MILLISECONDS)) {
-                        if (rateLimitActive) tokenBucket.release();
-                        throw new AgentSessionLimitException(configuredMaxConcurrent);
-                    }
-                } catch (InterruptedException e) {
-                    if (rateLimitActive) tokenBucket.release();
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(
-                            "Interrupted during concurrency acquisition", e);
-                }
-            }
-
+            acquireAll(strategies, acquireTimeout);
             try {
                 Multi<AgentEvent> result = delegate.invoke(config);
-                if (concurrencyActive) {
-                    result = result.onTermination()
-                            .invoke(() -> concurrencyGate.release());
-                }
-                return result;
+                return result.onTermination()
+                        .invoke(() -> releaseAll(strategies));
             } catch (Exception e) {
-                if (concurrencyActive) concurrencyGate.release();
+                releaseAll(strategies);
                 throw e;
             }
         }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
@@ -156,51 +104,55 @@ public class GatedAgentProvider implements AgentProvider {
         if (!active) {
             return delegate.openSession(init);
         }
-        long deadlineNanos = System.nanoTime() + acquireTimeout.toNanos();
-
-        if (rateLimitActive) {
-            try {
-                Duration remaining = durationUntil(deadlineNanos);
-                if (!tokenBucket.tryAcquire(remaining)) {
-                    throw new AgentRateLimitException(configuredPermitsPerSecond);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(
-                        "Interrupted during rate limit acquisition", e);
-            }
-        }
-
-        if (concurrencyActive) {
-            try {
-                Duration remaining = durationUntil(deadlineNanos);
-                if (!concurrencyGate.tryAcquire(
-                        remaining.toMillis(), TimeUnit.MILLISECONDS)) {
-                    if (rateLimitActive) tokenBucket.release();
-                    throw new AgentSessionLimitException(configuredMaxConcurrent);
-                }
-            } catch (InterruptedException e) {
-                if (rateLimitActive) tokenBucket.release();
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(
-                        "Interrupted during concurrency acquisition", e);
-            }
-        }
-
+        acquireAll(strategies, acquireTimeout);
         try {
             AgentSession session = delegate.openSession(init);
-            return new GatedAgentSession(session, tokenBucket,
-                    concurrencyGate, queryAcquireTimeout,
-                    rateLimitActive, concurrencyActive,
-                    configuredPermitsPerSecond);
+            return new GatedAgentSession(session, sessionStrategies,
+                    invocationStrategies, queryAcquireTimeout);
         } catch (Exception e) {
-            if (concurrencyActive) concurrencyGate.release();
+            releaseAll(strategies);
             throw e;
         }
     }
 
-    private static Duration durationUntil(long deadlineNanos) {
-        long remaining = deadlineNanos - System.nanoTime();
-        return remaining > 0 ? Duration.ofNanos(remaining) : Duration.ZERO;
+    static void acquireAll(List<AdmissionStrategy> strategies,
+                            Duration timeout) {
+        long deadlineNanos = System.nanoTime() + timeout.toNanos();
+        for (int i = 0; i < strategies.size(); i++) {
+            long remainingNanos = deadlineNanos - System.nanoTime();
+            Duration remaining = remainingNanos > 0
+                    ? Duration.ofNanos(remainingNanos) : Duration.ZERO;
+            try {
+                if (!strategies.get(i).tryAcquire(remaining)) {
+                    rollbackPrior(strategies, i);
+                    throw exceptionFor(strategies.get(i));
+                }
+            } catch (InterruptedException e) {
+                rollbackPrior(strategies, i);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(
+                        "Interrupted during admission acquisition", e);
+            }
+        }
+    }
+
+    static void releaseAll(List<AdmissionStrategy> strategies) {
+        for (int i = strategies.size() - 1; i >= 0; i--) {
+            strategies.get(i).release();
+        }
+    }
+
+    private static void rollbackPrior(List<AdmissionStrategy> strategies,
+                                       int failedIndex) {
+        for (int j = failedIndex - 1; j >= 0; j--) {
+            strategies.get(j).rollback();
+        }
+    }
+
+    private static RuntimeException exceptionFor(AdmissionStrategy strategy) {
+        if (strategy instanceof ConcurrencyStrategy) {
+            return new AgentSessionLimitException(0);
+        }
+        return new AgentRateLimitException(0);
     }
 }

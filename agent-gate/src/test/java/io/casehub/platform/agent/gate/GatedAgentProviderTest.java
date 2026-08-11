@@ -211,9 +211,17 @@ class GatedAgentProviderTest {
                                            int burstCapacity,
                                            Duration acquireTimeout,
                                            Duration queryAcquireTimeout) {
-        return new GatedAgentProvider(delegate, maxConcurrent,
-                permitsPerSecond, burstCapacity, acquireTimeout,
-                queryAcquireTimeout);
+        var strategies = new java.util.ArrayList<AdmissionStrategy>();
+        if (permitsPerSecond > 0) {
+            int burst = burstCapacity > 0 ? burstCapacity
+                    : (int) Math.ceil(permitsPerSecond);
+            strategies.add(new TokenBucketStrategy(permitsPerSecond, burst));
+        }
+        if (maxConcurrent > 0) {
+            strategies.add(new ConcurrencyStrategy(maxConcurrent));
+        }
+        return new GatedAgentProvider(delegate, strategies,
+                acquireTimeout, queryAcquireTimeout);
     }
 
     private static AgentSessionConfig config() {

@@ -147,12 +147,15 @@ class ClaudeAgentClientTest {
     }
 
     @Test
-    void validateBinary_nonExistentPath_throwsIllegalStateException() {
+    void validateBinary_nonExistentPath_disablesAgentFeatures() {
         var p = props(1);
         when(p.binaryPath()).thenReturn(Optional.of("/no/such/binary/claude-xyz-nonexistent"));
         var c = new ClaudeAgentClient(p);  // @Inject constructor — @PostConstruct not called
-        assertThatThrownBy(c::validateBinary)
+
+        assertThatCode(c::validateBinary).doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> c.run(config()).collect().asList().await().indefinitely())
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("claude-xyz-nonexistent");
+            .hasMessageContaining("agent features are disabled");
     }
 }

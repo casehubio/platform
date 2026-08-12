@@ -1,38 +1,31 @@
 package io.casehub.platform.agent.claude;
 
+import io.casehub.platform.agent.AgentBackend;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.smallrye.mutiny.Multi;
-import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
 /**
- * Claude Agent SDK implementation of {@link AgentProvider}.
+ * Claude Agent SDK implementation of {@link AgentBackend}.
  *
- * <p>Activates when {@code casehub-platform-agent-claude} is on the classpath —
- * {@code @Alternative @Priority(10)} beats both the no-op and LangChain4j adapters.
+ * <p>Discovered by {@code RoutingAgentProvider} via {@code Instance<AgentBackend>}
+ * with key {@code "claude"}.
  *
- * <p>CDI tier for {@code AgentProvider}:
- * <ul>
- *   <li>Tier 0: {@code NoOpAgentProvider @DefaultBean} (platform/) — fallback
- *   <li>Tier 1: {@code ChatModelAgentProvider @Alternative @Priority(1)} (agent-langchain4j/) — any LangChain4j model
- *   <li>Tier 10: {@code ClaudeAgentProvider @Alternative @Priority(10)} (agent-claude/) — native Claude
- * </ul>
- *
- * <p>App code injects {@link AgentProvider}, not {@link ClaudeAgentClient} directly.
+ * <p>App code injects {@link AgentProvider}, not this class directly.
  */
-@Alternative
-@Priority(10)
 @ApplicationScoped
-public class ClaudeAgentProvider implements AgentProvider {
+public class ClaudeAgentProvider implements AgentBackend {
 
     @Inject
     ClaudeAgentClient client;
+
+    @Override
+    public String key() {return "claude";}
 
     @Override
     public Multi<AgentEvent> invoke(final AgentSessionConfig config) {

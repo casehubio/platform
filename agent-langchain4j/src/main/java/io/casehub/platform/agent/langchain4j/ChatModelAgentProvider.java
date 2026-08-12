@@ -6,8 +6,8 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import io.casehub.platform.agent.AgentBackend;
 import io.casehub.platform.agent.AgentEvent;
-import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
@@ -15,9 +15,7 @@ import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
 import io.smallrye.mutiny.Multi;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Default;
 import jakarta.enterprise.inject.Instance;
@@ -27,10 +25,8 @@ import org.jboss.logging.Logger;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 
-@Alternative
-@Priority(1)
 @ApplicationScoped
-public class ChatModelAgentProvider implements AgentProvider {
+public class ChatModelAgentProvider implements AgentBackend {
 
     private static final Logger LOG = Logger.getLogger(ChatModelAgentProvider.class);
 
@@ -66,6 +62,10 @@ public class ChatModelAgentProvider implements AgentProvider {
         chatModel = candidates.get(0);
         streamingChatModel = (chatModel instanceof StreamingChatModel s) ? s : null;
     }
+
+    @Override
+    public String key() {return "langchain4j";}
+
 
     int availablePermits() {
         return semaphore.availablePermits();

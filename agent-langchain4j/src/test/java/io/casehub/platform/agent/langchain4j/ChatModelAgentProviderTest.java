@@ -103,7 +103,7 @@ class ChatModelAgentProviderTest {
         ChatModel chatModel = mock(ChatModel.class);
         injectFields(chatModel);
 
-        AgentSessionInit init = new AgentSessionInit("system prompt", List.of(), null, null);
+        AgentSessionInit init = new AgentSessionInit("system prompt", List.of(), null, null, null);
         AgentSession session = provider.openSession(init);
 
         assertThat(session).isInstanceOf(ChatModelAgentSession.class);
@@ -113,7 +113,7 @@ class ChatModelAgentProviderTest {
     void openSession_whenDisabled_throwsIllegalStateException() {
         injectFieldsWithNoChatModel();
 
-        AgentSessionInit init = new AgentSessionInit("system prompt", List.of(), null, null);
+        AgentSessionInit init = new AgentSessionInit("system prompt", List.of(), null, null, null);
 
         assertThatThrownBy(() -> provider.openSession(init))
             .isInstanceOf(IllegalStateException.class)
@@ -177,7 +177,7 @@ class ChatModelAgentProviderTest {
         injectFields(chatModel);
 
         AgentMcpServer.Stdio mcpServer = new AgentMcpServer.Stdio("npx", List.of("-y", "test"));
-        AgentSessionConfig config = new AgentSessionConfig("", "test", List.of(mcpServer), null, null);
+        AgentSessionConfig config = new AgentSessionConfig("", "test", List.of(mcpServer), null, null, null);
 
         Multi<AgentEvent> result = provider.invoke(config);
         result.collect().asList().await().indefinitely();

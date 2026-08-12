@@ -5,7 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 class AgentSessionInitTest {
 
@@ -26,7 +27,7 @@ class AgentSessionInitTest {
 
     @Test
     void fullConstructor_copiesDefensivelyAndNormalisesNullMcpServers() {
-        final var init = new AgentSessionInit("sys", null, Duration.ofMinutes(2), "corr-1");
+        final var init = new AgentSessionInit("sys", null, Duration.ofMinutes(2), "corr-1", null);
         assertThat(init.mcpServers()).isEmpty();
         assertThat(init.timeout()).isEqualTo(Duration.ofMinutes(2));
         assertThat(init.correlationId()).isEqualTo("corr-1");
@@ -35,8 +36,20 @@ class AgentSessionInitTest {
     @Test
     void mcpServers_isImmutable() {
         final var mcp = new java.util.ArrayList<AgentMcpServer>();
-        final var init = new AgentSessionInit("sys", mcp, null, null);
+        final var init = new AgentSessionInit("sys", mcp, null, null, null);
         mcp.add(new AgentMcpServer.Stdio("echo", List.of(), java.util.Map.of()));
         assertThat(init.mcpServers()).isEmpty();
+    }
+
+    @Test
+    void modelDefaultsToNull() {
+        var init = AgentSessionInit.of("sys");
+        assertThat(init.model()).isNull();
+    }
+
+    @Test
+    void modelSetViaFactory() {
+        var init = AgentSessionInit.of("sys", "openai");
+        assertThat(init.model()).isEqualTo("openai");
     }
 }

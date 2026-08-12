@@ -9,7 +9,8 @@ public record AgentSessionConfig(
         String userPrompt,
         List<AgentMcpServer> mcpServers,
         Duration timeout,
-        String correlationId
+        String correlationId,
+        String model
 ) {
     public AgentSessionConfig {
         Objects.requireNonNull(systemPrompt, "systemPrompt");
@@ -17,14 +18,26 @@ public record AgentSessionConfig(
         mcpServers = mcpServers != null ? List.copyOf(mcpServers) : List.of();
     }
 
-    /** Default timeout, no MCP servers, no correlation. */
+    /**
+     * Default timeout, no MCP servers, no correlation, no model.
+     */
     public static AgentSessionConfig of(String systemPrompt, String userPrompt) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null);
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, null);
     }
 
-    /** Explicit timeout, no MCP servers, no correlation. */
+    /**
+     * Explicit timeout.
+     */
     public static AgentSessionConfig of(String systemPrompt, String userPrompt,
                                         Duration timeout) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null);
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null, null);
+    }
+
+    /**
+     * Explicit model (provider key).
+     */
+    public static AgentSessionConfig of(String systemPrompt, String userPrompt,
+                                        String model) {
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, model);
     }
 }

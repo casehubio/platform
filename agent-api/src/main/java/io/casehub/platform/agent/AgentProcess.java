@@ -21,4 +21,7 @@ public interface AgentProcess extends AutoCloseable {
     void destroy();
 
     void destroyForcibly();
+
+    @Override
+    void close();
 }

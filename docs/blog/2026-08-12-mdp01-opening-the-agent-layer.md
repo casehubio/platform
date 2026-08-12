@@ -5,6 +5,7 @@ author: mdp
 entry_type: note
 subtype: diary
 tags: [agent-infrastructure, multi-provider, architecture, spi-design]
+series: issue-186-multi-agent-runtime
 status: draft
 ---
 

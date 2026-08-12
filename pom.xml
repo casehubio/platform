@@ -29,6 +29,7 @@
         <module>identity</module>
         <module>agent-claude</module>
         <module>agent-openai</module>
+        <module>agent-codex</module>
         <module>agent-langchain4j</module>
         <module>acl-inmem</module>
         <module>acl-jpa</module>

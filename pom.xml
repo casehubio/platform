@@ -30,6 +30,8 @@
         <module>agent-claude</module>
         <module>agent-openai</module>
         <module>agent-codex</module>
+        <module>agent-gemini</module>
+        <module>agent-gemini-cli</module>
         <module>agent-langchain4j</module>
         <module>acl-inmem</module>
         <module>acl-jpa</module>

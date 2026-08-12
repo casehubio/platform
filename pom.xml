@@ -58,6 +58,7 @@
         <module>platform-view-inmem</module>
         <module>platform-view-jpa</module>
         <module>preferences-editor</module>
+        <module>agent-router</module>
         <module>agent-gate</module>
     </modules>
 

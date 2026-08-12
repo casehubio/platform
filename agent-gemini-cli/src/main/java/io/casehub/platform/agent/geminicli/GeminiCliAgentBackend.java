@@ -124,12 +124,13 @@ public class GeminiCliAgentBackend implements AgentBackend {
 
     Multi<AgentEvent> buildEventStream(AgentSessionConfig config) {
         Duration effectiveTimeout = config.timeout() != null
-                ? config.timeout()
-                : properties.defaultTimeout();
+                                    ? config.timeout()
+                                    : properties.defaultTimeout();
 
         return Multi.createFrom().emitter(emitter -> {
-            AtomicBoolean timedOut = new AtomicBoolean(false);
-            io.casehub.platform.agent.AgentProcess process = null;
+            AtomicBoolean                          timedOut      = new AtomicBoolean(false);
+            io.casehub.platform.agent.AgentProcess process       = null;
+            ScheduledFuture<?>                     timeoutFuture = null;
             try {
                 var runtimeConfig = new AgentRuntimeConfig(
                         properties.binaryPath(),
@@ -139,7 +140,7 @@ public class GeminiCliAgentBackend implements AgentBackend {
                 process = runtime.spawn(runtimeConfig);
                 final var proc = process;
 
-                ScheduledFuture<?> timeoutFuture = timeoutScheduler.schedule(() -> {
+                timeoutFuture = timeoutScheduler.schedule(() -> {
                     if (timedOut.compareAndSet(false, true)) {
                         proc.destroyForcibly();
                     }
@@ -156,7 +157,6 @@ public class GeminiCliAgentBackend implements AgentBackend {
                 }
 
                 int exitCode = proc.exitCode().join();
-                timeoutFuture.cancel(false);
 
                 if (timedOut.get()) {
                     emitter.fail(new AgentTimeoutException(effectiveTimeout));
@@ -174,6 +174,9 @@ public class GeminiCliAgentBackend implements AgentBackend {
                             Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e));
                 }
             } finally {
+                if (timeoutFuture != null) {
+                    timeoutFuture.cancel(false);
+                }
                 if (process != null) {
                     process.destroy();
                 }

@@ -178,7 +178,7 @@ io.casehub.platform.api
   .acl           — AccessControlProvider (SPI: blocking grant/revoke/canAccess/revokeAll/registerParent/accessibleResources/grantBatch/revokeBatch/accessibleResourcesIncludingInherited/deny/removeDeny/denyBatch/removeDenyBatch),
                    AclAction (enum: READ/WRITE/ADMIN/CLAIM; satisfiedBy() returns actions that satisfy a check — ADMIN satisfies WRITE+READ, WRITE satisfies READ, CLAIM is orthogonal; deniedBy() returns actions whose denial cascades to block this action — deny READ blocks WRITE+ADMIN, deny WRITE blocks ADMIN, deny CLAIM blocks only CLAIM),
                    AclEntryType (enum: ALLOW/DENY),
-                   AclResourceType (constants: CASE/PLAN_ITEM/WORK_ITEM/EVENT_LOG/CASE_DEFINITION),
+                   AclResourceType removed (domain modules define their own resource type constants),
                    AclEntry (record: actorId, resourceId, action, entryType, grantedAt, expiresAt, tenancyId),
                    AclEntryRequest (record: actorId, resourceId, action, expiresAt — input type for grant/revoke/deny batch operations),
                    AclQuery (record: actorId, resourceType, action, cursor, limit — paginated accessibleResources input),

@@ -148,7 +148,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:ghi", AclAction.WRITE, null);
 
         List<String> readable = provider().accessibleResources("actor1",
-                                                               AclResourceType.CASE, AclAction.READ);
+                                                               "case", AclAction.READ);
         assertEquals(3, readable.size());
         assertTrue(readable.contains("case:abc"));
         assertTrue(readable.contains("case:def"));
@@ -162,7 +162,7 @@ public abstract class AccessControlProviderContractTest {
                          Instant.now().minus(1, ChronoUnit.HOURS));
 
         List<String> readable = provider().accessibleResources("actor1",
-                                                               AclResourceType.CASE, AclAction.READ);
+                                                               "case", AclAction.READ);
         assertEquals(1, readable.size());
         assertTrue(readable.contains("case:abc"));
     }
@@ -172,7 +172,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("group:managers", "case:abc", AclAction.READ, null);
 
         List<String> readable = provider().accessibleResources("actor1",
-                                                               AclResourceType.CASE, AclAction.READ);
+                                                               "case", AclAction.READ);
         assertTrue(readable.contains("case:abc"));
     }
 
@@ -274,7 +274,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:abc", AclAction.READ, null);
 
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.PLAN_ITEM, AclAction.READ);
+                                                             "planitem", AclAction.READ);
         assertEquals(1, result.size());
         assertTrue(result.contains("planitem:pi1"));
     }
@@ -285,7 +285,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("group:managers", "case:abc", AclAction.READ, null);
 
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.CASE, AclAction.READ);
+                                                             "case", AclAction.READ);
         assertEquals(1, result.size());
         assertTrue(result.contains("case:abc"));
     }
@@ -297,7 +297,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:ccc", AclAction.READ, null);
 
         AclPage page = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 2));
+                new AclQuery("actor1", "case", AclAction.READ, null, 2));
         assertEquals(2, page.resourceIds().size());
         assertNotNull(page.nextCursor());
     }
@@ -309,9 +309,9 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:ccc", AclAction.READ, null);
 
         AclPage page1 = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 2));
+                new AclQuery("actor1", "case", AclAction.READ, null, 2));
         AclPage page2 = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, page1.nextCursor(), 2));
+                new AclQuery("actor1", "case", AclAction.READ, page1.nextCursor(), 2));
         assertEquals(1, page2.resourceIds().size());
         assertNull(page2.nextCursor());
     }
@@ -319,7 +319,7 @@ public abstract class AccessControlProviderContractTest {
     @Test
     void accessibleResources_paginated_emptyResult() {
         AclPage page = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+                new AclQuery("actor1", "case", AclAction.READ, null, 10));
         assertTrue(page.resourceIds().isEmpty());
         assertNull(page.nextCursor());
     }
@@ -330,7 +330,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:bbb", AclAction.READ, null);
 
         AclPage page = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+                new AclQuery("actor1", "case", AclAction.READ, null, 10));
         assertEquals(2, page.resourceIds().size());
         assertNull(page.nextCursor());
     }
@@ -341,7 +341,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:bbb", AclAction.READ, null);
 
         AclPage page = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+                new AclQuery("actor1", "case", AclAction.READ, null, 10));
         assertEquals(2, page.resourceIds().size());
     }
 
@@ -352,7 +352,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:child2", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertTrue(result.contains("planitem:child1"));
         assertTrue(result.contains("planitem:child2"));
     }
@@ -364,7 +364,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:inherited", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertTrue(result.contains("planitem:direct"));
         assertTrue(result.contains("planitem:inherited"));
     }
@@ -375,7 +375,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:child", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertTrue(result.contains("planitem:child"));
     }
 
@@ -386,7 +386,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:child", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertFalse(result.contains("planitem:child"));
     }
 
@@ -396,7 +396,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:child", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertTrue(result.contains("planitem:child"));
     }
 
@@ -407,7 +407,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:pi1", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.PLAN_ITEM, AclAction.READ);
+                "actor1", "planitem", AclAction.READ);
         assertEquals(1, result.stream().filter("planitem:pi1"::equals).count());
     }
 
@@ -434,11 +434,11 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:abc", AclAction.READ, null);
         setTenancyId("other-tenant");
         provider().grant("actor1", "case:def", AclAction.READ, null);
-        List<String> result = provider().accessibleResources("actor1", AclResourceType.CASE, AclAction.READ);
+        List<String> result = provider().accessibleResources("actor1", "case", AclAction.READ);
         assertEquals(1, result.size());
         assertTrue(result.contains("case:def"));
         setTenancyId(tenancyId());
-        result = provider().accessibleResources("actor1", AclResourceType.CASE, AclAction.READ);
+        result = provider().accessibleResources("actor1", "case", AclAction.READ);
         assertEquals(1, result.size());
         assertTrue(result.contains("case:abc"));
     }
@@ -509,7 +509,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:*", AclAction.READ, null);
         provider().grant("actor1", "case:abc", AclAction.READ, null);
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.CASE, AclAction.READ);
+                                                             "case", AclAction.READ);
         assertTrue(result.contains("case:*"));
         assertTrue(result.contains("case:abc"));
     }
@@ -521,7 +521,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:bbb", AclAction.READ, null);
 
         AclPage page = provider().accessibleResources(
-                new AclQuery("actor1", AclResourceType.CASE, AclAction.READ, null, 10));
+                new AclQuery("actor1", "case", AclAction.READ, null, 10));
         assertTrue(page.resourceIds().contains("case:*"));
     }
 
@@ -531,7 +531,7 @@ public abstract class AccessControlProviderContractTest {
         provider().registerParent("planitem:child1", "case:parent");
 
         List<String> result = provider().accessibleResourcesIncludingInherited(
-                "actor1", AclResourceType.CASE, AclAction.READ);
+                "actor1", "case", AclAction.READ);
         assertTrue(result.contains("case:*"));
     }
 
@@ -676,7 +676,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:def", AclAction.READ, null);
         provider().deny("actor1", "case:abc", AclAction.READ, null);
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.CASE, AclAction.READ);
+                                                             "case", AclAction.READ);
         assertFalse(result.contains("case:abc"));
         assertTrue(result.contains("case:def"));
     }
@@ -687,7 +687,7 @@ public abstract class AccessControlProviderContractTest {
         provider().grant("actor1", "case:abc", AclAction.READ, null);
         provider().deny("actor1", "case:abc", AclAction.READ, null);
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.CASE, AclAction.READ);
+                                                             "case", AclAction.READ);
         assertTrue(result.contains("case:*"));
         assertFalse(result.contains("case:abc"));
     }
@@ -698,7 +698,7 @@ public abstract class AccessControlProviderContractTest {
         provider().deny("actor1", "case:*", AclAction.READ, null);
         provider().grant("actor1", "case:abc", AclAction.READ, null);
         List<String> result = provider().accessibleResources("actor1",
-                                                             AclResourceType.CASE, AclAction.READ);
+                                                             "case", AclAction.READ);
         assertFalse(result.contains("case:*"));
         assertTrue(result.contains("case:abc"));
     }

@@ -75,11 +75,20 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 
 ### Agent infrastructure
 
+Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `AgentBackend` implementations by the `model` key on `AgentSessionConfig`. Add one or more backend modules to the classpath; the router discovers them automatically.
+
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-agent-api` | `AgentProvider` SPI -- single-shot and multi-turn; `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
-| `casehub-platform-agent-claude` | Claude CLI subprocess integration (autonomous agent) via Spring AI Community `claude-code-sdk` |
-| `casehub-platform-agent-langchain4j` | Bidirectional LangChain4j interop -- any `ChatModel` as `AgentProvider`, any `AgentProvider` as `ChatModel` |
+| `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
+| `casehub-platform-agent-runtime` | `SubprocessRuntime` -- local process execution for CLI agent providers |
+| `casehub-platform-agent-router` | `RoutingAgentProvider` -- dispatches to `AgentBackend` implementations by `model` key. Config: `casehub.platform.agent.default-backend` |
+| `casehub-platform-agent-claude` | AgentBackend "claude" -- Claude CLI subprocess via `claude-code-sdk` |
+| `casehub-platform-agent-openai` | AgentBackend "openai" -- native OpenAI Java SDK with `prompt_cache_key` support |
+| `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
+| `casehub-platform-agent-gemini` | AgentBackend "gemini" -- native Google GenAI SDK with explicit caching |
+| `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
+| `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- catch-all fallback; bidirectional LangChain4j interop |
+| `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
 ### Access control
 
@@ -308,18 +317,22 @@ Backend implementations live in casehub-neocortex, not this repo.
 
 ### Agent Infrastructure
 
-`AgentProvider` SPI with two execution paths:
-- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers` (List<AgentMcpServer>), `timeout`, and `correlationId`.
-- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). Semaphore held for session lifetime. Sessions are serial -- one turn at a time. Must close via try-with-resources.
+**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and dispatches by the `model` field on config records. Callers always inject `AgentProvider`, never `AgentBackend`.
 
-`AgentEvent` is a sealed interface with variants: `TextDelta`, `ThinkingDelta`, `ToolCallDelta`, `ToolCallComplete`, `ToolResult`, `InvocationComplete` (terminal with cost/usage/timing metadata including `inputTokens`, `outputTokens`, `thinkingTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalCostUsd`, `durationMs`, `apiDurationMs`, `sessionId`, `numTurns`, `isError`).
+`AgentProvider` has two execution paths:
+- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model` (provider key).
+- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). `AgentSessionInit` carries `systemPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model`.
+
+`AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no native key, the "langchain4j" backend acts as a catch-all fallback.
+
+`AgentRuntime` abstracts subprocess lifecycle for CLI-based providers. `SubprocessRuntime` wraps `ProcessBuilder`; future runtimes (Kubernetes, container) would slot in without touching provider code. Only CLI providers (`agent-codex`, `agent-gemini-cli`) inject `AgentRuntime`.
+
+`AgentEvent` is a sealed interface with variants: `TextDelta`, `ThinkingDelta`, `ToolCallDelta`, `ToolCallComplete`, `ToolResult`, `InvocationComplete` (terminal with cost/usage/timing metadata).
 
 `AgentMcpServer` is a sealed interface with three transport variants:
 - `Stdio(command, args, env)` -- subprocess MCP server
 - `Sse(url, headers)` -- legacy HTTP Server-Sent Events transport
 - `Http(url, headers)` -- current streamable HTTP MCP transport (preferred for new servers)
-
-`agent-claude/` wraps the Claude Code CLI via the Spring AI Community `claude-code-sdk`. `agent-langchain4j/` provides bidirectional interop: any `ChatModel` as `AgentProvider`, any `AgentProvider` as `ChatModel`. These are not interchangeable -- `agent-claude/` runs an autonomous agent; LangChain4j runs a chat completion with caller-managed tool loop.
 
 ---
 
@@ -346,9 +359,26 @@ Backend implementations live in casehub-neocortex, not this repo.
 
 | Property | Purpose | Default |
 |----------|---------|---------|
+| `casehub.platform.agent.default-backend` | Default provider key when `model` is null | claude |
 | `casehub.platform.agent.claude.binaryPath` | Path to Claude CLI binary | (resolved from PATH) |
 | `casehub.platform.agent.claude.defaultTimeout` | Default wall-clock timeout | PT5M |
 | `casehub.platform.agent.claude.maxConcurrentSessions` | Concurrent Claude session limit | 4 |
+| `casehub.platform.agent.openai.api-key` | OpenAI API key | (from OPENAI_API_KEY env) |
+| `casehub.platform.agent.openai.default-model` | Default OpenAI model | gpt-4.1 |
+| `casehub.platform.agent.openai.prompt-cache-retention` | Cache retention policy | in_memory |
+| `casehub.platform.agent.openai.default-timeout` | Default wall-clock timeout | PT5M |
+| `casehub.platform.agent.openai.max-concurrent-sessions` | Concurrent OpenAI session limit | 4 |
+| `casehub.platform.agent.codex.binary-path` | Path to Codex CLI binary | codex |
+| `casehub.platform.agent.codex.default-timeout` | Default wall-clock timeout | PT5M |
+| `casehub.platform.agent.codex.max-concurrent-sessions` | Concurrent Codex session limit | 4 |
+| `casehub.platform.agent.gemini.api-key` | Gemini API key | (from env) |
+| `casehub.platform.agent.gemini.default-model` | Default Gemini model | gemini-2.5-flash |
+| `casehub.platform.agent.gemini.cache-ttl` | Explicit cache TTL | PT1H |
+| `casehub.platform.agent.gemini.default-timeout` | Default wall-clock timeout | PT5M |
+| `casehub.platform.agent.gemini.max-concurrent-sessions` | Concurrent Gemini session limit | 4 |
+| `casehub.platform.agent.gemini-cli.binary-path` | Path to Gemini CLI binary | gemini |
+| `casehub.platform.agent.gemini-cli.default-timeout` | Default wall-clock timeout | PT5M |
+| `casehub.platform.agent.gemini-cli.max-concurrent-sessions` | Concurrent Gemini CLI session limit | 4 |
 | `casehub.platform.agent.langchain4j.closeTimeout` | Session close timeout | PT30S |
 | `casehub.platform.agent.langchain4j.sessionMemoryWindowSize` | Conversation memory window | 20 |
 | `casehub.platform.agent.langchain4j.max-concurrent-sessions` | Concurrent LangChain4j session limit | 10 |

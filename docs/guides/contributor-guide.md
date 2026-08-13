@@ -25,7 +25,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | Module | Artifact | CDI | Purpose |
 |--------|----------|-----|---------|
 | `platform-api/` | `casehub-platform-api` | (none) | Pure Java SPIs -- zero deps |
-| `agent-api/` | `casehub-platform-agent-api` | (none) | `AgentProvider` SPI, `AgentEvent` sealed interface, `AgentMcpServer` -- Mutiny only, no Quarkus |
+| `agent-api/` | `casehub-platform-agent-api` | (none) | `AgentProvider` + `AgentBackend` SPIs, `AgentRuntime` + `AgentProcess`, `AgentEvent` sealed interface, `AgentMcpServer` -- Mutiny only, no Quarkus |
 | `platform/` | `casehub-platform` | `@DefaultBean` | Quarkus mocks + no-ops; `DataSourceRouter`; `CloudEventTypeDispatcher` |
 | `testing/` | `casehub-platform-testing` | `@Alternative @Priority(200)` | `FixedCurrentPrincipal`, `InMemoryGroupMembershipProvider` |
 | `config/` | `casehub-platform-config` | `@ApplicationScoped` | Scope-aware YAML + SmallRye Config |
@@ -43,9 +43,15 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `governance/` | `casehub-platform-governance` | `@ApplicationScoped` | `DefaultPolicyEnforcer` -- retry/timeout/backoff on virtual thread executor |
 | `credentials-quarkus/` | `casehub-platform-credentials-quarkus` | `@Alternative @Priority(1)` | Bridge `CredentialResolver` to Quarkus `CredentialsProvider` |
 | `scim/` | `casehub-platform-scim` | `@ApplicationScoped` | SCIM 2.0 `GroupMembershipProvider` |
-| `agent-claude/` | `casehub-platform-agent-claude` | `@Alternative @Priority(10)` | Claude CLI subprocess via Spring AI Community `claude-code-sdk` 1.0.0 -- semaphore-gated, wall-clock timeout |
-| `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@Alternative @Priority(1)` | Bidirectional LangChain4j interop -- any ChatModel as AgentProvider, any AgentProvider as ChatModel |
-| `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps any AgentProvider, deferred admission, per-query session limiting |
+| `agent-runtime/` | `casehub-platform-agent-runtime` | `@ApplicationScoped` | `SubprocessRuntime` -- local process execution for CLI agent providers |
+| `agent-claude/` | `casehub-platform-agent-claude` | `@ApplicationScoped` | AgentBackend "claude" -- Claude CLI subprocess via `claude-code-sdk` |
+| `agent-openai/` | `casehub-platform-agent-openai` | `@ApplicationScoped` | AgentBackend "openai" -- native OpenAI Java SDK (v4.50.0), `prompt_cache_key` support |
+| `agent-codex/` | `casehub-platform-agent-codex` | `@ApplicationScoped` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
+| `agent-gemini/` | `casehub-platform-agent-gemini` | `@ApplicationScoped` | AgentBackend "gemini" -- native Google GenAI SDK (v1.65.0), explicit caching |
+| `agent-gemini-cli/` | `casehub-platform-agent-gemini-cli` | `@ApplicationScoped` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
+| `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@ApplicationScoped` | AgentBackend "langchain4j" -- catch-all fallback; bidirectional LangChain4j interop |
+| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- dispatches to AgentBackend by key via CDI `Instance` |
+| `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps RoutingAgentProvider |
 | `endpoints-memory/` | `casehub-platform-endpoints-memory` | `@Alternative @Priority(100)` | In-memory `EndpointRegistry` -- volatile, Tier 4 CDI |
 | `endpoints-config/` | `casehub-platform-endpoints-config` | `@Startup @ApplicationScoped` | YAML endpoint populator -- `${VAR}` interpolation, multi-file |
 | `notifications/` | `casehub-platform-notifications` | `@ApplicationScoped` | REST + SSE -- list, mark-read, dismiss, unread-count, preferences, suppression |

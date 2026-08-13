@@ -38,7 +38,7 @@ class AccessControlProviderSpiTest {
 
     @Test
     void accessibleResources_defaultReturnsEmpty() {
-        assertTrue(spi.accessibleResources("actor", AclResourceType.CASE, AclAction.READ).isEmpty());
+        assertTrue(spi.accessibleResources("actor", "case", AclAction.READ).isEmpty());
     }
 
     @Test

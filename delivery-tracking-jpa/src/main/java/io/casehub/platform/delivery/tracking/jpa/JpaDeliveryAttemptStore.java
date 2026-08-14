@@ -171,6 +171,7 @@ public class JpaDeliveryAttemptStore implements DeliveryAttemptStore {
                             .stream().map(DeliveryAttemptEntity::toDomain).toList();
     }
 
+    // Engagement events are cleaned up by DDL-level ON DELETE CASCADE on engagement_event.attempt_id FK
     @Scheduled(cron = "0 0 3 * * ?")
     @Transactional
     void attemptRetentionPurge() {

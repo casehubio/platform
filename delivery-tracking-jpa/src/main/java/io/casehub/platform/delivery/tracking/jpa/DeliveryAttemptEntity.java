@@ -66,7 +66,6 @@ public class DeliveryAttemptEntity {
 
     @Column(name = "payload", nullable = false, columnDefinition = "TEXT")
     public String payload;
-
     @Column(name = "first_opened_at")
     public Instant firstOpenedAt;
 

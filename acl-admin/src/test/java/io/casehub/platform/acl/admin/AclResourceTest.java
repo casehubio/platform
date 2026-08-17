@@ -19,7 +19,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 
 @QuarkusTest
-@TestSecurity(user = "actor1", roles = "admin")
+@TestSecurity(user = "actor1", roles = "platform-admin")
 class AclResourceTest {
 
     @Inject
@@ -32,7 +32,7 @@ class AclResourceTest {
     void setUp() {
         principal.reset();
         principal.setActorId("actor1");
-        principal.addGroup("admin");
+        principal.addGroup("platform-admin");
         acl.revokeAll("actor1", "case:abc");
         acl.revokeAll("actor1", "case:def");
         acl.revokeAll("actor1", "case:*");

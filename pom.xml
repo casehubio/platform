@@ -64,6 +64,15 @@
         <module>preferences-editor</module>
         <module>agent-router</module>
         <module>agent-gate</module>
+        <module>graphql</module>
+        <module>graphql-client</module>
+        <module>mcp</module>
+        <module>callback-api</module>
+        <module>callback-inmem</module>
+        <module>callback</module>
+        <module>graphql-generator</module>
+        <module>callback-generator</module>
+        <module>callback-client</module>
     </modules>
 
     <properties>

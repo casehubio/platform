@@ -14,8 +14,11 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ClaudeAgentClientTest {
 
@@ -147,15 +150,15 @@ class ClaudeAgentClientTest {
     }
 
     @Test
-    void validateBinary_nonExistentPath_disablesAgentFeatures() {
+    void validateBinary_nonExistentPath_degradesGracefully() {
         var p = props(1);
         when(p.binaryPath()).thenReturn(Optional.of("/no/such/binary/claude-xyz-nonexistent"));
-        var c = new ClaudeAgentClient(p);  // @Inject constructor — @PostConstruct not called
+        client = new ClaudeAgentClient(p, c -> Multi.createFrom().empty());
+        assertThatCode(client::validateBinary).doesNotThrowAnyException();
 
-        assertThatCode(c::validateBinary).doesNotThrowAnyException();
-
-        assertThatThrownBy(() -> c.run(config()).collect().asList().await().indefinitely())
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("agent features are disabled");
+        var result = client.run(config());
+        assertThatThrownBy(() -> result.collect().asList().await().indefinitely())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not available");
     }
 }

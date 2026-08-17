@@ -6,6 +6,7 @@ import io.casehub.platform.api.acl.AclEntryRequest;
 import io.casehub.platform.api.acl.AclPage;
 import io.casehub.platform.api.acl.AclQuery;
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.PlatformRoles;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -38,7 +39,7 @@ public class AclResource {
 
     @POST
     @Path("/grants")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response grant(AclEntryInput input) {
         acl.grant(input.actorId(), input.resourceId(), input.action(), input.expiresAt());
         return Response.noContent().build();
@@ -46,7 +47,7 @@ public class AclResource {
 
     @POST
     @Path("/grants/batch")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response grantBatch(List<AclEntryInput> inputs) {
         acl.grantBatch(inputs.stream().map(AclResource::toRequest).toList());
         return Response.noContent().build();
@@ -54,7 +55,7 @@ public class AclResource {
 
     @DELETE
     @Path("/grants")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response revoke(@QueryParam("actorId") String actorId,
                            @QueryParam("resourceId") String resourceId,
                            @QueryParam("action") AclAction action) {
@@ -67,7 +68,7 @@ public class AclResource {
 
     @DELETE
     @Path("/grants/batch")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response revokeBatch(List<AclEntryInput> inputs) {
         acl.revokeBatch(inputs.stream().map(AclResource::toRequest).toList());
         return Response.noContent().build();
@@ -75,7 +76,7 @@ public class AclResource {
 
     @DELETE
     @Path("/grants/all")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response revokeAll(@QueryParam("actorId") String actorId,
                               @QueryParam("resourceId") String resourceId) {
         if (actorId == null || resourceId == null) {
@@ -89,7 +90,7 @@ public class AclResource {
 
     @POST
     @Path("/denies")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response deny(AclEntryInput input) {
         acl.deny(input.actorId(), input.resourceId(), input.action(), input.expiresAt());
         return Response.noContent().build();
@@ -97,7 +98,7 @@ public class AclResource {
 
     @POST
     @Path("/denies/batch")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response denyBatch(List<AclEntryInput> inputs) {
         acl.denyBatch(inputs.stream().map(AclResource::toRequest).toList());
         return Response.noContent().build();
@@ -105,7 +106,7 @@ public class AclResource {
 
     @DELETE
     @Path("/denies")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response removeDeny(@QueryParam("actorId") String actorId,
                                @QueryParam("resourceId") String resourceId,
                                @QueryParam("action") AclAction action) {
@@ -118,7 +119,7 @@ public class AclResource {
 
     @DELETE
     @Path("/denies/batch")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response removeDenyBatch(List<AclEntryInput> inputs) {
         acl.removeDenyBatch(inputs.stream().map(AclResource::toRequest).toList());
         return Response.noContent().build();
@@ -128,7 +129,7 @@ public class AclResource {
 
     @POST
     @Path("/parents")
-    @RolesAllowed("admin")
+    @RolesAllowed(PlatformRoles.ADMIN)
     public Response registerParent(ParentInput input) {
         acl.registerParent(input.childResourceId(), input.parentResourceId());
         return Response.noContent().build();
@@ -169,7 +170,7 @@ public class AclResource {
     }
 
     private boolean isAdminOrSelf(String actorId) {
-        return principal.groups().contains("admin") || principal.actorId().equals(actorId);
+        return principal.groups().contains(PlatformRoles.ADMIN) || principal.actorId().equals(actorId);
     }
 
     private static AclEntryRequest toRequest(AclEntryInput input) {

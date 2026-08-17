@@ -1,0 +1,5 @@
+package io.casehub.platform.graphql;
+
+import java.util.List;
+
+public record PageResult<T>(List<T> items, PageInfo pageInfo) {}

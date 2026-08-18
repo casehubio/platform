@@ -29,6 +29,7 @@ public class CallbackInvoker {
 
     public CallbackInvoker() {
         this.mapper = new ObjectMapper();
+        this.mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.mapper.registerModule(new JavaTimeModule());
         var callbackModule = new com.fasterxml.jackson.databind.module.SimpleModule("callback-types");
         callbackModule.addAbstractTypeMapping(

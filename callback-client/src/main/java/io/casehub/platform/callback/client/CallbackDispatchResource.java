@@ -71,7 +71,6 @@ public class CallbackDispatchResource {
             }
 
             final Object[] args = deserializeArgs(argsNode, method);
-            method.setAccessible(true);
             final Object result = method.invoke(bean, args);
 
             if (method.getReturnType() == void.class) {

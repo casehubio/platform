@@ -3,6 +3,7 @@ package io.casehub.platform.callback;
 import io.casehub.platform.api.callback.CallbackRegistration;
 import io.casehub.platform.api.callback.CallbackRegistrationRequest;
 import io.casehub.platform.api.callback.CallbackRegistry;
+import io.casehub.platform.api.identity.PlatformRoles;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -17,7 +18,7 @@ import jakarta.ws.rs.core.Response;
 
 @Path("/casehub/callbacks")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("**")
+@RolesAllowed(PlatformRoles.ADMIN)
 public class CallbackRegistrationResource {
 
     @Inject

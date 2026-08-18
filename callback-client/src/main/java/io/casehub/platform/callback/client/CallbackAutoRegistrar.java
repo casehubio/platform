@@ -1,9 +1,13 @@
 package io.casehub.platform.callback.client;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.platform.api.callback.CallbackRegistration;
 import io.casehub.platform.api.callback.CallbackRegistrationRequest;
-import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.mcp.CallbackEligible;
+import io.quarkus.runtime.Startup;
+import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
@@ -13,12 +17,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.quarkus.runtime.Startup;
-import io.quarkus.scheduler.Scheduled;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
@@ -38,8 +41,10 @@ public class CallbackAutoRegistrar implements HealthCheck {
     private static final Logger LOG = Logger.getLogger(CallbackAutoRegistrar.class);
 
     private final Map<String, CallbackRegistration> activeRegistrations = new ConcurrentHashMap<>();
+    private final Set<String> pendingSpiNames = ConcurrentHashMap.newKeySet();
     private final ObjectMapper mapper;
     private final HttpClient httpClient;
+    private final ExecutorService registrationExecutor = Executors.newSingleThreadExecutor();
     private volatile boolean registrationComplete = false;
 
     @Inject
@@ -51,15 +56,16 @@ public class CallbackAutoRegistrar implements HealthCheck {
     Optional<String> publicUrl;
 
     @Inject
+    @ConfigProperty(name = "casehub.callback.tenancy-id")
+    Optional<String> tenancyId;
+
+    @Inject
     @ConfigProperty(name = "casehub.callback.ttl-seconds", defaultValue = "300")
     int ttlSeconds;
 
     @Inject
     @ConfigProperty(name = "casehub.callback.timeout-ms", defaultValue = "30000")
     int timeoutMs;
-
-    @Inject
-    CurrentPrincipal currentPrincipal;
 
     @Inject
     CallbackDispatchResource dispatchResource;
@@ -70,6 +76,7 @@ public class CallbackAutoRegistrar implements HealthCheck {
 
     public CallbackAutoRegistrar() {
         this.mapper = new ObjectMapper();
+        this.mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.mapper.registerModule(new JavaTimeModule());
         this.httpClient = HttpClient.newHttpClient();
     }
@@ -81,11 +88,17 @@ public class CallbackAutoRegistrar implements HealthCheck {
             registrationComplete = true;
             return;
         }
+        if (tenancyId.isEmpty()) {
+            LOG.warn("Callback auto-registration disabled — casehub.callback.tenancy-id not configured");
+            registrationComplete = true;
+            return;
+        }
 
-        discoverAndRegister();
+        discoverSpis();
+        registrationExecutor.submit(this::registerAllWithRetry);
     }
 
-    void discoverAndRegister() {
+    void discoverSpis() {
         for (final var handle : allBeans.handles()) {
             final Class<?> beanClass = handle.getBean().getBeanClass();
             if (beanClass.isAnnotationPresent(io.quarkus.arc.DefaultBean.class)) {
@@ -102,25 +115,42 @@ public class CallbackAutoRegistrar implements HealthCheck {
                             : annotation.name();
                     final Object bean = handle.get();
                     dispatchResource.registerSpi(spiName, bean);
-                    registerWithServer(spiName);
+                    pendingSpiNames.add(spiName);
                 }
             }
+        }
+    }
+
+    private void registerAllWithRetry() {
+        int attempt = 0;
+        while (!pendingSpiNames.isEmpty() && attempt < 5) {
+            if (attempt > 0) {
+                try {
+                    long delay = Math.min(1000L * (1L << attempt), 30000L);
+                    Thread.sleep(delay);
+                } catch (final InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            attempt++;
+            for (final String spiName : Set.copyOf(pendingSpiNames)) {
+                if (registerWithServer(spiName)) {
+                    pendingSpiNames.remove(spiName);
+                }
+            }
+        }
+        if (!pendingSpiNames.isEmpty()) {
+            LOG.warnf("Failed to register %d SPI(s) after %d attempts: %s",
+                    pendingSpiNames.size(), attempt, pendingSpiNames);
         }
         registrationComplete = true;
     }
 
-    private void registerWithServer(final String spiName) {
+    private boolean registerWithServer(final String spiName) {
         final String callbackUrl = publicUrl.orElseThrow() + "/casehub/callbacks/" + spiName;
-        final String tenancyId;
-        try {
-            tenancyId = currentPrincipal.tenancyId();
-        } catch (final Exception e) {
-            LOG.warnf("Cannot resolve tenancyId for callback registration of %s — skipping", spiName);
-            return;
-        }
-
         final var request = new CallbackRegistrationRequest(
-                spiName, callbackUrl, null, tenancyId,
+                spiName, callbackUrl, null, tenancyId.orElseThrow(),
                 timeoutMs, ttlSeconds, Map.of());
 
         try {
@@ -139,12 +169,15 @@ public class CallbackAutoRegistrar implements HealthCheck {
                         response.body(), CallbackRegistration.class);
                 activeRegistrations.put(spiName, reg);
                 LOG.infof("Registered callback for SPI '%s' — id=%s", spiName, reg.id());
+                return true;
             } else {
                 LOG.warnf("Failed to register callback for SPI '%s' — HTTP %d: %s",
                         spiName, response.statusCode(), response.body());
+                return false;
             }
         } catch (final Exception e) {
-            LOG.warnf(e, "Failed to register callback for SPI '%s' — will retry on heartbeat", spiName);
+            LOG.warnf(e, "Failed to register callback for SPI '%s' — will retry", spiName);
+            return false;
         }
     }
 
@@ -173,6 +206,7 @@ public class CallbackAutoRegistrar implements HealthCheck {
 
     @jakarta.annotation.PreDestroy
     void shutdown() {
+        registrationExecutor.shutdownNow();
         for (final var entry : activeRegistrations.entrySet()) {
             try {
                 final HttpRequest request = HttpRequest.newBuilder()

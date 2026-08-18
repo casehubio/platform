@@ -39,6 +39,20 @@ class CallbackAutoRegistrarTest {
         final CallbackAutoRegistrar registrar = new CallbackAutoRegistrar();
         registrar.serverUrl = java.util.Optional.empty();
         registrar.publicUrl = java.util.Optional.empty();
+        registrar.tenancyId = java.util.Optional.empty();
+        registrar.init();
+
+        assertThat(registrar.getActiveRegistrations()).isEmpty();
+        assertThat(registrar.call().getStatus())
+                .isEqualTo(org.eclipse.microprofile.health.HealthCheckResponse.Status.UP);
+    }
+
+    @Test
+    void noTenancyId_registrationCompletesImmediately() {
+        final CallbackAutoRegistrar registrar = new CallbackAutoRegistrar();
+        registrar.serverUrl = java.util.Optional.of("http://localhost:8080");
+        registrar.publicUrl = java.util.Optional.of("http://localhost:9090");
+        registrar.tenancyId = java.util.Optional.empty();
         registrar.init();
 
         assertThat(registrar.getActiveRegistrations()).isEmpty();

@@ -3,6 +3,7 @@ package io.casehub.platform.acl.jpa;
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AccessControlProviderContractTest;
 import io.casehub.platform.api.acl.AclAction;
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -61,7 +62,7 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void grant_createsAuditLogEntry() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         List<AclAuditLogEntity> logs = AclAuditLogEntity.list("actorId", "actor1");
 
@@ -79,7 +80,7 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     @Test
     void grant_withExpiry_recordsExpiresAtInAuditLog() {
         Instant expires = Instant.now().plus(1, ChronoUnit.HOURS);
-        jpaProvider.grant("actor1", "case:abc", AclAction.WRITE, expires);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.WRITE, expires);
 
         List<AclAuditLogEntity> logs = AclAuditLogEntity.list("actorId", "actor1");
 
@@ -89,8 +90,8 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void revoke_createsAuditLogEntry() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
-        jpaProvider.revoke("actor1", "case:abc", AclAction.READ);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        jpaProvider.revoke("actor1", ResourceId.parse("case:abc"), AclAction.READ);
 
         List<AclAuditLogEntity> logs = AclAuditLogEntity.list(
                 "actorId = ?1 and operation = ?2", "actor1", "REVOKE");
@@ -105,8 +106,8 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void grant_andRevoke_createsTwoAuditLogEntries() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
-        jpaProvider.revoke("actor1", "case:abc", AclAction.READ);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        jpaProvider.revoke("actor1", ResourceId.parse("case:abc"), AclAction.READ);
 
         long total = AclAuditLogEntity.count("actorId", "actor1");
 
@@ -115,9 +116,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void revokeAll_createsAuditLogEntryPerAction() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
-        jpaProvider.grant("actor1", "case:abc", AclAction.WRITE, null);
-        jpaProvider.revokeAll("actor1", "case:abc");
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.WRITE, null);
+        jpaProvider.revokeAll("actor1", ResourceId.parse("case:abc"));
 
         List<AclAuditLogEntity> revokeLogs = AclAuditLogEntity.list(
                 "actorId = ?1 and operation = ?2", "actor1", "REVOKE");
@@ -129,7 +130,7 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void revokeAll_noGrants_createsNoAuditLog() {
-        jpaProvider.revokeAll("actor1", "case:abc");
+        jpaProvider.revokeAll("actor1", ResourceId.parse("case:abc"));
 
         long count = AclAuditLogEntity.count("actorId", "actor1");
 
@@ -138,8 +139,8 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void grant_duplicate_createsTwoAuditLogEntries() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         long grantCount = AclAuditLogEntity.count(
                 "actorId = ?1 and operation = ?2", "actor1", "GRANT");
@@ -169,7 +170,7 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void condition_nullByDefault() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         AclEntryEntity found = AclEntryEntity.<AclEntryEntity>find(
                                                      "actorId = ?1 and resourceId = ?2", "actor1", "case:abc")
@@ -181,7 +182,7 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
 
     @Test
     void auditLog_tenancyIdFromPrincipal() {
-        jpaProvider.grant("actor1", "case:abc", AclAction.READ, null);
+        jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         AclAuditLogEntity log = AclAuditLogEntity.<AclAuditLogEntity>find("actorId", "actor1")
                                                  .firstResult();

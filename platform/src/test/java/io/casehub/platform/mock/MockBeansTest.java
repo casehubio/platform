@@ -2,6 +2,7 @@ package io.casehub.platform.mock;
 
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
@@ -151,7 +152,7 @@ class MockBeansTest {
     }
 
     @Test
-    void accessControl_noOp_allows_all() {assertTrue(accessControl.canAccess("any-actor", "case:any", AclAction.READ));}
+    void accessControl_noOp_allows_all() {assertTrue(accessControl.canAccess("any-actor", ResourceId.parse("case:any"), AclAction.READ));}
 
     @Test
     void accessControl_noOp_accessibleResources_returns_empty() {assertTrue(accessControl.accessibleResources("any-actor", "case", AclAction.READ).isEmpty());}

@@ -3,6 +3,7 @@ package io.casehub.platform.acl.admin;
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
 import io.casehub.platform.api.acl.AclEntryRequest;
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.acl.AclPage;
 import io.casehub.platform.api.acl.AclQuery;
 import io.casehub.platform.api.identity.CurrentPrincipal;
@@ -57,7 +58,7 @@ public class AclResource {
     @Path("/grants")
     @RolesAllowed(PlatformRoles.ADMIN)
     public Response revoke(@QueryParam("actorId") String actorId,
-                           @QueryParam("resourceId") String resourceId,
+                           @QueryParam("resourceId") ResourceId resourceId,
                            @QueryParam("action") AclAction action) {
         if (actorId == null || resourceId == null || action == null) {
             return Response.status(400).entity(Map.of("error", "actorId, resourceId, and action are required")).build();
@@ -78,7 +79,7 @@ public class AclResource {
     @Path("/grants/all")
     @RolesAllowed(PlatformRoles.ADMIN)
     public Response revokeAll(@QueryParam("actorId") String actorId,
-                              @QueryParam("resourceId") String resourceId) {
+                              @QueryParam("resourceId") ResourceId resourceId) {
         if (actorId == null || resourceId == null) {
             return Response.status(400).entity(Map.of("error", "actorId and resourceId are required")).build();
         }
@@ -108,7 +109,7 @@ public class AclResource {
     @Path("/denies")
     @RolesAllowed(PlatformRoles.ADMIN)
     public Response removeDeny(@QueryParam("actorId") String actorId,
-                               @QueryParam("resourceId") String resourceId,
+                               @QueryParam("resourceId") ResourceId resourceId,
                                @QueryParam("action") AclAction action) {
         if (actorId == null || resourceId == null || action == null) {
             return Response.status(400).entity(Map.of("error", "actorId, resourceId, and action are required")).build();
@@ -140,7 +141,7 @@ public class AclResource {
     @GET
     @Path("/check")
     public Response check(@QueryParam("actorId") String actorId,
-                          @QueryParam("resourceId") String resourceId,
+                          @QueryParam("resourceId") ResourceId resourceId,
                           @QueryParam("action") AclAction action) {
         if (actorId == null || resourceId == null || action == null) {
             return Response.status(400).entity(Map.of("error", "actorId, resourceId, and action are required")).build();

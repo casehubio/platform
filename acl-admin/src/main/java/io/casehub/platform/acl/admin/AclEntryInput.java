@@ -4,5 +4,6 @@ import io.casehub.platform.api.acl.AclAction;
 
 import java.time.Instant;
 
-public record AclEntryInput(String actorId, String resourceId, AclAction action, Instant expiresAt) {
+public record AclEntryInput(String actorId, io.casehub.platform.api.acl.ResourceId resourceId, AclAction action,
+                            Instant expiresAt) {
 }

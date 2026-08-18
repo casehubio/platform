@@ -2,6 +2,7 @@ package io.casehub.platform.acl.admin;
 
 import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
@@ -33,10 +34,10 @@ class AclResourceTest {
         principal.reset();
         principal.setActorId("actor1");
         principal.addGroup("platform-admin");
-        acl.revokeAll("actor1", "case:abc");
-        acl.revokeAll("actor1", "case:def");
-        acl.revokeAll("actor1", "case:*");
-        acl.revokeAll("actor1", "planitem:child");
+        acl.revokeAll("actor1", ResourceId.parse("case:abc"));
+        acl.revokeAll("actor1", ResourceId.parse("case:def"));
+        acl.revokeAll("actor1", ResourceId.parse("case:*"));
+        acl.revokeAll("actor1", ResourceId.parse("planitem:child"));
     }
 
     // --- Grant endpoints ---
@@ -87,7 +88,7 @@ class AclResourceTest {
 
     @Test
     void revoke_removesEntry() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
                 .queryParam("actorId", "actor1")
@@ -107,8 +108,8 @@ class AclResourceTest {
 
     @Test
     void revokeBatch_removesMultipleEntries() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.grant("actor1", "case:def", AclAction.WRITE, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:def"), AclAction.WRITE, null);
 
         given()
                 .contentType("application/json")
@@ -129,8 +130,8 @@ class AclResourceTest {
 
     @Test
     void revokeAll_clearsBothGrantsAndDenies() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.deny("actor1", "case:abc", AclAction.WRITE, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.deny("actor1", ResourceId.parse("case:abc"), AclAction.WRITE, null);
 
         given()
                 .queryParam("actorId", "actor1")
@@ -138,7 +139,7 @@ class AclResourceTest {
                 .when().delete("/acl/grants/all")
                 .then().statusCode(204);
 
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
@@ -152,7 +153,7 @@ class AclResourceTest {
 
     @Test
     void deny_createsEntry() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
                 .contentType("application/json")
@@ -171,8 +172,8 @@ class AclResourceTest {
 
     @Test
     void denyBatch_createsMultipleDenies() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.grant("actor1", "case:def", AclAction.WRITE, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:def"), AclAction.WRITE, null);
 
         given()
                 .contentType("application/json")
@@ -193,8 +194,8 @@ class AclResourceTest {
 
     @Test
     void removeDeny_removesEntry() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.deny("actor1", "case:abc", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.deny("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
                 .queryParam("actorId", "actor1")
@@ -214,10 +215,10 @@ class AclResourceTest {
 
     @Test
     void removeDenyBatch_removesMultipleDenies() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.grant("actor1", "case:def", AclAction.WRITE, null);
-        acl.deny("actor1", "case:abc", AclAction.READ, null);
-        acl.deny("actor1", "case:def", AclAction.WRITE, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:def"), AclAction.WRITE, null);
+        acl.deny("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.deny("actor1", ResourceId.parse("case:def"), AclAction.WRITE, null);
 
         given()
                 .contentType("application/json")
@@ -240,7 +241,7 @@ class AclResourceTest {
 
     @Test
     void registerParent_createsRelationship() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
                 .contentType("application/json")
@@ -283,7 +284,7 @@ class AclResourceTest {
     void check_nonAdminQueryingSelf_allowed() {
         principal.setActorId("nonadmin");
         principal.setGroups(java.util.Set.of());
-        acl.grant("nonadmin", "case:abc", AclAction.READ, null);
+        acl.grant("nonadmin", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
                 .queryParam("actorId", "nonadmin")
@@ -312,8 +313,8 @@ class AclResourceTest {
 
     @Test
     void accessible_returnsPaginatedResults() {
-        acl.grant("actor1", "case:abc", AclAction.READ, null);
-        acl.grant("actor1", "case:def", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:def"), AclAction.READ, null);
 
         given()
                 .queryParam("actorId", "actor1")
@@ -327,7 +328,7 @@ class AclResourceTest {
 
     @Test
     void accessible_wildcardGrant_includesWildcard() {
-        acl.grant("actor1", "case:*", AclAction.READ, null);
+        acl.grant("actor1", ResourceId.parse("case:*"), AclAction.READ, null);
 
         given()
                 .queryParam("actorId", "actor1")

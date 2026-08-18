@@ -1,8 +1,10 @@
 package io.casehub.platform.api.acl;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ResourceIdTest {
 
@@ -77,5 +79,25 @@ class ResourceIdTest {
         assertEquals(new ResourceId("case", "123"), new ResourceId("case", "123"));
         assertNotEquals(new ResourceId("case", "123"), new ResourceId("case", "456"));
         assertNotEquals(new ResourceId("case", "123"), new ResourceId("plan", "123"));
+    }
+
+    @Test
+    void jacksonSerializesAsFlatString() throws Exception {
+        var    mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var    rid    = new ResourceId("case", "abc-123");
+        String json   = mapper.writeValueAsString(rid);
+        assertEquals("\"case:abc-123\"", json);
+    }
+
+    @Test
+    void jacksonDeserializesFromFlatString() throws Exception {
+        var        mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        ResourceId rid    = mapper.readValue("\"case:abc-123\"", ResourceId.class);
+        assertEquals(new ResourceId("case", "abc-123"), rid);
+    }
+
+    @Test
+    void fromStringDelegatesToParse() {
+        assertEquals(ResourceId.parse("case:abc"), ResourceId.fromString("case:abc"));
     }
 }

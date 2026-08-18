@@ -14,11 +14,13 @@ public record ResourceId(String type, String id) {
         }
     }
 
+    @com.fasterxml.jackson.annotation.JsonValue
     @Override
     public String toString() {
         return type + ":" + id;
     }
 
+    @com.fasterxml.jackson.annotation.JsonCreator
     public static ResourceId parse(String value) {
         if (value == null) {
             throw new IllegalArgumentException("value must not be null");
@@ -26,8 +28,13 @@ public record ResourceId(String type, String id) {
         int colon = value.indexOf(':');
         if (colon <= 0 || colon == value.length() - 1) {
             throw new IllegalArgumentException(
-                "ResourceId must be 'type:id', got: " + value);
+                    "ResourceId must be 'type:id', got: " + value);
         }
         return new ResourceId(value.substring(0, colon), value.substring(colon + 1));
     }
+
+    public static ResourceId fromString(String value) {
+        return parse(value);
+    }
+
 }

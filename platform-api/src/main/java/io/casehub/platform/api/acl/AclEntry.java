@@ -4,7 +4,7 @@ import java.time.Instant;
 
 public record AclEntry(
         String actorId,
-        String resourceId,
+        ResourceId resourceId,
         AclAction action,
         AclEntryType entryType,
         Instant grantedAt,

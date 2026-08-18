@@ -4,6 +4,7 @@ import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.acl.AclAction;
 import io.casehub.platform.api.acl.AclEntry;
 import io.casehub.platform.api.acl.AclEntryType;
+import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import jakarta.annotation.Priority;
@@ -24,11 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 public class InMemoryAccessControlProvider implements AccessControlProvider {
 
-    private final ConcurrentHashMap<GrantKey, AclEntry> grants  = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<GrantKey, AclEntry> denies  = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ParentKey, String>  parents = new ConcurrentHashMap<>();
-    private final GroupMembershipProvider               groupMembership;
-    private final CurrentPrincipal                      principal;
+    private final ConcurrentHashMap<GrantKey, AclEntry>    grants  = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<GrantKey, AclEntry>    denies  = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ParentKey, ResourceId> parents = new ConcurrentHashMap<>();
+    private final GroupMembershipProvider                  groupMembership;
+    private final CurrentPrincipal                         principal;
 
     @Inject
     public InMemoryAccessControlProvider(GroupMembershipProvider groupMembership, CurrentPrincipal principal) {
@@ -37,39 +38,39 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     }
 
     @Override
-    public boolean canAccess(String actorId, String resourceId, AclAction action) {
+    public boolean canAccess(String actorId, ResourceId resourceId, AclAction action) {
         Set<String> candidates = buildCandidateSet(actorId);
         return resolveAccess(candidates, resourceId, action, 0);
     }
 
     @Override
-    public void grant(String actorId, String resourceId, AclAction action, Instant expires) {
+    public void grant(String actorId, ResourceId resourceId, AclAction action, Instant expires) {
         String tenancyId = principal.tenancyId();
         var    key       = new GrantKey(actorId, resourceId, action, tenancyId);
         grants.put(key, new AclEntry(actorId, resourceId, action, AclEntryType.ALLOW, Instant.now(), expires, tenancyId));
     }
 
     @Override
-    public void deny(String actorId, String resourceId, AclAction action, Instant expires) {
+    public void deny(String actorId, ResourceId resourceId, AclAction action, Instant expires) {
         String tenancyId = principal.tenancyId();
         var    key       = new GrantKey(actorId, resourceId, action, tenancyId);
         denies.put(key, new AclEntry(actorId, resourceId, action, AclEntryType.DENY, Instant.now(), expires, tenancyId));
     }
 
     @Override
-    public void revoke(String actorId, String resourceId, AclAction action) {
+    public void revoke(String actorId, ResourceId resourceId, AclAction action) {
         String tenancyId = principal.tenancyId();
         grants.remove(new GrantKey(actorId, resourceId, action, tenancyId));
     }
 
     @Override
-    public void removeDeny(String actorId, String resourceId, AclAction action) {
+    public void removeDeny(String actorId, ResourceId resourceId, AclAction action) {
         String tenancyId = principal.tenancyId();
         denies.remove(new GrantKey(actorId, resourceId, action, tenancyId));
     }
 
     @Override
-    public void revokeAll(String actorId, String resourceId) {
+    public void revokeAll(String actorId, ResourceId resourceId) {
         String tenancyId = principal.tenancyId();
         for (AclAction action : AclAction.values()) {
             grants.remove(new GrantKey(actorId, resourceId, action, tenancyId));
@@ -78,25 +79,23 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     }
 
     @Override
-    public void registerParent(String childResourceId, String parentResourceId) {
+    public void registerParent(ResourceId childResourceId, ResourceId parentResourceId) {
         parents.put(new ParentKey(childResourceId, principal.tenancyId()), parentResourceId);
     }
 
     @Override
-    public List<String> accessibleResources(String actorId, String resourceType, AclAction action) {
+    public List<ResourceId> accessibleResources(String actorId, String resourceType, AclAction action) {
         Set<String>    candidates    = buildCandidateSet(actorId);
-        String         prefix        = resourceType + ":";
         boolean        filterTenant  = shouldFilterByTenant();
         String         tenancyId     = principal.tenancyId();
         Set<AclAction> satisfyingSet = action.satisfiedBy();
         Set<AclAction> deniedBySet   = action.deniedBy();
-        String         wildcardId    = resourceType + ":*";
 
-        Set<String> seen = new LinkedHashSet<>();
+        Set<ResourceId> seen = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
                 && satisfyingSet.contains(entry.action())
-                && entry.resourceId().startsWith(prefix)
+                && entry.resourceId().type().equals(resourceType)
                 && !entry.isExpired()
                 && (!filterTenant || tenancyId.equals(entry.tenancyId()))) {
                 seen.add(entry.resourceId());
@@ -109,15 +108,14 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
     }
 
     @Override
-    public List<String> accessibleResourcesIncludingInherited(String actorId, String resourceType, AclAction action) {
+    public List<ResourceId> accessibleResourcesIncludingInherited(String actorId, String resourceType, AclAction action) {
         Set<String>    candidates    = buildCandidateSet(actorId);
-        String         prefix        = resourceType + ":";
         boolean        filterTenant  = shouldFilterByTenant();
         String         tenancyId     = principal.tenancyId();
         Set<AclAction> satisfyingSet = action.satisfiedBy();
         Set<AclAction> deniedBySet   = action.deniedBy();
 
-        Set<String> directlyGranted = new LinkedHashSet<>();
+        Set<ResourceId> directlyGranted = new LinkedHashSet<>();
         for (var entry : grants.values()) {
             if (candidates.contains(entry.actorId())
                 && satisfyingSet.contains(entry.action())
@@ -127,30 +125,30 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
             }
         }
 
-        Set<String> result = new LinkedHashSet<>();
-        for (String resourceId : directlyGranted) {
-            if (resourceId.startsWith(prefix) && !isDenied(candidates, resourceId, deniedBySet, filterTenant, tenancyId)) {
+        Set<ResourceId> result = new LinkedHashSet<>();
+        for (ResourceId resourceId : directlyGranted) {
+            if (resourceId.type().equals(resourceType) && !isDenied(candidates, resourceId, deniedBySet, filterTenant, tenancyId)) {
                 result.add(resourceId);
             }
-            collectChildren(resourceId, prefix, tenancyId, filterTenant, result, candidates, deniedBySet, 0);
+            collectChildren(resourceId, resourceType, tenancyId, filterTenant, result, candidates, deniedBySet, 0);
         }
 
         return new ArrayList<>(result);
     }
 
-    private void collectChildren(String parentResourceId, String prefix, String tenancyId,
-                                 boolean filterTenant, Set<String> result, Set<String> candidates,
+    private void collectChildren(ResourceId parentResourceId, String resourceType, String tenancyId,
+                                 boolean filterTenant, Set<ResourceId> result, Set<String> candidates,
                                  Set<AclAction> deniedBySet, int depth) {
         if (depth > 20) {return;}
         for (var entry : parents.entrySet()) {
             ParentKey key = entry.getKey();
             if (entry.getValue().equals(parentResourceId)
                 && (!filterTenant || tenancyId.equals(key.tenancyId()))) {
-                String childId = key.childResourceId();
-                if (childId.startsWith(prefix) && !isDenied(candidates, childId, deniedBySet, filterTenant, tenancyId)) {
+                ResourceId childId = key.childResourceId();
+                if (childId.type().equals(resourceType) && !isDenied(candidates, childId, deniedBySet, filterTenant, tenancyId)) {
                     result.add(childId);
                 }
-                collectChildren(childId, prefix, tenancyId, filterTenant, result, candidates, deniedBySet, depth + 1);
+                collectChildren(childId, resourceType, tenancyId, filterTenant, result, candidates, deniedBySet, depth + 1);
             }
         }
     }
@@ -164,17 +162,15 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         return candidates;
     }
 
-    private boolean resolveAccess(Set<String> candidates, String resourceId,
+    private boolean resolveAccess(Set<String> candidates, ResourceId resourceId,
                                   AclAction action, int depth) {
         if (depth > 20) {return false;}
 
-        // resolveAt: check deny/grant at instance then wildcard level
         int resolution = resolveAt(candidates, resourceId, action);
         if (resolution != 0) {return resolution > 0;}
 
-        // walk parent chain
-        String tenancyId = principal.tenancyId();
-        String parent    = parents.get(new ParentKey(resourceId, tenancyId));
+        String     tenancyId = principal.tenancyId();
+        ResourceId parent    = parents.get(new ParentKey(resourceId, tenancyId));
         if (parent != null) {
             return resolveAccess(candidates, parent, action, depth + 1);
         }
@@ -182,10 +178,7 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         return false;
     }
 
-    /**
-     * @return 1 = ALLOW, -1 = DENY, 0 = CONTINUE
-     */
-    private int resolveAt(Set<String> candidates, String resourceId, AclAction action) {
+    private int resolveAt(Set<String> candidates, ResourceId resourceId, AclAction action) {
         boolean        filterTenant  = shouldFilterByTenant();
         String         tenancyId     = principal.tenancyId();
         Set<AclAction> deniedBySet   = action.deniedBy();
@@ -198,21 +191,16 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         if (isGranted(candidates, resourceId, satisfyingSet, filterTenant, tenancyId)) {return 1;}
 
         // 3-4. Wildcard deny/grant
-        int colonIndex = resourceId.indexOf(':');
-        if (colonIndex > 0) {
-            String wildcardId = resourceId.substring(0, colonIndex) + ":*";
-            if (!wildcardId.equals(resourceId)) {
-                // 3. Wildcard deny
-                if (isDenied(candidates, wildcardId, deniedBySet, filterTenant, tenancyId)) {return -1;}
-                // 4. Wildcard grant
-                if (isGranted(candidates, wildcardId, satisfyingSet, filterTenant, tenancyId)) {return 1;}
-            }
+        ResourceId wildcardId = new ResourceId(resourceId.type(), "*");
+        if (!wildcardId.equals(resourceId)) {
+            if (isDenied(candidates, wildcardId, deniedBySet, filterTenant, tenancyId)) {return -1;}
+            if (isGranted(candidates, wildcardId, satisfyingSet, filterTenant, tenancyId)) {return 1;}
         }
 
-        return 0; // CONTINUE
+        return 0;
     }
 
-    private boolean isDenied(Set<String> candidates, String resourceId, Set<AclAction> deniedBySet,
+    private boolean isDenied(Set<String> candidates, ResourceId resourceId, Set<AclAction> deniedBySet,
                              boolean filterTenant, String tenancyId) {
         for (String candidate : candidates) {
             for (AclAction denyAction : deniedBySet) {
@@ -234,7 +222,7 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         return false;
     }
 
-    private boolean isGranted(Set<String> candidates, String resourceId, Set<AclAction> satisfyingSet,
+    private boolean isGranted(Set<String> candidates, ResourceId resourceId, Set<AclAction> satisfyingSet,
                               boolean filterTenant, String tenancyId) {
         for (String candidate : candidates) {
             for (AclAction satisfying : satisfyingSet) {
@@ -259,7 +247,7 @@ public class InMemoryAccessControlProvider implements AccessControlProvider {
         return !principal.isCrossTenantAdmin();
     }
 
-    private record GrantKey(String actorId, String resourceId, AclAction action, String tenancyId) {}
+    private record GrantKey(String actorId, ResourceId resourceId, AclAction action, String tenancyId) {}
 
-    private record ParentKey(String childResourceId, String tenancyId) {}
+    private record ParentKey(ResourceId childResourceId, String tenancyId) {}
 }

@@ -3,7 +3,7 @@ package io.casehub.platform.api.acl;
 import java.util.List;
 
 public record AclPage(
-        List<String> resourceIds,
+        List<ResourceId> resourceIds,
         String nextCursor
 ) {
     public AclPage {

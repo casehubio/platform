@@ -210,7 +210,7 @@ CDI tier for `AgentProvider`:
 
 ### Access Control Architecture
 
-**InMemoryAccessControlProvider** (`@Alternative @Priority(10)`): Three `ConcurrentHashMap`s -- grants, denies, parents. `GrantKey = (actorId, resourceId, action, tenancyId)`.
+**InMemoryAccessControlProvider** (`@Alternative @Priority(10)`): Three `ConcurrentHashMap`s -- grants, denies, parents. `GrantKey = (actorId, ResourceId, action, tenancyId)`. All SPI methods use `ResourceId` (structured `type:id` value type) instead of raw strings.
 
 **JpaAccessControlProvider** (`@ApplicationScoped`): Hibernate ORM Panache entities. All mutations are `@Transactional` with audit logging to `AclAuditLogEntity`. Upsert semantics on grants/denies.
 

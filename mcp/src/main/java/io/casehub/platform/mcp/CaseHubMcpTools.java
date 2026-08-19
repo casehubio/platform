@@ -1,7 +1,6 @@
 package io.casehub.platform.mcp;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.quarkiverse.mcp.server.McpServer;
@@ -24,9 +23,6 @@ public class CaseHubMcpTools {
     @Inject
     ModelRegistry registry;
 
-    @Inject
-    ReflectiveOperationDispatcher dispatcher;
-
     private final ObjectMapper mapper;
 
     public CaseHubMcpTools() {
@@ -44,21 +40,6 @@ public class CaseHubMcpTools {
             return mapper.writeValueAsString(buildTier0());
         }
         return mapper.writeValueAsString(buildTier1(domain));
-    }
-
-    @Tool(description = "Execute a CaseHub operation. "
-            + "Use casehub_model first to discover available operations.")
-    public String casehub_action(
-            @ToolArg(description = "Domain name") String domain,
-            @ToolArg(description = "Operation name") String operation,
-            @ToolArg(description = "Operation parameters as JSON object") String params)
-            throws Exception {
-        Map<String, Object> paramMap = Map.of();
-        if (params != null && !params.isBlank()) {
-            paramMap = mapper.readValue(params, new TypeReference<>() {});
-        }
-        Object result = dispatcher.dispatch(domain, operation, paramMap);
-        return mapper.writeValueAsString(result);
     }
 
     private Map<String, Object> buildTier0() {

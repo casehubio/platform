@@ -84,40 +84,6 @@ class CaseHubMcpToolsTest {
     }
 
     @Test
-    void actionExecutesQuery() throws Exception {
-        String result = tools.casehub_action("test", "echo",
-                "{\"message\": \"hello\"}");
-        assertThat(result).isEqualTo("\"hello\"");
-    }
-
-    @Test
-    void actionExecutesMutation() throws Exception {
-        String result = tools.casehub_action("test", "store",
-                "{\"key\": \"x\", \"value\": \"y\"}");
-        assertThat(result).isEqualTo("\"x=y\"");
-    }
-
-    @Test
-    void actionWithNullParams() throws Exception {
-        String result = tools.casehub_action("test", "hello", null);
-        assertThat(result).isEqualTo("\"Hello from CaseHub\"");
-    }
-
-    @Test
-    void actionRejectsUnknownOperation() {
-        assertThatThrownBy(() ->
-                tools.casehub_action("test", "notExposed", null))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void actionRejectsUnknownDomain() {
-        assertThatThrownBy(() ->
-                tools.casehub_action("nonexistent", "echo", null))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
     @SuppressWarnings("unchecked")
     void tier1IncludesEvents() throws Exception {
         String              json   = tools.casehub_model("test");
@@ -150,13 +116,6 @@ class CaseHubMcpToolsTest {
         Map<String, String> fields = (Map<String, String>) inputParam.get("fields");
         assertThat(fields).containsEntry("name", "String");
         assertThat(fields).containsEntry("count", "Integer");
-    }
-
-    @Test
-    void actionDispatchesWithComplexInput() throws Exception {
-        String result = tools.casehub_action("test", "create",
-                                             "{\"input\": {\"name\": \"foo\", \"count\": 42}}");
-        assertThat(result).isEqualTo("\"foo:42\"");
     }
 
 }

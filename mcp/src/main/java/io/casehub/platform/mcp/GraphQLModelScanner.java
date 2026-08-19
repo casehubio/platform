@@ -5,6 +5,7 @@ import io.casehub.platform.api.mcp.ModelEnricher;
 import io.quarkus.arc.Arc;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
@@ -35,6 +36,9 @@ public class GraphQLModelScanner {
     @Inject
     @Any
     Instance<ModelEnricher> enrichers;
+    @Inject
+    Event<ModelScanComplete> scanComplete;
+
 
     void onStartup(@Observes StartupEvent event) {
         scan();
@@ -100,7 +104,10 @@ public class GraphQLModelScanner {
                 LOG.warnf("ModelEnricher for domain '%s' has no matching resolvers",
                           enricherDomain);
             }
-        }}
+        }
+
+        scanComplete.fire(new ModelScanComplete());
+    }
 
     private Map<String, ModelEnricher> resolveEnrichers() {
         Map<String, ModelEnricher> map = new HashMap<>();

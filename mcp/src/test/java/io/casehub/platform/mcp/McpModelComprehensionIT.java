@@ -40,6 +40,9 @@ class McpModelComprehensionIT {
     CaseHubMcpTools tools;
 
     @Inject
+    ReflectiveOperationDispatcher dispatcher;
+
+    @Inject
     AgentProvider agentProvider;
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -123,12 +126,15 @@ class McpModelComprehensionIT {
                 + "{\"domain\": \"test\", \"operation\": \"<name>\", \"params\": {...}}");
 
         Map<String, Object> action = parseJson(response);
-        String actionResult = tools.casehub_action(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = action.get("params") != null
+                ? (Map<String, Object>) action.get("params") : Map.of();
+        Object actionResult = dispatcher.dispatch(
                 (String) action.get("domain"),
                 (String) action.get("operation"),
-                mapper.writeValueAsString(action.get("params")));
+                params);
 
-        assertThat(actionResult).contains("round-trip works");
+        assertThat(actionResult.toString()).contains("round-trip works");
     }
 
     private String askClaude(String userPrompt) {

@@ -9,6 +9,7 @@ import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.mcp.McpResourceRegistry;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.preferences.PreferenceKey;
 import io.casehub.platform.api.preferences.PreferenceProvider;
@@ -42,6 +43,9 @@ class MockBeansTest {
     EndpointRegistry        endpointRegistry;
     @Inject
     CredentialResolver      credentialResolver;
+    @Inject
+    McpResourceRegistry     mcpResourceRegistry;
+
 
     @Test
     void currentPrincipal_defaults_to_system() {
@@ -180,5 +184,11 @@ class MockBeansTest {
     @Test
     void credentialResolver_defaultBean_returns_empty_for_unconfigured_ref() {
         assertTrue(credentialResolver.resolve("unconfigured-ref").isEmpty());
+    }
+
+    @Test
+    void mcpResourceRegistry_noOp() {
+        assertTrue(mcpResourceRegistry.list().isEmpty());
+        assertTrue(mcpResourceRegistry.resolve("any").isEmpty());
     }
 }

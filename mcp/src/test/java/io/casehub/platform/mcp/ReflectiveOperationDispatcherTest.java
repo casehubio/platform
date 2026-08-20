@@ -88,4 +88,19 @@ class ReflectiveOperationDispatcherTest {
                 .hasMessageContaining("message: String (required)");
     }
 
+    @Test
+    void dispatchesToDirectDomainQuery() throws Exception {
+        Object result = dispatcher.dispatch("direct", "lookup",
+                                            Map.of("id", "abc"));
+        assertThat(result).isEqualTo("found:abc");
+    }
+
+    @Test
+    void dispatchesToDirectDomainMutation() throws Exception {
+        Object result = dispatcher.dispatch("direct", "createItem",
+                                            Map.of("name", "widget", "count", 5));
+        assertThat(result).isEqualTo("widget:5");
+    }
+
+
 }

@@ -2,6 +2,8 @@ package io.casehub.platform.mcp;
 
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.ModelEnricher;
+import io.casehub.platform.api.mcp.PlatformMutation;
+import io.casehub.platform.api.mcp.PlatformQuery;
 import io.quarkus.arc.Arc;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -83,6 +85,32 @@ public class GraphQLModelScanner {
             }
         }
 
+        for (Bean<?> bean : beans) {
+            Class<?> beanClass = bean.getBeanClass();
+            for (Class<?> iface : beanClass.getInterfaces()) {
+                McpDomain mcpDomain = iface.getAnnotation(McpDomain.class);
+                if (mcpDomain == null) {continue;}
+
+                String domain = mcpDomain.value();
+                if (domainOps.containsKey(domain)) {continue;}
+
+                domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
+                for (Method method : iface.getDeclaredMethods()) {
+                    if (method.isAnnotationPresent(PlatformQuery.class)) {
+                        String desc = method.getAnnotation(PlatformQuery.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                                         OperationDescriptor.OperationType.QUERY, desc));
+                    } else if (method.isAnnotationPresent(PlatformMutation.class)) {
+                        String desc = method.getAnnotation(PlatformMutation.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                                         OperationDescriptor.OperationType.MUTATION, desc));
+                    }
+                }
+            }
+        }
+
         Map<String, ModelEnricher> enricherMap = resolveEnrichers();
 
         for (String domain : domainOps.keySet()) {
@@ -151,11 +179,16 @@ public class GraphQLModelScanner {
     }
 
     private OperationDescriptor buildOperation(Method method, Class<?> resolverClass,
-                                                OperationDescriptor.OperationType type) {
-        String summary = readDescription(method);
+                                               OperationDescriptor.OperationType type) {
+        return buildOperationFromMethod(method, resolverClass, type, readDescription(method));
+    }
+
+    private OperationDescriptor buildOperationFromMethod(Method method, Class<?> resolverClass,
+                                                         OperationDescriptor.OperationType type,
+                                                         String description) {
         List<ParameterDescriptor> params = buildParams(method);
-        return new OperationDescriptor(method.getName(), type, summary, params,
-                method.getReturnType().getSimpleName(), method, resolverClass);
+        return new OperationDescriptor(method.getName(), type, description, params,
+                                       method.getReturnType().getSimpleName(), method, resolverClass);
     }
 
     private EventDescriptor buildEvent(Method method, String domain) {

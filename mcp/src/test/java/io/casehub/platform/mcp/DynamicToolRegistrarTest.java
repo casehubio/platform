@@ -57,7 +57,10 @@ class DynamicToolRegistrarTest {
 
         var domainEnum = domainProp.getJsonArray("enum");
         assertThat(domainEnum).isNotNull();
-        assertThat(domainEnum.getString(0)).isEqualTo("test");
+        List<String> domainNames = domainEnum.stream()
+                .map(Object::toString)
+                .toList();
+        assertThat(domainNames).contains("test");
     }
 
     @Test

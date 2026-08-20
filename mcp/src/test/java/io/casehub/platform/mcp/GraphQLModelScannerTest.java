@@ -100,6 +100,77 @@ class GraphQLModelScannerTest {
     }
 
     @Test
+    void discoversDirectMcpDomainInterface() {
+        var domain = registry.getDomain("direct");
+        assertThat(domain).isPresent();
+        assertThat(domain.get().name()).isEqualTo("direct");
+    }
+
+    @Test
+    void directDomainHasQueryOperations() {
+        var domain = registry.getDomain("direct").orElseThrow();
+        assertThat(domain.queryCount()).isEqualTo(1);
+    }
+
+    @Test
+    void directDomainHasMutationOperations() {
+        var domain = registry.getDomain("direct").orElseThrow();
+        assertThat(domain.mutationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void directDomainOperationHasDescription() {
+        var lookup = registry.getOperation("direct", "lookup").orElseThrow();
+        assertThat(lookup.summary()).isEqualTo("Look up by ID");
+    }
+
+    @Test
+    void directDomainMutationHasDescription() {
+        var createItem = registry.getOperation("direct", "createItem").orElseThrow();
+        assertThat(createItem.summary()).isEqualTo("Create a new item");
+    }
+
+    @Test
+    void directDomainOperationHasParams() {
+        var lookup = registry.getOperation("direct", "lookup").orElseThrow();
+        assertThat(lookup.params()).hasSize(1);
+        assertThat(lookup.params().get(0).name()).isEqualTo("id");
+        assertThat(lookup.params().get(0).typeName()).isEqualTo("String");
+        assertThat(lookup.params().get(0).required()).isTrue();
+    }
+
+    @Test
+    void directDomainMutationHasMultipleParams() {
+        var createItem = registry.getOperation("direct", "createItem").orElseThrow();
+        assertThat(createItem.params()).hasSize(2);
+        assertThat(createItem.params().get(0).name()).isEqualTo("name");
+        assertThat(createItem.params().get(1).name()).isEqualTo("count");
+        assertThat(createItem.params().get(1).typeName()).isEqualTo("Integer");
+    }
+
+    @Test
+    void directDomainStoresImplAsResolverClass() {
+        var lookup = registry.getOperation("direct", "lookup").orElseThrow();
+        assertThat(lookup.resolverClass()).isEqualTo(DirectDomainImpl.class);
+    }
+
+    @Test
+    void directDomainNonAnnotatedMethodNotExposed() {
+        var helper = registry.getOperation("direct", "helper");
+        assertThat(helper).isEmpty();
+    }
+
+    @Test
+    void graphQLApiPathTakesPrecedenceOverDirectInterface() {
+        // "test" domain is registered via @GraphQLApi — verify it retains its exact operation counts
+        // If the direct interface path incorrectly overwrote it, counts would differ
+        var domain = registry.getDomain("test").orElseThrow();
+        assertThat(domain.queryCount()).isEqualTo(2);
+        assertThat(domain.mutationCount()).isEqualTo(2);
+    }
+
+
+    @Test
     void complexTypeFieldExpansion() {
         var create = registry.getOperation("test", "create").orElseThrow();
         assertThat(create.params()).hasSize(1);

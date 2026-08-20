@@ -8,6 +8,8 @@ projects: [casehub-platform]
 tags: [mcp, resources, subscription, notification, quarkus-mcp-server, architecture]
 ---
 
+# From Tool Calls to Browsable State
+
 Most MCP integrations start with tools. You expose operations — query this, mutate that — and let the LLM call them. CaseHub started there too. Two tools, not sixty: `casehub_model` for navigating the domain catalog, `casehub_action` for dispatching operations. A hierarchical model that keeps the tool surface small while scaling the operation set underneath.
 
 But tools are request-response. You ask a question, you get an answer. There's a whole category of data that doesn't fit that pattern — data that exists independently of any query, changes over time, and is interesting precisely because it changes. An IoT device's current temperature. A case's active work items. A domain's operational state. This is read-only, potentially subscribable data. In MCP protocol terms: resources.

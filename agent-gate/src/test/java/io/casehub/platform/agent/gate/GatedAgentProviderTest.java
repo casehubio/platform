@@ -221,7 +221,7 @@ class GatedAgentProviderTest {
             strategies.add(new ConcurrencyStrategy(maxConcurrent));
         }
         return new GatedAgentProvider(delegate, strategies,
-                acquireTimeout, queryAcquireTimeout);
+                acquireTimeout, queryAcquireTimeout, new SessionRegistry());
     }
 
     private static AgentSessionConfig config() {

@@ -38,4 +38,23 @@ public interface AgentGateProperties {
         @WithDefault("60")
         int windowSeconds();
     }
+
+    Reaper reaper();
+
+    interface Reaper {
+        @WithDefault("60s")
+        Duration scanInterval();
+
+        @WithDefault("5m")
+        Duration warnThreshold();
+
+        @WithDefault("false")
+        boolean forceCloseEnabled();
+
+        @WithDefault("30m")
+        Duration forceCloseThreshold();
+
+        @WithDefault("24h")
+        Duration maxRegistryAge();
+    }
 }

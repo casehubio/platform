@@ -27,6 +27,7 @@ public class GatedAgentProvider implements AgentProvider {
 
     @Inject @Delegate @Any AgentProvider delegate;
     @Inject AgentGateProperties properties;
+    @Inject SessionRegistry registry;
 
     private List<AdmissionStrategy> strategies = List.of();
     private List<AdmissionStrategy> sessionStrategies = List.of();
@@ -38,10 +39,12 @@ public class GatedAgentProvider implements AgentProvider {
     protected GatedAgentProvider() {}
 
     GatedAgentProvider(AgentProvider delegate, List<AdmissionStrategy> strategies,
-                       Duration acquireTimeout, Duration queryAcquireTimeout) {
+                       Duration acquireTimeout, Duration queryAcquireTimeout,
+                       SessionRegistry registry) {
         this.delegate = delegate;
         this.acquireTimeout = acquireTimeout;
         this.queryAcquireTimeout = queryAcquireTimeout;
+        this.registry = registry;
         setStrategies(strategies);
     }
 
@@ -107,8 +110,11 @@ public class GatedAgentProvider implements AgentProvider {
         acquireAll(strategies, acquireTimeout);
         try {
             AgentSession session = delegate.openSession(init);
-            return new GatedAgentSession(session, sessionStrategies,
-                    invocationStrategies, queryAcquireTimeout);
+            long id = registry.nextId();
+            var gated = new GatedAgentSession(session, sessionStrategies,
+                    invocationStrategies, queryAcquireTimeout, registry, id);
+            registry.register(id, gated);
+            return gated;
         } catch (Exception e) {
             releaseAll(strategies);
             throw e;

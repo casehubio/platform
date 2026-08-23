@@ -6,7 +6,6 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,6 +14,9 @@ class DynamicToolRegistrarTest {
 
     @Inject
     ToolManager toolManager;
+    @Inject
+    DynamicToolRegistrar registrar;
+
 
     @Test
     void casehubActionToolIsRegistered() {
@@ -75,5 +77,59 @@ class DynamicToolRegistrarTest {
         assertThat(description).contains("test:");
         assertThat(description).contains("Queries:");
         assertThat(description).contains("Mutations:");
+    }
+
+    @Test
+    void casehubActivateToolIsRegistered() {
+        var tool = toolManager.getTool("casehub_activate");
+        assertThat(tool).isNotNull();
+        assertThat(tool.description()).contains("Activate a domain");
+    }
+
+    @Test
+    void activateDomain_shouldRegisterPerOperationTools() {
+        registrar.activateDomain("test");
+        assertThat(toolManager.getTool("test_echo")).isNotNull();
+        assertThat(toolManager.getTool("test_hello")).isNotNull();
+        assertThat(toolManager.getTool("test_store")).isNotNull();
+        assertThat(toolManager.getTool("test_create")).isNotNull();
+    }
+
+    @Test
+    void activateDomain_shouldBeIdempotent() {
+        registrar.activateDomain("test");
+        var second = registrar.activateDomain("test");
+        assertThat(second.content().get(0).asText().text())
+                .contains("already activated");
+    }
+
+    @Test
+    void activateDomain_unknownDomain_shouldReturnError() {
+        var response = registrar.activateDomain("nonexistent");
+        assertThat(response.isError()).isTrue();
+    }
+
+    @Test
+    void activateDomain_queryShouldHaveReadOnlyAndIdempotentHints() {
+        registrar.activateDomain("test");
+        var echoTool = toolManager.getTool("test_echo");
+        assertThat(echoTool).isNotNull();
+        var annotations = echoTool.annotations();
+        assertThat(annotations).isPresent();
+        assertThat(annotations.get().readOnlyHint()).isTrue();
+        assertThat(annotations.get().idempotentHint()).isTrue();
+        assertThat(annotations.get().destructiveHint()).isFalse();
+    }
+
+    @Test
+    void activateDomain_mutationShouldNotBeIdempotentOrReadOnly() {
+        registrar.activateDomain("test");
+        var storeTool = toolManager.getTool("test_store");
+        assertThat(storeTool).isNotNull();
+        var annotations = storeTool.annotations();
+        assertThat(annotations).isPresent();
+        assertThat(annotations.get().readOnlyHint()).isFalse();
+        assertThat(annotations.get().idempotentHint()).isFalse();
+        assertThat(annotations.get().destructiveHint()).isFalse();
     }
 }

@@ -1,1 +1,1 @@
-# Design Journal — issue-198-preference-schema-versioning
+# Design Journal — issue-782-hibernate-session-vt-corruption

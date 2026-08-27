@@ -2,6 +2,7 @@ package io.casehub.platform.notification.rest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.governance.SessionIsolator;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.notification.AllNotificationsRead;
 import io.casehub.platform.api.notification.NotificationCreated;
@@ -37,15 +38,18 @@ public class NotificationSseResource {
     private final NotificationStore                                  store;
     private final CurrentPrincipal                                   principal;
     private final ObjectMapper                                       objectMapper;
+    private final SessionIsolator                                    sessionIsolator;
 
     @Inject
     public NotificationSseResource(
             NotificationStore store,
             CurrentPrincipal principal,
-            ObjectMapper objectMapper) {
-        this.store        = store;
-        this.principal    = principal;
-        this.objectMapper = objectMapper;
+            ObjectMapper objectMapper,
+            SessionIsolator sessionIsolator) {
+        this.store           = store;
+        this.principal       = principal;
+        this.objectMapper    = objectMapper;
+        this.sessionIsolator = sessionIsolator;
     }
 
     @GET
@@ -63,7 +67,8 @@ public class NotificationSseResource {
 
         VIRTUAL_EXECUTOR.execute(() -> {
             try {
-                long count = store.unreadCount(userId, tenancyId);
+                long count = sessionIsolator.runIsolated(
+                        () -> store.unreadCount(userId, tenancyId));
                 sendUnreadCount(eventSink, sse, count);
             } catch (Exception e) {
                 LOG.errorf(e, "Failed to fetch initial unread count for user %s", userId);
@@ -106,7 +111,8 @@ public class NotificationSseResource {
         }
 
         try {
-            long count = store.unreadCount(notification.userId(), notification.tenancyId());
+            long count = sessionIsolator.runIsolated(
+                    () -> store.unreadCount(notification.userId(), notification.tenancyId()));
             sendUnreadCountToUser(notification.userId(), notification.tenancyId(), count);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to fetch unread count for user %s", notification.userId());
@@ -148,7 +154,8 @@ public class NotificationSseResource {
         }
 
         try {
-            long count = store.unreadCount(notification.userId(), notification.tenancyId());
+            long count = sessionIsolator.runIsolated(
+                    () -> store.unreadCount(notification.userId(), notification.tenancyId()));
             sendUnreadCountToUser(notification.userId(), notification.tenancyId(), count);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to fetch unread count for user %s", notification.userId());
@@ -157,7 +164,8 @@ public class NotificationSseResource {
 
     void onAllNotificationsRead(@ObservesAsync AllNotificationsRead event) {
         try {
-            long count = store.unreadCount(event.userId(), event.tenancyId());
+            long count = sessionIsolator.runIsolated(
+                    () -> store.unreadCount(event.userId(), event.tenancyId()));
             sendUnreadCountToUser(event.userId(), event.tenancyId(), count);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to fetch unread count for user %s", event.userId());

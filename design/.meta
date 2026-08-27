@@ -1,0 +1,9 @@
+branch: issue-782-hibernate-session-vt-corruption
+project-sha: eaecf32a37138e850429e5cc5fcc99d1e32298a3
+date: 2026-08-24
+issue: 782
+issue-repo: casehubio/engine
+covers: 782
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:

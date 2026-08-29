@@ -73,6 +73,7 @@
         <module>graphql-generator</module>
         <module>callback-generator</module>
         <module>callback-client</module>
+        <module>yaml-core</module>
     </modules>
 
     <properties>

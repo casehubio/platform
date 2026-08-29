@@ -58,6 +58,12 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 | `casehub-platform-digest-inmem` | In-memory `DigestBuffer` |
 | `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- drain via SELECT+DELETE in transaction |
 
+### YAML declaration primitives
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-yaml-core` | Pure Java YAML primitives — `VariableResolver` (pluggable sources, deferred prefixes, `${each.*}` context), `ForEachExpander` (generic adapter, inline + named groups, `when` conditions), `Truthiness` (boolean string eval), `CsvParser` (typed columns). JSON Schema fragments for composable YAML validation. Zero deps, J2CL-transpilable |
+
 ### Data source and event streams
 
 | Artifact | What it provides |

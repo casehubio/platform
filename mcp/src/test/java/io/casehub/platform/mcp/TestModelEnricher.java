@@ -11,7 +11,7 @@ import java.util.Map;
 public class TestModelEnricher implements ModelEnricher {
 
     @Override
-    public String summary() { return "Test domain for verification"; }
+    public String summary() { return "Test domain — echo messages, store values, create items"; }
 
     @Override
     public Map<String, Object> state() { return Map.of("itemCount", 3); }

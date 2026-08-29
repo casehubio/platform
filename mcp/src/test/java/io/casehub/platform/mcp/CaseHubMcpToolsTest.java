@@ -42,7 +42,7 @@ class CaseHubMcpToolsTest {
         Map<String, Object> testDomain = domains.stream()
                 .filter(d -> "test".equals(d.get("name"))).findFirst().orElseThrow();
 
-        assertThat(testDomain).containsEntry("summary", "Test domain for verification");
+        assertThat(testDomain).containsEntry("summary", "Test domain — echo messages, store values, create items");
         assertThat(testDomain).containsKey("state");
     }
 

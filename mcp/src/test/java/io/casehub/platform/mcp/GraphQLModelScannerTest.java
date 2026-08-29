@@ -53,7 +53,7 @@ class GraphQLModelScannerTest {
     @Test
     void enricherMergesSummaryAndState() {
         var domain = registry.getDomain("test").orElseThrow();
-        assertThat(domain.summary()).isEqualTo("Test domain for verification");
+        assertThat(domain.summary()).isEqualTo("Test domain — echo messages, store values, create items");
         assertThat(domain.state()).containsEntry("itemCount", 3);
     }
 

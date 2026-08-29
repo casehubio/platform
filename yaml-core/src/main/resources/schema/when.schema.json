@@ -1,0 +1,7 @@
+{
+  "$id": "https://casehub.io/yaml-core/when.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conditional Inclusion",
+  "description": "A 'when' condition is a string that resolves to a boolean value. After variable resolution, the result must be one of: true/false/yes/no/on/off/y/n/1/0 (case-insensitive). Elements with a false condition are excluded from expansion.",
+  "type": "string"
+}

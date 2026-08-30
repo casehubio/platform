@@ -119,6 +119,16 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `Age
 |----------|------------------|
 | `casehub-platform-preferences-editor` | REST API for preference writes + schema discovery + validation; `PreferenceValidator`; `InMemoryPreferenceSchemaRegistry` |
 
+### PDF generation
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-pdf` | HTML-to-PDF conversion with PDF/A-2b conformance. `OpenHtmlToPdfGenerator` implements `PdfGenerator` SPI. Bundled Liberation Sans + Mono fonts for reproducible rendering. Classpath-activated — when absent, `NoOpPdfGenerator` returns `Optional.empty()` |
+
+**SPI:** `PdfGenerator.generateFromHtml(String html, PdfOptions options)` returns `Optional<byte[]>`.
+
+**PdfOptions:** `title`, `author`, `createdAt`, `reportType`, `conformance` (default `PdfAConformance.PDFA_2_B`). Use `PdfOptions.defaults()` for basic conversion.
+
 ---
 
 ## Key Abstractions and SPIs

@@ -75,6 +75,7 @@
         <module>callback-client</module>
         <module>yaml-core</module>
         <module>ts-core</module>
+        <module>platform-pdf</module>
     </modules>
 
     <properties>
@@ -121,6 +122,11 @@
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j</artifactId>
                 <version>${langchain4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-pdfbox</artifactId>
+                <version>1.1.37</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

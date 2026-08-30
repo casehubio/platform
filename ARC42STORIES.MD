@@ -228,6 +228,11 @@ C4Container
     Container(digestJpa, "casehub-platform-digest-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaDigestBuffer — Flyway V2000, JSON payload")
   }
 
+  Container_Boundary(l_decl, "Declaration Primitives") {
+    Container(yamlCore, "casehub-platform-yaml-core", "Java 21", "VariableResolver, ForEachExpander, Truthiness, CsvParser — zero deps")
+    Container(tsCore, "casehub-platform-ts-core", "Java 21", "TsExecutor SPI, NodeTsExecutor (Node.js subprocess) — zero deps")
+  }
+
   Rel(platform, api, "implements SPIs from")
   Rel(testing, api, "implements SPIs from")
   Rel(config, api, "implements PreferenceProvider from")

@@ -76,6 +76,7 @@
         <module>yaml-core</module>
         <module>ts-core</module>
         <module>platform-pdf</module>
+        <module>platform-signing</module>
     </modules>
 
     <properties>

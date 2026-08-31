@@ -4,6 +4,7 @@ import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +54,10 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(3);
-        assertThat(result.elements().stream().map(TestElement::id).toList())
+        assertThat(new ArrayList<>(result.elements().keySet()))
                 .containsExactly("regional-source.us-east",
                         "regional-source.eu-west", "regional-source.ap-south");
-        TestElement usEast = result.elements().stream()
-                .filter(e -> e.id().equals("regional-source.us-east"))
-                .findFirst().orElseThrow();
+        TestElement usEast = result.elements().get("regional-source.us-east");
         assertThat(usEast.spec()).containsEntry("name", "customers-us-east")
                 .containsEntry("uri", "s3://us-east/data.csv");
     }
@@ -76,7 +75,7 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(2);
-        assertThat(result.elements().stream().map(TestElement::id).toList())
+        assertThat(new ArrayList<>(result.elements().keySet()))
                 .containsExactly("regional-source.us-east", "regional-source.eu-west");
     }
 
@@ -94,7 +93,7 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(4);
-        assertThat(result.elements().stream().map(TestElement::id).toList())
+        assertThat(new ArrayList<>(result.elements().keySet()))
                 .containsExactly("source.us-east", "source.eu-west",
                         "ingest.us-east", "ingest.eu-west");
     }
@@ -109,8 +108,8 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(1);
-        assertThat(result.elements().get(0).id()).isEqualTo("db");
-        assertThat(result.elements().get(0).spec()).containsEntry("name", "database");
+        assertThat(result.elements().get("db").id()).isEqualTo("db");
+        assertThat(result.elements().get("db").spec()).containsEntry("name", "database");
     }
 
     @Test
@@ -125,7 +124,7 @@ class ForEachExpanderTest {
         var result = ForEachExpander.expand(elements, Map.of(), resolver,
                 adapter, 1000);
 
-        assertThat(result.elements().get(0).spec()).containsEntry("env", "production");
+        assertThat(result.elements().get("db").spec()).containsEntry("env", "production");
     }
 
     @Test
@@ -243,7 +242,7 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(1);
-        assertThat(result.elements().get(0).id()).isEqualTo("source.true");
+        assertThat(result.elements().containsKey("source.true")).isTrue();
         assertThat(result.excludedIds()).containsExactly("source.false");
     }
 
@@ -265,8 +264,8 @@ class ForEachExpanderTest {
                 adapter, 1000);
 
         assertThat(result.elements()).hasSize(1);
-        assertThat(result.elements().get(0).id()).isEqualTo("node.prod");
-        assertThat(result.elements().get(0).spec()).containsEntry("name", "prod");
+        assertThat(result.elements().get("node.prod").id()).isEqualTo("node.prod");
+        assertThat(result.elements().get("node.prod").spec()).containsEntry("name", "prod");
     }
 
     @Test
@@ -284,7 +283,23 @@ class ForEachExpanderTest {
         var result = ForEachExpander.expand(elements, groups, resolver,
                 adapter, 1000);
 
-        assertThat(result.elements().stream().map(TestElement::id).toList())
+        assertThat(new ArrayList<>(result.elements().keySet()))
                 .containsExactly("first", "expand.a", "expand.b", "last");
     }
+
+    @Test
+    void duplicate_forEach_values_throws() {
+        Map<String, Object> inlineForEach = Map.of("as", "x",
+                                                   "in", List.of("same", "same"));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("name", "${each.x}"), inlineForEach, null));
+
+        assertThatThrownBy(() -> ForEachExpander.expand(elements, Map.of(),
+                                                        resolver, adapter, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Duplicate stamped ID")
+                .hasMessageContaining("node.same");
+    }
+
 }

@@ -22,7 +22,7 @@ public final class ForEachExpander {
             ForEachAdapter<E> adapter,
             int maxExpansion) {
 
-        List<E> allElements = new ArrayList<>();
+        LinkedHashMap<String, E> allElements = new LinkedHashMap<>();
         Set<String> excludedIds = new HashSet<>();
         Map<String, String> elementToGroup = new LinkedHashMap<>();
         Map<String, List<String>> groupValues = new LinkedHashMap<>();
@@ -89,7 +89,7 @@ public final class ForEachExpander {
                         continue;
                     }
                 }
-                allElements.add(adapter.stamp(element, elementId, resolver));
+                allElements.put(elementId, adapter.stamp(element, elementId, resolver));
                 continue;
             }
 
@@ -109,11 +109,15 @@ public final class ForEachExpander {
                     }
                 }
 
-                allElements.add(adapter.stamp(element, stampedId, eachResolver));
+                if (allElements.containsKey(stampedId)) {
+                    throw new IllegalStateException("Duplicate stamped ID '" + stampedId
+                            + "' — forEach values must be unique within each template.");
+                }
+                allElements.put(stampedId, adapter.stamp(element, stampedId, eachResolver));
             }
         }
 
-        return new ExpansionResult<>(List.copyOf(allElements), Set.copyOf(excludedIds));
+        return new ExpansionResult<>(allElements, Set.copyOf(excludedIds));
     }
 
     private static List<String> resolveValues(List<?> in, VariableResolver resolver,

@@ -62,7 +62,7 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-yaml-core` | Pure Java YAML primitives — `VariableResolver` (pluggable sources, deferred prefixes, `${each.*}` context), `ForEachExpander` (generic adapter, inline + named groups, `when` conditions), `Truthiness` (boolean string eval), `CsvParser` (typed columns). JSON Schema fragments for composable YAML validation. Zero deps, J2CL-transpilable |
+| `casehub-platform-yaml-core` | Pure Java YAML primitives — `VariableResolver` (pluggable sources, deferred prefixes, `DeferredPrefixHandler`, `${each.*}` context), `ForEachExpander` (generic adapter, inline + named groups, `when` conditions, ID-keyed results), `Truthiness` (boolean string eval), `CsvParser` (typed columns). Module system: `YamlModule` (generic sections), `YamlModuleParameter` (typed constraints), `ParameterValidator` (collect-all), `ModuleExpander` (alias prefixing, import merging). JSON Schema fragments for composable YAML validation. Zero deps, J2CL-transpilable |
 | `casehub-platform-ts-core` | TypeScript execution SPI — `TsExecutor` interface with `evaluate(String)` and `evaluate(Path)` returning `TsEvalResult`. `NodeTsExecutor` (Node.js subprocess via `npx tsx`). Repos consuming TS-defined configurations depend on this for the executor SPI and build their own domain-specific processors |
 
 ### Data source and event streams

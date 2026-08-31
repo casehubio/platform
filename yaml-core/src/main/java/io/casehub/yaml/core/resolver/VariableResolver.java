@@ -129,6 +129,10 @@ public class VariableResolver {
             defaultValue = null;
         }
 
+        if (deferredPrefixes.contains(prefix)) {
+            return null;
+        }
+
         if ("each".equals(prefix)) {
             return resolveEach(name, key, elementContext);
         }
@@ -140,10 +144,6 @@ public class VariableResolver {
             if (defaultValue != null) return defaultValue;
             throw new UnresolvedVariableException(key, elementContext,
                     "Variable '" + name + "' not found in prefix '" + prefix + "'.");
-        }
-
-        if (deferredPrefixes.contains(prefix)) {
-            return null;
         }
 
         throw new UnresolvedVariableException(key, elementContext,

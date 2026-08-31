@@ -22,13 +22,13 @@ public record CbrCaseEntry(
 
 **Validation (compact constructor):**
 - `problem` and `solution`: non-null, non-blank
-- `confidence`: null allowed; if non-null, must be in [0.0, 1.0]
+- `origin`: null allowed; if non-null, must be in [0.0, 1.0]
 
 **`toMemoryInput(entityId, domain, tenantId, caseId)`:**  
-Maps fields to `MemoryInput`. `problem` → `text`. `solution`, `outcome` (if non-null), `confidence` (if non-null, formatted via `MemoryAttributeKeys.formatConfidence`) → attributes.
+Maps fields to `MemoryInput`. `problem` → `text`. `solution`, `outcome` (if non-null), `origin` (if non-null, formatted via `MemoryAttributeKeys.formatConfidence`) → attributes.
 
 **`static from(Memory)`:**  
-Extracts CBR fields. `text` → `problem`. Attributes → `solution`, `outcome`, `confidence` (null if absent). Parses confidence via `MemoryAttributeKeys.parseConfidence`.
+Extracts CBR fields. `text` → `problem`. Attributes → `solution`, `outcome`, `origin` (null if absent). Parses confidence via `MemoryAttributeKeys.parseConfidence`.
 
 ### New constant: `MemoryAttributeKeys.SOLUTION = "solution"`
 

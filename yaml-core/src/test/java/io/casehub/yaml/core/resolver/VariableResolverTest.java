@@ -308,4 +308,68 @@ class VariableResolverTest {
         assertThat(resolver.resolveString("${sys.java.version}", "test"))
                 .isNotEmpty();
     }
+
+// --- DeferredPrefixHandler ---
+
+    @Test
+    void deferred_prefix_handler_invoked_on_hit() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<String>();
+        var resolver = new VariableResolver(Map.of(), Set.of("match"))
+                               .withDeferredPrefixHandler((prefix, key, ctx) ->
+                                                                  captured.set(prefix + ":" + key));
+        resolver.resolveString("${match.sink.id}", "rule");
+        assertThat(captured.get()).isEqualTo("match:match.sink.id");
+    }
+
+    @Test
+    void deferred_prefix_handler_can_throw() {
+        var resolver = new VariableResolver(Map.of(), Set.of("match"))
+                               .withDeferredPrefixHandler((prefix, key, ctx) -> {
+                                   throw new UnresolvedVariableException(key, ctx,
+                                                                         prefix + " refs resolved at runtime");
+                               });
+        assertThatThrownBy(() -> resolver.resolveString("${match.sink.id}", "node"))
+                .isInstanceOf(UnresolvedVariableException.class)
+                .hasMessageContaining("runtime");
+    }
+
+    @Test
+    void no_handler_deferred_passes_through_silently() {
+        var resolver = new VariableResolver(Map.of(), Set.of("match"));
+        assertThat(resolver.resolveString("${match.sink.id}", "rule"))
+                .isEqualTo("${match.sink.id}");
+    }
+
+    @Test
+    void handler_survives_withEachContext() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<String>();
+        var resolver = new VariableResolver(Map.of(), Set.of("match"))
+                               .withDeferredPrefixHandler((prefix, key, ctx) ->
+                                                                  captured.set(prefix));
+        var child = resolver.withEachContext(Map.of("region", "us-east"));
+        child.resolveString("${match.x}", "test");
+        assertThat(captured.get()).isEqualTo("match");
+    }
+
+    @Test
+    void handler_survives_withScope() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<String>();
+        var resolver = new VariableResolver(Map.of(), Set.of("fault"))
+                               .withDeferredPrefixHandler((prefix, key, ctx) ->
+                                                                  captured.set(prefix));
+        var child = resolver.withScope("var", name -> "val");
+        child.resolveString("${fault.nodeId}", "test");
+        assertThat(captured.get()).isEqualTo("fault");
+    }
+
+    @Test
+    void handler_survives_withEachRowContext() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<String>();
+        var resolver = new VariableResolver(Map.of(), Set.of("match"))
+                               .withDeferredPrefixHandler((prefix, key, ctx) ->
+                                                                  captured.set(prefix));
+        var child = resolver.withEachRowContext(Map.of("env", Map.of("name", "prod")));
+        child.resolveString("${match.x}", "test");
+        assertThat(captured.get()).isEqualTo("match");
+    }
 }

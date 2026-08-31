@@ -274,9 +274,19 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 **StringExpressionEvaluator:** Sub-interface of `ExpressionEvaluator` for string-based evaluators (carries `expression()` string). Concrete records: `JQExpressionEvaluator`, `MvelExpressionEvaluator`.
 
+### Signing
+
+`SigningProvider` SPI for cryptographic signing operations. `SignatureVerifier` for verification. `NoOpSigningProvider` `@DefaultBean` is a silent no-op. Real implementations plug in via CDI displacement.
+
+### SessionIsolator
+
+`SessionIsolator` SPI — virtual-thread-safe Hibernate session isolation. Wraps JPA calls that would otherwise fail on virtual threads due to Hibernate's thread-local session management. Use for any blocking JPA operations in `@RunOnVirtualThread` contexts (e.g. `NotificationSseResource`).
+
 ### Access Control
 
 `AccessControlProvider` provides blocking access control with resource hierarchy inheritance. Group-based grants resolve via `GroupMembershipProvider`. Parent-child hierarchy with depth guard of 20.
+
+**ResourceId:** Type-safe resource identifier replacing raw `String resourceId`. `ResourceId.of(type, id)` creates a typed reference; `ResourceId.parse("case:123")` parses the `type:id` format. All ACL SPI methods now accept `ResourceId` instead of separate `resourceType` + `resourceId` parameters.
 
 **Action hierarchy:** `AclAction` enum: `READ`, `WRITE`, `ADMIN`, `CLAIM`. ADMIN implies WRITE implies READ -- a WRITE grant satisfies a READ check; an ADMIN grant satisfies both READ and WRITE. CLAIM is independent. `satisfiedBy()` and `deniedBy()` methods encode this hierarchy.
 
@@ -350,6 +360,14 @@ Backend implementations live in casehub-neocortex, not this repo.
 - `Stdio(command, args, env)` -- subprocess MCP server
 - `Sse(url, headers)` -- legacy HTTP Server-Sent Events transport
 - `Http(url, headers)` -- current streamable HTTP MCP transport (preferred for new servers)
+
+**Session leak detection:** `GatedAgentSession` maintains a registry of open sessions. An `@Scheduled` reaper detects sessions exceeding their timeout without being closed, logs a warning, and performs idempotent cleanup. Sessions implement `AutoCloseable` with idempotent close semantics.
+
+**MCP infrastructure:**
+- `casehub_activate` — on-demand per-operation tool registration. Agents discover and activate tools at runtime instead of exposing all tools at startup.
+- **Resource subscriptions:** `McpResourceRegistry` SPI for registering subscribable MCP resources. `McpResourceSubscriptionManager` tracks subscriptions and fires notifications on resource changes.
+- **Dynamic tool schema:** The operation catalog is injected into the `casehub_action` tool definition at runtime, providing contextual tool descriptions.
+- `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations.
 
 ---
 

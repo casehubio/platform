@@ -14,4 +14,12 @@ public interface VariableSource {
             return null;
         };
     }
+
+    static VariableSource env() {
+        return System::getenv;
+    }
+
+    static VariableSource systemProperty() {
+        return System::getProperty;
+    }
 }

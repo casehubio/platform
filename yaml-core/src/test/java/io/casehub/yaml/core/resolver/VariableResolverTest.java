@@ -247,4 +247,65 @@ class VariableResolverTest {
         assertThat(scoped.resolveString("${step.result}", "test")).isEqualTo("ok");
         assertThat(scoped.resolveString("${var.x}", "test")).isEqualTo("1");
     }
+
+    // --- Default values ---
+
+    @Test
+    void default_value_used_when_variable_missing() {
+        var resolver = new VariableResolver(
+                Map.of("env", mapSource(Map.of())), Set.of());
+        assertThat(resolver.resolveString("${env.MISSING:-fallback}", "test"))
+                .isEqualTo("fallback");
+    }
+
+    @Test
+    void default_value_ignored_when_variable_present() {
+        var resolver = new VariableResolver(
+                Map.of("env", mapSource(Map.of("HOST", "prod.example.com"))), Set.of());
+        assertThat(resolver.resolveString("${env.HOST:-localhost}", "test"))
+                .isEqualTo("prod.example.com");
+    }
+
+    @Test
+    void empty_default_value() {
+        var resolver = new VariableResolver(
+                Map.of("env", mapSource(Map.of())), Set.of());
+        assertThat(resolver.resolveString("${env.MISSING:-}", "test"))
+                .isEqualTo("");
+    }
+
+    @Test
+    void default_value_with_embedded_text() {
+        var resolver = new VariableResolver(
+                Map.of("env", mapSource(Map.of())), Set.of());
+        assertThat(resolver.resolveString("host=${env.DB_HOST:-localhost}:5432", "test"))
+                .isEqualTo("host=localhost:5432");
+    }
+
+    @Test
+    void no_default_still_throws() {
+        var resolver = new VariableResolver(
+                Map.of("env", mapSource(Map.of())), Set.of());
+        assertThatThrownBy(() -> resolver.resolveString("${env.MISSING}", "test"))
+                .isInstanceOf(UnresolvedVariableException.class)
+                .hasMessageContaining("MISSING");
+    }
+
+    // --- Built-in sources ---
+
+    @Test
+    void env_source_resolves_real_env_var() {
+        var resolver = new VariableResolver(
+                Map.of("env", VariableSource.env()), Set.of());
+        String path = resolver.resolveString("${env.PATH}", "test");
+        assertThat(path).isNotEmpty();
+    }
+
+    @Test
+    void systemProperty_source_resolves() {
+        var resolver = new VariableResolver(
+                Map.of("sys", VariableSource.systemProperty()), Set.of());
+        assertThat(resolver.resolveString("${sys.java.version}", "test"))
+                .isNotEmpty();
+    }
 }

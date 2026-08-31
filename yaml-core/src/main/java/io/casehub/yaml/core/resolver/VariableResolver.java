@@ -116,7 +116,18 @@ public class VariableResolver {
         }
 
         String prefix = key.substring(0, dot);
-        String name = key.substring(dot + 1);
+        String nameWithDefault = key.substring(dot + 1);
+
+        String name;
+        String defaultValue;
+        int defaultSep = nameWithDefault.indexOf(":-");
+        if (defaultSep >= 0) {
+            name = nameWithDefault.substring(0, defaultSep);
+            defaultValue = nameWithDefault.substring(defaultSep + 2);
+        } else {
+            name = nameWithDefault;
+            defaultValue = null;
+        }
 
         if ("each".equals(prefix)) {
             return resolveEach(name, key, elementContext);
@@ -126,6 +137,7 @@ public class VariableResolver {
         if (source != null) {
             String value = source.resolve(name);
             if (value != null) return value;
+            if (defaultValue != null) return defaultValue;
             throw new UnresolvedVariableException(key, elementContext,
                     "Variable '" + name + "' not found in prefix '" + prefix + "'.");
         }

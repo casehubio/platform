@@ -129,6 +129,28 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `Age
 
 **PdfOptions:** `title`, `author`, `createdAt`, `reportType`, `conformance` (default `PdfAConformance.PDFA_2_B`). Use `PdfOptions.defaults()` for basic conversion.
 
+### Document signing
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-signing` | EU DSS 6.2-backed PAdES PDF signing + CAdES detached signatures. `DssDocumentSigningService` implements `DocumentSigningService`. `DssDocumentVerificationService` implements `DocumentVerificationService`. Classpath-activated — when absent, `NoOp*` defaults return `Optional.empty()` / `UNSIGNED` |
+
+**SPIs** (in `platform-api`, package `io.casehub.platform.api.signing.document`):
+- `DocumentSigningService.signPdf(byte[], SigningIdentity)` → `Optional<SignedDocument>` — PAdES embedded
+- `DocumentSigningService.signDetached(byte[], SigningIdentity)` → `Optional<DetachedSignature>` — CAdES .p7s
+- `DocumentVerificationService.verifyPdf(byte[])` → `DocumentVerificationResult`
+- `DocumentVerificationService.verifyDetached(byte[], byte[])` → `DocumentVerificationResult`
+
+**Configuration** (prefix `casehub.signing`):
+- `keystore-path` — path to PKCS#12 keystore (signing disabled when absent)
+- `keystore-password` — keystore password (resolved via `CredentialResolver` in production)
+- `keystore-type` — default `PKCS12`
+- `key-alias` — alias for the signing key (default: first alias in keystore)
+- `pades-profile` — `B_B`, `B_T` (default), `B_LT`, `B_LTA`
+- `tsa-url` — RFC 3161 TSA endpoint (required for B_T+; absent + B_T = fail)
+
+**Profile enforcement:** B_T+ configured without TSA throws `IllegalStateException` — no silent downgrade to B_B.
+
 ---
 
 ## Key Abstractions and SPIs

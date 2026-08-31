@@ -275,6 +275,21 @@ Both implementations share the same resolution algorithm:
 
 The `condition` field is `CompiledExpression<Map<String, Object>, Boolean>` -- any expression engine (JQ, MVEL, JEXL) can compile the condition. JQ expressions work through `MapAdaptedJQExpression` which auto-converts `Map` to `JsonNode`.
 
+### Document Signing Architecture
+
+Two separate signing concerns coexist:
+- **Ledger signing** (`SigningProvider` in `platform-api/.../signing/`) — raw sign/verify for agent attestation (Ed25519 keypairs). Used by casehub-ledger.
+- **Document sealing** (`DocumentSigningService` in `platform-api/.../signing/document/`) — PAdES/CAdES for compliance reports. Used by casehub-qhorus compliance-report.
+
+These are deliberately separate SPIs — document signing requires X.509 certificate chains and timestamping, which raw `SigningProvider` cannot provide.
+
+`platform-signing/` implements document sealing via EU DSS 6.2:
+- `KeyStoreManager` wraps `Pkcs12SignatureToken` — loads PKCS#12 at construction, exposes `DSSPrivateKeyEntry` via `resolveKey(tenancyId)` with tenant-alias fallback to default
+- `DssDocumentSigningService` uses the 3-step DSS flow: `getDataToSign()` → `token.sign()` → `signDocument()`. Separate `PAdESService` and `CAdESService` instances per call (stateless). `CommonCertificateVerifier` for offline validation
+- `DssDocumentVerificationService` uses `SignedDocumentValidator.fromDocument()` for auto-format detection
+
+**PDFBox version constraint:** `platform-pdf` uses PDFBox 3.0.3 (via OpenHTMLtoPDF 1.1.37). `platform-signing` uses PDFBox 3.0.4 (via DSS 6.2). Both 3.0.x — binary compatible. Maven resolves to 3.0.4. If either dependency bumps PDFBox major version, alignment must be verified.
+
 ---
 
 ## Dependencies

@@ -377,4 +377,146 @@ class ForEachExpanderTest {
                 .hasMessageContaining("bad")
                 .hasCauseInstanceOf(RuntimeException.class);
     }
+
+// --- Reference rewriting ---
+
+    record RefElement(String id, Map<String, Object> spec,
+                      Object forEach, String when,
+                      List<ForEachAdapter.Reference> refs) {}
+
+    static class RefAdapter implements ForEachAdapter<RefElement> {
+        @Override
+        public RefElement stamp(RefElement template, String stampedId,
+                                VariableResolver scopedResolver) {
+            return new RefElement(stampedId,
+                                  scopedResolver.resolveMap(template.spec(), stampedId),
+                                  null, null, template.refs());
+        }
+
+        @Override
+        public Object getForEach(RefElement element) {return element.forEach();}
+
+        @Override
+        public String getId(RefElement element) {return element.id();}
+
+        @Override
+        public String getWhen(RefElement element) {return element.when();}
+
+        @Override
+        public List<ForEachAdapter.Reference> getReferences(RefElement element) {return element.refs();}
+
+        @Override
+        public RefElement withReferences(RefElement element, List<ForEachAdapter.Reference> rewritten) {
+            return new RefElement(element.id(), element.spec(), element.forEach(),
+                                  element.when(), rewritten);
+        }
+    }
+
+    @Test
+    void reference_rewriting_static_unchanged() {
+        var refAdapter = new RefAdapter();
+        var elements   = new LinkedHashMap<String, RefElement>();
+        elements.put("static-node", new RefElement("static-node",
+                                                   Map.of(), null, null, List.of()));
+        elements.put("consumer", new RefElement("consumer",
+                                                Map.of(), null, null,
+                                                List.of(new ForEachAdapter.Reference("static-node", false))));
+
+        var result = ForEachExpander.expand(elements, Map.of(),
+                                            resolver, refAdapter, 1000);
+
+        RefElement consumer = result.elements().get("consumer");
+        assertThat(consumer.refs()).containsExactly(
+                new ForEachAdapter.Reference("static-node", false));
+    }
+
+    @Test
+    void reference_rewriting_same_group_paired() {
+        var refAdapter = new RefAdapter();
+        var groups = Map.of("regional",
+                            new IterationGroup("region", List.of("us", "eu")));
+        var elements = new LinkedHashMap<String, RefElement>();
+        elements.put("source", new RefElement("source",
+                                              Map.of(), "regional", null, List.of()));
+        elements.put("sink", new RefElement("sink",
+                                            Map.of(), "regional", null,
+                                            List.of(new ForEachAdapter.Reference("source", false))));
+
+        var result = ForEachExpander.expand(elements, groups,
+                                            resolver, refAdapter, 1000);
+
+        RefElement sinkUs = result.elements().get("sink.us");
+        assertThat(sinkUs.refs()).containsExactly(
+                new ForEachAdapter.Reference("source.us", false));
+        RefElement sinkEu = result.elements().get("sink.eu");
+        assertThat(sinkEu.refs()).containsExactly(
+                new ForEachAdapter.Reference("source.eu", false));
+    }
+
+    @Test
+    void reference_rewriting_cross_group_optional_skipped() {
+        var refAdapter = new RefAdapter();
+        var groups = Map.of(
+                "g1", new IterationGroup("a", List.of("x")),
+                "g2", new IterationGroup("b", List.of("y")));
+        var elements = new LinkedHashMap<String, RefElement>();
+        elements.put("src", new RefElement("src",
+                                           Map.of(), "g1", null, List.of()));
+        elements.put("sink", new RefElement("sink",
+                                            Map.of(), "g2", null,
+                                            List.of(new ForEachAdapter.Reference("src", true))));
+
+        var result = ForEachExpander.expand(elements, groups,
+                                            resolver, refAdapter, 1000);
+
+        RefElement sinkY = result.elements().get("sink.y");
+        assertThat(sinkY.refs()).isEmpty();
+    }
+
+    @Test
+    void reference_rewriting_cross_group_required_throws() {
+        var refAdapter = new RefAdapter();
+        var groups = Map.of(
+                "g1", new IterationGroup("a", List.of("x")),
+                "g2", new IterationGroup("b", List.of("y")));
+        var elements = new LinkedHashMap<String, RefElement>();
+        elements.put("src", new RefElement("src",
+                                           Map.of(), "g1", null, List.of()));
+        elements.put("sink", new RefElement("sink",
+                                            Map.of(), "g2", null,
+                                            List.of(new ForEachAdapter.Reference("src", false))));
+
+        assertThatThrownBy(() -> ForEachExpander.expand(elements, groups,
+                                                        resolver, refAdapter, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("different group");
+    }
+
+    @Test
+    void reference_to_excluded_required_throws() {
+        var refAdapter = new RefAdapter();
+        var elements   = new LinkedHashMap<String, RefElement>();
+        elements.put("excluded", new RefElement("excluded",
+                                                Map.of(), null, "false", List.of()));
+        elements.put("consumer", new RefElement("consumer",
+                                                Map.of(), null, null,
+                                                List.of(new ForEachAdapter.Reference("excluded", false))));
+
+        assertThatThrownBy(() -> ForEachExpander.expand(elements, Map.of(),
+                                                        resolver, refAdapter, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("excluded");
+    }
+
+    @Test
+    void no_references_default_noop() {
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("k", "v"), null, null));
+
+        var result = ForEachExpander.expand(elements, Map.of(),
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).containsKey("node");
+    }
 }

@@ -128,6 +128,44 @@ public final class ForEachExpander {
             }
         }
 
+        for (Map.Entry<String, E> refEntry : new ArrayList<>(allElements.entrySet())) {
+            String stampedId = refEntry.getKey();
+            E element = refEntry.getValue();
+            List<ForEachAdapter.Reference> refs = adapter.getReferences(element);
+            if (refs.isEmpty()) continue;
+
+            String origId = originalId(stampedId);
+            String sourceGroup = elementToGroup.get(origId);
+            String sourceValue = extractValue(stampedId);
+
+            List<ForEachAdapter.Reference> rewritten = new ArrayList<>();
+            for (ForEachAdapter.Reference ref : refs) {
+                String targetGroup = elementToGroup.get(ref.targetId());
+
+                if (targetGroup == null) {
+                    rewritten.add(ref);
+                } else if (targetGroup.equals(sourceGroup) && sourceValue != null) {
+                    rewritten.add(new ForEachAdapter.Reference(
+                            ref.targetId() + "." + sourceValue, ref.optional()));
+                } else if (ref.optional()) {
+                    // skip optional cross-group ref
+                } else {
+                    throw new IllegalStateException("Element '" + stampedId
+                            + "' references forEach element '" + ref.targetId()
+                            + "' in a different group.");
+                }
+            }
+
+            for (ForEachAdapter.Reference ref : rewritten) {
+                if (excludedIds.contains(ref.targetId()) && !ref.optional()) {
+                    throw new IllegalStateException("Element '" + stampedId
+                            + "' references excluded element '" + ref.targetId() + "'.");
+                }
+            }
+
+            allElements.put(stampedId, adapter.withReferences(element, rewritten));
+        }
+
         return new ExpansionResult<>(allElements, Set.copyOf(excludedIds));
     }
 
@@ -166,4 +204,15 @@ public final class ForEachExpander {
         }
         throw new IllegalArgumentException("Invalid forEach: " + forEach);
     }
+
+    private static String originalId(String stampedId) {
+        int dot = stampedId.lastIndexOf('.');
+        return dot >= 0 ? stampedId.substring(0, dot) : stampedId;
+    }
+
+    private static String extractValue(String stampedId) {
+        int dot = stampedId.lastIndexOf('.');
+        return dot >= 0 ? stampedId.substring(dot + 1) : null;
+    }
+
 }

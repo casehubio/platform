@@ -11,4 +11,11 @@ public interface ForEachAdapter<E> {
     String getId(E element);
 
     String getWhen(E element);
+
+    default java.util.List<Reference> getReferences(E element)               {return java.util.List.of();}
+
+    default E withReferences(E element, java.util.List<Reference> rewritten) {return element;}
+
+    record Reference(String targetId, boolean optional) {}
+
 }

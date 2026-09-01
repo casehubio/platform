@@ -270,4 +270,86 @@ class ModuleExpanderTest {
         Map<String, Object> unknown = result.section("nonexistent");
         assertThat(unknown).isEmpty();
     }
+
+    // --- Chaining ---
+
+    @Test
+    void chaining_later_import_uses_earlier_output() {
+        var dbParam = new YamlModuleParameter(ParameterType.STRING, true, null,
+                null, null, null, null, null);
+        var dbOutput = new YamlModuleOutput(ParameterType.STRING,
+                "jdbc:${var.engine}://db:5432/app");
+        var dbModule = new YamlModule("database", Map.of("engine", dbParam),
+                Map.of("url", dbOutput), Map.of("nodes", Map.of("db", Map.of())));
+
+        var cacheParam = new YamlModuleParameter(ParameterType.STRING, true, null,
+                null, null, null, null, null);
+        var cacheModule = new YamlModule("cache", Map.of("backend", cacheParam),
+                Map.of(), Map.of("nodes", Map.of("c", Map.of())));
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("database", "app-db", null,
+                                Map.of("engine", "postgres")),
+                        new YamlImport("cache", "app-cache", null,
+                                Map.of("backend", "${module.app-db.url}"))),
+                Map.of("database", dbModule, "cache", cacheModule),
+                Map.of());
+
+        assertThat(result.moduleScopes().get("app-cache"))
+                .containsEntry("backend", "jdbc:postgres://db:5432/app");
+    }
+
+    @Test
+    void forward_reference_throws_actionable_error() {
+        var module = new YamlModule("m", Map.of(),
+                Map.of("out", new YamlModuleOutput(ParameterType.STRING, "val")),
+                Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("m", "b", null,
+                                Map.of("x", "${module.a.out}")),
+                        new YamlImport("m", "a", null, Map.of())),
+                Map.of("m", module), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("b")
+                .hasMessageContaining("a");
+    }
+
+    @Test
+    void chaining_type_validated_after_resolution() {
+        var dbParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                null, null, null, null, null);
+        var dbOutput = new YamlModuleOutput(ParameterType.INTEGER, "${var.port}");
+        var dbModule = new YamlModule("db", Map.of("port", dbParam),
+                Map.of("port", dbOutput), Map.of());
+
+        var appParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                null, null, null, null, null);
+        var appModule = new YamlModule("app", Map.of("dbPort", appParam),
+                Map.of(), Map.of());
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("db", "mydb", null, Map.of("port", "5432")),
+                        new YamlImport("app", "myapp", null,
+                                Map.of("dbPort", "${module.mydb.port}"))),
+                Map.of("db", dbModule, "app", appModule),
+                Map.of());
+
+        assertThat(result.moduleScopes().get("myapp"))
+                .containsEntry("dbPort", "5432");
+    }
+
+    @Test
+    void conditional_import_outputs_available() {
+        var output = new YamlModuleOutput(ParameterType.STRING, "value");
+        var module = new YamlModule("m", Map.of(),
+                Map.of("out", output), Map.of());
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("m", "gated", "${var.enabled}", Map.of())),
+                Map.of("m", module), Map.of());
+
+        assertThat(result.moduleOutputs().get("gated"))
+                .containsEntry("out", "value");
+    }
 }

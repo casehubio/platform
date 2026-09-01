@@ -45,7 +45,9 @@ public final class ModuleExpander {
 
         for (YamlImport imp : imports) {
             YamlModule module = availableModules.get(imp.module());
-            Map<String, String> paramScope = resolveParameters(module, imp);
+            Map<String, String> resolvedParams = resolveModuleRefsInParams(
+                    imp.parameters(), allOutputs, imp.as());
+            Map<String, String> paramScope = resolveParameters(module, imp, resolvedParams);
             moduleScopes.put(imp.as(), paramScope);
             importConditions.put(imp.as(), imp.when());
 
@@ -117,12 +119,13 @@ public final class ModuleExpander {
     }
 
     private static Map<String, String> resolveParameters(YamlModule module,
-                                                          YamlImport imp) {
+                                                          YamlImport imp,
+                                                          Map<String, String> resolvedParams) {
         Map<String, String> resolved = new LinkedHashMap<>();
         for (Map.Entry<String, YamlModuleParameter> entry : module.parameters().entrySet()) {
             String name = entry.getKey();
             YamlModuleParameter param = entry.getValue();
-            String value = imp.parameters().get(name);
+            String value = resolvedParams.get(name);
             if (value == null && param.defaultValue() != null) {
                 value = param.defaultValue();
             }
@@ -131,9 +134,62 @@ public final class ModuleExpander {
             }
         }
 
-        ParameterValidator.validateOrThrow(module.parameters(), imp.parameters());
+        ParameterValidator.validateOrThrow(module.parameters(), resolvedParams);
 
         return Map.copyOf(resolved);
+    }
+
+    private static Map<String, String> resolveModuleRefsInParams(
+            Map<String, String> rawParams,
+            Map<String, Map<String, String>> allOutputs,
+            String currentAlias) {
+        if (rawParams.values().stream().noneMatch(v -> v.contains("${module."))) {
+            return rawParams;
+        }
+        VariableSource moduleSource = buildModuleSource(allOutputs);
+        VariableResolver resolver = new VariableResolver(
+                Map.of("module", moduleSource), Set.of());
+        Map<String, String> resolved = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : rawParams.entrySet()) {
+            String value = entry.getValue();
+            if (value.contains("${module.")) {
+                checkForwardRefs(value, allOutputs.keySet(), currentAlias);
+                value = resolver.resolveString(value, currentAlias + "." + entry.getKey());
+            }
+            resolved.put(entry.getKey(), value);
+        }
+        return resolved;
+    }
+
+    private static VariableSource buildModuleSource(
+            Map<String, Map<String, String>> allOutputs) {
+        return name -> {
+            int dot = name.indexOf('.');
+            if (dot < 0) return null;
+            String alias = name.substring(0, dot);
+            String outputName = name.substring(dot + 1);
+            Map<String, String> outputs = allOutputs.get(alias);
+            return outputs != null ? outputs.get(outputName) : null;
+        };
+    }
+
+    private static void checkForwardRefs(String value, Set<String> processedAliases,
+                                          String currentAlias) {
+        Matcher matcher = VAR_REF.matcher(value);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            if (!key.startsWith("module.")) continue;
+            String rest = key.substring("module.".length());
+            int dot = rest.indexOf('.');
+            if (dot < 0) continue;
+            String refAlias = rest.substring(0, dot);
+            if (!processedAliases.contains(refAlias)) {
+                throw new IllegalArgumentException(
+                        "Import '" + currentAlias + "' references ${" + key
+                        + "}, but '" + refAlias + "' has not been imported yet. "
+                        + "Move the '" + refAlias + "' import before '" + currentAlias + "'.");
+            }
+        }
     }
 
     private static void validateOutputNames(YamlModule module, List<String> errors) {

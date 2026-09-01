@@ -372,4 +372,57 @@ class VariableResolverTest {
         child.resolveString("${match.x}", "test");
         assertThat(captured.get()).isEqualTo("match");
     }
+
+// --- sourceFor ---
+
+    @Test
+    void sourceFor_returns_registered_source() {
+        VariableSource source   = name -> "val";
+        var            resolver = new VariableResolver(Map.of("var", source), Set.of());
+        assertThat(resolver.sourceFor("var")).isSameAs(source);
+    }
+
+    @Test
+    void sourceFor_returns_null_for_unknown() {
+        var resolver = new VariableResolver(Map.of(), Set.of());
+        assertThat(resolver.sourceFor("var")).isNull();
+    }
+
+// --- withChainedScope ---
+
+    @Test
+    void withChainedScope_layers_ahead_of_existing() {
+        VariableSource base     = name -> "region".equals(name) ? "us-east" : null;
+        var            resolver = new VariableResolver(Map.of("var", base), Set.of());
+        VariableSource module   = name -> "region".equals(name) ? "eu-west" : null;
+        var            scoped   = resolver.withChainedScope("var", module);
+        assertThat(scoped.resolveString("${var.region}", "test")).isEqualTo("eu-west");
+    }
+
+    @Test
+    void withChainedScope_falls_through_to_existing() {
+        VariableSource base     = name -> "batch".equals(name) ? "500" : null;
+        var            resolver = new VariableResolver(Map.of("var", base), Set.of());
+        VariableSource module   = name -> null;
+        var            scoped   = resolver.withChainedScope("var", module);
+        assertThat(scoped.resolveString("${var.batch}", "test")).isEqualTo("500");
+    }
+
+    @Test
+    void withChainedScope_no_existing_registers_directly() {
+        var            resolver = new VariableResolver(Map.of(), Set.of());
+        VariableSource module   = name -> "region".equals(name) ? "us-east" : null;
+        var            scoped   = resolver.withChainedScope("var", module);
+        assertThat(scoped.resolveString("${var.region}", "test")).isEqualTo("us-east");
+    }
+
+    @Test
+    void withChainedScope_propagates_handler() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<String>();
+        var resolver = new VariableResolver(Map.of(), Set.of("match"))
+                               .withDeferredPrefixHandler((p, k, c) -> captured.set(p));
+        var scoped = resolver.withChainedScope("var", name -> "val");
+        scoped.resolveString("${match.x}", "test");
+        assertThat(captured.get()).isEqualTo("match");
+    }
 }

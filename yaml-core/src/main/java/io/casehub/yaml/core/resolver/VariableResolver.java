@@ -57,6 +57,18 @@ public class VariableResolver {
         return new VariableResolver(prefixSources, deferredPrefixes, eachContext, eachRowContext, handler);
     }
 
+    public VariableSource sourceFor(String prefix) {
+        return prefixSources.get(prefix);
+    }
+
+    public VariableResolver withChainedScope(String prefix, VariableSource source) {
+        VariableSource existing = prefixSources.get(prefix);
+        VariableSource chained = existing != null
+                                 ? VariableSource.chain(source, existing) : source;
+        return withScope(prefix, chained);
+    }
+
+
     public Object resolve(Object value) {
         if (value instanceof String s) {
             return s.contains("${") ? resolveString(s, "") : s;

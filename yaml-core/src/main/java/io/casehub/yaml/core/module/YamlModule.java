@@ -5,10 +5,12 @@ import java.util.Map;
 public record YamlModule(
         String name,
         Map<String, YamlModuleParameter> parameters,
+        Map<String, YamlModuleOutput> outputs,
         Map<String, Map<String, Object>> sections) {
 
     public YamlModule {
-        if (parameters == null) { parameters = Map.of(); }
-        if (sections == null) { sections = Map.of(); }
+        if (parameters == null) {parameters = Map.of();}
+        if (outputs == null) {outputs = Map.of();}
+        if (sections == null) {sections = Map.of();}
     }
 }

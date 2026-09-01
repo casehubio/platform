@@ -9,18 +9,21 @@ public record YamlModuleFile(
         List<YamlImport> imports) {
 
     public YamlModuleFile {
-        if (sections == null) { sections = Map.of(); }
-        if (imports == null) { imports = List.of(); }
+        if (sections == null) {sections = Map.of();}
+        if (imports == null) {imports = List.of();}
     }
 
     public YamlModule toModule() {
-        return new YamlModule(module.name(), module.parameters(), sections);
+        return new YamlModule(module.name(), module.parameters(),
+                              module.outputs(), sections);
     }
 
     public record YamlModuleHeader(String name,
-            Map<String, YamlModuleParameter> parameters) {
+                                   Map<String, YamlModuleParameter> parameters,
+                                   Map<String, YamlModuleOutput> outputs) {
         public YamlModuleHeader {
-            if (parameters == null) { parameters = Map.of(); }
+            if (parameters == null) {parameters = Map.of();}
+            if (outputs == null) {outputs = Map.of();}
         }
     }
 }

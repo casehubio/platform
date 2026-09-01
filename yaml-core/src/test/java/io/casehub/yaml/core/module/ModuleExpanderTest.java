@@ -12,7 +12,7 @@ class ModuleExpanderTest {
 
     @Test
     void alias_prefixes_section_keys() {
-        var module = new YamlModule("monitor", Map.of(),
+        var module = new YamlModule("monitor", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("cpu-check", Map.of("type", "sensor"))));
         var imp = new YamlImport("monitor", "infra", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
@@ -24,7 +24,7 @@ class ModuleExpanderTest {
     void parameter_resolution_builds_scope() {
         var param = new YamlModuleParameter(ParameterType.STRING, true, null,
                 null, null, null, null, null);
-        var module = new YamlModule("monitor", Map.of("threshold", param),
+        var module = new YamlModule("monitor", Map.of("threshold", param), Map.of(),
                 Map.of("nodes", Map.of("check", Map.of("val", "x"))));
         var imp = new YamlImport("monitor", "mon", null, Map.of("threshold", "90"));
         var result = ModuleExpander.expand(List.of(imp),
@@ -37,7 +37,7 @@ class ModuleExpanderTest {
     void default_parameter_used_when_not_provided() {
         var param = new YamlModuleParameter(ParameterType.STRING, false, "us-east",
                 null, null, null, null, null);
-        var module = new YamlModule("m", Map.of("region", param),
+        var module = new YamlModule("m", Map.of("region", param), Map.of(),
                 Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
@@ -48,9 +48,9 @@ class ModuleExpanderTest {
 
     @Test
     void multiple_imports_merge_sections() {
-        var m1 = new YamlModule("a", Map.of(),
+        var m1 = new YamlModule("a", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("n1", Map.of("t", "1"))));
-        var m2 = new YamlModule("b", Map.of(),
+        var m2 = new YamlModule("b", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("n2", Map.of("t", "2"))));
         var result = ModuleExpander.expand(
                 List.of(new YamlImport("a", "x", null, Map.of()),
@@ -63,7 +63,7 @@ class ModuleExpanderTest {
 
     @Test
     void existing_sections_preserved() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("new", Map.of())));
         var existing = Map.<String, Map<String, Object>>of(
                 "nodes", Map.of("existing", Map.of("type", "fixed")));
@@ -77,7 +77,7 @@ class ModuleExpanderTest {
 
     @Test
     void conditional_import_returns_importConditions() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", "${var.enabled}", Map.of());
         var result = ModuleExpander.expand(List.of(imp),
@@ -87,7 +87,7 @@ class ModuleExpanderTest {
 
     @Test
     void unconditional_import_null_in_importConditions() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
@@ -106,7 +106,7 @@ class ModuleExpanderTest {
 
     @Test
     void missing_alias_throws() {
-        var module = new YamlModule("m", Map.of(), Map.of());
+        var module = new YamlModule("m", Map.of(), Map.of(), Map.of());
         var imp = new YamlImport("m", null, null, Map.of());
         assertThatThrownBy(() -> ModuleExpander.expand(
                 List.of(imp), Map.of("m", module), Map.of()))
@@ -116,7 +116,7 @@ class ModuleExpanderTest {
 
     @Test
     void blank_alias_throws() {
-        var module = new YamlModule("m", Map.of(), Map.of());
+        var module = new YamlModule("m", Map.of(), Map.of(), Map.of());
         var imp = new YamlImport("m", "  ", null, Map.of());
         assertThatThrownBy(() -> ModuleExpander.expand(
                 List.of(imp), Map.of("m", module), Map.of()))
@@ -126,7 +126,7 @@ class ModuleExpanderTest {
 
     @Test
     void dot_in_alias_throws() {
-        var module = new YamlModule("m", Map.of(), Map.of());
+        var module = new YamlModule("m", Map.of(), Map.of(), Map.of());
         var imp = new YamlImport("m", "infra.monitor", null, Map.of());
         assertThatThrownBy(() -> ModuleExpander.expand(
                 List.of(imp), Map.of("m", module), Map.of()))
@@ -136,7 +136,7 @@ class ModuleExpanderTest {
 
     @Test
     void duplicate_alias_throws() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                 Map.of("nodes", Map.of("n", Map.of())));
         assertThatThrownBy(() -> ModuleExpander.expand(
                 List.of(new YamlImport("m", "a", null, Map.of()),
@@ -152,7 +152,7 @@ class ModuleExpanderTest {
         var module = new YamlModule("m",
                 Map.of("region", new YamlModuleParameter(ParameterType.STRING,
                         false, null, null, null, null, null, null)),
-                Map.of("nodes", Map.of("n", Map.of())));
+                Map.of(), Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of("reigon", "us-east"));
         assertThatThrownBy(() -> ModuleExpander.expand(
                 List.of(imp), Map.of("m", module), Map.of()))

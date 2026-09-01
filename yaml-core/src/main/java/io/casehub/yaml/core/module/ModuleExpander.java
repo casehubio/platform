@@ -1,13 +1,20 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.core.resolver.VariableResolver;
+import io.casehub.yaml.core.resolver.VariableSource;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class ModuleExpander {
+
+    private static final Pattern VAR_REF = Pattern.compile("\\$\\{([^}]+)}");
 
     private ModuleExpander() {}
 
@@ -30,6 +37,7 @@ public final class ModuleExpander {
         Map<String, Map<String, Object>> mergedSections = new LinkedHashMap<>();
         Map<String, Map<String, String>> moduleScopes = new LinkedHashMap<>();
         Map<String, String> importConditions = new LinkedHashMap<>();
+        Map<String, Map<String, String>> allOutputs = new LinkedHashMap<>();
 
         for (Map.Entry<String, Map<String, Object>> entry : existingSections.entrySet()) {
             mergedSections.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
@@ -40,6 +48,9 @@ public final class ModuleExpander {
             Map<String, String> paramScope = resolveParameters(module, imp);
             moduleScopes.put(imp.as(), paramScope);
             importConditions.put(imp.as(), imp.when());
+
+            Map<String, String> resolvedOutputs = resolveOutputs(module, paramScope);
+            allOutputs.put(imp.as(), resolvedOutputs);
 
             for (Map.Entry<String, Map<String, Object>> sectionEntry : module.sections().entrySet()) {
                 String sectionName = sectionEntry.getKey();
@@ -68,7 +79,8 @@ public final class ModuleExpander {
         return new ExpandedModule(
                 Map.copyOf(mergedSections),
                 Map.copyOf(moduleScopes),
-                java.util.Collections.unmodifiableMap(importConditions));
+                java.util.Collections.unmodifiableMap(importConditions),
+                Map.copyOf(allOutputs));
     }
 
     private static void validateImports(List<YamlImport> imports,
@@ -79,6 +91,8 @@ public final class ModuleExpander {
         for (YamlImport imp : imports) {
             if (!availableModules.containsKey(imp.module())) {
                 errors.add("Import references unknown module '" + imp.module() + "'.");
+            } else {
+                validateOutputNames(availableModules.get(imp.module()), errors);
             }
 
             if (imp.as() == null || imp.as().isBlank()) {
@@ -120,5 +134,68 @@ public final class ModuleExpander {
         ParameterValidator.validateOrThrow(module.parameters(), imp.parameters());
 
         return Map.copyOf(resolved);
+    }
+
+    private static void validateOutputNames(YamlModule module, List<String> errors) {
+        for (String outputName : module.outputs().keySet()) {
+            if (outputName == null || outputName.isBlank()) {
+                errors.add("Module '" + module.name() + "' has a blank output name.");
+            } else if (outputName.contains(".")) {
+                errors.add("Output '" + outputName + "' in module '" + module.name()
+                        + "' contains '.', which is reserved as the alias/name separator.");
+            } else if (outputName.contains("${")) {
+                errors.add("Output '" + outputName + "' in module '" + module.name()
+                        + "' contains '${', which is reserved for variable references.");
+            }
+        }
+    }
+
+    private static Map<String, String> resolveOutputs(YamlModule module,
+                                                       Map<String, String> paramScope) {
+        if (module.outputs().isEmpty()) {
+            return Map.of();
+        }
+
+        VariableResolver outputResolver = new VariableResolver(
+                Map.of("var", (VariableSource) paramScope::get), Set.of());
+
+        Map<String, String> resolved = new LinkedHashMap<>();
+        for (Map.Entry<String, YamlModuleOutput> entry : module.outputs().entrySet()) {
+            String outputName = entry.getKey();
+            YamlModuleOutput output = entry.getValue();
+
+            validateOutputTemplateScope(output.value(), outputName, module.name());
+
+            String resolvedValue = outputResolver.resolveString(output.value(),
+                    "output." + module.name() + "." + outputName);
+
+            try {
+                output.type().parse(resolvedValue);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Output '" + outputName + "' in module '" + module.name()
+                        + "': resolved value '" + resolvedValue
+                        + "' is not valid " + output.type(), e);
+            }
+
+            resolved.put(outputName, resolvedValue);
+        }
+        return Map.copyOf(resolved);
+    }
+
+    private static void validateOutputTemplateScope(String template, String outputName,
+                                                     String moduleName) {
+        Matcher matcher = VAR_REF.matcher(template);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            int dot = key.indexOf('.');
+            String prefix = dot >= 0 ? key.substring(0, dot) : key;
+            if (!"var".equals(prefix)) {
+                throw new IllegalArgumentException(
+                        "Output '" + outputName + "' in module '" + moduleName
+                        + "': template references '${" + key
+                        + "}' — output templates may only use ${var.*} references.");
+            }
+        }
     }
 }

@@ -176,7 +176,7 @@ class ModuleExpanderTest {
 
     @Test
     void deserializer_converts_during_expansion() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                                     Map.of("nodes", Map.of("check", Map.of("type", "sensor",
                                                                            "spec", Map.of("uri", "s3://data"),
                                                                            "dependsOn", List.of()))));
@@ -203,7 +203,7 @@ class ModuleExpanderTest {
 
     @Test
     void deserializer_null_passes_raw() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                                     Map.of("nodes", Map.of("n", Map.of("type", "x"))));
         var imp = new YamlImport("m", "a", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
@@ -213,7 +213,7 @@ class ModuleExpanderTest {
 
     @Test
     void rewriter_receives_typed_objects() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                                     Map.of("nodes", Map.of("alerter", Map.of("type", "alert",
                                                                              "spec", Map.of(), "dependsOn", List.of("monitor")),
                                                            "monitor", Map.of("type", "sensor",
@@ -247,7 +247,7 @@ class ModuleExpanderTest {
 
     @Test
     void section_typed_accessor() {
-        var module = new YamlModule("m", Map.of(),
+        var module = new YamlModule("m", Map.of(), Map.of(),
                                     Map.of("nodes", Map.of("n", Map.of("type", "x",
                                                                        "spec", Map.of(), "dependsOn", List.of()))));
         var imp = new YamlImport("m", "a", null, Map.of());

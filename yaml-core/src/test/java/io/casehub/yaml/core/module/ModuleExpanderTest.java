@@ -23,7 +23,7 @@ class ModuleExpanderTest {
     @Test
     void parameter_resolution_builds_scope() {
         var param = new YamlModuleParameter(ParameterType.STRING, true, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var module = new YamlModule("monitor", Map.of("threshold", param), Map.of(),
                 Map.of("nodes", Map.of("check", Map.of("val", "x"))));
         var imp = new YamlImport("monitor", "mon", null, Map.of("threshold", "90"));
@@ -36,7 +36,7 @@ class ModuleExpanderTest {
     @Test
     void default_parameter_used_when_not_provided() {
         var param = new YamlModuleParameter(ParameterType.STRING, false, "us-east",
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var module = new YamlModule("m", Map.of("region", param), Map.of(),
                 Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of());
@@ -151,7 +151,7 @@ class ModuleExpanderTest {
     void unknown_parameter_throws() {
         var module = new YamlModule("m",
                 Map.of("region", new YamlModuleParameter(ParameterType.STRING,
-                        false, null, null, null, null, null, null)),
+                        false, null, null, null, null, null, null, List.of(), null)),
                 Map.of(), Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of("reigon", "us-east"));
         assertThatThrownBy(() -> ModuleExpander.expand(
@@ -277,7 +277,7 @@ class ModuleExpanderTest {
         var output = new YamlModuleOutput(ParameterType.STRING, "val");
         var module = new YamlModule("m", Map.of(), Map.of("real", output), Map.of());
         var paramDecl = new YamlModuleParameter(ParameterType.STRING, true, null,
-                                                null, null, null, null, null);
+                                                null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("c", Map.of("x", paramDecl), Map.of(), Map.of());
 
         assertThatThrownBy(() -> ModuleExpander.expand(
@@ -301,13 +301,13 @@ class ModuleExpanderTest {
     void type_incompatible_whole_value_throws() {
         var boolOutput = new YamlModuleOutput(ParameterType.BOOLEAN, "${var.flag}");
         var boolParam = new YamlModuleParameter(ParameterType.BOOLEAN, true, null,
-                                                null, null, null, null, null);
+                                                null, null, null, null, null, List.of(), null);
         var producer = new YamlModule("producer",
                                       Map.of("flag", boolParam),
                                       Map.of("enabled", boolOutput), Map.of());
 
         var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("count", intParam), Map.of(), Map.of());
 
@@ -333,13 +333,13 @@ class ModuleExpanderTest {
     void type_compatible_widening_passes() {
         var intOutput = new YamlModuleOutput(ParameterType.INTEGER, "${var.port}");
         var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var producer = new YamlModule("producer",
                                       Map.of("port", intParam),
                                       Map.of("port", intOutput), Map.of());
 
         var numParam = new YamlModuleParameter(ParameterType.NUMBER, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("factor", numParam), Map.of(), Map.of());
 
@@ -361,7 +361,7 @@ class ModuleExpanderTest {
                                       Map.of("host", strOutput), Map.of());
 
         var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("port", intParam), Map.of(), Map.of());
 
@@ -389,7 +389,7 @@ class ModuleExpanderTest {
                                       Map.of("host", strOutput), Map.of());
 
         var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("url", strParam), Map.of(), Map.of());
 
@@ -410,9 +410,9 @@ class ModuleExpanderTest {
                                       Map.of("flag", boolOutput), Map.of());
 
         var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("count", intParam, "name", strParam), Map.of(), Map.of());
 
@@ -436,13 +436,13 @@ class ModuleExpanderTest {
     void list_to_string_rejected() {
         var listOutput = new YamlModuleOutput(ParameterType.LIST, "${var.items}");
         var listParam = new YamlModuleParameter(ParameterType.LIST, true, null,
-                                                null, null, null, null, null);
+                                                null, null, null, null, null, List.of(), null);
         var producer = new YamlModule("producer",
                                       Map.of("items", listParam),
                                       Map.of("items", listOutput), Map.of());
 
         var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
-                                               null, null, null, null, null);
+                                               null, null, null, null, null, List.of(), null);
         var consumer = new YamlModule("consumer",
                                       Map.of("label", strParam), Map.of(), Map.of());
 
@@ -467,14 +467,14 @@ class ModuleExpanderTest {
     @Test
     void chaining_later_import_uses_earlier_output() {
         var dbParam = new YamlModuleParameter(ParameterType.STRING, true, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var dbOutput = new YamlModuleOutput(ParameterType.STRING,
                 "jdbc:${var.engine}://db:5432/app");
         var dbModule = new YamlModule("database", Map.of("engine", dbParam),
                 Map.of("url", dbOutput), Map.of("nodes", Map.of("db", Map.of())));
 
         var cacheParam = new YamlModuleParameter(ParameterType.STRING, true, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var cacheModule = new YamlModule("cache", Map.of("backend", cacheParam),
                 Map.of(), Map.of("nodes", Map.of("c", Map.of())));
 
@@ -516,13 +516,13 @@ class ModuleExpanderTest {
     @Test
     void chaining_type_validated_after_resolution() {
         var dbParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var dbOutput = new YamlModuleOutput(ParameterType.INTEGER, "${var.port}");
         var dbModule = new YamlModule("db", Map.of("port", dbParam),
                 Map.of("port", dbOutput), Map.of());
 
         var appParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), null);
         var appModule = new YamlModule("app", Map.of("dbPort", appParam),
                 Map.of(), Map.of());
 

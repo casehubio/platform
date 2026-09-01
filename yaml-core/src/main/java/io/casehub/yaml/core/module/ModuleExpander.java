@@ -254,11 +254,12 @@ public final class ModuleExpander {
                     if (!processedAliases.contains(refAlias)) {
                         violations.add(new ParameterViolation(paramName,
                                                               "module-ref-forward",
+
                                                               "Import '" + imp.as() + "' references ${" + key
                                                               + "}, but '" + refAlias
                                                               + "' has not been imported yet. Move the '"
                                                               + refAlias + "' import before '" + imp.as() + "'.",
-                                                              paramValue));
+                                                              paramValue, null));
                         continue;
                     }
 
@@ -275,7 +276,7 @@ public final class ModuleExpander {
                                                               + "', but module '" + refModule.name()
                                                               + "' does not declare that output. Available: "
                                                               + refModule.outputs().keySet(),
-                                                              paramValue));
+                                                              paramValue, null));
                         continue;
                     }
 
@@ -287,7 +288,7 @@ public final class ModuleExpander {
                                                                   + ") on '" + refAlias
                                                                   + "' is not assignable to parameter '"
                                                                   + paramName + "' (" + paramDecl.type() + ").",
-                                                                  paramValue));
+                                                                  paramValue, null));
                         }
                     }
                 }
@@ -299,7 +300,7 @@ public final class ModuleExpander {
                                                           "Parameter '" + paramName + "' (" + paramDecl.type()
                                                           + ") uses string interpolation, which always "
                                                           + "produces STRING.",
-                                                          paramValue));
+                                                          paramValue, null));
                 }
             }
             processedAliases.add(imp.as());

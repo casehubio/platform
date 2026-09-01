@@ -17,9 +17,9 @@ public final class ParameterValidator {
 
         for (Map.Entry<String, String> entry : provided.entrySet()) {
             if (!declared.containsKey(entry.getKey())) {
-                violations.add(new ParameterViolation(entry.getKey(), "unknown",
+                violations.add(createViolation(entry.getKey(), "unknown",
                         "Parameter '" + entry.getKey() + "' is not declared. "
-                        + "Available: " + declared.keySet(), entry.getValue()));
+                        + "Available: " + declared.keySet(), entry.getValue(), null));
             }
         }
 
@@ -30,8 +30,9 @@ public final class ParameterValidator {
 
             if (value == null) {
                 if (param.required() && param.defaultValue() == null) {
-                    violations.add(new ParameterViolation(name, "required",
-                            "Required parameter '" + name + "' is missing.", null));
+                    violations.add(createViolation(name, "required",
+                            "Required parameter '" + name + "' is missing.", null,
+                            param.constraintDescription()));
                 }
                 continue;
             }
@@ -40,9 +41,10 @@ public final class ParameterValidator {
             try {
                 parsed = param.type().parse(value);
             } catch (Exception e) {
-                violations.add(new ParameterViolation(name, "type",
+                violations.add(createViolation(name, "type",
                         "Parameter '" + name + "': expected " + param.type()
-                        + ", got '" + value + "'.", value));
+                        + ", got '" + value + "'.", value,
+                        param.constraintDescription()));
                 continue;
             }
 
@@ -67,18 +69,20 @@ public final class ParameterValidator {
         if (param.minLength() != null) {
             int length = lengthOf(param, rawValue, parsed);
             if (length < param.minLength()) {
-                violations.add(new ParameterViolation(name, "minLength",
+                violations.add(createViolation(name, "minLength",
                         "Parameter '" + name + "': length " + length
-                        + " is less than minimum " + param.minLength() + ".", rawValue));
+                        + " is less than minimum " + param.minLength() + ".", rawValue,
+                        param.constraintDescription()));
             }
         }
 
         if (param.maxLength() != null) {
             int length = lengthOf(param, rawValue, parsed);
             if (length > param.maxLength()) {
-                violations.add(new ParameterViolation(name, "maxLength",
+                violations.add(createViolation(name, "maxLength",
                         "Parameter '" + name + "': length " + length
-                        + " exceeds maximum " + param.maxLength() + ".", rawValue));
+                        + " exceeds maximum " + param.maxLength() + ".", rawValue,
+                        param.constraintDescription()));
             }
         }
 
@@ -86,37 +90,46 @@ public final class ParameterValidator {
             if (parsed instanceof List<?> list) {
                 for (Object item : list) {
                     if (!Pattern.matches(param.pattern(), item.toString())) {
-                        violations.add(new ParameterViolation(name, "pattern",
+                        violations.add(createViolation(name, "pattern",
                                 "Parameter '" + name + "': element '" + item
                                 + "' does not match pattern '" + param.pattern() + "'.",
-                                rawValue));
+                                rawValue, param.constraintDescription()));
                     }
                 }
             } else {
                 if (!Pattern.matches(param.pattern(), rawValue)) {
-                    violations.add(new ParameterViolation(name, "pattern",
+                    violations.add(createViolation(name, "pattern",
                             "Parameter '" + name + "': value '" + rawValue
                             + "' does not match pattern '" + param.pattern() + "'.",
-                            rawValue));
+                            rawValue, param.constraintDescription()));
                 }
             }
         }
 
         if (param.minimum() != null && parsed instanceof Number num) {
             if (num.doubleValue() < param.minimum().doubleValue()) {
-                violations.add(new ParameterViolation(name, "minimum",
+                violations.add(createViolation(name, "minimum",
                         "Parameter '" + name + "': value " + num
                         + " is less than minimum " + param.minimum() + ".",
-                        rawValue));
+                        rawValue, param.constraintDescription()));
             }
         }
 
         if (param.maximum() != null && parsed instanceof Number num) {
             if (num.doubleValue() > param.maximum().doubleValue()) {
-                violations.add(new ParameterViolation(name, "maximum",
+                violations.add(createViolation(name, "maximum",
                         "Parameter '" + name + "': value " + num
                         + " exceeds maximum " + param.maximum() + ".",
-                        rawValue));
+                        rawValue, param.constraintDescription()));
+            }
+        }
+
+        if (!param.allowedValues().isEmpty()) {
+            if (!param.allowedValues().contains(rawValue)) {
+                String technical = "Parameter '" + name + "': value '" + rawValue
+                        + "' is not one of " + param.allowedValues() + ".";
+                violations.add(createViolation(name, "allowedValues", technical,
+                        rawValue, param.constraintDescription()));
             }
         }
     }
@@ -125,4 +138,15 @@ public final class ParameterValidator {
         if (parsed instanceof List<?> list) { return list.size(); }
         return rawValue.length();
     }
+
+    private static ParameterViolation createViolation(String name, String constraint,
+                                                      String technicalMessage, Object actualValue, String constraintDescription) {
+        if (constraintDescription != null) {
+            return new ParameterViolation(name, constraint, constraintDescription,
+                                          actualValue, technicalMessage);
+        }
+        return new ParameterViolation(name, constraint, technicalMessage,
+                                      actualValue, null);
+    }
+
 }

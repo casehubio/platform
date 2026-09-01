@@ -302,4 +302,79 @@ class ForEachExpanderTest {
                 .hasMessageContaining("node.same");
     }
 
+
+// --- IterationValueExpander ---
+
+    @Test
+    void valueExpander_splits_values() {
+        var groups = Map.of("regional",
+                            new IterationGroup("region", List.of("us-east|eu-west")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("source", new TestElement("source",
+                                               Map.of("name", "${each.region}"), "regional", null));
+
+        IterationValueExpander expander = (resolved, ctx) -> {
+            if (resolved.contains("|")) {
+                return List.of(resolved.split("\\|"));
+            }
+            return List.of(resolved);
+        };
+
+        var result = ForEachExpander.expand(elements, groups, resolver,
+                                            adapter, 1000, expander);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(result.elements().containsKey("source.us-east")).isTrue();
+        assertThat(result.elements().containsKey("source.eu-west")).isTrue();
+    }
+
+    @Test
+    void valueExpander_null_uses_default() {
+        Map<String, Object> inlineForEach = Map.of("as", "x",
+                                                   "in", List.of("a", "b"));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("name", "${each.x}"), inlineForEach, null));
+
+        var result = ForEachExpander.expand(elements, Map.of(), resolver,
+                                            adapter, 1000, null);
+
+        assertThat(result.elements()).hasSize(2);
+    }
+
+    @Test
+    void valueExpander_single_passthrough() {
+        var groups = Map.of("env",
+                            new IterationGroup("e", List.of("prod")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("name", "${each.e}"), "env", null));
+
+        IterationValueExpander expander = (resolved, ctx) -> List.of(resolved);
+
+        var result = ForEachExpander.expand(elements, groups, resolver,
+                                            adapter, 1000, expander);
+
+        assertThat(result.elements()).hasSize(1);
+        assertThat(result.elements().containsKey("node.prod")).isTrue();
+    }
+
+    @Test
+    void valueExpander_error_wraps_context() {
+        var groups = Map.of("bad",
+                            new IterationGroup("x", List.of("boom")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("name", "${each.x}"), "bad", null));
+
+        IterationValueExpander expander = (resolved, ctx) -> {
+            throw new RuntimeException("parse failed");
+        };
+
+        assertThatThrownBy(() -> ForEachExpander.expand(elements, groups,
+                                                        resolver, adapter, 1000, expander))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bad")
+                .hasCauseInstanceOf(RuntimeException.class);
+    }
 }

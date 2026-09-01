@@ -21,6 +21,17 @@ public final class ForEachExpander {
             VariableResolver resolver,
             ForEachAdapter<E> adapter,
             int maxExpansion) {
+        return expand(elements, iterationGroups, resolver, adapter, maxExpansion, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> ExpansionResult<E> expand(
+            Map<String, E> elements,
+            Map<String, IterationGroup> iterationGroups,
+            VariableResolver resolver,
+            ForEachAdapter<E> adapter,
+            int maxExpansion,
+            IterationValueExpander valueExpander) {
 
         LinkedHashMap<String, E> allElements = new LinkedHashMap<>();
         Set<String> excludedIds = new HashSet<>();
@@ -49,7 +60,7 @@ public final class ForEachExpander {
                                 "forEach on '" + elementId
                                 + "' references unknown iteration group '" + groupRef + "'.");
                     }
-                    values = resolveValues(group.inAsList(), resolver, groupRef);
+                    values = resolveValues(group.inAsList(), resolver, groupRef, valueExpander);
                     groupValues.put(groupRef, values);
                 }
                 values = groupValues.get(groupRef);
@@ -57,7 +68,7 @@ public final class ForEachExpander {
                 groupKey = "__inline__" + elementId;
                 List<?> in = (List<?>) inlineMap.get("in");
                 if (in == null) { in = List.of(); }
-                values = resolveValues(in, resolver, elementId);
+                values = resolveValues(in, resolver, elementId, valueExpander);
                 groupValues.put(groupKey, values);
             } else {
                 throw new IllegalArgumentException(
@@ -121,14 +132,25 @@ public final class ForEachExpander {
     }
 
     private static List<String> resolveValues(List<?> in, VariableResolver resolver,
-                                               String context) {
+                                               String context,
+                                               IterationValueExpander valueExpander) {
         List<String> values = new ArrayList<>();
         for (Object item : in) {
             String s = item.toString();
             if (s.contains("${")) {
                 s = resolver.resolveString(s, "forEach." + context);
             }
-            values.add(s);
+            if (valueExpander != null) {
+                try {
+                    values.addAll(valueExpander.expand(s, context));
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "IterationValueExpander failed for group '" + context
+                            + "': resolved value '" + s + "'", e);
+                }
+            } else {
+                values.add(s);
+            }
         }
         return values;
     }

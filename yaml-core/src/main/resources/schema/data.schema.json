@@ -2,7 +2,7 @@
   "$id": "https://casehub.io/yaml-core/data.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Typed CSV Data Source",
-  "description": "A data section defines named CSV data sources with typed columns. The CSV header row declares columns as 'columnName:TYPE'. Supported types: STRING, INTEGER, BOOLEAN, DECIMAL. Rows are parsed and type-validated at load time. Data source rows can be used as forEach iteration values and accessed via ${each.<source>.<field>} syntax.",
+  "description": "A data section defines named CSV data sources with typed columns. The CSV header row declares columns as 'columnName:TYPE'. Supported types: STRING, INTEGER, BOOLEAN, NUMBER. Rows are parsed and type-validated at load time. Data source rows can be used as forEach iteration values and accessed via ${each.<source>.<field>} syntax.",
   "type": "object",
   "additionalProperties": {
     "type": "object",

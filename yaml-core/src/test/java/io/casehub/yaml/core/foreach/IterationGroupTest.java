@@ -28,9 +28,8 @@ class IterationGroupTest {
     }
 
     @Test
-    void invalid_type_throws() {
-        var group = new IterationGroup("region", 42);
-        assertThatThrownBy(group::inAsList)
+    void invalid_type_throws_at_construction() {
+        assertThatThrownBy(() -> new IterationGroup("region", 42))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("list or string");
     }

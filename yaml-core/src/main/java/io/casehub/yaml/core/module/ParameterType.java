@@ -7,14 +7,14 @@ import java.util.Arrays;
 public enum ParameterType {
     STRING, LIST, INTEGER, NUMBER, BOOLEAN;
 
-    public Object parse(String value) {
+    public ParsedValue parse(String value) {
         return switch (this) {
-            case STRING -> value;
-            case LIST -> Arrays.stream(value.split(","))
-                    .map(String::trim).toList();
-            case INTEGER -> Integer.parseInt(value);
-            case NUMBER -> Double.parseDouble(value);
-            case BOOLEAN -> Truthiness.isTruthy(value);
+            case STRING -> new ParsedValue.StringValue(value);
+            case LIST -> new ParsedValue.ListValue(Arrays.stream(value.split(","))
+                                                                   .map(String::trim).toList());
+            case INTEGER -> new ParsedValue.IntegerValue(Integer.parseInt(value));
+            case NUMBER -> new ParsedValue.NumberValue(Double.parseDouble(value));
+            case BOOLEAN -> new ParsedValue.BooleanValue(Truthiness.isTruthy(value));
         };
     }
 

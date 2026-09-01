@@ -210,13 +210,14 @@ class ParameterValidatorTest {
     }
 
     @Test
-    void constraintDescription_null_no_technicalDetail() {
+    void constraintDescription_null_technicalDetail_matches_message() {
         var param = new YamlModuleParameter(ParameterType.INTEGER, true, null,
                                             null, null, null, 1, 100, List.of(), null);
         var violations = ParameterValidator.validate(
                 Map.of("pct", param), Map.of("pct", "200"));
         assertThat(violations).hasSize(1);
-        assertThat(violations.get(0).technicalDetail()).isNull();
+        assertThat(violations.get(0).technicalDetail())
+                .isEqualTo(violations.get(0).message());
     }
 
     @Test
@@ -234,4 +235,36 @@ class ParameterValidatorTest {
                 .contains("ap-south-1")
                 .contains("us-east-1");
     }
+
+    @Test
+    void allowedValues_boolean_canonical_match() {
+        var param = new YamlModuleParameter(ParameterType.BOOLEAN, true, null,
+                                            null, null, null, null, null,
+                                            List.of("true"), null);
+        var violations = ParameterValidator.validate(
+                Map.of("flag", param), Map.of("flag", "yes"));
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void allowedValues_boolean_canonical_reject() {
+        var param = new YamlModuleParameter(ParameterType.BOOLEAN, true, null,
+                                            null, null, null, null, null,
+                                            List.of("true"), null);
+        var violations = ParameterValidator.validate(
+                Map.of("flag", param), Map.of("flag", "no"));
+        assertThat(violations).hasSize(1);
+        assertThat(violations.get(0).constraint()).isEqualTo("allowedValues");
+    }
+
+    @Test
+    void allowedValues_integer_canonical_match() {
+        var param = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                                            null, null, null, null, null,
+                                            List.of("8080", "9090"), null);
+        var violations = ParameterValidator.validate(
+                Map.of("port", param), Map.of("port", "8080"));
+        assertThat(violations).isEmpty();
+    }
+
 }

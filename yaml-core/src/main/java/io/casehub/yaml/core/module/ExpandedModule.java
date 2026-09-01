@@ -10,10 +10,8 @@ public record ExpandedModule(
         Map<String, String> importConditions,
         Map<String, Map<String, String>> moduleOutputs) {
 
-    @SuppressWarnings("unchecked")
-    public <T> Map<String, T> section(String name) {
-        return (Map<String, T>) (Map<String, ?>)
-                sections.getOrDefault(name, Map.of());
+    public Map<String, Object> section(String name) {
+        return sections.getOrDefault(name, Map.of());
     }
 
     public VariableSource outputSource() {

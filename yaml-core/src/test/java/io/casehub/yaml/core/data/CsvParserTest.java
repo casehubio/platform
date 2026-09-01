@@ -57,7 +57,7 @@ class CsvParserTest {
     @Test
     void parses_decimal_column() {
         String csv = """
-                name:STRING,rate:DECIMAL
+                name:STRING,rate:NUMBER
                 gold,0.05
                 silver,1.5
                 """;
@@ -69,7 +69,7 @@ class CsvParserTest {
     @Test
     void parses_mixed_types() {
         String csv = """
-                name:STRING,port:INTEGER,enabled:BOOLEAN,rate:DECIMAL
+                name:STRING,port:INTEGER,enabled:BOOLEAN,rate:NUMBER
                 web,8080,true,0.95
                 """;
         CsvDataSource ds = CsvParser.parse("mixed", csv);
@@ -130,14 +130,14 @@ class CsvParserTest {
     @Test
     void decimal_parse_error_includes_row_and_column() {
         String csv = """
-                name:STRING,rate:DECIMAL
+                name:STRING,rate:NUMBER
                 web,abc
                 """;
         assertThatThrownBy(() -> CsvParser.parse("bad", csv))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("row 1")
                 .hasMessageContaining("rate")
-                .hasMessageContaining("DECIMAL");
+                .hasMessageContaining("NUMBER");
     }
 
     @Test

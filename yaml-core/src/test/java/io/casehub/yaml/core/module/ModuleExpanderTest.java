@@ -86,13 +86,13 @@ class ModuleExpanderTest {
     }
 
     @Test
-    void unconditional_import_null_in_importConditions() {
+    void unconditional_import_absent_from_importConditions() {
         var module = new YamlModule("m", Map.of(), Map.of(),
-                Map.of("nodes", Map.of("n", Map.of())));
+                                    Map.of("nodes", Map.of("n", Map.of())));
         var imp = new YamlImport("m", "a", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
-                Map.of("m", module), Map.of());
-        assertThat(result.importConditions().get("a")).isNull();
+                                           Map.of("m", module), Map.of());
+        assertThat(result.importConditions()).doesNotContainKey("a");
     }
 
     @Test
@@ -194,7 +194,7 @@ class ModuleExpanderTest {
         };
 
         var result = ModuleExpander.expand(List.of(imp),
-                                           Map.of("m", module), Map.of(), deserializer, null);
+                                           Map.of("m", module), Map.of(), ExpansionOptions.of(deserializer, null));
 
         Object value = result.sections().get("nodes").get("a.check");
         assertThat(value).isInstanceOf(TypedNode.class);
@@ -207,7 +207,7 @@ class ModuleExpanderTest {
                                     Map.of("nodes", Map.of("n", Map.of("type", "x"))));
         var imp = new YamlImport("m", "a", null, Map.of());
         var result = ModuleExpander.expand(List.of(imp),
-                                           Map.of("m", module), Map.of(), null, null);
+                                           Map.of("m", module), Map.of(), ExpansionOptions.NONE);
         assertThat(result.sections().get("nodes").get("a.n")).isInstanceOf(Map.class);
     }
 
@@ -237,7 +237,7 @@ class ModuleExpanderTest {
         };
 
         var result = ModuleExpander.expand(List.of(imp),
-                                           Map.of("m", module), Map.of(), deserializer, rewriter);
+                                           Map.of("m", module), Map.of(), ExpansionOptions.of(deserializer, rewriter));
 
         TypedNode alerter = (TypedNode) result.sections().get("nodes").get("pipe.alerter");
         assertThat(alerter.dependsOn()).containsExactly("pipe.monitor");
@@ -258,15 +258,15 @@ class ModuleExpanderTest {
                                                                  List.of());
 
         var result = ModuleExpander.expand(List.of(imp),
-                                           Map.of("m", module), Map.of(), deserializer, null);
+                                           Map.of("m", module), Map.of(), ExpansionOptions.of(deserializer, null));
 
-        Map<String, TypedNode> nodes = result.section("nodes");
-        assertThat(nodes.get("a.n").type()).isEqualTo("x");
+        TypedNode node = (TypedNode) result.section("nodes").get("a.n");
+        assertThat(node.type()).isEqualTo("x");
     }
 
     @Test
     void section_accessor_returns_empty_for_unknown() {
-        var                 result  = ModuleExpander.expand(List.of(), Map.of(), Map.of(), null, null);
+        var                 result  = ModuleExpander.expand(List.of(), Map.of(), Map.of(), ExpansionOptions.NONE);
         Map<String, Object> unknown = result.section("nonexistent");
         assertThat(unknown).isEmpty();
     }

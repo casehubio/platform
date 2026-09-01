@@ -37,7 +37,7 @@ public final class ParameterValidator {
                 continue;
             }
 
-            Object parsed;
+            ParsedValue parsed;
             try {
                 parsed = param.type().parse(value);
             } catch (Exception e) {
@@ -64,15 +64,14 @@ public final class ParameterValidator {
     }
 
     private static void validateConstraints(String name, YamlModuleParameter param,
-            String rawValue, Object parsed, List<ParameterViolation> violations) {
-
+            String rawValue, ParsedValue parsed, List<ParameterViolation> violations) {
         if (param.minLength() != null) {
             int length = lengthOf(param, rawValue, parsed);
             if (length < param.minLength()) {
                 violations.add(createViolation(name, "minLength",
-                        "Parameter '" + name + "': length " + length
-                        + " is less than minimum " + param.minLength() + ".", rawValue,
-                        param.constraintDescription()));
+                                               "Parameter '" + name + "': length " + length
+                                               + " is less than minimum " + param.minLength() + ".", rawValue,
+                                               param.constraintDescription()));
             }
         }
 
@@ -80,62 +79,83 @@ public final class ParameterValidator {
             int length = lengthOf(param, rawValue, parsed);
             if (length > param.maxLength()) {
                 violations.add(createViolation(name, "maxLength",
-                        "Parameter '" + name + "': length " + length
-                        + " exceeds maximum " + param.maxLength() + ".", rawValue,
-                        param.constraintDescription()));
+                                               "Parameter '" + name + "': length " + length
+                                               + " exceeds maximum " + param.maxLength() + ".", rawValue,
+                                               param.constraintDescription()));
             }
         }
 
         if (param.pattern() != null) {
-            if (parsed instanceof List<?> list) {
-                for (Object item : list) {
-                    if (!Pattern.matches(param.pattern(), item.toString())) {
+            if (parsed instanceof ParsedValue.ListValue lv) {
+                for (String item : lv.value()) {
+                    if (!Pattern.matches(param.pattern(), item)) {
                         violations.add(createViolation(name, "pattern",
-                                "Parameter '" + name + "': element '" + item
-                                + "' does not match pattern '" + param.pattern() + "'.",
-                                rawValue, param.constraintDescription()));
+                                                       "Parameter '" + name + "': element '" + item
+                                                       + "' does not match pattern '" + param.pattern() + "'.",
+                                                       rawValue, param.constraintDescription()));
                     }
                 }
             } else {
                 if (!Pattern.matches(param.pattern(), rawValue)) {
                     violations.add(createViolation(name, "pattern",
-                            "Parameter '" + name + "': value '" + rawValue
-                            + "' does not match pattern '" + param.pattern() + "'.",
-                            rawValue, param.constraintDescription()));
+                                                   "Parameter '" + name + "': value '" + rawValue
+                                                   + "' does not match pattern '" + param.pattern() + "'.",
+                                                   rawValue, param.constraintDescription()));
                 }
             }
         }
 
-        if (param.minimum() != null && parsed instanceof Number num) {
-            if (num.doubleValue() < param.minimum().doubleValue()) {
+        if (param.minimum() != null) {
+            double numValue = numericValue(parsed);
+            if (!Double.isNaN(numValue) && numValue < param.minimum().doubleValue()) {
                 violations.add(createViolation(name, "minimum",
-                        "Parameter '" + name + "': value " + num
-                        + " is less than minimum " + param.minimum() + ".",
-                        rawValue, param.constraintDescription()));
+                                               "Parameter '" + name + "': value " + rawValue
+                                               + " is less than minimum " + param.minimum() + ".",
+                                               rawValue, param.constraintDescription()));
             }
         }
 
-        if (param.maximum() != null && parsed instanceof Number num) {
-            if (num.doubleValue() > param.maximum().doubleValue()) {
+        if (param.maximum() != null) {
+            double numValue = numericValue(parsed);
+            if (!Double.isNaN(numValue) && numValue > param.maximum().doubleValue()) {
                 violations.add(createViolation(name, "maximum",
-                        "Parameter '" + name + "': value " + num
-                        + " exceeds maximum " + param.maximum() + ".",
-                        rawValue, param.constraintDescription()));
+                                               "Parameter '" + name + "': value " + rawValue
+                                               + " exceeds maximum " + param.maximum() + ".",
+                                               rawValue, param.constraintDescription()));
             }
         }
 
         if (!param.allowedValues().isEmpty()) {
-            if (!param.allowedValues().contains(rawValue)) {
+            boolean matches = param.allowedValues().contains(rawValue);
+            if (!matches) {
+                String canonical = switch (parsed) {
+                    case ParsedValue.IntegerValue iv -> String.valueOf(iv.value());
+                    case ParsedValue.NumberValue nv -> String.valueOf(nv.value());
+                    case ParsedValue.BooleanValue bv -> String.valueOf(bv.value());
+                    default -> null;
+                };
+                if (canonical != null) {
+                    matches = param.allowedValues().contains(canonical);
+                }
+            }
+            if (!matches) {
                 String technical = "Parameter '" + name + "': value '" + rawValue
-                        + "' is not one of " + param.allowedValues() + ".";
+                                   + "' is not one of " + param.allowedValues() + ".";
                 violations.add(createViolation(name, "allowedValues", technical,
-                        rawValue, param.constraintDescription()));
+                                               rawValue, param.constraintDescription()));
             }
         }
     }
 
-    private static int lengthOf(YamlModuleParameter param, String rawValue, Object parsed) {
-        if (parsed instanceof List<?> list) { return list.size(); }
+
+    private static double numericValue(ParsedValue parsed) {
+        if (parsed instanceof ParsedValue.IntegerValue iv) {return iv.value();}
+        if (parsed instanceof ParsedValue.NumberValue nv) {return nv.value();}
+        return Double.NaN;
+    }
+
+    private static int lengthOf(YamlModuleParameter param, String rawValue, ParsedValue parsed) {
+        if (parsed instanceof ParsedValue.ListValue lv) {return lv.value().size();}
         return rawValue.length();
     }
 
@@ -146,7 +166,7 @@ public final class ParameterValidator {
                                           actualValue, technicalMessage);
         }
         return new ParameterViolation(name, constraint, technicalMessage,
-                                      actualValue, null);
+                                      actualValue, technicalMessage);
     }
 
 }

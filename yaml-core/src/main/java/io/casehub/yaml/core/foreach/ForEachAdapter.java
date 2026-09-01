@@ -6,7 +6,7 @@ public interface ForEachAdapter<E> {
 
     E stamp(E template, String stampedId, VariableResolver scopedResolver);
 
-    Object getForEach(E element);
+    ForEachDirective getForEach(E element);
 
     String getId(E element);
 

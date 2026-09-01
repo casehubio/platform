@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ForEachExpanderTest {
 
     record TestElement(String id, Map<String, Object> spec,
-                       Object forEach, String when) {}
+                       ForEachDirective forEach, String when) {}
 
     static class TestAdapter implements ForEachAdapter<TestElement> {
         @Override
@@ -28,7 +28,7 @@ class ForEachExpanderTest {
         }
 
         @Override
-        public Object getForEach(TestElement element) { return element.forEach(); }
+        public ForEachDirective getForEach(TestElement element) { return element.forEach(); }
 
         @Override
         public String getId(TestElement element) { return element.id(); }
@@ -42,8 +42,8 @@ class ForEachExpanderTest {
 
     @Test
     void inlineForEach_stampsThreeCopies() {
-        Map<String, Object> inlineForEach = Map.of("as", "region",
-                "in", List.of("us-east", "eu-west", "ap-south"));
+        var inlineForEach = new ForEachDirective.InlineIteration("region",
+                List.of("us-east", "eu-west", "ap-south"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("regional-source", new TestElement("regional-source",
                 Map.of("name", "customers-${each.region}",
@@ -69,7 +69,7 @@ class ForEachExpanderTest {
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("regional-source", new TestElement("regional-source",
                 Map.of("name", "${each.region}"),
-                "regional", null));
+                new ForEachDirective.GroupRef("regional"), null));
 
         var result = ForEachExpander.expand(elements, groups, resolver,
                 adapter, 1000);
@@ -85,9 +85,9 @@ class ForEachExpanderTest {
                 new IterationGroup("region", List.of("us-east", "eu-west")));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("source", new TestElement("source",
-                Map.of("name", "${each.region}"), "regional", null));
+                Map.of("name", "${each.region}"), new ForEachDirective.GroupRef("regional"), null));
         elements.put("ingest", new TestElement("ingest",
-                Map.of("name", "${each.region}-ingest"), "regional", null));
+                Map.of("name", "${each.region}-ingest"), new ForEachDirective.GroupRef("regional"), null));
 
         var result = ForEachExpander.expand(elements, groups, resolver,
                 adapter, 1000);
@@ -137,7 +137,7 @@ class ForEachExpanderTest {
         elements.put("fixed-schema", new TestElement("fixed-schema",
                 Map.of("name", "schema"), null, null));
         elements.put("regional-source", new TestElement("regional-source",
-                Map.of("name", "${each.region}"), "regional", null));
+                Map.of("name", "${each.region}"), new ForEachDirective.GroupRef("regional"), null));
 
         var result = ForEachExpander.expand(elements, groups, resolver,
                 adapter, 1000);
@@ -147,8 +147,8 @@ class ForEachExpanderTest {
 
     @Test
     void expansionLimit_exceeded_throws() {
-        Map<String, Object> inlineForEach = Map.of("as", "idx",
-                "in", List.of("1", "2", "3", "4", "5"));
+        var inlineForEach = new ForEachDirective.InlineIteration("idx",
+                List.of("1", "2", "3", "4", "5"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
                 Map.of("name", "${each.idx}"), inlineForEach, null));
@@ -163,7 +163,7 @@ class ForEachExpanderTest {
 
     @Test
     void zeroValues_producesEmpty() {
-        Map<String, Object> inlineForEach = Map.of("as", "idx", "in", List.of());
+        var inlineForEach = new ForEachDirective.InlineIteration("idx", List.of());
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("template", new TestElement("template",
                 Map.of("name", "x"), inlineForEach, null));
@@ -214,8 +214,8 @@ class ForEachExpanderTest {
                 Map.of("var", (VariableSource) name ->
                         "enable_sources".equals(name) ? "false" : null),
                 Set.of());
-        Map<String, Object> inlineForEach = Map.of("as", "region",
-                "in", List.of("us-east", "eu-west"));
+        var inlineForEach = new ForEachDirective.InlineIteration("region",
+                List.of("us-east", "eu-west"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("source", new TestElement("source",
                 Map.of("name", "${each.region}"),
@@ -231,8 +231,8 @@ class ForEachExpanderTest {
 
     @Test
     void forEach_when_perCopy_selectiveExclusion() {
-        Map<String, Object> inlineForEach = Map.of("as", "flag",
-                "in", List.of("true", "false"));
+        var inlineForEach = new ForEachDirective.InlineIteration("flag",
+                List.of("true", "false"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("source", new TestElement("source",
                 Map.of("name", "${each.flag}"),
@@ -254,8 +254,8 @@ class ForEachExpanderTest {
                 Map.of("var", (VariableSource) name ->
                         "suffix".equals(name) ? "prod" : null),
                 Set.of());
-        Map<String, Object> inlineForEach = Map.of("as", "env",
-                "in", List.of("${var.suffix}"));
+        var inlineForEach = new ForEachDirective.InlineIteration("env",
+                List.of("${var.suffix}"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
                 Map.of("name", "${each.env}"), inlineForEach, null));
@@ -276,7 +276,7 @@ class ForEachExpanderTest {
         elements.put("first", new TestElement("first",
                 Map.of("name", "1"), null, null));
         elements.put("expand", new TestElement("expand",
-                Map.of("name", "${each.e}"), "env", null));
+                Map.of("name", "${each.e}"), new ForEachDirective.GroupRef("env"), null));
         elements.put("last", new TestElement("last",
                 Map.of("name", "3"), null, null));
 
@@ -289,8 +289,8 @@ class ForEachExpanderTest {
 
     @Test
     void duplicate_forEach_values_throws() {
-        Map<String, Object> inlineForEach = Map.of("as", "x",
-                                                   "in", List.of("same", "same"));
+        var inlineForEach = new ForEachDirective.InlineIteration("x",
+                                                   List.of("same", "same"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
                                              Map.of("name", "${each.x}"), inlineForEach, null));
@@ -311,7 +311,7 @@ class ForEachExpanderTest {
                             new IterationGroup("region", List.of("us-east|eu-west")));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("source", new TestElement("source",
-                                               Map.of("name", "${each.region}"), "regional", null));
+                                               Map.of("name", "${each.region}"), new ForEachDirective.GroupRef("regional"), null));
 
         IterationValueExpander expander = (resolved, ctx) -> {
             if (resolved.contains("|")) {
@@ -330,8 +330,8 @@ class ForEachExpanderTest {
 
     @Test
     void valueExpander_null_uses_default() {
-        Map<String, Object> inlineForEach = Map.of("as", "x",
-                                                   "in", List.of("a", "b"));
+        var inlineForEach = new ForEachDirective.InlineIteration("x",
+                                                   List.of("a", "b"));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
                                              Map.of("name", "${each.x}"), inlineForEach, null));
@@ -348,7 +348,7 @@ class ForEachExpanderTest {
                             new IterationGroup("e", List.of("prod")));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
-                                             Map.of("name", "${each.e}"), "env", null));
+                                             Map.of("name", "${each.e}"), new ForEachDirective.GroupRef("env"), null));
 
         IterationValueExpander expander = (resolved, ctx) -> List.of(resolved);
 
@@ -365,7 +365,7 @@ class ForEachExpanderTest {
                             new IterationGroup("x", List.of("boom")));
         var elements = new LinkedHashMap<String, TestElement>();
         elements.put("node", new TestElement("node",
-                                             Map.of("name", "${each.x}"), "bad", null));
+                                             Map.of("name", "${each.x}"), new ForEachDirective.GroupRef("bad"), null));
 
         IterationValueExpander expander = (resolved, ctx) -> {
             throw new RuntimeException("parse failed");
@@ -381,7 +381,7 @@ class ForEachExpanderTest {
 // --- Reference rewriting ---
 
     record RefElement(String id, Map<String, Object> spec,
-                      Object forEach, String when,
+                      ForEachDirective forEach, String when,
                       List<ForEachAdapter.Reference> refs) {}
 
     static class RefAdapter implements ForEachAdapter<RefElement> {
@@ -394,7 +394,7 @@ class ForEachExpanderTest {
         }
 
         @Override
-        public Object getForEach(RefElement element) {return element.forEach();}
+        public ForEachDirective getForEach(RefElement element) {return element.forEach();}
 
         @Override
         public String getId(RefElement element) {return element.id();}
@@ -437,9 +437,9 @@ class ForEachExpanderTest {
                             new IterationGroup("region", List.of("us", "eu")));
         var elements = new LinkedHashMap<String, RefElement>();
         elements.put("source", new RefElement("source",
-                                              Map.of(), "regional", null, List.of()));
+                                              Map.of(), new ForEachDirective.GroupRef("regional"), null, List.of()));
         elements.put("sink", new RefElement("sink",
-                                            Map.of(), "regional", null,
+                                            Map.of(), new ForEachDirective.GroupRef("regional"), null,
                                             List.of(new ForEachAdapter.Reference("source", false))));
 
         var result = ForEachExpander.expand(elements, groups,
@@ -461,9 +461,9 @@ class ForEachExpanderTest {
                 "g2", new IterationGroup("b", List.of("y")));
         var elements = new LinkedHashMap<String, RefElement>();
         elements.put("src", new RefElement("src",
-                                           Map.of(), "g1", null, List.of()));
+                                           Map.of(), new ForEachDirective.GroupRef("g1"), null, List.of()));
         elements.put("sink", new RefElement("sink",
-                                            Map.of(), "g2", null,
+                                            Map.of(), new ForEachDirective.GroupRef("g2"), null,
                                             List.of(new ForEachAdapter.Reference("src", true))));
 
         var result = ForEachExpander.expand(elements, groups,
@@ -481,9 +481,9 @@ class ForEachExpanderTest {
                 "g2", new IterationGroup("b", List.of("y")));
         var elements = new LinkedHashMap<String, RefElement>();
         elements.put("src", new RefElement("src",
-                                           Map.of(), "g1", null, List.of()));
+                                           Map.of(), new ForEachDirective.GroupRef("g1"), null, List.of()));
         elements.put("sink", new RefElement("sink",
-                                            Map.of(), "g2", null,
+                                            Map.of(), new ForEachDirective.GroupRef("g2"), null,
                                             List.of(new ForEachAdapter.Reference("src", false))));
 
         assertThatThrownBy(() -> ForEachExpander.expand(elements, groups,

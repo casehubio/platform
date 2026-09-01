@@ -52,7 +52,7 @@ public final class CsvParser {
                 throw new IllegalArgumentException(
                         "Unknown column type '" + typeName
                         + "' for column '" + colName
-                        + "'. Expected: STRING, INTEGER, BOOLEAN, DECIMAL.");
+                        + "'. Expected: STRING, INTEGER, BOOLEAN, NUMBER.");
             }
             columns.add(new CsvColumn(colName, type));
         }

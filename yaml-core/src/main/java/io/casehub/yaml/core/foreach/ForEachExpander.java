@@ -41,7 +41,7 @@ public final class ForEachExpander {
         for (Map.Entry<String, E> entry : elements.entrySet()) {
             String elementId = entry.getKey();
             E element = entry.getValue();
-            Object forEach = adapter.getForEach(element);
+            ForEachDirective forEach = adapter.getForEach(element);
 
             if (forEach == null) {
                 elementToGroup.put(elementId, null);
@@ -51,30 +51,25 @@ public final class ForEachExpander {
             List<String> values;
             String groupKey;
 
-            if (forEach instanceof String groupRef) {
-                groupKey = groupRef;
-                if (!groupValues.containsKey(groupRef)) {
-                    IterationGroup group = iterationGroups.get(groupRef);
+            if (forEach instanceof ForEachDirective.GroupRef ref) {
+                groupKey = ref.groupName();
+                if (!groupValues.containsKey(ref.groupName())) {
+                    IterationGroup group = iterationGroups.get(ref.groupName());
                     if (group == null) {
                         throw new IllegalArgumentException(
                                 "forEach on '" + elementId
-                                + "' references unknown iteration group '" + groupRef + "'.");
+                                + "' references unknown iteration group '" + ref.groupName() + "'.");
                     }
-                    values = resolveValues(group.inAsList(), resolver, groupRef, valueExpander);
-                    groupValues.put(groupRef, values);
+                    values = resolveValues(group.inAsList(), resolver, ref.groupName(), valueExpander);
+                    groupValues.put(ref.groupName(), values);
                 }
-                values = groupValues.get(groupRef);
-            } else if (forEach instanceof Map<?, ?> inlineMap) {
+                values = groupValues.get(ref.groupName());
+            } else if (forEach instanceof ForEachDirective.InlineIteration inline) {
                 groupKey = "__inline__" + elementId;
-                List<?> in = (List<?>) inlineMap.get("in");
-                if (in == null) { in = List.of(); }
-                values = resolveValues(in, resolver, elementId, valueExpander);
+                values = resolveValues(inline.in(), resolver, elementId, valueExpander);
                 groupValues.put(groupKey, values);
             } else {
-                throw new IllegalArgumentException(
-                        "Invalid forEach on element '" + elementId
-                        + "': expected String (group ref) or Map (inline), got "
-                        + forEach.getClass().getSimpleName());
+                throw new IllegalArgumentException("Unexpected ForEachDirective type: " + forEach);
             }
 
             elementToGroup.put(elementId, groupKey);
@@ -193,16 +188,12 @@ public final class ForEachExpander {
         return values;
     }
 
-    @SuppressWarnings("unchecked")
-    private static String resolveAs(Object forEach,
-                                     Map<String, IterationGroup> groups) {
-        if (forEach instanceof String groupRef) {
-            return groups.get(groupRef).as();
-        }
-        if (forEach instanceof Map<?, ?> m) {
-            return (String) m.get("as");
-        }
-        throw new IllegalArgumentException("Invalid forEach: " + forEach);
+    private static String resolveAs(ForEachDirective forEach,
+                                    Map<String, IterationGroup> groups) {
+        return switch (forEach) {
+            case ForEachDirective.GroupRef ref -> groups.get(ref.groupName()).as();
+            case ForEachDirective.InlineIteration inline -> inline.as();
+        };
     }
 
     private static String originalId(String stampedId) {

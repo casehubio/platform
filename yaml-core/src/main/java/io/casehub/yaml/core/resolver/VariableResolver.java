@@ -71,12 +71,11 @@ public class VariableResolver {
 
     public Object resolve(Object value) {
         if (value instanceof String s) {
-            return s.contains("${") ? resolveString(s, "") : s;
+            return s.contains("${") ? resolveString(s, "<root>") : s;
         }
-        if (value instanceof Map<?, ?> map) { return resolveMap(map, ""); }
-        if (value instanceof List<?> list) { return resolveList(list, ""); }
-        return value;
-    }
+        if (value instanceof Map<?, ?> map) {return resolveMap(map, "<root>");}
+        if (value instanceof List<?> list) {return resolveList(list, "<root>");}
+        return value;}
 
     public String resolveString(String template, String elementContext) {
         Matcher matcher = VAR_PATTERN.matcher(template);
@@ -112,18 +111,18 @@ public class VariableResolver {
         return result;
     }
 
-    public List<?> resolveList(List<?> input, String elementContext) {
+    public List<Object> resolveList(List<?> input, String elementContext) {
         return input.stream()
-                .map(item -> {
-                    if (item instanceof String s && s.contains("${")) {
-                        return resolveString(s, elementContext);
-                    }
-                    if (item instanceof Map<?, ?> map) {
-                        return resolveMap(map, elementContext);
-                    }
-                    return item;
-                })
-                .toList();
+                    .map(item -> {
+                        if (item instanceof String s && s.contains("${")) {
+                            return (Object) resolveString(s, elementContext);
+                        }
+                        if (item instanceof Map<?, ?> map) {
+                            return (Object) resolveMap(map, elementContext);
+                        }
+                        return item;
+                    })
+                    .toList();
     }
 
     private String lookupVariable(String key, String elementContext) {

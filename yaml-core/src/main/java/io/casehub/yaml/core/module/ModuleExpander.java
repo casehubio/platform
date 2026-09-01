@@ -25,15 +25,14 @@ public final class ModuleExpander {
             List<YamlImport> imports,
             Map<String, YamlModule> availableModules,
             Map<String, Map<String, Object>> existingSections) {
-        return expand(imports, availableModules, existingSections, null, null);
+        return expand(imports, availableModules, existingSections, ExpansionOptions.NONE);
     }
 
     public static ExpandedModule expand(
             List<YamlImport> imports,
             Map<String, YamlModule> availableModules,
             Map<String, Map<String, Object>> existingSections,
-            SectionDeserializer deserializer,
-            SectionContentRewriter rewriter) {
+            ExpansionOptions options) {
 
         validateImports(imports, availableModules);
         validateModuleRefs(imports, availableModules);
@@ -53,7 +52,9 @@ public final class ModuleExpander {
                     imp.parameters(), allOutputs, imp.as());
             Map<String, String> paramScope = resolveParameters(module, imp, resolvedParams);
             moduleScopes.put(imp.as(), paramScope);
-            importConditions.put(imp.as(), imp.when());
+            if (imp.when() != null) {
+                importConditions.put(imp.as(), imp.when());
+            }
 
             Map<String, String> resolvedOutputs = resolveOutputs(module, paramScope);
             allOutputs.put(imp.as(), resolvedOutputs);
@@ -68,13 +69,13 @@ public final class ModuleExpander {
                 for (Map.Entry<String, Object> contentEntry : sectionContent.entrySet()) {
                     String prefixedKey = imp.as() + "." + contentEntry.getKey();
                     Object value = contentEntry.getValue();
-                    if (deserializer != null && value instanceof Map) {
+                    if (options.deserializer() != null && value instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> rawMap = (Map<String, Object>) value;
-                        value = deserializer.deserialize(sectionName, contentEntry.getKey(), rawMap);
+                        value = options.deserializer().deserialize(sectionName, contentEntry.getKey(), rawMap);
                     }
-                    if (rewriter != null) {
-                        value = rewriter.rewrite(sectionName, contentEntry.getKey(), value,
+                    if (options.rewriter() != null) {
+                        value = options.rewriter().rewrite(sectionName, contentEntry.getKey(), value,
                                 imp.as(), sectionContent.keySet());
                     }
                     targetSection.put(prefixedKey, value);
@@ -85,7 +86,7 @@ public final class ModuleExpander {
         return new ExpandedModule(
                 Map.copyOf(mergedSections),
                 Map.copyOf(moduleScopes),
-                java.util.Collections.unmodifiableMap(importConditions),
+                Map.copyOf(importConditions),
                 Map.copyOf(allOutputs));
     }
 

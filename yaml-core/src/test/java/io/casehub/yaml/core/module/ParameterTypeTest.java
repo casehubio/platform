@@ -11,22 +11,22 @@ class ParameterTypeTest {
 
     @Test
     void string_returns_value() {
-        assertThat(ParameterType.STRING.parse("hello")).isEqualTo("hello");
+        assertThat(ParameterType.STRING.parse("hello").raw()).isEqualTo("hello");
     }
 
     @Test
     void list_splits_on_comma() {
-        assertThat(ParameterType.LIST.parse("a, b, c")).isEqualTo(List.of("a", "b", "c"));
+        assertThat(ParameterType.LIST.parse("a, b, c").raw()).isEqualTo(List.of("a", "b", "c"));
     }
 
     @Test
     void list_single_value() {
-        assertThat(ParameterType.LIST.parse("only")).isEqualTo(List.of("only"));
+        assertThat(ParameterType.LIST.parse("only").raw()).isEqualTo(List.of("only"));
     }
 
     @Test
     void integer_parses() {
-        assertThat(ParameterType.INTEGER.parse("42")).isEqualTo(42);
+        assertThat(ParameterType.INTEGER.parse("42").raw()).isEqualTo(42);
     }
 
     @Test
@@ -37,7 +37,7 @@ class ParameterTypeTest {
 
     @Test
     void number_parses() {
-        assertThat(ParameterType.NUMBER.parse("3.14")).isEqualTo(3.14);
+        assertThat(ParameterType.NUMBER.parse("3.14").raw()).isEqualTo(3.14);
     }
 
     @Test
@@ -48,12 +48,12 @@ class ParameterTypeTest {
 
     @Test
     void boolean_parses_truthy() {
-        assertThat(ParameterType.BOOLEAN.parse("yes")).isEqualTo(true);
+        assertThat(ParameterType.BOOLEAN.parse("yes").raw()).isEqualTo(true);
     }
 
     @Test
     void boolean_parses_falsy() {
-        assertThat(ParameterType.BOOLEAN.parse("no")).isEqualTo(false);
+        assertThat(ParameterType.BOOLEAN.parse("no").raw()).isEqualTo(false);
     }
 
     @Test

@@ -3,14 +3,14 @@ package io.casehub.yaml.core.data;
 import io.casehub.yaml.core.condition.Truthiness;
 
 public enum CsvColumnType {
-    STRING, INTEGER, BOOLEAN, DECIMAL;
+    STRING, INTEGER, BOOLEAN, NUMBER;
 
     public Object parse(String value, int row, String columnName) {
         return switch (this) {
             case STRING -> value;
             case INTEGER -> parseInteger(value, row, columnName);
             case BOOLEAN -> parseBoolean(value, row, columnName);
-            case DECIMAL -> parseDecimal(value, row, columnName);
+            case NUMBER -> parseNumber(value, row, columnName);
         };
     }
 
@@ -34,13 +34,13 @@ public enum CsvColumnType {
         }
     }
 
-    private static double parseDecimal(String value, int row, String columnName) {
+    private static double parseNumber(String value, int row, String columnName) {
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
                     "CSV row " + row + ", column '" + columnName
-                    + "': expected DECIMAL, got '" + value + "'");
+                    + "': expected NUMBER, got '" + value + "'");
         }
     }
 }

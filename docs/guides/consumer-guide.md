@@ -346,11 +346,9 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 **Label infrastructure:** `LabelRule` record with `name`, `condition` (CompiledExpression), `actions` (List<LabelAction>), `triggerEvents` (Set<String>, optional). Static `evaluate(rules, context)` and `evaluate(rules, context, event)` methods. `LabelAction` is a sealed interface with `Add(label)` and `Remove(label)` variants.
 
-### CaseMemoryStore
+### CaseMemoryStore (migrated)
 
-Cross-case semantic recall. `CaseMemoryStore` (blocking) provides `store`, `query`, `erase`. Domain isolation via `MemoryDomain` -- facts do not cross domain boundaries. `MemoryPermissions` enforces tenant access at the SPI layer. `@DefaultBean` is a silent no-op -- the system functions correctly without memory.
-
-Backend implementations live in casehub-neocortex, not this repo.
+The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`, `MemoryQuery`) migrated to casehub-neocortex. The `@DefaultBean` no-op (`NoOpCaseMemoryStore`) also lives in neocortex. Platform no longer owns memory abstractions — consume `casehub-neocortex-memory-api` directly.
 
 ### Credentials
 
@@ -537,7 +535,7 @@ Backend implementations live in casehub-neocortex, not this repo.
 ## What This Repo Does NOT Do
 
 - **Domain logic.** No case definitions, work items, or business rules. Those live in consumer repos (ledger, work, engine, devtown, etc.).
-- **Memory backends.** `CaseMemoryStore` SPI is here; implementations (in-mem, JPA, SQLite, Mem0, Graphiti) live in casehub-neocortex.
+- **Memory.** `CaseMemoryStore` SPI and all implementations (in-mem, JPA, SQLite, Mem0, Graphiti) live in casehub-neocortex. Platform no longer owns memory abstractions.
 - **Preference writes without the editor module.** `PreferenceProvider` is permanently read-only. The `preferences-editor/` module provides the write path via `PreferenceStore`.
 - **Security enforcement beyond tenancy.** `CurrentPrincipal` provides identity. `@RolesAllowed` and full RBAC are Quarkus concerns, not platform concerns.
 - **Orchestration.** Event routing and subscription matching happen here. Case orchestration, planning, and execution live in casehub-engine.

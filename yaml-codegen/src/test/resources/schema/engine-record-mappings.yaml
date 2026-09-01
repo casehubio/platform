@@ -1,0 +1,96 @@
+globalAnnotations:
+  - "com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)"
+
+types:
+  CaseDefinitionSpec:
+    fields:
+      completion:
+        type: io.casehub.api.model.CaseCompletion
+        deserializer: io.casehub.api.model.converter.deser.CaseCompletionDeserializer
+      cbrConfig:
+        alias: cbr
+        type: io.casehub.api.model.cbr.CbrConfig
+        deserializer: io.casehub.api.model.converter.deser.CbrConfigDeserializer
+      adaptationConfig:
+        alias: adaptation
+        type: io.casehub.api.model.AdaptationConfig
+        deserializer: io.casehub.api.model.converter.deser.AdaptationConfigDeserializer
+      reflectionTrigger:
+        alias: reflection
+      actions:
+        alias: goapActions
+
+  Capability:
+    fields:
+      inputProjection:
+        alias: inputSchema
+      outputProjection:
+        alias: outputSchema
+
+  Goal:
+    fields:
+      when:
+        alias: condition
+        type: io.casehub.platform.api.expression.ExpressionEvaluator
+
+  Milestone:
+    fields:
+      when:
+        alias: [condition, completionCriteria]
+        type: io.casehub.platform.api.expression.ExpressionEvaluator
+
+  SubCase:
+    fields:
+      inputMapping:
+        type: io.casehub.api.model.SubCaseMapping
+        deserializer: io.casehub.api.model.converter.deser.SubCaseMappingDeserializer
+      outputMapping:
+        type: io.casehub.api.model.SubCaseMapping
+        deserializer: io.casehub.api.model.converter.deser.SubCaseMappingDeserializer
+
+  Binding:
+    fields:
+      "on":
+        type: io.casehub.api.model.Trigger
+        deserializer: io.casehub.api.model.converter.deser.TriggerDeserializer
+      when:
+        type: io.casehub.platform.api.expression.ExpressionEvaluator
+      inputProjectionOverride:
+        type: io.casehub.platform.api.expression.ExpressionEvaluator
+      replanHint:
+        alias: replanAfter
+      humanTask:
+        type: io.casehub.api.model.converter.yaml.YamlHumanTaskTarget
+      judgment:
+        type: io.casehub.api.model.converter.yaml.YamlJudgmentTarget
+      subCase:
+        type: io.casehub.api.model.converter.yaml.YamlSubCaseTarget
+      recoveryOverride:
+        type: io.casehub.api.model.converter.yaml.YamlRecoveryOverride
+      sideEffectClassification:
+        type: java.lang.String
+
+  Worker:
+    fields:
+      doBlock:
+        jsonProperty: "do"
+        type: com.fasterxml.jackson.databind.JsonNode
+      definitionRef:
+        type: java.lang.String
+      forEach:
+        type: java.lang.String
+      agent:
+        type: io.casehub.api.model.converter.yaml.YamlAgent
+      react:
+        type: io.casehub.api.model.converter.yaml.YamlReact
+      a2a:
+        type: io.casehub.api.model.converter.yaml.YamlA2A
+      mcp:
+        type: io.casehub.api.model.converter.yaml.YamlMcp
+      agentDescriptor:
+        type: io.casehub.api.model.converter.yaml.YamlAgentDescriptor
+
+  HumanTask:
+    fields:
+      escalationStrategy:
+        alias: escalatorStrategy

@@ -92,6 +92,8 @@ Read `docs/guides/consumer-guide.md` for app-level work. Only read `docs/guides/
   - **Configurable mock** (PreferenceProvider, CurrentPrincipal): returns values driven by @ConfigProperty — suitable when tests need to set specific return values
   - **Silent no-op** (CaseMemoryStore): always returns empty/void — suitable when the capability is optional and "not installed" means "nothing happens"
 - `config/` reads YAML preference files at startup — declare as compile scope in production; not needed on test-only classpaths (mock handles test defaults via `application.properties`)
+- `yaml-core/` must remain zero-dependency (J2CL-transpilable) — YAML processing primitives only
+- `yaml-codegen/` is a Maven plugin (`maven-plugin` packaging) generating Java records and POJOs from JSON Schema. Depends on jsonschema2pojo-core for schema parsing. Sibling to `yaml-core` — different dependency profile (build-time vs runtime zero-dep)
 
 ## Project Type
 

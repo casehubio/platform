@@ -1,0 +1,18 @@
+globalAnnotations:
+  - "com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)"
+
+types:
+  Person:
+    fields:
+      name:
+        alias: fullName
+      address:
+        type: com.example.CustomAddress
+        deserializer: com.example.AddressDeserializer
+      nickname:
+        skip: true
+  Worker:
+    fields:
+      doBlock:
+        jsonProperty: "do"
+        type: com.fasterxml.jackson.databind.JsonNode

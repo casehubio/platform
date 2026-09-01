@@ -74,6 +74,7 @@
         <module>callback-generator</module>
         <module>callback-client</module>
         <module>yaml-core</module>
+        <module>yaml-codegen</module>
         <module>ts-core</module>
         <module>platform-pdf</module>
         <module>platform-signing</module>

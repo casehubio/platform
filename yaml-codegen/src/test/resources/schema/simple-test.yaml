@@ -1,0 +1,36 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Person:
+    type: object
+    properties:
+      name:
+        type: string
+      age:
+        type: integer
+      tags:
+        type: array
+        items:
+          type: string
+      address:
+        $ref: "#/$defs/Address"
+    unevaluatedProperties: false
+    required:
+      - name
+  Address:
+    type: object
+    properties:
+      street:
+        type: string
+      city:
+        type: string
+      metadata:
+        type: object
+        additionalProperties:
+          type: string
+    unevaluatedProperties: false
+type: object
+properties:
+  people:
+    type: array
+    items:
+      $ref: "#/$defs/Person"

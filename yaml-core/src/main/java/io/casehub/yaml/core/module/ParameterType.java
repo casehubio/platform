@@ -3,7 +3,6 @@ package io.casehub.yaml.core.module;
 import io.casehub.yaml.core.condition.Truthiness;
 
 import java.util.Arrays;
-import java.util.List;
 
 public enum ParameterType {
     STRING, LIST, INTEGER, NUMBER, BOOLEAN;
@@ -18,4 +17,12 @@ public enum ParameterType {
             case BOOLEAN -> Truthiness.isTruthy(value);
         };
     }
+
+    public boolean canAccept(ParameterType outputType) {
+        if (this == outputType) {return true;}
+        if (this == STRING && outputType != LIST) {return true;}
+        if (this == NUMBER && outputType == INTEGER) {return true;}
+        return false;
+    }
+
 }

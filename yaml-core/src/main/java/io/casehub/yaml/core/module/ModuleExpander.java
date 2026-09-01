@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
 public final class ModuleExpander {
 
     private static final Pattern VAR_REF = Pattern.compile("\\$\\{([^}]+)}");
+    private static final Pattern WHOLE_MODULE_REF =
+            Pattern.compile("^\\s*\\$\\{module\\.[^}]+}\\s*$");
+
 
     private ModuleExpander() {}
 
@@ -33,6 +36,7 @@ public final class ModuleExpander {
             SectionContentRewriter rewriter) {
 
         validateImports(imports, availableModules);
+        validateModuleRefs(imports, availableModules);
 
         Map<String, Map<String, Object>> mergedSections = new LinkedHashMap<>();
         Map<String, Map<String, String>> moduleScopes = new LinkedHashMap<>();
@@ -153,7 +157,21 @@ public final class ModuleExpander {
         for (Map.Entry<String, String> entry : rawParams.entrySet()) {
             String value = entry.getValue();
             if (value.contains("${module.")) {
-                checkForwardRefs(value, allOutputs.keySet(), currentAlias);
+                Matcher guardMatcher = VAR_REF.matcher(value);
+                while (guardMatcher.find()) {
+                    String guardKey = guardMatcher.group(1);
+                    if (!guardKey.startsWith("module.")) continue;
+                    String rest = guardKey.substring("module.".length());
+                    int dot = rest.indexOf('.');
+                    if (dot < 0) continue;
+                    String refAlias = rest.substring(0, dot);
+                    if (!allOutputs.containsKey(refAlias)) {
+                        throw new IllegalStateException(
+                                "Forward reference to '" + refAlias + "' in import '"
+                                + currentAlias
+                                + "' — should have been caught by validateModuleRefs.");
+                    }
+                }
                 value = resolver.resolveString(value, currentAlias + "." + entry.getKey());
             }
             resolved.put(entry.getKey(), value);
@@ -173,25 +191,6 @@ public final class ModuleExpander {
         };
     }
 
-    private static void checkForwardRefs(String value, Set<String> processedAliases,
-                                          String currentAlias) {
-        Matcher matcher = VAR_REF.matcher(value);
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (!key.startsWith("module.")) continue;
-            String rest = key.substring("module.".length());
-            int dot = rest.indexOf('.');
-            if (dot < 0) continue;
-            String refAlias = rest.substring(0, dot);
-            if (!processedAliases.contains(refAlias)) {
-                throw new IllegalArgumentException(
-                        "Import '" + currentAlias + "' references ${" + key
-                        + "}, but '" + refAlias + "' has not been imported yet. "
-                        + "Move the '" + refAlias + "' import before '" + currentAlias + "'.");
-            }
-        }
-    }
-
     private static void validateOutputNames(YamlModule module, List<String> errors) {
         for (String outputName : module.outputs().keySet()) {
             if (outputName == null || outputName.isBlank()) {
@@ -205,6 +204,112 @@ public final class ModuleExpander {
             }
         }
     }
+
+    private static boolean isWholeModuleRef(String value) {
+        return WHOLE_MODULE_REF.matcher(value).matches();
+    }
+
+    private static YamlModule findModuleByAlias(String alias,
+                                                List<YamlImport> imports,
+                                                Map<String, YamlModule> availableModules) {
+        for (YamlImport imp : imports) {
+            if (alias.equals(imp.as())) {
+                return availableModules.get(imp.module());
+            }
+        }
+        return null;
+    }
+
+    private static void validateModuleRefs(List<YamlImport> imports,
+                                           Map<String, YamlModule> availableModules) {
+        List<ParameterViolation> violations       = new ArrayList<>();
+        Set<String>              processedAliases = new HashSet<>();
+
+        for (YamlImport imp : imports) {
+            YamlModule targetModule = availableModules.get(imp.module());
+            if (targetModule == null) {
+                processedAliases.add(imp.as());
+                continue;
+            }
+
+            for (Map.Entry<String, String> paramEntry : imp.parameters().entrySet()) {
+                String paramName  = paramEntry.getKey();
+                String paramValue = paramEntry.getValue();
+
+                if (!paramValue.contains("${module.")) {continue;}
+
+                YamlModuleParameter paramDecl    = targetModule.parameters().get(paramName);
+                boolean             isWholeValue = isWholeModuleRef(paramValue);
+
+                Matcher matcher = VAR_REF.matcher(paramValue);
+                while (matcher.find()) {
+                    String key = matcher.group(1);
+                    if (!key.startsWith("module.")) {continue;}
+                    String rest = key.substring("module.".length());
+                    int    dot  = rest.indexOf('.');
+                    if (dot < 0) {continue;}
+                    String refAlias   = rest.substring(0, dot);
+                    String outputName = rest.substring(dot + 1);
+
+                    if (!processedAliases.contains(refAlias)) {
+                        violations.add(new ParameterViolation(paramName,
+                                                              "module-ref-forward",
+                                                              "Import '" + imp.as() + "' references ${" + key
+                                                              + "}, but '" + refAlias
+                                                              + "' has not been imported yet. Move the '"
+                                                              + refAlias + "' import before '" + imp.as() + "'.",
+                                                              paramValue));
+                        continue;
+                    }
+
+                    YamlModule refModule = findModuleByAlias(refAlias, imports,
+                                                             availableModules);
+                    if (refModule == null) {continue;}
+
+                    YamlModuleOutput output = refModule.outputs().get(outputName);
+                    if (output == null) {
+                        violations.add(new ParameterViolation(paramName,
+                                                              "module-ref-missing-output",
+                                                              "Import '" + imp.as() + "' references output '"
+                                                              + outputName + "' on '" + refAlias
+                                                              + "', but module '" + refModule.name()
+                                                              + "' does not declare that output. Available: "
+                                                              + refModule.outputs().keySet(),
+                                                              paramValue));
+                        continue;
+                    }
+
+                    if (isWholeValue && paramDecl != null) {
+                        if (!paramDecl.type().canAccept(output.type())) {
+                            violations.add(new ParameterViolation(paramName,
+                                                                  "module-ref-type-incompatible",
+                                                                  "Output '" + outputName + "' (" + output.type()
+                                                                  + ") on '" + refAlias
+                                                                  + "' is not assignable to parameter '"
+                                                                  + paramName + "' (" + paramDecl.type() + ").",
+                                                                  paramValue));
+                        }
+                    }
+                }
+
+                if (!isWholeValue && paramDecl != null
+                    && paramDecl.type() != ParameterType.STRING) {
+                    violations.add(new ParameterViolation(paramName,
+                                                          "module-ref-embedded-type",
+                                                          "Parameter '" + paramName + "' (" + paramDecl.type()
+                                                          + ") uses string interpolation, which always "
+                                                          + "produces STRING.",
+                                                          paramValue));
+                }
+            }
+            processedAliases.add(imp.as());
+        }
+
+        if (!violations.isEmpty()) {
+            throw new ParameterValidationException(violations);
+        }
+    }
+
 
     private static Map<String, String> resolveOutputs(YamlModule module,
                                                        Map<String, String> paramScope) {

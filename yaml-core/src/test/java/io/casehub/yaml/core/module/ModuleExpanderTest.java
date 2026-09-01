@@ -270,6 +270,197 @@ class ModuleExpanderTest {
         Map<String, Object> unknown = result.section("nonexistent");
         assertThat(unknown).isEmpty();
     }
+// --- Structural type checking ---
+
+    @Test
+    void missing_output_reference_throws() {
+        var output = new YamlModuleOutput(ParameterType.STRING, "val");
+        var module = new YamlModule("m", Map.of(), Map.of("real", output), Map.of());
+        var paramDecl = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                                null, null, null, null, null);
+        var consumer = new YamlModule("c", Map.of("x", paramDecl), Map.of(), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("m", "a", null, Map.of()),
+                        new YamlImport("c", "b", null,
+                                       Map.of("x", "${module.a.nonexistent}"))),
+                Map.of("m", module, "c", consumer), Map.of()))
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSize(1);
+                    assertThat(violations.get(0).constraint())
+                            .isEqualTo("module-ref-missing-output");
+                    assertThat(violations.get(0).message())
+                            .contains("nonexistent")
+                            .contains("real");
+                });
+    }
+
+    @Test
+    void type_incompatible_whole_value_throws() {
+        var boolOutput = new YamlModuleOutput(ParameterType.BOOLEAN, "${var.flag}");
+        var boolParam = new YamlModuleParameter(ParameterType.BOOLEAN, true, null,
+                                                null, null, null, null, null);
+        var producer = new YamlModule("producer",
+                                      Map.of("flag", boolParam),
+                                      Map.of("enabled", boolOutput), Map.of());
+
+        var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("count", intParam), Map.of(), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null,
+                                       Map.of("flag", "true")),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("count", "${module.p.enabled}"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of()))
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSize(1);
+                    assertThat(violations.get(0).constraint())
+                            .isEqualTo("module-ref-type-incompatible");
+                    assertThat(violations.get(0).message())
+                            .contains("BOOLEAN")
+                            .contains("INTEGER");
+                });
+    }
+
+    @Test
+    void type_compatible_widening_passes() {
+        var intOutput = new YamlModuleOutput(ParameterType.INTEGER, "${var.port}");
+        var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                                               null, null, null, null, null);
+        var producer = new YamlModule("producer",
+                                      Map.of("port", intParam),
+                                      Map.of("port", intOutput), Map.of());
+
+        var numParam = new YamlModuleParameter(ParameterType.NUMBER, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("factor", numParam), Map.of(), Map.of());
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null,
+                                       Map.of("port", "5432")),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("factor", "${module.p.port}"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of());
+
+        assertThat(result.moduleScopes().get("c"))
+                .containsEntry("factor", "5432");
+    }
+
+    @Test
+    void embedded_ref_non_string_param_throws() {
+        var strOutput = new YamlModuleOutput(ParameterType.STRING, "val");
+        var producer = new YamlModule("producer", Map.of(),
+                                      Map.of("host", strOutput), Map.of());
+
+        var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("port", intParam), Map.of(), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null, Map.of()),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("port", "prefix-${module.p.host}"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of()))
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSize(1);
+                    assertThat(violations.get(0).constraint())
+                            .isEqualTo("module-ref-embedded-type");
+                    assertThat(violations.get(0).message())
+                            .contains("INTEGER")
+                            .contains("string interpolation");
+                });
+    }
+
+    @Test
+    void embedded_ref_string_param_passes() {
+        var strOutput = new YamlModuleOutput(ParameterType.STRING, "localhost");
+        var producer = new YamlModule("producer", Map.of(),
+                                      Map.of("host", strOutput), Map.of());
+
+        var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("url", strParam), Map.of(), Map.of());
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null, Map.of()),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("url", "http://${module.p.host}:8080"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of());
+
+        assertThat(result.moduleScopes().get("c"))
+                .containsEntry("url", "http://localhost:8080");
+    }
+
+    @Test
+    void collect_all_multiple_errors() {
+        var boolOutput = new YamlModuleOutput(ParameterType.BOOLEAN, "true");
+        var producer = new YamlModule("producer", Map.of(),
+                                      Map.of("flag", boolOutput), Map.of());
+
+        var intParam = new YamlModuleParameter(ParameterType.INTEGER, true, null,
+                                               null, null, null, null, null);
+        var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("count", intParam, "name", strParam), Map.of(), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null, Map.of()),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("count", "${module.p.flag}",
+                                              "name", "${module.p.missing}"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of()))
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSizeGreaterThanOrEqualTo(2);
+                    assertThat(violations.stream().map(ParameterViolation::constraint))
+                            .contains("module-ref-type-incompatible",
+                                      "module-ref-missing-output");
+                });
+    }
+
+    @Test
+    void list_to_string_rejected() {
+        var listOutput = new YamlModuleOutput(ParameterType.LIST, "${var.items}");
+        var listParam = new YamlModuleParameter(ParameterType.LIST, true, null,
+                                                null, null, null, null, null);
+        var producer = new YamlModule("producer",
+                                      Map.of("items", listParam),
+                                      Map.of("items", listOutput), Map.of());
+
+        var strParam = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                               null, null, null, null, null);
+        var consumer = new YamlModule("consumer",
+                                      Map.of("label", strParam), Map.of(), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("producer", "p", null,
+                                       Map.of("items", "a,b,c")),
+                        new YamlImport("consumer", "c", null,
+                                       Map.of("label", "${module.p.items}"))),
+                Map.of("producer", producer, "consumer", consumer), Map.of()))
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSize(1);
+                    assertThat(violations.get(0).constraint())
+                            .isEqualTo("module-ref-type-incompatible");
+                });
+    }
+
 
     // --- Chaining ---
 
@@ -310,9 +501,16 @@ class ModuleExpanderTest {
                                 Map.of("x", "${module.a.out}")),
                         new YamlImport("m", "a", null, Map.of())),
                 Map.of("m", module), Map.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("b")
-                .hasMessageContaining("a");
+                .isInstanceOf(ParameterValidationException.class)
+                .satisfies(ex -> {
+                    var violations = ((ParameterValidationException) ex).violations();
+                    assertThat(violations).hasSize(1);
+                    assertThat(violations.get(0).constraint())
+                            .isEqualTo("module-ref-forward");
+                    assertThat(violations.get(0).message())
+                            .contains("b")
+                            .contains("a");
+                });
     }
 
     @Test

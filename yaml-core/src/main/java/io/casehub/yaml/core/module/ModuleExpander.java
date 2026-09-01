@@ -15,6 +15,15 @@ public final class ModuleExpander {
             List<YamlImport> imports,
             Map<String, YamlModule> availableModules,
             Map<String, Map<String, Object>> existingSections) {
+        return expand(imports, availableModules, existingSections, null, null);
+    }
+
+    public static ExpandedModule expand(
+            List<YamlImport> imports,
+            Map<String, YamlModule> availableModules,
+            Map<String, Map<String, Object>> existingSections,
+            SectionDeserializer deserializer,
+            SectionContentRewriter rewriter) {
 
         validateImports(imports, availableModules);
 
@@ -41,7 +50,17 @@ public final class ModuleExpander {
 
                 for (Map.Entry<String, Object> contentEntry : sectionContent.entrySet()) {
                     String prefixedKey = imp.as() + "." + contentEntry.getKey();
-                    targetSection.put(prefixedKey, contentEntry.getValue());
+                    Object value = contentEntry.getValue();
+                    if (deserializer != null && value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> rawMap = (Map<String, Object>) value;
+                        value = deserializer.deserialize(sectionName, contentEntry.getKey(), rawMap);
+                    }
+                    if (rewriter != null) {
+                        value = rewriter.rewrite(sectionName, contentEntry.getKey(), value,
+                                imp.as(), sectionContent.keySet());
+                    }
+                    targetSection.put(prefixedKey, value);
                 }
             }
         }

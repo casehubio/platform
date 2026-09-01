@@ -169,4 +169,105 @@ class ModuleExpanderTest {
         assertThat(result.moduleScopes()).isEmpty();
         assertThat(result.importConditions()).isEmpty();
     }
+
+// --- SectionDeserializer + SectionContentRewriter ---
+
+    record TypedNode(String type, Map<String, Object> spec, List<String> dependsOn) {}
+
+    @Test
+    void deserializer_converts_during_expansion() {
+        var module = new YamlModule("m", Map.of(),
+                                    Map.of("nodes", Map.of("check", Map.of("type", "sensor",
+                                                                           "spec", Map.of("uri", "s3://data"),
+                                                                           "dependsOn", List.of()))));
+        var imp = new YamlImport("m", "a", null, Map.of());
+
+        SectionDeserializer deserializer = (section, key, raw) -> {
+            if ("nodes".equals(section)) {
+                return new TypedNode(
+                        (String) raw.get("type"),
+                        raw.get("spec") instanceof Map ? (Map<String, Object>) raw.get("spec") : Map.of(),
+                        raw.get("dependsOn") instanceof List ? ((List<?>) raw.get("dependsOn")).stream()
+                                                                                               .map(Object::toString).toList() : List.of());
+            }
+            return raw;
+        };
+
+        var result = ModuleExpander.expand(List.of(imp),
+                                           Map.of("m", module), Map.of(), deserializer, null);
+
+        Object value = result.sections().get("nodes").get("a.check");
+        assertThat(value).isInstanceOf(TypedNode.class);
+        assertThat(((TypedNode) value).type()).isEqualTo("sensor");
+    }
+
+    @Test
+    void deserializer_null_passes_raw() {
+        var module = new YamlModule("m", Map.of(),
+                                    Map.of("nodes", Map.of("n", Map.of("type", "x"))));
+        var imp = new YamlImport("m", "a", null, Map.of());
+        var result = ModuleExpander.expand(List.of(imp),
+                                           Map.of("m", module), Map.of(), null, null);
+        assertThat(result.sections().get("nodes").get("a.n")).isInstanceOf(Map.class);
+    }
+
+    @Test
+    void rewriter_receives_typed_objects() {
+        var module = new YamlModule("m", Map.of(),
+                                    Map.of("nodes", Map.of("alerter", Map.of("type", "alert",
+                                                                             "spec", Map.of(), "dependsOn", List.of("monitor")),
+                                                           "monitor", Map.of("type", "sensor",
+                                                                             "spec", Map.of(), "dependsOn", List.of()))));
+        var imp = new YamlImport("m", "pipe", null, Map.of());
+
+        SectionDeserializer deserializer = (section, key, raw) ->
+                                                   new TypedNode((String) raw.get("type"),
+                                                                 raw.get("spec") instanceof Map ? (Map<String, Object>) raw.get("spec") : Map.of(),
+                                                                 raw.get("dependsOn") instanceof List ? ((List<?>) raw.get("dependsOn")).stream()
+                                                                                                                                        .map(Object::toString).toList() : List.of());
+
+        SectionContentRewriter rewriter = (section, key, value, alias, moduleKeys) -> {
+            if (value instanceof TypedNode node) {
+                List<String> rewritten = node.dependsOn().stream()
+                                             .map(dep -> moduleKeys.contains(dep) ? alias + "." + dep : dep)
+                                             .toList();
+                return new TypedNode(node.type(), node.spec(), rewritten);
+            }
+            return value;
+        };
+
+        var result = ModuleExpander.expand(List.of(imp),
+                                           Map.of("m", module), Map.of(), deserializer, rewriter);
+
+        TypedNode alerter = (TypedNode) result.sections().get("nodes").get("pipe.alerter");
+        assertThat(alerter.dependsOn()).containsExactly("pipe.monitor");
+    }
+
+// --- Typed accessor ---
+
+    @Test
+    void section_typed_accessor() {
+        var module = new YamlModule("m", Map.of(),
+                                    Map.of("nodes", Map.of("n", Map.of("type", "x",
+                                                                       "spec", Map.of(), "dependsOn", List.of()))));
+        var imp = new YamlImport("m", "a", null, Map.of());
+
+        SectionDeserializer deserializer = (section, key, raw) ->
+                                                   new TypedNode((String) raw.get("type"),
+                                                                 raw.get("spec") instanceof Map ? (Map<String, Object>) raw.get("spec") : Map.of(),
+                                                                 List.of());
+
+        var result = ModuleExpander.expand(List.of(imp),
+                                           Map.of("m", module), Map.of(), deserializer, null);
+
+        Map<String, TypedNode> nodes = result.section("nodes");
+        assertThat(nodes.get("a.n").type()).isEqualTo("x");
+    }
+
+    @Test
+    void section_accessor_returns_empty_for_unknown() {
+        var                 result  = ModuleExpander.expand(List.of(), Map.of(), Map.of(), null, null);
+        Map<String, Object> unknown = result.section("nonexistent");
+        assertThat(unknown).isEmpty();
+    }
 }

@@ -314,7 +314,7 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 `AccessControlProvider` provides blocking access control with resource hierarchy inheritance. Group-based grants resolve via `GroupMembershipProvider`. Parent-child hierarchy with depth guard of 20.
 
-**ResourceId:** Type-safe resource identifier replacing raw `String resourceId`. `ResourceId.of(type, id)` creates a typed reference; `ResourceId.parse("case:123")` parses the `type:id` format. All ACL SPI methods now accept `ResourceId` instead of separate `resourceType` + `resourceId` parameters.
+**ResourceId:** Type-safe resource identifier replacing raw `String resourceId`. `new ResourceId(type, id)` creates a typed reference; `ResourceId.parse("case:123")` parses the `type:id` format; `ResourceId.fromString(value)` is an alias for `parse`. All ACL SPI methods now accept `ResourceId` instead of separate `resourceType` + `resourceId` parameters.
 
 **Action hierarchy:** `AclAction` enum: `READ`, `WRITE`, `ADMIN`, `CLAIM`. ADMIN implies WRITE implies READ -- a WRITE grant satisfies a READ check; an ADMIN grant satisfies both READ and WRITE. CLAIM is independent. `satisfiedBy()` and `deniedBy()` methods encode this hierarchy.
 
@@ -393,7 +393,7 @@ Backend implementations live in casehub-neocortex, not this repo.
 
 **MCP infrastructure:**
 - `casehub_activate` — on-demand per-operation tool registration. Agents discover and activate tools at runtime instead of exposing all tools at startup.
-- **Resource subscriptions:** `McpResourceRegistry` SPI for registering subscribable MCP resources. `McpResourceSubscriptionManager` tracks subscriptions and fires notifications on resource changes.
+- **Resource subscriptions:** `McpResourceRegistry` SPI for registering subscribable MCP resources. `McpResourceRegistryBridge` tracks subscriptions and fires notifications on resource changes.
 - **Dynamic tool schema:** The operation catalog is injected into the `casehub_action` tool definition at runtime, providing contextual tool descriptions.
 - `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations.
 

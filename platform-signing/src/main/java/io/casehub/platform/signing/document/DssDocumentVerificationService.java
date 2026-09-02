@@ -9,6 +9,7 @@ import io.casehub.platform.api.signing.document.DocumentVerificationResult;
 import io.casehub.platform.api.signing.document.DocumentVerificationService;
 import io.casehub.platform.api.signing.document.VerificationStatus;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
@@ -18,6 +19,17 @@ import java.util.List;
 public class DssDocumentVerificationService implements DocumentVerificationService {
 
     private static final Logger LOG = Logger.getLogger(DssDocumentVerificationService.class);
+
+    private final TrustedListManager trustedListManager;
+
+    @Inject
+    DssDocumentVerificationService(TrustedListManager trustedListManager) {
+        this.trustedListManager = trustedListManager;
+    }
+
+    public DssDocumentVerificationService() {
+        this.trustedListManager = null;
+    }
 
     @Override
     public DocumentVerificationResult verifyPdf(byte[] pdfBytes) {
@@ -34,7 +46,11 @@ public class DssDocumentVerificationService implements DocumentVerificationServi
                                                List<InMemoryDocument> detachedContents) {
         try {
             var validator = SignedDocumentValidator.fromDocument(signatureDoc);
-            validator.setCertificateVerifier(new CommonCertificateVerifier());
+            var verifier = new CommonCertificateVerifier();
+            if (trustedListManager != null && trustedListManager.isEnabled()) {
+                verifier.addTrustedCertSources(trustedListManager.getTrustedListSource());
+            }
+            validator.setCertificateVerifier(verifier);
             if (detachedContents != null) {
                 validator.setDetachedContents(List.copyOf(detachedContents));
             }

@@ -64,6 +64,12 @@ Optional module activated by classpath presence.</description>
     </dependency>
 
     <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-tsl-validation</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-arc</artifactId>
     </dependency>

@@ -24,4 +24,6 @@ public interface DssSigningConfig {
     Optional<String> tsaUrl();
 
     Optional<Integer> expiryWarningDays();
+
+    Optional<String> trustedListUrl();
 }

@@ -14,6 +14,11 @@ public record ExpandedModule(
         return sections.getOrDefault(name, Map.of());
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> Map<String, T> typedSection(String name) {
+        return (Map<String, T>) (Map<String, ?>) sections.getOrDefault(name, Map.of());
+    }
+
     public VariableSource outputSource() {
         return name -> {
             int dot = name.indexOf('.');

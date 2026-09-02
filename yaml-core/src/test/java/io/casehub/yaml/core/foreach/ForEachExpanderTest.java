@@ -31,9 +31,6 @@ class ForEachExpanderTest {
         public ForEachDirective getForEach(TestElement element) { return element.forEach(); }
 
         @Override
-        public String getId(TestElement element) { return element.id(); }
-
-        @Override
         public String getWhen(TestElement element) { return element.when(); }
     }
 
@@ -397,9 +394,6 @@ class ForEachExpanderTest {
         public ForEachDirective getForEach(RefElement element) {return element.forEach();}
 
         @Override
-        public String getId(RefElement element) {return element.id();}
-
-        @Override
         public String getWhen(RefElement element) {return element.when();}
 
         @Override
@@ -519,4 +513,40 @@ class ForEachExpanderTest {
 
         assertThat(result.elements()).containsKey("node");
     }
+// --- commaSplit factory ---
+
+    @Test
+    void commaSplit_splits_csv() {
+        IterationValueExpander expander = IterationValueExpander.commaSplit();
+        assertThat(expander.expand("us-east,eu-west,ap-south", "ctx"))
+                .containsExactly("us-east", "eu-west", "ap-south");
+    }
+
+    @Test
+    void commaSplit_trims_whitespace() {
+        IterationValueExpander expander = IterationValueExpander.commaSplit();
+        assertThat(expander.expand(" us-east , eu-west , ap-south ", "ctx"))
+                .containsExactly("us-east", "eu-west", "ap-south");
+    }
+
+    @Test
+    void commaSplit_filters_empty_segments() {
+        IterationValueExpander expander = IterationValueExpander.commaSplit();
+        assertThat(expander.expand("a,,b, ,c", "ctx"))
+                .containsExactly("a", "b", "c");
+    }
+
+    @Test
+    void commaSplit_single_value_returns_singleton() {
+        IterationValueExpander expander = IterationValueExpander.commaSplit();
+        assertThat(expander.expand("single", "ctx"))
+                .containsExactly("single");
+    }
+
+    @Test
+    void commaSplit_empty_string_returns_empty() {
+        IterationValueExpander expander = IterationValueExpander.commaSplit();
+        assertThat(expander.expand("", "ctx")).isEmpty();
+    }
+
 }

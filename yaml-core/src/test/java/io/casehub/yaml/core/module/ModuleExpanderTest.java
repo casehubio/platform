@@ -260,8 +260,8 @@ class ModuleExpanderTest {
         var result = ModuleExpander.expand(List.of(imp),
                                            Map.of("m", module), Map.of(), ExpansionOptions.of(deserializer, null));
 
-        TypedNode node = (TypedNode) result.section("nodes").get("a.n");
-        assertThat(node.type()).isEqualTo("x");
+        Map<String, TypedNode> nodes = result.typedSection("nodes");
+        assertThat(nodes.get("a.n").type()).isEqualTo("x");
     }
 
     @Test
@@ -270,6 +270,14 @@ class ModuleExpanderTest {
         Map<String, Object> unknown = result.section("nonexistent");
         assertThat(unknown).isEmpty();
     }
+
+    @Test
+    void typedSection_returns_empty_for_unknown() {
+        var                    result  = ModuleExpander.expand(List.of(), Map.of(), Map.of(), ExpansionOptions.NONE);
+        Map<String, TypedNode> unknown = result.typedSection("nonexistent");
+        assertThat(unknown).isEmpty();
+    }
+
 // --- Structural type checking ---
 
     @Test
@@ -550,4 +558,37 @@ class ModuleExpanderTest {
         assertThat(result.moduleOutputs().get("gated"))
                 .containsEntry("out", "value");
     }
+
+    @Test
+    void output_template_referencing_undeclared_parameter_throws() {
+        var param = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                            null, null, null, null, null, List.of(), null);
+        var output = new YamlModuleOutput(ParameterType.STRING, "${var.host}:${var.nonexistent}");
+        var module = new YamlModule("m", Map.of("host", param),
+                                    Map.of("url", output), Map.of());
+
+        assertThatThrownBy(() -> ModuleExpander.expand(
+                List.of(new YamlImport("m", "a", null, Map.of("host", "localhost"))),
+                Map.of("m", module), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("undeclared parameter")
+                .hasMessageContaining("nonexistent")
+                .hasMessageContaining("host");
+    }
+
+    @Test
+    void output_template_referencing_declared_parameter_passes() {
+        var param = new YamlModuleParameter(ParameterType.STRING, true, null,
+                                            null, null, null, null, null, List.of(), null);
+        var output = new YamlModuleOutput(ParameterType.STRING, "${var.host}:8080");
+        var module = new YamlModule("m", Map.of("host", param),
+                                    Map.of("url", output), Map.of());
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("m", "a", null, Map.of("host", "localhost"))),
+                Map.of("m", module), Map.of());
+
+        assertThat(result.moduleOutputs().get("a")).containsEntry("url", "localhost:8080");
+    }
+
 }

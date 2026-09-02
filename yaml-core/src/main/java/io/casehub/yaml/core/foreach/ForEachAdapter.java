@@ -8,8 +8,6 @@ public interface ForEachAdapter<E> {
 
     ForEachDirective getForEach(E element);
 
-    String getId(E element);
-
     String getWhen(E element);
 
     default java.util.List<Reference> getReferences(E element)               {return java.util.List.of();}

@@ -327,7 +327,8 @@ public final class ModuleExpander {
             String outputName = entry.getKey();
             YamlModuleOutput output = entry.getValue();
 
-            validateOutputTemplateScope(output.value(), outputName, module.name());
+            validateOutputTemplateScope(output.value(), outputName, module.name(),
+                    module.parameters().keySet());
 
             String resolvedValue = outputResolver.resolveString(output.value(),
                     "output." + module.name() + "." + outputName);
@@ -347,7 +348,8 @@ public final class ModuleExpander {
     }
 
     private static void validateOutputTemplateScope(String template, String outputName,
-                                                     String moduleName) {
+                                                     String moduleName,
+                                                     Set<String> declaredParams) {
         Matcher matcher = VAR_REF.matcher(template);
         while (matcher.find()) {
             String key = matcher.group(1);
@@ -358,6 +360,15 @@ public final class ModuleExpander {
                         "Output '" + outputName + "' in module '" + moduleName
                         + "': template references '${" + key
                         + "}' — output templates may only use ${var.*} references.");
+            }
+            if (dot >= 0) {
+                String paramName = key.substring(dot + 1);
+                if (!declaredParams.contains(paramName)) {
+                    throw new IllegalArgumentException(
+                            "Output '" + outputName + "' in module '" + moduleName
+                            + "': references undeclared parameter '${" + key
+                            + "}'. Declared parameters: " + declaredParams);
+                }
             }
         }
     }

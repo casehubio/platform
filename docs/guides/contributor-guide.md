@@ -284,9 +284,17 @@ Two separate signing concerns coexist:
 These are deliberately separate SPIs — document signing requires X.509 certificate chains and timestamping, which raw `SigningProvider` cannot provide.
 
 `platform-signing/` implements document sealing via EU DSS 6.2:
-- `KeyStoreManager` wraps `Pkcs12SignatureToken` — loads PKCS#12 at construction, exposes `DSSPrivateKeyEntry` via `resolveKey(tenancyId)` with tenant-alias fallback to default
-- `DssDocumentSigningService` uses the 3-step DSS flow: `getDataToSign()` → `token.sign()` → `signDocument()`. Separate `PAdESService` and `CAdESService` instances per call (stateless). `CommonCertificateVerifier` for offline validation
-- `DssDocumentVerificationService` uses `SignedDocumentValidator.fromDocument()` for auto-format detection
+- `document/` — core signing and verification:
+  - `KeyStoreManager @ApplicationScoped` — wraps `Pkcs12SignatureToken`, `@Inject` from `DssSigningConfig`. Shared by `DssDocumentSigningService`, `CertificateExpiryScheduler`, and `TenantKeyStoreResolver`
+  - `DssDocumentSigningService` — 3-step DSS flow: `getDataToSign()` → `token.sign()` → `signDocument()`. Stateless per call
+  - `DssDocumentVerificationService` — `SignedDocumentValidator.fromDocument()` with optional `TrustedListManager` as trusted cert source
+  - `TrustedListManager @ApplicationScoped` — EU LOTL loading via `dss-tsl-validation` (`TLValidationJob.onlineRefresh()`). File-cached 24h. Disabled when `casehub.signing.trusted-list-url` absent
+- `lifecycle/` — certificate lifecycle management:
+  - `CertificateExpiryMonitor` — scans keystore certificates, fires `CertificateExpiryEvent` CDI event when within threshold. Clock-injected for deterministic tests
+  - `CertificateExpiryScheduler` — `@Scheduled(every = "6h")` driver
+  - `KeyStoreRotationService` — atomic `AtomicReference<KeyStoreManager>` swap. Failed rotations (wrong password, missing file) keep the old manager — no signing downtime
+- `tenant/` — multi-tenant keystore support:
+  - `TenantKeyStoreResolver` — maps tenancyId to per-tenant PKCS#12 via `TenantKeyStoreConfig`. ConcurrentHashMap cache (one `KeyStoreManager` per tenant, created on first resolve). Unknown tenants fall back to the default `KeyStoreManager`
 
 **PDFBox version constraint:** `platform-pdf` uses PDFBox 3.0.3 (via OpenHTMLtoPDF 1.1.37). `platform-signing` uses PDFBox 3.0.4 (via DSS 6.2). Both 3.0.x — binary compatible. Maven resolves to 3.0.4. If either dependency bumps PDFBox major version, alignment must be verified.
 

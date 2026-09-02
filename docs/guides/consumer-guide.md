@@ -148,6 +148,12 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `Age
 - `key-alias` — alias for the signing key (default: first alias in keystore)
 - `pades-profile` — `B_B`, `B_T` (default), `B_LT`, `B_LTA`
 - `tsa-url` — RFC 3161 TSA endpoint (required for B_T+; absent + B_T = fail)
+- `expiry-warning-days` — certificate expiry warning threshold (default 30). `CertificateExpiryEvent` CDI event fired when any keystore certificate is within this threshold. `@Scheduled` check every 6h
+- `trusted-list-url` — EU LOTL URL for Trusted List validation (e.g. `https://ec.europa.eu/tools/lotl/eu-lotl.xml`). When set, `DssDocumentVerificationService` validates signer certificates against the EU Trusted List. File-cached with 24h expiry. Disabled by default
+
+**Per-tenant keystores:** `TenantKeyStoreResolver` maps tenant IDs to dedicated PKCS#12 files. Unknown tenants fall back to the default keystore. Configure tenant keystores programmatically via `TenantKeyStoreConfig`.
+
+**Runtime rotation:** `KeyStoreRotationService` atomically swaps the active keystore without restart. Failed rotations (wrong password, missing file) keep the existing keystore — no downtime on bad config.
 
 **Profile enforcement:** B_T+ configured without TSA throws `IllegalStateException` — no silent downgrade to B_B.
 

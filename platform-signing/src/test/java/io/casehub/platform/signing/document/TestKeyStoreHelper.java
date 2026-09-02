@@ -19,9 +19,9 @@ import java.util.Date;
 
 public final class TestKeyStoreHelper {
 
-    static final String ALIAS = "test-seal";
-    static final String PASSWORD = "changeit";
-    static final String DN = "CN=Test Seal, O=CaseHub, C=IE";
+    public static final String ALIAS = "test-seal";
+    public static final String PASSWORD = "changeit";
+    public static final String DN = "CN=Test Seal, O=CaseHub, C=IE";
 
     private TestKeyStoreHelper() {}
 

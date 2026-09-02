@@ -6,11 +6,15 @@ import eu.europa.esig.dss.token.Pkcs12SignatureToken;
 import eu.europa.esig.dss.token.SignatureTokenConnection;
 import org.jboss.logging.Logger;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
 import java.io.IOException;
 import java.security.KeyStore;
 import java.util.List;
 
-class KeyStoreManager {
+@ApplicationScoped
+public class KeyStoreManager {
 
     private static final Logger LOG = Logger.getLogger(KeyStoreManager.class);
 
@@ -18,7 +22,15 @@ class KeyStoreManager {
     private final Pkcs12SignatureToken token;
     private final String defaultAlias;
 
-    KeyStoreManager(String path, String password, String type, String alias) {
+    @Inject
+    KeyStoreManager(DssSigningConfig config) {
+        this(config.keystorePath().orElse(null),
+             config.keystorePassword().orElse(null),
+             config.keystoreType(),
+             config.keyAlias().orElse(null));
+    }
+
+    public KeyStoreManager(String path, String password, String type, String alias) {
         if (path == null || path.isBlank()) {
             LOG.warn("No keystore path configured — document signing disabled");
             this.loaded = false;
@@ -41,20 +53,20 @@ class KeyStoreManager {
         }
     }
 
-    boolean isLoaded() {
+    public boolean isLoaded() {
         return loaded;
     }
 
-    List<DSSPrivateKeyEntry> getKeys() {
+    public List<DSSPrivateKeyEntry> getKeys() {
         if (!loaded) return List.of();
         return token.getKeys();
     }
 
-    SignatureTokenConnection getToken() {
+    public SignatureTokenConnection getToken() {
         return token;
     }
 
-    DSSPrivateKeyEntry resolveKey(String tenancyId) {
+    public DSSPrivateKeyEntry resolveKey(String tenancyId) {
         if (!loaded) return null;
         var keys = token.getKeys();
         if (keys.isEmpty()) return null;

@@ -17,7 +17,7 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Date;
 
-final class TestKeyStoreHelper {
+public final class TestKeyStoreHelper {
 
     static final String ALIAS = "test-seal";
     static final String PASSWORD = "changeit";
@@ -25,7 +25,7 @@ final class TestKeyStoreHelper {
 
     private TestKeyStoreHelper() {}
 
-    static Path createTestKeystore(Path directory) throws Exception {
+    public static Path createTestKeystore(Path directory) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
         kpg.initialize(256);
         KeyPair kp = kpg.generateKeyPair();

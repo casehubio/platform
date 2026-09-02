@@ -31,14 +31,8 @@ public class DssDocumentSigningService implements DocumentSigningService {
     private final String tsaUrl;
 
     @Inject
-    DssDocumentSigningService(DssSigningConfig config) {
-        this(new KeyStoreManager(
-                        config.keystorePath().orElse(null),
-                        config.keystorePassword().orElse(null),
-                        config.keystoreType(),
-                        config.keyAlias().orElse(null)),
-                config.padesProfile(),
-                config.tsaUrl().orElse(null));
+    DssDocumentSigningService(KeyStoreManager keyStoreManager, DssSigningConfig config) {
+        this(keyStoreManager, config.padesProfile(), config.tsaUrl().orElse(null));
     }
 
     DssDocumentSigningService(KeyStoreManager keyStoreManager, SigningProfile profile,

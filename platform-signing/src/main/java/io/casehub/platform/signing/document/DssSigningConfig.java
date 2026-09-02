@@ -22,4 +22,6 @@ public interface DssSigningConfig {
     SigningProfile padesProfile();
 
     Optional<String> tsaUrl();
+
+    Optional<Integer> expiryWarningDays();
 }

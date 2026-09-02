@@ -8,3 +8,6 @@ proj
 .mvn/maven.config
 .mvn/slot-settings.xml
 Users/
+.worktrees
+.worktrees/
+.claude/

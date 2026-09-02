@@ -299,6 +299,18 @@ These are deliberately separate SPIs — document signing requires X.509 certifi
 
 **PDFBox version constraint:** `platform-pdf` uses PDFBox 3.0.3 (via OpenHTMLtoPDF 1.1.37). `platform-signing` uses PDFBox 3.0.4 (via DSS 6.2). Both 3.0.x — binary compatible. Maven resolves to 3.0.4. If either dependency bumps PDFBox major version, alignment must be verified.
 
+### Capacity Signal + Redistribution
+
+Cross-domain actor overload detection and automated work redistribution. The SPI lives in `platform-api` (`io.casehub.platform.api.capacity`); implementations in `platform/` (`io.casehub.platform.capacity`).
+
+**Signal flow:** Domain repos implement `CapacitySignalSource` to expose their load metric as pressure 0.0–1.0. `AggregatingActorCapacityView` collects all sources via `@Any Instance<CapacitySignalSource>` and takes max-pressure across signal types. `CapacityPressureMonitor` sweeps every 60s, fires `CapacityPressureEvent` (CDI async) per overloaded actor. Domain executors observe the event, build `RedistributionContext` with their own domain state, and call `RedistributionPolicy.evaluate()` for a decision: Compress, Redistribute, Hold, or Escalate.
+
+**Key types:** `CapacitySignal` (record: actorId, signalType, pressure, observedAt, metadata), `CapacitySignalSource` (SPI: observe + observeOverloaded), `ActorCapacity` (record: aggregated view), `ActorCapacityView` (SPI: single + fleet query), `RedistributionPolicy` (SPI: evaluate → decision), `RedistributionDecision` (sealed: Redistribute/Compress/Hold/Escalate), `CapacityPressureEvent` (CDI event).
+
+**Implementations:** `AggregatingActorCapacityView @DefaultBean` (max-pressure, error-isolated), `DefaultRedistributionPolicy @DefaultBean` (configurable thresholds: compress 0.7, redistribute 0.85, immediate 0.95, inactivity escalation 5m), `CapacityPressureMonitor @ApplicationScoped` (@Scheduled sweep), `CapacityActorStateContributor @ApplicationScoped` (bridges capacity into the ActorState dashboard via `ActorStateAccumulator.capacity()`).
+
+**Signals are tenant-agnostic.** An agent's context window or session slots are physical resources shared across tenants. Pressure represents aggregate physical state. Tenant scoping happens at the domain executor level during redistribution.
+
 ---
 
 ## Dependencies

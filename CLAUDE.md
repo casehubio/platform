@@ -2,15 +2,15 @@
 
 **Name:** casehub-platform
 
-**Physical path:** `/Users/mdproctor/claude/casehub/platform/CLAUDE.md`
-**Symlinked at:** `/Users/mdproctor/claude/public/casehub/platform/CLAUDE.md`
-**Project repo:** `/Users/mdproctor/claude/casehub/platform`
-**Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
+**Physical path:** `proj/`
+**Symlinked at:** `wksp/`
+**Project repo:** `proj/`
+**Workspace:** `wksp/`
 **Workspace type:** public
 
 ## Session Start
 
-Run `add-dir /Users/mdproctor/claude/casehub/platform` and `add-dir /Users/mdproctor/claude/public/casehub/platform` before any other work.
+Run `# add-dir removed — use proj/ symlink instead and `# add-dir removed — use proj/ symlink instead before any other work.
 
 ## Artifact Locations
 
@@ -28,13 +28,13 @@ Run `add-dir /Users/mdproctor/claude/casehub/platform` and `add-dir /Users/mdpro
 ## Git Discipline
 
 Two git repositories are active in every session:
-- **Workspace** (`/Users/mdproctor/claude/public/casehub/platform`) — plans, blog, specs, snapshots, handover
-- **Project repo** (`/Users/mdproctor/claude/casehub/platform`) — source code, ADRs
+- **Workspace** (wksp/) — plans, blog, specs, snapshots, handover
+- **Project repo** (proj/) — source code, ADRs
 
 Never rely on CWD for git operations:
 ```bash
-git -C /Users/mdproctor/claude/public/casehub/platform ...   # workspace artifacts
-git -C /Users/mdproctor/claude/casehub/platform ...          # project artifacts
+git -C proj/ ...   # workspace artifacts
+git -C proj/ ...          # project artifacts
 ```
 
 Two remotes are configured on the project repo:
@@ -57,7 +57,7 @@ git push --force mdproctor main   # --force on first push after fork creation
 | Artifact   | Destination | Notes |
 |------------|-------------|-------|
 | adr        | project     | lands in `adr/` |
-| protocols  | garden      | `/Users/mdproctor/claude/casehub/garden/docs/protocols/` — never create local protocol files |
+| protocols  | garden      | `proj/` — never create local protocol files |
 | specs      | project     | lands in `docs/` |
 | blog       | project     | lands in `docs/blog/` — promoted at work end |
 | plans      | workspace   | stay in workspace permanently |
@@ -121,7 +121,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | Module | Artifact | Purpose |
 |--------|----------|---------|
 | `platform-api/` | `casehub-platform-api` | Pure Java SPIs — zero deps |
-| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `NoOpPreferenceStore @DefaultBean` + `NoOpPreferenceSchemaRegistry @DefaultBean` + `PlatformPreferenceRegistrar @ApplicationScoped` (@Startup — registers 10 PreferenceSchemaDescriptors from PlatformPreferenceKeys (6 retention + engagement toggle + retry limit + digest retention + view cache TTL)) + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) + `CloudEventTypeDispatcher @ApplicationScoped` (re-fires CloudEvents with `@CloudEventType` qualifier for type-specific CDI observers) |
+| `platform/` | `casehub-platform` | Quarkus @DefaultBean implementations (configurable mocks + no-ops) + `NoOpPreferenceStore @DefaultBean` + `NoOpPreferenceSchemaRegistry @DefaultBean` + `PlatformPreferenceRegistrar @ApplicationScoped` (@Startup — registers 10 PreferenceSchemaDescriptors from PlatformPreferenceKeys (6 retention + engagement toggle + retry limit + digest retention + view cache TTL)) + `DataSourceRouter @ApplicationScoped` (CDI CloudEvent → DataSource bridge) + `CloudEventTypeDispatcher @ApplicationScoped` (re-fires CloudEvents with `@CloudEventType` qualifier for type-specific CDI observers) + `AggregatingActorCapacityView @DefaultBean` (max-pressure aggregation across CapacitySignalSource beans, error-isolated per source) + `DefaultRedistributionPolicy @DefaultBean` (configurable threshold-based decisions: compress 0.7, redistribute 0.85, immediate 0.95, inactivity escalation 5m) + `CapacityPressureMonitor @ApplicationScoped` (@Scheduled sweep, fires CapacityPressureEvent per overloaded actor) + `CapacityActorStateContributor @ApplicationScoped` (bridges capacity data into ActorState dashboard via ActorStateAccumulator.capacity()) |
 | `testing/` | `casehub-platform-testing` | @Alternative identity fixtures — no Quarkus runtime. FixedCurrentPrincipal @Priority(200) beats OidcCurrentPrincipal in tests; InMemoryGroupMembershipProvider @Priority(1) |
 | `config/` | `casehub-platform-config` | Scope-aware YAML + SmallRye Config PreferenceProvider — displaces mock when on classpath |
 | `oidc/` | `casehub-platform-oidc` | @Alternative @Priority(100) @RequestScoped OIDC-backed CurrentPrincipal — displaces all non-alternative CurrentPrincipal impls when on classpath. Reads actorId/groups from SecurityIdentity, tenancyId from JWT claim |
@@ -217,15 +217,16 @@ io.casehub.platform.api
                    AuthorizationDecision (record: approved, reason — approve()/deny(String) factories),
                    WorkerAuthorizationDeniedException (extends SecurityException: actorId, definitionId, reason)
   .actor         — ActorStateContributor (SPI: contribute data to a unified actor state view, @ApplicationScoped),
-                   ActorStateAccumulator (visitor: trustScore, capabilityScore — assembled concurrently by aggregator)
-  .capacity      — CapacitySignal (record: actorId, source, pressure 0.0–1.0, timestamp — validated),
-                   CapacitySignalSource (SPI: sourceName + signals() → List<CapacitySignal>),
-                   ActorCapacityView (SPI: aggregatedPressure/signalsByActor/allAggregatedPressures),
-                   RedistributionAction (enum: NONE/COMPRESS/REDISTRIBUTE/ESCALATE),
-                   RedistributionContext (record: actorId, aggregatedSignal, sourceSignals),
-                   RedistributionDecision (record+factories: action, reason — none()/compress()/redistribute()/escalate()),
+                   ActorStateAccumulator (visitor: trustScore, capabilityScore, capacity — assembled concurrently by aggregator)
+  .capacity      — CapacitySignal (record: actorId, signalType, pressure 0.0–1.0, observedAt, metadata),
+                   CapacitySignalSource (SPI: observe single actor + observeOverloaded fleet scan),
+                   CapacitySignalTypes (constants: CONTEXT_PRESSURE, TASK_COUNT, SESSION_COUNT),
+                   ActorCapacity (record: actorId, aggregatePressure, pressureBySignalType, observedAt),
+                   ActorCapacityView (SPI: getCapacity single + getOverloaded fleet scan),
                    RedistributionPolicy (SPI: evaluate(RedistributionContext) → RedistributionDecision),
-                   CapacityPressureEvent (CDI event record: actorId, decision, aggregatedSignal, firedAt)
+                   RedistributionContext (record: actorId, capacity, triggerSignalType, openObligationCount, timeSinceLastActivity),
+                   RedistributionDecision (sealed: Redistribute(reason, gracePeriod, excludeActors) / Compress(reason) / Hold(reason) / Escalate(reason)),
+                   CapacityPressureEvent (CDI event record: actorId, capacity, threshold, triggerSignalType)
   .notification  — NotificationStore (SPI: blocking store/storeAll/find/unreadCount/markRead/dismiss/markAllRead),
                    Notification (record: id, userId, tenancyId, title, body, category, severity, actionUrl, source, status, createdAt, readAt, dismissedAt),
                    NotificationInput (record: routing layer input — no id/status/timestamps), NotificationSource (record: eventId, entityType, entityId, actorId),

@@ -90,6 +90,27 @@ public final class ModuleExpander {
                 Map.copyOf(allOutputs));
     }
 
+    public static <T> TypedExpandedModule<T> expand(
+            List<YamlImport> imports,
+            Map<String, YamlModule> availableModules,
+            T existingContent,
+            ModuleBridge<T> bridge) {
+
+        Map<String, Map<String, Object>> rawSections = bridge.toSections(existingContent);
+        ExpansionOptions                 options     = new ExpansionOptions(null, bridge.rewriter());
+
+        ExpandedModule rawResult = expand(imports, availableModules, rawSections, options);
+
+        T typedContent = bridge.fromSections(rawResult.sections());
+
+        return new TypedExpandedModule<>(
+                typedContent,
+                rawResult.moduleScopes(),
+                rawResult.importConditions(),
+                rawResult.moduleOutputs());
+    }
+
+
     private static void validateImports(List<YamlImport> imports,
                                          Map<String, YamlModule> availableModules) {
         List<String> errors = new ArrayList<>();

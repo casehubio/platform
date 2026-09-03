@@ -77,7 +77,8 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `platform-view/` | `casehub-platform-view` | `@ApplicationScoped` | `SubjectViewEvaluator` + `SubjectViewOrchestrator` -- label-path view evaluation with caching |
 | `platform-view-inmem/` | `casehub-platform-view-inmem` | `@Alternative @Priority(100)` | In-memory view store + membership tracker + `InMemorySubjectViewQuerySupport` abstract helper |
 | `platform-view-jpa/` | `casehub-platform-view-jpa` | `@ApplicationScoped` | JPA view store -- `JpaLabelPatternQuerySupport` for domain consumers, `LabelPatternPredicates` for SQL LIKE |
-| `yaml-core/` | `casehub-platform-yaml-core` | (none) | Pure Java YAML primitives -- `VariableResolver`, `ForEachExpander`, `Truthiness`, `CsvParser`. Zero deps |
+| `yaml-core/` | `casehub-platform-yaml-core` | (none) | Pure Java YAML primitives -- `VariableResolver`, `ForEachExpander`, `Truthiness`, `CsvParser`, `ModuleBridge<T>`, `TypedExpandedModule<T>`. Zero deps |
+| `yaml-jackson/` | `casehub-platform-yaml-jackson` | (none) | Jackson mixins for yaml-core types -- `YamlCoreJacksonModule`, dynamic section capture, case-insensitive enums. Depends on yaml-core + jackson-databind |
 | `ts-core/` | `casehub-platform-ts-core` | (none) | TypeScript execution SPI -- `TsExecutor` interface, `NodeTsExecutor` (Node.js subprocess). Zero deps |
 
 **Removed from build:** `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` -- memory backends migrated to casehub-neocortex (neocortex#56). Directories remain on disk.

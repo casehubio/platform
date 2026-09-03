@@ -75,6 +75,7 @@
         <module>callback-client</module>
         <module>yaml-core</module>
         <module>yaml-codegen</module>
+        <module>yaml-jackson</module>
         <module>schema-generator</module>
         <module>ts-core</module>
         <module>platform-pdf</module>

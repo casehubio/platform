@@ -1739,7 +1739,11 @@ Cross-cutting decisions not captured in layer entries:
 | `PreferenceProvider` | SPI for resolving preferences by scope `Path`. `get(key)` returns null on absence; `getOrDefault(key)` applies `key.defaultValue()`. |
 | `Path` | Hierarchical scope key (e.g. `casehubio/devtown/pr-review`). `Path.of(String...)` for explicit segments; `Path.parse(String)` for raw string input with configured separator. |
 | `CurrentPrincipal` | CDI-injectable identity context for the current request actor — `actorId`, `groups`, `tenancyId`, `isCrossTenantAdmin`, `actorType`. |
-| `ActorType` | Enum: `HUMAN \| AGENT \| SYSTEM`. Owned by `platform-api`; resolved by `ActorTypeResolver` from actorId string patterns. |
+| `ActorType` | Enum: `HUMAN \| AGENT \| SYSTEM`. Owned by `platform-api`; resolved by `ActorTypeResolver` from actorId string patterns. Planned rename to `PrincipalType` (#272). |
+| `Identity` | Sealed interface unifying `PrincipalId`, `ActorId`, and `ParticipantId`. Use when the specific identity level doesn't matter (e.g., logging). All three share the `type:id` string format. |
+| `PrincipalId` | Stable, long-lived identity record (human, agent, or system). The universal foundation for ownership, authorisation, and accountability. String format: `type:id` (e.g., `human:alice`, `agent:claude:analyst@v1`). See §8 Identity Hierarchy. |
+| `ActorId` | A principal performing an action in a specific context. Use for execution attribution, audit, and delegation. Wraps a `PrincipalId`. See §8 Identity Hierarchy. |
+| `ParticipantId` | An actor involved in a multi-party interaction (conversation, session, collaboration). Wraps an `ActorId`. See §8 Identity Hierarchy. |
 | `GroupMember` | Record: `actorId` (SCIM `value` = OIDC `sub` = stable identity key) + `displayName` (human label — never use as a routing key). |
 | `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking; wrapped by `BlockingToReactiveBridge` for reactive callers. `store()` is append-only. |
 | `MemoryQuery` | Query builder for `CaseMemoryStore.query()` — multi-entity fan-out, `MemoryOrder` (CHRONOLOGICAL / RELEVANCE), `since` filter, domain filter. |

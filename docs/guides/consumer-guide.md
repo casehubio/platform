@@ -177,6 +177,51 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `Age
 
 **Actor types:** `ActorType` enum with `HUMAN`, `AGENT`, `SYSTEM`. `ActorTypeResolver.resolve(actorId)` derives the type from the actor ID string. `actorType()` and `isSystem()` use this.
 
+#### Identity Hierarchy
+
+casehub uses a three-level identity hierarchy. All levels share the `type:id`
+string format (e.g., `human:john.smith`, `agent:claude:analyst@v1`, `system:scheduler`).
+
+| Level | Type | Use when |
+|-------|------|----------|
+| **Principal** | `PrincipalId` | Ownership, permissions, ACLs, preferences, memory |
+| **Actor** | `ActorId` | Execution context, audit logs, delegation, tool calls |
+| **Participant** | `ParticipantId` | Multi-party interaction membership (sessions, conversations) |
+
+**Rules of thumb:**
+
+- Whose memory/preference/permission is this? → `PrincipalId`
+- Who performed this action? Who is delegating? → `ActorId`
+- Who is in this conversation/session? → `ParticipantId`
+- Which tenant's data? → `tenancyId` (not an identity type — see below)
+
+**Conversions:**
+
+```java
+// Down — adding context
+ActorId actor = ActorId.of(principal);
+ParticipantId participant = ParticipantId.of(actor);
+
+// Up — extracting stable identity
+PrincipalId principal = actorId.principalId();
+PrincipalId principal = participantId.principalId(); // shorthand
+```
+
+**Creating identities:**
+
+```java
+PrincipalId alice = PrincipalId.human("alice");
+PrincipalId claude = PrincipalId.agent("claude:analyst@v1");
+PrincipalId cron = PrincipalId.system("scheduler");
+
+// Or parse from a stored string
+PrincipalId parsed = PrincipalId.parse("agent:claude");
+```
+
+**Tenancy is not identity.** `tenancyId` answers "where" (which organisational boundary), not "who." They are orthogonal — a `PrincipalId` exists within a tenant but is not scoped by it. Never use `tenancyId` as an ownership key. Never use `PrincipalId` as a tenant filter.
+
+**Migration from raw strings:** Existing SPIs use `String actorId`, `String userId`, `String ownerId` — these are all `PrincipalId` semantically. New code should use the typed identity types. Existing SPI signatures will migrate in future issues.
+
 ### Path
 
 Hierarchical, scope-labelling type for case types, preference scopes, label paths. Not a filesystem path -- strict validation, no empty segments, no leading/trailing slashes.

@@ -857,4 +857,74 @@ class ModuleExpanderTest {
         assertThat(resolved.get("parent").sections().get("nodes"))
                 .containsKey("base");
     }
+
+    @Test
+    void extended_module_expands_correctly() {
+        var parentParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("monitoring",
+                                                               Map.of("region", parentParam), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("monitor", Map.of("type", "poller"))), List.of());
+
+        var childParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var childHeader = new YamlModuleFile.YamlModuleHeader("monitoring-slack",
+                                                              Map.of("channel", childParam), Map.of(), "monitoring");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("nodes", Map.of("notifier", Map.of("type", "slack"))), List.of());
+
+        var modules = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("monitoring-slack", "alerts", null,
+                                       Map.of("region", "us-east", "channel", "#ops"))),
+                modules, Map.of());
+
+        assertThat(result.sections().get("nodes"))
+                .containsKey("alerts.monitor")
+                .containsKey("alerts.notifier");
+        assertThat(result.moduleScopes().get("alerts"))
+                .containsEntry("region", "us-east")
+                .containsEntry("channel", "#ops");
+    }
+
+    @Test
+    void extended_module_with_bridge() {
+        var parentParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("monitoring",
+                                                               Map.of("region", parentParam), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("monitor", Map.of("type", "poller"))), List.of());
+
+        var childParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var childHeader = new YamlModuleFile.YamlModuleHeader("monitoring-slack",
+                                                              Map.of("channel", childParam), Map.of(), "monitoring");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("nodes", Map.of("notifier", Map.of("type", "slack"))), List.of());
+
+        var modules = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        ModuleBridge<Map<String, Map<String, Object>>> identityBridge = new ModuleBridge<>() {
+            @Override
+            public Map<String, Map<String, Object>> fromSections(Map<String, Map<String, Object>> sections) {
+                return sections;
+            }
+
+            @Override
+            public Map<String, Map<String, Object>> toSections(Map<String, Map<String, Object>> content) {
+                return content;
+            }
+        };
+
+        var result = ModuleExpander.expand(
+                List.of(new YamlImport("monitoring-slack", "alerts", null,
+                                       Map.of("region", "us-east", "channel", "#ops"))),
+                modules, Map.of(), identityBridge);
+
+        assertThat(result.content().get("nodes"))
+                .containsKey("alerts.monitor")
+                .containsKey("alerts.notifier");
+        assertThat(result.moduleScopes().get("alerts"))
+                .containsEntry("region", "us-east")
+                .containsEntry("channel", "#ops");
+    }
 }

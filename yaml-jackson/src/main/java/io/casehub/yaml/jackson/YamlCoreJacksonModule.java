@@ -13,5 +13,7 @@ public class YamlCoreJacksonModule extends SimpleModule {
     public void setupModule(SetupContext context) {
         super.setupModule(context);
         context.setMixInAnnotations(YamlModuleFile.class, YamlModuleFileMixin.class);
+        context.setMixInAnnotations(YamlModuleFile.YamlModuleHeader.class,
+                                    YamlModuleHeaderMixin.class);
     }
 }

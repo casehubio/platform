@@ -128,4 +128,59 @@ class YamlModuleFileBuilderTest {
 
         assertThat(file.sections()).containsOnlyKeys("nodes");
     }
+
+    @Test
+    void extends_field_deserialized() throws Exception {
+        String yaml = """
+                      module:
+                        name: child
+                        extends: parent
+                      nodes:
+                        notifier:
+                          type: slack
+                      """;
+
+        YamlModuleFile file = mapper.readValue(yaml, YamlModuleFile.class);
+
+        assertThat(file.module().extendsModule()).isEqualTo("parent");
+        assertThat(file.module().name()).isEqualTo("child");
+        assertThat(file.sections()).containsKey("nodes");
+    }
+
+    @Test
+    void no_extends_field_null() throws Exception {
+        String yaml = """
+                      module:
+                        name: standalone
+                      nodes:
+                        monitor:
+                          type: poller
+                      """;
+
+        YamlModuleFile file = mapper.readValue(yaml, YamlModuleFile.class);
+
+        assertThat(file.module().extendsModule()).isNull();
+    }
+
+    @Test
+    void extends_with_params_and_sections() throws Exception {
+        String yaml = """
+                      module:
+                        name: monitoring-with-slack
+                        extends: monitoring
+                        parameters:
+                          slack_channel:
+                            type: string
+                            required: true
+                      nodes:
+                        slack-notifier:
+                          type: notifier
+                      """;
+
+        YamlModuleFile file = mapper.readValue(yaml, YamlModuleFile.class);
+
+        assertThat(file.module().extendsModule()).isEqualTo("monitoring");
+        assertThat(file.module().parameters()).containsKey("slack_channel");
+        assertThat(file.sections()).containsKey("nodes");
+    }
 }

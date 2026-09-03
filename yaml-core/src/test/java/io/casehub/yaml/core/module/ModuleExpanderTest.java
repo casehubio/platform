@@ -591,4 +591,270 @@ class ModuleExpanderTest {
         assertThat(result.moduleOutputs().get("a")).containsEntry("url", "localhost:8080");
     }
 
+
+// --- resolveExtensions ---
+
+    @Test
+    void resolve_no_extensions_converts_all() {
+        var h1 = new YamlModuleFile.YamlModuleHeader("a", Map.of(), Map.of(), null);
+        var h2 = new YamlModuleFile.YamlModuleHeader("b", Map.of(), Map.of(), null);
+        var f1 = new YamlModuleFile(h1, Map.of("nodes", Map.of("n1", Map.of())), List.of());
+        var f2 = new YamlModuleFile(h2, Map.of("nodes", Map.of("n2", Map.of())), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(f1, f2));
+
+        assertThat(resolved).containsKeys("a", "b");
+        assertThat(resolved.get("a").sections().get("nodes")).containsKey("n1");
+        assertThat(resolved.get("b").sections().get("nodes")).containsKey("n2");
+    }
+
+    @Test
+    void resolve_inherits_parameters() {
+        var parentParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of("region", parentParam), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childParam = YamlModuleParameter.builder().type(ParameterType.STRING).required().build();
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of("channel", childParam), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").parameters())
+                .containsKeys("region", "channel");
+    }
+
+    @Test
+    void resolve_inherits_outputs() {
+        var parentOutput = new YamlModuleOutput(ParameterType.STRING, "value");
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of("endpoint", parentOutput), null);
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").outputs()).containsKey("endpoint");
+    }
+
+    @Test
+    void resolve_inherits_sections() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("monitor", Map.of("type", "http-poller"))), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").sections().get("nodes"))
+                .containsKey("monitor");
+    }
+
+    @Test
+    void resolve_child_adds_section_entries() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("monitor", Map.of("type", "poller"))), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("nodes", Map.of("notifier", Map.of("type", "slack"))), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").sections().get("nodes"))
+                .containsKeys("monitor", "notifier");
+    }
+
+    @Test
+    void resolve_child_adds_new_section() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("n", Map.of())), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("rules", Map.of("r", Map.of())), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").sections()).containsKeys("nodes", "rules");
+    }
+
+    @Test
+    void resolve_child_overrides_parameter() {
+        var parentParam = YamlModuleParameter.builder().type(ParameterType.STRING)
+                                             .defaultValue("us-east").build();
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of("region", parentParam), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childParam = YamlModuleParameter.builder().type(ParameterType.INTEGER)
+                                            .required().build();
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of("region", childParam), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").parameters().get("region").type())
+                .isEqualTo(ParameterType.INTEGER);
+        assertThat(resolved.get("child").parameters().get("region").required())
+                .isTrue();
+    }
+
+    @Test
+    void resolve_child_overrides_output() {
+        var parentOutput = new YamlModuleOutput(ParameterType.STRING, "old");
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of("url", parentOutput), null);
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childOutput = new YamlModuleOutput(ParameterType.INTEGER, "42");
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of("url", childOutput), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved.get("child").outputs().get("url").type())
+                .isEqualTo(ParameterType.INTEGER);
+    }
+
+    @Test
+    void resolve_child_overrides_section_entry() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("monitor",
+                                                                   Map.of("type", "poller", "interval", 30))), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("nodes", Map.of("monitor",
+                                                                  Map.of("type", "webhook"))), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> monitor = (Map<String, Object>)
+                                              resolved.get("child").sections().get("nodes").get("monitor");
+        assertThat(monitor).containsEntry("type", "webhook");
+        assertThat(monitor).doesNotContainKey("interval");
+    }
+
+    @Test
+    void resolve_preserves_child_name() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(List.of(parentFile, childFile));
+
+        assertThat(resolved).containsKey("child");
+        assertThat(resolved.get("child").name()).isEqualTo("child");
+    }
+
+    @Test
+    void resolve_unknown_parent_throws() {
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "nonexistent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        assertThatThrownBy(() -> ModuleExpander.resolveExtensions(List.of(childFile)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("child")
+                .hasMessageContaining("nonexistent");
+    }
+
+    @Test
+    void resolve_self_extension_throws() {
+        var header = new YamlModuleFile.YamlModuleHeader("m",
+                                                         Map.of(), Map.of(), "m");
+        var file = new YamlModuleFile(header, Map.of(), List.of());
+
+        assertThatThrownBy(() -> ModuleExpander.resolveExtensions(List.of(file)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("extends itself");
+    }
+
+    @Test
+    void resolve_chain_throws() {
+        var grandparentHeader = new YamlModuleFile.YamlModuleHeader("gp",
+                                                                    Map.of(), Map.of(), null);
+        var grandparentFile = new YamlModuleFile(grandparentHeader, Map.of(), List.of());
+
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), "gp");
+        var parentFile = new YamlModuleFile(parentHeader, Map.of(), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader, Map.of(), List.of());
+
+        assertThatThrownBy(() -> ModuleExpander.resolveExtensions(
+                List.of(grandparentFile, parentFile, childFile)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("chain")
+                .hasMessageContaining("child")
+                .hasMessageContaining("parent");
+    }
+
+    @Test
+    void resolve_duplicate_name_throws() {
+        var h1 = new YamlModuleFile.YamlModuleHeader("m", Map.of(), Map.of(), null);
+        var h2 = new YamlModuleFile.YamlModuleHeader("m", Map.of(), Map.of(), null);
+
+        assertThatThrownBy(() -> ModuleExpander.resolveExtensions(
+                List.of(new YamlModuleFile(h1, Map.of(), List.of()),
+                        new YamlModuleFile(h2, Map.of(), List.of()))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate");
+    }
+
+    @Test
+    void resolve_mixed_extended_and_plain() {
+        var parentHeader = new YamlModuleFile.YamlModuleHeader("parent",
+                                                               Map.of(), Map.of(), null);
+        var parentFile = new YamlModuleFile(parentHeader,
+                                            Map.of("nodes", Map.of("base", Map.of())), List.of());
+
+        var childHeader = new YamlModuleFile.YamlModuleHeader("child",
+                                                              Map.of(), Map.of(), "parent");
+        var childFile = new YamlModuleFile(childHeader,
+                                           Map.of("nodes", Map.of("extra", Map.of())), List.of());
+
+        var plainHeader = new YamlModuleFile.YamlModuleHeader("standalone",
+                                                              Map.of(), Map.of(), null);
+        var plainFile = new YamlModuleFile(plainHeader,
+                                           Map.of("rules", Map.of("r1", Map.of())), List.of());
+
+        var resolved = ModuleExpander.resolveExtensions(
+                List.of(parentFile, childFile, plainFile));
+
+        assertThat(resolved).hasSize(3);
+        assertThat(resolved.get("child").sections().get("nodes"))
+                .containsKeys("base", "extra");
+        assertThat(resolved.get("standalone").sections()).containsKey("rules");
+        assertThat(resolved.get("parent").sections().get("nodes"))
+                .containsKey("base");
+    }
 }

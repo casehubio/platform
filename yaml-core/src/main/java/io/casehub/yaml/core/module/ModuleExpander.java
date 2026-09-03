@@ -110,6 +110,82 @@ public final class ModuleExpander {
                 rawResult.moduleOutputs());
     }
 
+    public static Map<String, YamlModule> resolveExtensions(
+            List<YamlModuleFile> moduleFiles) {
+
+        Map<String, YamlModuleFile> filesByName = new LinkedHashMap<>();
+        for (YamlModuleFile file : moduleFiles) {
+            String name = file.module().name();
+            if (filesByName.containsKey(name)) {
+                throw new IllegalArgumentException(
+                        "Duplicate module name '" + name + "'.");
+            }
+            filesByName.put(name, file);
+        }
+
+        Map<String, YamlModule> resolved = new LinkedHashMap<>();
+        for (YamlModuleFile file : moduleFiles) {
+            String parentName = file.module().extendsModule();
+
+            if (parentName == null) {
+                resolved.put(file.module().name(), file.toModule());
+                continue;
+            }
+
+            if (parentName.equals(file.module().name())) {
+                throw new IllegalArgumentException(
+                        "Module '" + parentName + "' extends itself.");
+            }
+
+            YamlModuleFile parentFile = filesByName.get(parentName);
+            if (parentFile == null) {
+                throw new IllegalArgumentException(
+                        "Module '" + file.module().name()
+                        + "' extends unknown module '" + parentName + "'.");
+            }
+
+            if (parentFile.module().extendsModule() != null) {
+                throw new IllegalArgumentException(
+                        "Module '" + file.module().name() + "' extends '"
+                        + parentName + "', which itself extends '"
+                        + parentFile.module().extendsModule()
+                        + "'. Extension chains are not supported.");
+            }
+
+            YamlModule parentModule = parentFile.toModule();
+            YamlModule merged       = mergeModules(parentModule, file);
+            resolved.put(file.module().name(), merged);
+        }
+
+        return Map.copyOf(resolved);
+    }
+
+    private static YamlModule mergeModules(YamlModule parent,
+                                           YamlModuleFile childFile) {
+        Map<String, YamlModuleParameter> mergedParams =
+                new LinkedHashMap<>(parent.parameters());
+        mergedParams.putAll(childFile.module().parameters());
+
+        Map<String, YamlModuleOutput> mergedOutputs =
+                new LinkedHashMap<>(parent.outputs());
+        mergedOutputs.putAll(childFile.module().outputs());
+
+        Map<String, Map<String, Object>> mergedSections = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Object>> entry : parent.sections().entrySet()) {
+            mergedSections.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+        }
+        for (Map.Entry<String, Map<String, Object>> entry : childFile.sections().entrySet()) {
+            Map<String, Object> targetSection = mergedSections
+                                                        .computeIfAbsent(entry.getKey(), k -> new LinkedHashMap<>());
+            targetSection.putAll(entry.getValue());
+        }
+
+        return new YamlModule(childFile.module().name(),
+                              Map.copyOf(mergedParams),
+                              Map.copyOf(mergedOutputs),
+                              Map.copyOf(mergedSections));
+    }
+
 
     private static void validateImports(List<YamlImport> imports,
                                          Map<String, YamlModule> availableModules) {

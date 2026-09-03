@@ -20,7 +20,8 @@ public record YamlModuleFile(
 
     public record YamlModuleHeader(String name,
                                    Map<String, YamlModuleParameter> parameters,
-                                   Map<String, YamlModuleOutput> outputs) {
+                                   Map<String, YamlModuleOutput> outputs,
+                                   String extendsModule) {
         public YamlModuleHeader {
             if (parameters == null) {parameters = Map.of();}
             if (outputs == null) {outputs = Map.of();}

@@ -11,7 +11,7 @@ class YamlModuleFileTest {
 
     @Test
     void toModule_converts_header_and_sections() {
-        var header = new YamlModuleFile.YamlModuleHeader("monitor", Map.of(), Map.of());
+        var header = new YamlModuleFile.YamlModuleHeader("monitor", Map.of(), Map.of(), null);
         var sections = Map.of("nodes", Map.<String, Object>of("cpu-check",
                 Map.of("type", "sensor")));
         var file = new YamlModuleFile(header, sections, List.of());
@@ -22,7 +22,7 @@ class YamlModuleFileTest {
 
     @Test
     void toModule_discards_imports() {
-        var header = new YamlModuleFile.YamlModuleHeader("m", Map.of(), Map.of());
+        var header = new YamlModuleFile.YamlModuleHeader("m", Map.of(), Map.of(), null);
         var imp = new YamlImport("other", "alias", null, Map.of());
         var file = new YamlModuleFile(header, Map.of(), List.of(imp));
         var module = file.toModule();
@@ -31,7 +31,7 @@ class YamlModuleFileTest {
 
     @Test
     void null_defaults() {
-        var header = new YamlModuleFile.YamlModuleHeader("m", null, null);
+        var header = new YamlModuleFile.YamlModuleHeader("m", null, null, null);
         var file = new YamlModuleFile(header, null, null);
         assertThat(header.parameters()).isEmpty();
         assertThat(file.sections()).isEmpty();
@@ -42,7 +42,7 @@ class YamlModuleFileTest {
     void toModule_includes_outputs() {
         var output = new YamlModuleOutput(ParameterType.STRING, "jdbc:${var.engine}://db");
         var header = new YamlModuleFile.YamlModuleHeader("db",
-                                                         Map.of(), Map.of("url", output));
+                                                         Map.of(), Map.of("url", output), null);
         var file   = new YamlModuleFile(header, Map.of(), List.of());
         var module = file.toModule();
         assertThat(module.outputs()).containsKey("url");
@@ -55,4 +55,19 @@ class YamlModuleFileTest {
         var module = new YamlModule("m", Map.of(), null, Map.of());
         assertThat(module.outputs()).isEmpty();
     }
+
+    @Test
+    void toModule_discards_extends() {
+        var header = new YamlModuleFile.YamlModuleHeader("child", Map.of(), Map.of(), "parent");
+        var file   = new YamlModuleFile(header, Map.of(), List.of());
+        var module = file.toModule();
+        assertThat(module.name()).isEqualTo("child");
+    }
+
+    @Test
+    void extends_null_by_default() {
+        var header = new YamlModuleFile.YamlModuleHeader("m", Map.of(), Map.of(), null);
+        assertThat(header.extendsModule()).isNull();
+    }
+
 }

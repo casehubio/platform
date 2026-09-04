@@ -342,6 +342,24 @@ public final class ForEachExpander {
         return new ExpansionResult<>(allElements, Set.copyOf(excludedIds));
     }
 
+    public static <E> java.util.List<E> expandList(
+            java.util.List<E> elements,
+            java.util.function.Function<E, String> idExtractor,
+            Map<String, IterationGroup> iterationGroups,
+            Map<String, io.casehub.yaml.core.data.CsvDataSource> dataSources,
+            io.casehub.yaml.core.resolver.VariableResolver resolver,
+            ForEachAdapter<E> adapter,
+            int maxExpansion) {
+        LinkedHashMap<String, E> elementMap = new LinkedHashMap<>();
+        for (E element : elements) {
+            elementMap.put(idExtractor.apply(element), element);
+        }
+        ExpansionResult<E> result = expand(elementMap, iterationGroups, dataSources,
+                                           resolver, adapter, maxExpansion);
+        return new ArrayList<>(result.elements().values());
+    }
+
+
     private static List<String> resolveValuesStatic(List<?> in, VariableResolver resolver, String context) {
         List<String> values = new ArrayList<>();
         for (Object item : in) {

@@ -57,6 +57,23 @@ public class VariableResolver {
         return new VariableResolver(prefixSources, deferredPrefixes, eachContext, eachRowContext, handler);
     }
 
+    public static VariableResolver forParams(
+            java.util.Map<String, io.casehub.yaml.core.module.YamlModuleParameter> declared,
+            java.util.Map<String, String> callerParams,
+            java.util.Set<String> deferredPrefixes) {
+        java.util.Map<String, String> defaults = new java.util.LinkedHashMap<>();
+        for (var entry : declared.entrySet()) {
+            if (entry.getValue().defaultValue() != null) {
+                defaults.put(entry.getKey(), entry.getValue().defaultValue());
+            }
+        }
+        VariableSource paramSource = VariableSource.chain(callerParams::get, defaults::get);
+        return new VariableResolver(
+                java.util.Map.of("params", paramSource, "var", paramSource),
+                deferredPrefixes);
+    }
+
+
     public VariableSource sourceFor(String prefix) {
         return prefixSources.get(prefix);
     }

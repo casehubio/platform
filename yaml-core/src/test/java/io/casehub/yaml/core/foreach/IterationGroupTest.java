@@ -33,4 +33,33 @@ class IterationGroupTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("list or string");
     }
+
+// --- fromBlock factory ---
+
+    @Test
+    void fromBlock_parsesNamedGroups() {
+        var block = java.util.Map.<String, Object>of(
+                "regions", java.util.Map.of("as", "region", "in", java.util.List.of("us-east", "eu-west")),
+                "envs", java.util.Map.of("as", "env", "in", java.util.List.of("dev", "prod")));
+        var result = IterationGroup.fromBlock(block);
+        assertThat(result).containsKeys("regions", "envs");
+        assertThat(result.get("regions").as()).isEqualTo("region");
+        assertThat(result.get("regions").inAsList()).containsExactly("us-east", "eu-west");
+        assertThat(result.get("envs").as()).isEqualTo("env");
+    }
+
+    @Test
+    void fromBlock_emptyBlock_returnsEmpty() {
+        var result = IterationGroup.fromBlock(java.util.Map.of());
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void fromBlock_skipsNonMapEntries() {
+        var block = java.util.Map.<String, Object>of(
+                "regions", java.util.Map.of("as", "region", "in", java.util.List.of("a")),
+                "scalar", "not-a-map");
+        var result = IterationGroup.fromBlock(block);
+        assertThat(result).containsOnlyKeys("regions");
+    }
 }

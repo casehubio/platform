@@ -16,4 +16,17 @@ public record IterationGroup(String as, Object in) {
         if (in instanceof String s) {return List.of(s);}
         return List.of();
     }
+
+    @SuppressWarnings("unchecked")
+    public static java.util.Map<String, IterationGroup> fromBlock(java.util.Map<String, Object> block) {
+        var groups = new java.util.LinkedHashMap<String, IterationGroup>();
+        for (var entry : block.entrySet()) {
+            if (entry.getValue() instanceof java.util.Map<?, ?> spec) {
+                String as = (String) spec.get("as");
+                Object in = spec.get("in");
+                groups.put(entry.getKey(), new IterationGroup(as, in));
+            }
+        }
+        return java.util.Collections.unmodifiableMap(groups);
+    }
 }

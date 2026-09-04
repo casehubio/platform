@@ -218,6 +218,14 @@ io.casehub.platform.api
                    WorkerAuthorizationDeniedException (extends SecurityException: actorId, definitionId, reason)
   .actor         — ActorStateContributor (SPI: contribute data to a unified actor state view, @ApplicationScoped),
                    ActorStateAccumulator (visitor: trustScore, capabilityScore — assembled concurrently by aggregator)
+  .capacity      — CapacitySignal (record: actorId, source, pressure 0.0–1.0, timestamp — validated),
+                   CapacitySignalSource (SPI: sourceName + signals() → List<CapacitySignal>),
+                   ActorCapacityView (SPI: aggregatedPressure/signalsByActor/allAggregatedPressures),
+                   RedistributionAction (enum: NONE/COMPRESS/REDISTRIBUTE/ESCALATE),
+                   RedistributionContext (record: actorId, aggregatedSignal, sourceSignals),
+                   RedistributionDecision (record+factories: action, reason — none()/compress()/redistribute()/escalate()),
+                   RedistributionPolicy (SPI: evaluate(RedistributionContext) → RedistributionDecision),
+                   CapacityPressureEvent (CDI event record: actorId, decision, aggregatedSignal, firedAt)
   .notification  — NotificationStore (SPI: blocking store/storeAll/find/unreadCount/markRead/dismiss/markAllRead),
                    Notification (record: id, userId, tenancyId, title, body, category, severity, actionUrl, source, status, createdAt, readAt, dismissedAt),
                    NotificationInput (record: routing layer input — no id/status/timestamps), NotificationSource (record: eventId, entityType, entityId, actorId),

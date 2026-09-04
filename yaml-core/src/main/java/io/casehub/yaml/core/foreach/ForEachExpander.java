@@ -260,7 +260,7 @@ public final class ForEachExpander {
                     String              stampedId = elementId + "." + rowKey;
 
                     VariableResolver rowResolver = resolver
-                                                           .withEachContext(Map.of(as, rowKey))
+                                                           .withEachContext(Map.of(as, rowKey, "index", String.valueOf(i)))
                                                            .withEachRowContext(Map.of(as, row));
 
                     String when = adapter.getWhen(element);

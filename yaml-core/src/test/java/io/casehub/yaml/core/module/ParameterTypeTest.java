@@ -110,4 +110,34 @@ class ParameterTypeTest {
         assertThat(ParameterType.LIST.canAccept(ParameterType.BOOLEAN)).isFalse();
     }
 
+
+    @Test
+    void fromString_standard_names() {
+        assertThat(ParameterType.fromString("string")).isEqualTo(ParameterType.STRING);
+        assertThat(ParameterType.fromString("integer")).isEqualTo(ParameterType.INTEGER);
+        assertThat(ParameterType.fromString("number")).isEqualTo(ParameterType.NUMBER);
+        assertThat(ParameterType.fromString("boolean")).isEqualTo(ParameterType.BOOLEAN);
+        assertThat(ParameterType.fromString("list")).isEqualTo(ParameterType.LIST);
+    }
+
+    @Test
+    void fromString_decimal_alias_for_number() {
+        assertThat(ParameterType.fromString("decimal")).isEqualTo(ParameterType.NUMBER);
+        assertThat(ParameterType.fromString("DECIMAL")).isEqualTo(ParameterType.NUMBER);
+    }
+
+    @Test
+    void fromString_case_insensitive() {
+        assertThat(ParameterType.fromString("STRING")).isEqualTo(ParameterType.STRING);
+        assertThat(ParameterType.fromString("Integer")).isEqualTo(ParameterType.INTEGER);
+        assertThat(ParameterType.fromString("Boolean")).isEqualTo(ParameterType.BOOLEAN);
+    }
+
+    @Test
+    void fromString_unknown_throws() {
+        assertThatThrownBy(() -> ParameterType.fromString("blob"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blob")
+                .hasMessageContaining("STRING");
+    }
 }

@@ -25,4 +25,17 @@ public enum ParameterType {
         return false;
     }
 
+    public static ParameterType fromString(String name) {
+        return switch (name.toUpperCase(java.util.Locale.ROOT)) {
+            case "STRING" -> STRING;
+            case "LIST" -> LIST;
+            case "INTEGER" -> INTEGER;
+            case "NUMBER", "DECIMAL" -> NUMBER;
+            case "BOOLEAN" -> BOOLEAN;
+            default -> throw new IllegalArgumentException(
+                    "Unknown parameter type '" + name + "'. Expected: STRING, INTEGER, NUMBER, BOOLEAN, LIST, DECIMAL.");
+        };
+    }
+
+
 }

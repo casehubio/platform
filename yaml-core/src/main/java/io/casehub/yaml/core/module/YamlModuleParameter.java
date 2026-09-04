@@ -21,6 +21,41 @@ public record YamlModuleParameter(
 
     public static Builder builder() {return new Builder();}
 
+    @SuppressWarnings("unchecked")
+    public static java.util.Map<String, YamlModuleParameter> fromDescriptors(
+            List<java.util.Map<String, Object>> descriptors) {
+        var result = new java.util.LinkedHashMap<String, YamlModuleParameter>();
+        for (var desc : descriptors) {
+            String        name         = (String) desc.get("name");
+            String        typeName     = (String) desc.getOrDefault("type", "string");
+            ParameterType type         = ParameterType.fromString(typeName);
+            boolean       required     = Boolean.TRUE.equals(desc.get("required"));
+            Object        rawDefault   = desc.get("default");
+            String        defaultValue = rawDefault != null ? String.valueOf(rawDefault) : null;
+
+            List<String> allowedValues = List.of();
+            Object       enumVal       = desc.get("enum");
+            if (enumVal instanceof List<?> enumList) {
+                allowedValues = enumList.stream()
+                                        .map(String::valueOf)
+                                        .toList();
+            }
+
+            Number  minimum               = desc.get("min") instanceof Number n ? n : null;
+            Number  maximum               = desc.get("max") instanceof Number n ? n : null;
+            String  pattern               = desc.get("pattern") instanceof String s ? s : null;
+            Integer minLength             = desc.get("minLength") instanceof Number n ? n.intValue() : null;
+            Integer maxLength             = desc.get("maxLength") instanceof Number n ? n.intValue() : null;
+            String  constraintDescription = desc.get("constraintDescription") instanceof String s ? s : null;
+
+            result.put(name, new YamlModuleParameter(type, required, defaultValue,
+                                                     minLength, maxLength, pattern, minimum, maximum, allowedValues,
+                                                     constraintDescription));
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+
     public static final class Builder {
         private ParameterType type          = ParameterType.STRING;
         private boolean       required;

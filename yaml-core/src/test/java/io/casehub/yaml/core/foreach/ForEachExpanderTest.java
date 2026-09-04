@@ -549,4 +549,132 @@ class ForEachExpanderTest {
         assertThat(expander.expand("", "ctx")).isEmpty();
     }
 
+
+// --- CSV data source expansion ---
+
+    @Test
+    void csvDataSource_stampsPerRow() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("members",
+                                                            "name:STRING,role:STRING\nAlice,Developer\nBob,Viewer");
+        var dataSources = Map.of("members", csv);
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("create-member", new TestElement("create-member",
+                                                      Map.of("fullName", "${each.member.name}", "memberRole", "${each.member.role}"),
+                                                      new ForEachDirective.GroupRef("members"), null));
+
+        // Use the as override via iteration groups
+        var groups = Map.of("members", new IterationGroup("member", List.of()));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(new ArrayList<>(result.elements().keySet()))
+                .containsExactly("create-member.Alice", "create-member.Bob");
+        assertThat(result.elements().get("create-member.Alice").spec())
+                .containsEntry("fullName", "Alice")
+                .containsEntry("memberRole", "Developer");
+        assertThat(result.elements().get("create-member.Bob").spec())
+                .containsEntry("fullName", "Bob")
+                .containsEntry("memberRole", "Viewer");
+    }
+
+    @Test
+    void csvDataSource_whenCondition_excludesRows() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("members",
+                                                            "name:STRING,admin:BOOLEAN\nAlice,true\nBob,false");
+        var dataSources = Map.of("members", csv);
+        var groups      = Map.of("members", new IterationGroup("member", List.of()));
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("grant-admin", new TestElement("grant-admin",
+                                                    Map.of("user", "${each.member.name}"),
+                                                    new ForEachDirective.GroupRef("members"), "${each.member.admin}"));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(1);
+        assertThat(result.elements().containsKey("grant-admin.Alice")).isTrue();
+        assertThat(result.excludedIds()).contains("grant-admin.Bob");
+    }
+
+    @Test
+    void csvDataSource_mixedWithRegularGroups() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("users",
+                                                            "name:STRING\nAlice\nBob");
+        var dataSources = Map.of("users", csv);
+        var groups = Map.of(
+                "users", new IterationGroup("user", List.of()),
+                "env", new IterationGroup("e", List.of("dev", "prod")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("user-step", new TestElement("user-step",
+                                                  Map.of("n", "${each.user.name}"),
+                                                  new ForEachDirective.GroupRef("users"), null));
+        elements.put("env-step", new TestElement("env-step",
+                                                 Map.of("n", "${each.e}"),
+                                                 new ForEachDirective.GroupRef("env"), null));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(4);
+        assertThat(new ArrayList<>(result.elements().keySet()))
+                .containsExactly("user-step.Alice", "user-step.Bob",
+                                 "env-step.dev", "env-step.prod");
+    }
+
+    @Test
+    void csvDataSource_emptyDataSources_fallsBackToGroups() {
+        var groups   = Map.of("env", new IterationGroup("e", List.of("a", "b")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("node", new TestElement("node",
+                                             Map.of("name", "${each.e}"),
+                                             new ForEachDirective.GroupRef("env"), null));
+
+        var result = ForEachExpander.expand(elements, groups, Map.of(),
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+    }
+
+    @Test
+    void csvDataSource_fixedElementsPassThrough() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("items",
+                                                            "name:STRING\nOne");
+        var dataSources = Map.of("items", csv);
+        var groups      = Map.of("items", new IterationGroup("item", List.of()));
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("fixed", new TestElement("fixed",
+                                              Map.of("k", "v"), null, null));
+        elements.put("expand", new TestElement("expand",
+                                               Map.of("n", "${each.item.name}"),
+                                               new ForEachDirective.GroupRef("items"), null));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(new ArrayList<>(result.elements().keySet()))
+                .containsExactly("fixed", "expand.One");
+    }
+
+    @Test
+    void csvDataSource_typedColumns_resolveCorrectly() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("envs",
+                                                            "name:STRING,port:INTEGER,production:BOOLEAN\nstaging,8080,false\nprod,443,true");
+        var dataSources = Map.of("envs", csv);
+        var groups      = Map.of("envs", new IterationGroup("env", List.of()));
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("deploy", new TestElement("deploy",
+                                               Map.of("host", "${each.env.name}", "p", "${each.env.port}"),
+                                               new ForEachDirective.GroupRef("envs"), null));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(result.elements().get("deploy.staging").spec())
+                .containsEntry("host", "staging")
+                .containsEntry("p", "8080");
+    }
 }

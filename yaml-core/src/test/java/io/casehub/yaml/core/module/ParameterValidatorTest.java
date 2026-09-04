@@ -267,4 +267,103 @@ class ParameterValidatorTest {
         assertThat(violations).isEmpty();
     }
 
+
+// --- fromParamDescriptors bridge ---
+
+    @Test
+    void fromDescriptors_converts_basic_param() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "projectName", "type", "string", "required", true));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        assertThat(result).containsKey("projectName");
+        var param = result.get("projectName");
+        assertThat(param.type()).isEqualTo(ParameterType.STRING);
+        assertThat(param.required()).isTrue();
+        assertThat(param.defaultValue()).isNull();
+    }
+
+    @Test
+    void fromDescriptors_converts_default_and_enum() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "template", "type", "string", "required", false,
+                "default", "blank", "enum", List.of("blank", "starter", "enterprise")));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        var param  = result.get("template");
+        assertThat(param.defaultValue()).isEqualTo("blank");
+        assertThat(param.allowedValues()).containsExactly("blank", "starter", "enterprise");
+    }
+
+    @Test
+    void fromDescriptors_converts_integer_with_constraints() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "teamSize", "type", "integer", "required", false,
+                "default", 5, "min", 1, "max", 100));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        var param  = result.get("teamSize");
+        assertThat(param.type()).isEqualTo(ParameterType.INTEGER);
+        assertThat(param.defaultValue()).isEqualTo("5");
+        assertThat(param.minimum()).isEqualTo(1);
+        assertThat(param.maximum()).isEqualTo(100);
+    }
+
+    @Test
+    void fromDescriptors_decimal_maps_to_number() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "rate", "type", "decimal", "required", false));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        assertThat(result.get("rate").type()).isEqualTo(ParameterType.NUMBER);
+    }
+
+    @Test
+    void fromDescriptors_boolean_type() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "enableCI", "type", "boolean", "required", false, "default", true));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        var param  = result.get("enableCI");
+        assertThat(param.type()).isEqualTo(ParameterType.BOOLEAN);
+        assertThat(param.defaultValue()).isEqualTo("true");
+    }
+
+    @Test
+    void fromDescriptors_multiple_params_preserves_order() {
+        var descriptors = List.of(
+                Map.<String, Object>of("name", "first", "type", "string", "required", true),
+                Map.<String, Object>of("name", "second", "type", "integer", "required", false));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        assertThat(result.keySet()).containsExactly("first", "second");
+    }
+
+    @Test
+    void fromDescriptors_with_pattern() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "slug", "type", "string", "required", true,
+                "pattern", "^[a-z-]+$"));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        assertThat(result.get("slug").pattern()).isEqualTo("^[a-z-]+$");
+    }
+
+    @Test
+    void fromDescriptors_validates_via_parameterValidator() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "port", "type", "integer", "required", true,
+                "min", 1024, "max", 65535));
+        var declared   = YamlModuleParameter.fromDescriptors(descriptors);
+        var violations = ParameterValidator.validate(declared, Map.of("port", "80"));
+        assertThat(violations).hasSize(1);
+        assertThat(violations.get(0).constraint()).isEqualTo("minimum");
+    }
+
+    @Test
+    void fromDescriptors_empty_returns_empty() {
+        var result = YamlModuleParameter.fromDescriptors(List.of());
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void fromDescriptors_defaults_type_to_string() {
+        var descriptors = List.of(Map.<String, Object>of(
+                "name", "label", "required", false));
+        var result = YamlModuleParameter.fromDescriptors(descriptors);
+        assertThat(result.get("label").type()).isEqualTo(ParameterType.STRING);
+    }
 }

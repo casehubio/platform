@@ -358,6 +358,7 @@ public final class ForEachExpander {
                                             Map<String, IterationGroup> groups) {
         return switch (forEach) {
             case ForEachDirective.GroupRef ref -> {
+                if (ref.as() != null) {yield ref.as();}
                 IterationGroup group = groups.get(ref.groupName());
                 yield group != null ? group.as() : ref.groupName();
             }
@@ -403,7 +404,10 @@ public final class ForEachExpander {
     private static String resolveAs(ForEachDirective forEach,
                                     Map<String, IterationGroup> groups) {
         return switch (forEach) {
-            case ForEachDirective.GroupRef ref -> groups.get(ref.groupName()).as();
+            case ForEachDirective.GroupRef ref -> {
+                if (ref.as() != null) {yield ref.as();}
+                yield groups.get(ref.groupName()).as();
+            }
             case ForEachDirective.InlineIteration inline -> inline.as();
         };
     }

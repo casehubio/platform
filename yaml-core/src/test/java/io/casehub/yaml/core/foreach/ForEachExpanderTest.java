@@ -677,4 +677,85 @@ class ForEachExpanderTest {
                 .containsEntry("host", "staging")
                 .containsEntry("p", "8080");
     }
+
+// --- ForEachDirective.parse ---
+
+    @Test
+    void parse_string_returns_groupRef() {
+        var result = ForEachDirective.parse("members");
+        assertThat(result).isInstanceOf(ForEachDirective.GroupRef.class);
+        assertThat(((ForEachDirective.GroupRef) result).groupName()).isEqualTo("members");
+        assertThat(((ForEachDirective.GroupRef) result).as()).isNull();
+    }
+
+    @Test
+    void parse_mapWithStringIn_returnsGroupRef() {
+        var result = ForEachDirective.parse(Map.of("as", "member", "in", "team-members"));
+        assertThat(result).isInstanceOf(ForEachDirective.GroupRef.class);
+        var ref = (ForEachDirective.GroupRef) result;
+        assertThat(ref.groupName()).isEqualTo("team-members");
+        assertThat(ref.as()).isEqualTo("member");
+    }
+
+    @Test
+    void parse_mapWithListIn_returnsInlineIteration() {
+        var result = ForEachDirective.parse(Map.of("as", "env", "in", List.of("dev", "prod")));
+        assertThat(result).isInstanceOf(ForEachDirective.InlineIteration.class);
+        var inline = (ForEachDirective.InlineIteration) result;
+        assertThat(inline.as()).isEqualTo("env");
+        assertThat(inline.in()).map(Object::toString).containsExactly("dev", "prod");
+    }
+
+    @Test
+    void parse_null_returnsNull() {
+        assertThat(ForEachDirective.parse(null)).isNull();
+    }
+
+    @Test
+    void parse_existingDirective_passesThrough() {
+        var directive = new ForEachDirective.GroupRef("x");
+        assertThat(ForEachDirective.parse(directive)).isSameAs(directive);
+    }
+
+    @Test
+    void parse_invalidType_throws() {
+        assertThatThrownBy(() -> ForEachDirective.parse(42))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Integer");
+    }
+
+// --- GroupRef.as override in expansion ---
+
+    @Test
+    void groupRef_asOverride_usedInsteadOfGroupAs() {
+        var groups   = Map.of("team-members", new IterationGroup("tm", List.of("Alice", "Bob")));
+        var elements = new LinkedHashMap<String, TestElement>();
+        elements.put("step", new TestElement("step",
+                                             Map.of("name", "${each.member}"),
+                                             new ForEachDirective.GroupRef("team-members", "member"), null));
+
+        var result = ForEachExpander.expand(elements, groups, resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(result.elements().get("step.Alice").spec()).containsEntry("name", "Alice");
+    }
+
+    @Test
+    void csvDataSource_groupRef_asOverride_usedForRowContext() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("team-members",
+                                                            "name:STRING,role:STRING\nAlice,Dev\nBob,PM");
+        var dataSources = Map.of("team-members", csv);
+        var groups      = Map.of("team-members", new IterationGroup("tm", List.of()));
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("step", new TestElement("step",
+                                             Map.of("n", "${each.member.name}", "r", "${each.member.role}"),
+                                             new ForEachDirective.GroupRef("team-members", "member"), null));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements()).hasSize(2);
+        assertThat(result.elements().get("step.Alice").spec())
+                .containsEntry("n", "Alice").containsEntry("r", "Dev");
+    }
 }

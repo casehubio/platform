@@ -215,4 +215,31 @@ class CsvParserTest {
         assertThatThrownBy(() -> ds.rows().get(0).put("name", "hacked"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+// --- CsvDataSource.fromDataBlock ---
+
+    @Test
+    void fromDataBlock_extractsInlineCsv() {
+        var data = java.util.Map.<String, Object>of(
+                "members", java.util.Map.of("inline", "name:STRING,role:STRING\nAlice,Dev\nBob,PM"),
+                "lookup", java.util.Map.of("key", "value"));
+        var result = io.casehub.yaml.core.data.CsvDataSource.fromDataBlock(data);
+        assertThat(result).containsKey("members");
+        assertThat(result).doesNotContainKey("lookup");
+        assertThat(result.get("members").rows()).hasSize(2);
+    }
+
+    @Test
+    void fromDataBlock_emptyData_returnsEmpty() {
+        var result = io.casehub.yaml.core.data.CsvDataSource.fromDataBlock(java.util.Map.of());
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void fromDataBlock_noInlineEntries_returnsEmpty() {
+        var data = java.util.Map.<String, Object>of(
+                "lookup", java.util.Map.of("source", "external.csv"));
+        var result = io.casehub.yaml.core.data.CsvDataSource.fromDataBlock(data);
+        assertThat(result).isEmpty();
+    }
 }

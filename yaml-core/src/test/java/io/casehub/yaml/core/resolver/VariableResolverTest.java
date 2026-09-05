@@ -161,13 +161,14 @@ class VariableResolverTest {
                 .isEqualTo("${fault.nodeId}");
     }
 
-    // --- Each context ---
+    // --- Each context (via VariableSource.forEachContext) ---
 
     @Test
     void each_context_resolves() {
         var resolver = new VariableResolver(
                 Map.of("var", mapSource(Map.of("batch", "1000"))), Set.of());
-        var eachResolver = resolver.withEachContext(Map.of("region", "us-east"));
+        var eachResolver = resolver.withScope("each",
+                VariableSource.forEachContext(Map.of("region", "us-east"), null));
         assertThat(eachResolver.resolveString("s3://${each.region}/${var.batch}", "node"))
                 .isEqualTo("s3://us-east/1000");
     }
@@ -175,7 +176,8 @@ class VariableResolverTest {
     @Test
     void each_unknown_variable_throws() {
         var resolver = new VariableResolver(Map.of(), Set.of());
-        var eachResolver = resolver.withEachContext(Map.of("region", "us-east"));
+        var eachResolver = resolver.withScope("each",
+                VariableSource.forEachContext(Map.of("region", "us-east"), null));
         assertThatThrownBy(() -> eachResolver.resolveString("${each.zone}", "node"))
                 .isInstanceOf(UnresolvedVariableException.class)
                 .hasMessageContaining("zone");
@@ -186,16 +188,17 @@ class VariableResolverTest {
         var resolver = new VariableResolver(Map.of(), Set.of());
         assertThatThrownBy(() -> resolver.resolveString("${each.region}", "node"))
                 .isInstanceOf(UnresolvedVariableException.class)
-                .hasMessageContaining("forEach");
+                .hasMessageContaining("each");
     }
 
-    // --- Each row context (CSV) ---
+    // --- Each row context (CSV, via VariableSource.forEachContext) ---
 
     @Test
     void each_row_context_drills_into_field() {
         var resolver = new VariableResolver(Map.of(), Set.of());
-        var rowResolver = resolver.withEachRowContext(
-                Map.of("env", Map.of("name", "staging", "region", "us-east")));
+        var rowResolver = resolver.withScope("each",
+                VariableSource.forEachContext(null,
+                        Map.of("env", Map.of("name", "staging", "region", "us-east"))));
         assertThat(rowResolver.resolveString("${each.env.name}", "node"))
                 .isEqualTo("staging");
         assertThat(rowResolver.resolveString("${each.env.region}", "node"))
@@ -205,10 +208,11 @@ class VariableResolverTest {
     @Test
     void each_row_missing_field_throws() {
         var resolver = new VariableResolver(Map.of(), Set.of());
-        var rowResolver = resolver.withEachRowContext(
-                Map.of("env", Map.of("name", "staging")));
+        var rowResolver = resolver.withScope("each",
+                VariableSource.forEachContext(null,
+                        Map.of("env", Map.of("name", "staging"))));
         assertThatThrownBy(() -> rowResolver.resolveString("${each.env.missing}", "node"))
-                .isInstanceOf(UnresolvedVariableException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("missing")
                 .hasMessageContaining("name");
     }
@@ -216,10 +220,11 @@ class VariableResolverTest {
     @Test
     void each_row_without_field_throws_with_guidance() {
         var resolver = new VariableResolver(Map.of(), Set.of());
-        var rowResolver = resolver.withEachRowContext(
-                Map.of("env", Map.of("name", "staging")));
+        var rowResolver = resolver.withScope("each",
+                VariableSource.forEachContext(null,
+                        Map.of("env", Map.of("name", "staging"))));
         assertThatThrownBy(() -> rowResolver.resolveString("${each.env}", "node"))
-                .isInstanceOf(UnresolvedVariableException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("field access");
     }
 
@@ -341,12 +346,13 @@ class VariableResolverTest {
     }
 
     @Test
-    void handler_survives_withEachContext() {
+    void handler_survives_withForEachContext() {
         var captured = new java.util.concurrent.atomic.AtomicReference<String>();
         var resolver = new VariableResolver(Map.of(), Set.of("match"))
                                .withDeferredPrefixHandler((prefix, key, ctx) ->
                                                                   captured.set(prefix));
-        var child = resolver.withEachContext(Map.of("region", "us-east"));
+        var child = resolver.withScope("each",
+                                       VariableSource.forEachContext(Map.of("region", "us-east"), null));
         child.resolveString("${match.x}", "test");
         assertThat(captured.get()).isEqualTo("match");
     }
@@ -363,12 +369,13 @@ class VariableResolverTest {
     }
 
     @Test
-    void handler_survives_withEachRowContext() {
+    void handler_survives_withForEachRowContext() {
         var captured = new java.util.concurrent.atomic.AtomicReference<String>();
         var resolver = new VariableResolver(Map.of(), Set.of("match"))
                                .withDeferredPrefixHandler((prefix, key, ctx) ->
                                                                   captured.set(prefix));
-        var child = resolver.withEachRowContext(Map.of("env", Map.of("name", "prod")));
+        var child = resolver.withScope("each",
+                                       VariableSource.forEachContext(null, Map.of("env", Map.of("name", "prod"))));
         child.resolveString("${match.x}", "test");
         assertThat(captured.get()).isEqualTo("match");
     }
@@ -496,11 +503,11 @@ class VariableResolverTest {
     }
 
     @Test
-    void nested_returnsEmptyString_forMissingField() {
+    void nested_returnsNull_forMissingField() {
         var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
         data.put("step1", java.util.Map.of("name", "Alice"));
         var source = VariableSource.nested(data);
-        assertThat(source.resolve("step1.missingField")).isEqualTo("");
+        assertThat(source.resolve("step1.missingField")).isNull();
     }
 
     @Test

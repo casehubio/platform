@@ -104,7 +104,7 @@ public final class ForEachExpander {
 
             for (String value : values) {
                 String stampedId = elementId + "." + value;
-                VariableResolver eachResolver = resolver.withEachContext(Map.of(as, value));
+                VariableResolver eachResolver = resolver.withScope("each", io.casehub.yaml.core.resolver.VariableSource.forEachContext(Map.of(as, value), null));
 
                 String when = adapter.getWhen(element);
                 if (when != null) {
@@ -259,9 +259,10 @@ public final class ForEachExpander {
                     String              rowKey    = values.get(i);
                     String              stampedId = elementId + "." + rowKey;
 
-                    VariableResolver rowResolver = resolver
-                                                           .withEachContext(Map.of(as, rowKey, "index", String.valueOf(i)))
-                                                           .withEachRowContext(Map.of(as, row));
+                    VariableResolver rowResolver = resolver.withScope("each",
+                            io.casehub.yaml.core.resolver.VariableSource.forEachContext(
+                                    Map.of(as, rowKey, "index", String.valueOf(i)),
+                                    Map.of(as, row)));
 
                     String when = adapter.getWhen(element);
                     if (when != null) {
@@ -281,7 +282,7 @@ public final class ForEachExpander {
             } else {
                 for (String value : values) {
                     String           stampedId    = elementId + "." + value;
-                    VariableResolver eachResolver = resolver.withEachContext(Map.of(as, value));
+                    VariableResolver eachResolver = resolver.withScope("each", io.casehub.yaml.core.resolver.VariableSource.forEachContext(Map.of(as, value), null));
 
                     String when = adapter.getWhen(element);
                     if (when != null) {

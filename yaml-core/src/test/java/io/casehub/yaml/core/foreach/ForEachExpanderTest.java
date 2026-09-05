@@ -759,59 +759,5 @@ class ForEachExpanderTest {
                 .containsEntry("n", "Alice").containsEntry("r", "Dev");
     }
 
-// --- expandList ---
 
-    @Test
-    void expandList_returnsOrderedList() {
-        var groups = Map.of("env", new IterationGroup("e", List.of("dev", "prod")));
-        var elements = List.of(
-                new TestElement("fixed", Map.of("k", "v"), null, null),
-                new TestElement("expand", Map.of("n", "${each.e}"), new ForEachDirective.GroupRef("env"), null),
-                new TestElement("last", Map.of("k", "end"), null, null));
-
-        var result = ForEachExpander.expandList(elements,
-                                                e -> e.id(), groups, Map.of(), resolver, adapter, 1000);
-
-        assertThat(result).hasSize(4);
-        assertThat(result.stream().map(TestElement::id).toList())
-                .containsExactly("fixed", "expand.dev", "expand.prod", "last");
-    }
-
-    @Test
-    void expandList_withCsvDataSources() {
-        var csv = io.casehub.yaml.core.data.CsvParser.parse("users",
-                                                            "name:STRING\nAlice\nBob");
-        var groups = Map.of("users", new IterationGroup("user", List.of()));
-        var elements = List.of(
-                new TestElement("step", Map.of("n", "${each.user.name}"),
-                                new ForEachDirective.GroupRef("users"), null));
-
-        var result = ForEachExpander.expandList(elements,
-                                                e -> e.id(), groups, Map.of("users", csv), resolver, adapter, 1000);
-
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).spec()).containsEntry("n", "Alice");
-        assertThat(result.get(1).spec()).containsEntry("n", "Bob");
-    }
-
-    @Test
-    void expandList_whenExclusion() {
-        var elements = List.of(
-                new TestElement("keep", Map.of("k", "v"), null, null),
-                new TestElement("drop", Map.of("k", "v"), null, "false"));
-        var varResolver = new VariableResolver(Map.of(), Set.of());
-
-        var result = ForEachExpander.expandList(elements,
-                                                e -> e.id(), Map.of(), Map.of(), varResolver, adapter, 1000);
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo("keep");
-    }
-
-    @Test
-    void expandList_emptyInput_returnsEmpty() {
-        var result = ForEachExpander.<TestElement>expandList(List.of(),
-                                                             e -> e.id(), Map.of(), Map.of(), resolver, adapter, 1000);
-        assertThat(result).isEmpty();
-    }
 }

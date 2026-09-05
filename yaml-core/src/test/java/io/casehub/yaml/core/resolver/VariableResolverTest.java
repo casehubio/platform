@@ -468,4 +468,66 @@ class VariableResolverTest {
         var result   = resolver.resolveString("${step.something}", "test");
         assertThat(result).isEqualTo("${step.something}");
     }
+
+// --- VariableSource.nested ---
+
+    @Test
+    void nested_resolves_topLevelField() {
+        var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        data.put("login", java.util.Map.of("userId", "alice", "role", "admin"));
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("login.userId")).isEqualTo("alice");
+        assertThat(source.resolve("login.role")).isEqualTo("admin");
+    }
+
+    @Test
+    void nested_resolves_deeplyNestedField() {
+        var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        data.put("step1", java.util.Map.of("result", java.util.Map.of("id", 42)));
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("step1.result.id")).isEqualTo("42");
+    }
+
+    @Test
+    void nested_returnsNull_forUnknownKey() {
+        var data   = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("missing.field")).isNull();
+    }
+
+    @Test
+    void nested_returnsEmptyString_forMissingField() {
+        var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        data.put("step1", java.util.Map.of("name", "Alice"));
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("step1.missingField")).isEqualTo("");
+    }
+
+    @Test
+    void nested_reflectsMutations() {
+        var data   = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("step1.name")).isNull();
+        data.put("step1", java.util.Map.of("name", "Bob"));
+        assertThat(source.resolve("step1.name")).isEqualTo("Bob");
+    }
+
+    @Test
+    void nested_keyOnlyReturnsMapToString() {
+        var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        data.put("step1", java.util.Map.of("a", "1"));
+        var source = VariableSource.nested(data);
+        assertThat(source.resolve("step1")).isNotNull();
+    }
+
+    @Test
+    void nested_worksWithVariableResolver() {
+        var data = new java.util.LinkedHashMap<String, java.util.Map<String, Object>>();
+        data.put("login", java.util.Map.of("token", "abc123"));
+        var resolver = new VariableResolver(
+                java.util.Map.of("step", VariableSource.nested(data)),
+                java.util.Set.of());
+        assertThat(resolver.resolveString("Bearer ${step.login.token}", "test"))
+                .isEqualTo("Bearer abc123");
+    }
 }

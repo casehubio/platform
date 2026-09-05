@@ -4,9 +4,7 @@ import java.util.List;
 
 public interface ActorCapacityView {
 
-    CapacitySignal aggregatedPressure(String actorId);
+    ActorCapacity getCapacity(String actorId);
 
-    List<CapacitySignal> signalsByActor(String actorId);
-
-    List<CapacitySignal> allAggregatedPressures();
+    List<ActorCapacity> getOverloaded(double threshold);
 }

@@ -1,11 +1,12 @@
 package io.casehub.platform.capacity;
 
-import io.casehub.platform.api.capacity.CapacitySignal;
-import io.casehub.platform.api.capacity.RedistributionAction;
+import io.casehub.platform.api.capacity.ActorCapacity;
 import io.casehub.platform.api.capacity.RedistributionContext;
+import io.casehub.platform.api.capacity.RedistributionDecision;
 import org.junit.jupiter.api.Test;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DefaultRedistributionPolicyTest {
@@ -15,42 +16,42 @@ class DefaultRedistributionPolicyTest {
     }
 
     private RedistributionContext ctx(double pressure) {
-        var signal = new CapacitySignal("a", "aggregated", pressure, Instant.now());
-        return new RedistributionContext("a", signal, List.of());
+        var cap = new ActorCapacity("a", pressure, Map.of("ctx", pressure), Instant.now());
+        return new RedistributionContext("a", cap, "ctx", 0, Duration.ZERO);
     }
 
     @Test
-    void below_all_thresholds_returns_none() {
-        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.5)).action())
-                .isEqualTo(RedistributionAction.NONE);
+    void below_all_thresholds_returns_hold() {
+        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.5)))
+                .isInstanceOf(RedistributionDecision.Hold.class);
     }
 
     @Test
     void at_compress_threshold() {
-        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.75)).action())
-                .isEqualTo(RedistributionAction.COMPRESS);
+        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.75)))
+                .isInstanceOf(RedistributionDecision.Compress.class);
     }
 
     @Test
     void at_redistribute_threshold() {
-        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.9)).action())
-                .isEqualTo(RedistributionAction.REDISTRIBUTE);
+        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.9)))
+                .isInstanceOf(RedistributionDecision.Redistribute.class);
     }
 
     @Test
     void at_escalate_threshold() {
-        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.97)).action())
-                .isEqualTo(RedistributionAction.ESCALATE);
+        assertThat(policy(0.7, 0.85, 0.95).evaluate(ctx(0.97)))
+                .isInstanceOf(RedistributionDecision.Escalate.class);
     }
 
     @Test
     void custom_thresholds() {
-        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.55)).action())
-                .isEqualTo(RedistributionAction.COMPRESS);
-        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.65)).action())
-                .isEqualTo(RedistributionAction.REDISTRIBUTE);
-        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.75)).action())
-                .isEqualTo(RedistributionAction.ESCALATE);
+        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.55)))
+                .isInstanceOf(RedistributionDecision.Compress.class);
+        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.65)))
+                .isInstanceOf(RedistributionDecision.Redistribute.class);
+        assertThat(policy(0.5, 0.6, 0.7).evaluate(ctx(0.75)))
+                .isInstanceOf(RedistributionDecision.Escalate.class);
     }
 
     @Test

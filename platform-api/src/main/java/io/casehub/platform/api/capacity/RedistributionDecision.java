@@ -1,21 +1,29 @@
 package io.casehub.platform.api.capacity;
 
-public record RedistributionDecision(RedistributionAction action,
-                                      String reason) {
+import java.time.Duration;
+import java.util.Set;
 
-    public static RedistributionDecision none() {
-        return new RedistributionDecision(RedistributionAction.NONE, null);
+public sealed interface RedistributionDecision {
+
+    String reason();
+
+    record Redistribute(String reason, Duration gracePeriod,
+                        Set<String> excludeActors) implements RedistributionDecision {
+        public Redistribute {
+            if (gracePeriod == null) { gracePeriod = Duration.ZERO; }
+            if (excludeActors == null) { excludeActors = Set.of(); }
+        }
+        public Redistribute(String reason) { this(reason, Duration.ZERO, Set.of()); }
     }
 
-    public static RedistributionDecision compress(String reason) {
-        return new RedistributionDecision(RedistributionAction.COMPRESS, reason);
-    }
+    record Compress(String reason) implements RedistributionDecision {}
 
-    public static RedistributionDecision redistribute(String reason) {
-        return new RedistributionDecision(RedistributionAction.REDISTRIBUTE, reason);
-    }
+    record Hold(String reason) implements RedistributionDecision {}
 
-    public static RedistributionDecision escalate(String reason) {
-        return new RedistributionDecision(RedistributionAction.ESCALATE, reason);
-    }
+    record Escalate(String reason) implements RedistributionDecision {}
+
+    static RedistributionDecision compress(String reason) { return new Compress(reason); }
+    static RedistributionDecision redistribute(String reason) { return new Redistribute(reason); }
+    static RedistributionDecision hold(String reason) { return new Hold(reason); }
+    static RedistributionDecision escalate(String reason) { return new Escalate(reason); }
 }

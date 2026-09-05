@@ -27,7 +27,7 @@ public class DefaultRedistributionPolicy implements RedistributionPolicy {
 
     @Override
     public RedistributionDecision evaluate(RedistributionContext context) {
-        double pressure = context.aggregatedSignal().pressure();
+        double pressure = context.capacity().aggregatePressure();
 
         if (pressure >= escalateThreshold) {
             return RedistributionDecision.escalate(
@@ -44,6 +44,6 @@ public class DefaultRedistributionPolicy implements RedistributionPolicy {
                     "pressure " + pressure + " exceeds compress threshold "
                     + compressThreshold);
         }
-        return RedistributionDecision.none();
+        return RedistributionDecision.hold("pressure " + pressure + " below all thresholds");
     }
 }

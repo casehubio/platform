@@ -1,15 +1,18 @@
 package io.casehub.platform.api.capacity;
 
-import java.util.List;
+import java.time.Duration;
 import java.util.Objects;
 
 public record RedistributionContext(String actorId,
-                                     CapacitySignal aggregatedSignal,
-                                     List<CapacitySignal> sourceSignals) {
+                                     ActorCapacity capacity,
+                                     String triggerSignalType,
+                                     int openObligationCount,
+                                     Duration timeSinceLastActivity) {
 
     public RedistributionContext {
         Objects.requireNonNull(actorId);
-        Objects.requireNonNull(aggregatedSignal);
-        if (sourceSignals == null) { sourceSignals = List.of(); }
+        Objects.requireNonNull(capacity);
+        if (triggerSignalType == null) { triggerSignalType = "unknown"; }
+        if (timeSinceLastActivity == null) { timeSinceLastActivity = Duration.ZERO; }
     }
 }

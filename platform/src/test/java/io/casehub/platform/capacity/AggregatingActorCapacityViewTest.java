@@ -1,5 +1,6 @@
 package io.casehub.platform.capacity;
 
+import io.casehub.platform.api.capacity.ActorCapacity;
 import io.casehub.platform.api.capacity.CapacitySignal;
 import io.casehub.platform.api.capacity.CapacitySignalSource;
 import org.junit.jupiter.api.Test;
@@ -12,109 +13,77 @@ class AggregatingActorCapacityViewTest {
     @Test
     void no_sources_returns_zero_pressure() {
         var view = new AggregatingActorCapacityView(List.of());
-        view.refresh();
-        var result = view.aggregatedPressure("actor-1");
-        assertThat(result.pressure()).isEqualTo(0.0);
-        assertThat(result.source()).isEqualTo("aggregated");
+        var result = view.getCapacity("actor-1");
+        assertThat(result.aggregatePressure()).isEqualTo(0.0);
     }
 
     @Test
     void single_source_returns_its_pressure() {
-        CapacitySignalSource source = new CapacitySignalSource() {
-            @Override public String sourceName() { return "work-queue"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("actor-1", "work-queue", 0.6, Instant.now()));
-            }
-        };
+        var source = stubSource(List.of(
+                new CapacitySignal("actor-1", "work-queue", 0.6, Instant.now())));
         var view = new AggregatingActorCapacityView(List.of(source));
-        view.refresh();
-        assertThat(view.aggregatedPressure("actor-1").pressure()).isEqualTo(0.6);
+        assertThat(view.getCapacity("actor-1").aggregatePressure()).isEqualTo(0.6);
     }
 
     @Test
     void max_pressure_across_sources() {
-        CapacitySignalSource s1 = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s1"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("actor-1", "s1", 0.4, Instant.now()));
-            }
-        };
-        CapacitySignalSource s2 = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s2"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("actor-1", "s2", 0.8, Instant.now()));
-            }
-        };
+        var s1 = stubSource(List.of(new CapacitySignal("actor-1", "s1", 0.4, Instant.now())));
+        var s2 = stubSource(List.of(new CapacitySignal("actor-1", "s2", 0.8, Instant.now())));
         var view = new AggregatingActorCapacityView(List.of(s1, s2));
-        view.refresh();
-        assertThat(view.aggregatedPressure("actor-1").pressure()).isEqualTo(0.8);
+        assertThat(view.getCapacity("actor-1").aggregatePressure()).isEqualTo(0.8);
     }
 
     @Test
-    void multiple_actors_grouped() {
-        CapacitySignalSource source = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(
-                        new CapacitySignal("a", "s", 0.3, Instant.now()),
-                        new CapacitySignal("b", "s", 0.7, Instant.now()));
-            }
-        };
-        var view = new AggregatingActorCapacityView(List.of(source));
-        view.refresh();
-        assertThat(view.aggregatedPressure("a").pressure()).isEqualTo(0.3);
-        assertThat(view.aggregatedPressure("b").pressure()).isEqualTo(0.7);
-    }
-
-    @Test
-    void signals_by_actor_returns_individual_sources() {
-        CapacitySignalSource s1 = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s1"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("a", "s1", 0.3, Instant.now()));
-            }
-        };
-        CapacitySignalSource s2 = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s2"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("a", "s2", 0.6, Instant.now()));
-            }
-        };
+    void pressure_by_signal_type() {
+        var s1 = stubSource(List.of(new CapacitySignal("actor-1", "ctx", 0.4, Instant.now())));
+        var s2 = stubSource(List.of(new CapacitySignal("actor-1", "task", 0.8, Instant.now())));
         var view = new AggregatingActorCapacityView(List.of(s1, s2));
-        view.refresh();
-        assertThat(view.signalsByActor("a")).hasSize(2);
+        var cap = view.getCapacity("actor-1");
+        assertThat(cap.pressureBySignalType()).containsEntry("ctx", 0.4);
+        assertThat(cap.pressureBySignalType()).containsEntry("task", 0.8);
     }
 
     @Test
-    void refresh_replaces_cache() {
-        var mutablePressure = new double[]{0.5};
-        CapacitySignalSource source = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(new CapacitySignal("a", "s", mutablePressure[0], Instant.now()));
-            }
-        };
+    void get_overloaded_filters_by_threshold() {
+        var source = overloadedSource(List.of(
+                new CapacitySignal("a", "s", 0.3, Instant.now()),
+                new CapacitySignal("b", "s", 0.9, Instant.now())));
         var view = new AggregatingActorCapacityView(List.of(source));
-        view.refresh();
-        assertThat(view.aggregatedPressure("a").pressure()).isEqualTo(0.5);
-
-        mutablePressure[0] = 0.9;
-        view.refresh();
-        assertThat(view.aggregatedPressure("a").pressure()).isEqualTo(0.9);
+        var overloaded = view.getOverloaded(0.7);
+        assertThat(overloaded).hasSize(1);
+        assertThat(overloaded.get(0).actorId()).isEqualTo("b");
     }
 
     @Test
-    void all_aggregated_pressures() {
-        CapacitySignalSource source = new CapacitySignalSource() {
-            @Override public String sourceName() { return "s"; }
-            @Override public List<CapacitySignal> signals() {
-                return List.of(
-                        new CapacitySignal("a", "s", 0.3, Instant.now()),
-                        new CapacitySignal("b", "s", 0.7, Instant.now()));
+    void error_isolated_per_source() {
+        var good = stubSource(List.of(new CapacitySignal("actor-1", "s", 0.5, Instant.now())));
+        CapacitySignalSource bad = new CapacitySignalSource() {
+            @Override public List<CapacitySignal> observe(String actorId) { throw new RuntimeException("fail"); }
+            @Override public List<CapacitySignal> observeOverloaded(double t) { throw new RuntimeException("fail"); }
+        };
+        var view = new AggregatingActorCapacityView(List.of(bad, good));
+        assertThat(view.getCapacity("actor-1").aggregatePressure()).isEqualTo(0.5);
+    }
+
+    private static CapacitySignalSource stubSource(List<CapacitySignal> signals) {
+        return new CapacitySignalSource() {
+            @Override public List<CapacitySignal> observe(String actorId) {
+                return signals.stream().filter(s -> s.actorId().equals(actorId)).toList();
+            }
+            @Override public List<CapacitySignal> observeOverloaded(double threshold) {
+                return signals.stream().filter(s -> s.pressure() >= threshold).toList();
             }
         };
-        var view = new AggregatingActorCapacityView(List.of(source));
-        view.refresh();
-        assertThat(view.allAggregatedPressures()).hasSize(2);
+    }
+
+    private static CapacitySignalSource overloadedSource(List<CapacitySignal> signals) {
+        return new CapacitySignalSource() {
+            @Override public List<CapacitySignal> observe(String actorId) {
+                return signals.stream().filter(s -> s.actorId().equals(actorId)).toList();
+            }
+            @Override public List<CapacitySignal> observeOverloaded(double threshold) {
+                return signals;
+            }
+        };
     }
 }

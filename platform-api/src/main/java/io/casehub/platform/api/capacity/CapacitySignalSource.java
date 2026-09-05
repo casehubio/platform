@@ -4,7 +4,7 @@ import java.util.List;
 
 public interface CapacitySignalSource {
 
-    String sourceName();
+    List<CapacitySignal> observe(String actorId);
 
-    List<CapacitySignal> signals();
+    List<CapacitySignal> observeOverloaded(double threshold);
 }

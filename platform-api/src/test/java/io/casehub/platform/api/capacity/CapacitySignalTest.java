@@ -11,8 +11,9 @@ class CapacitySignalTest {
     void valid_signal() {
         var signal = new CapacitySignal("actor-1", "work-queue", 0.75, Instant.now());
         assertThat(signal.actorId()).isEqualTo("actor-1");
-        assertThat(signal.source()).isEqualTo("work-queue");
+        assertThat(signal.signalType()).isEqualTo("work-queue");
         assertThat(signal.pressure()).isEqualTo(0.75);
+        assertThat(signal.metadata()).isEmpty();
     }
 
     @Test
@@ -48,15 +49,15 @@ class CapacitySignalTest {
     }
 
     @Test
-    void null_source_throws() {
+    void null_signalType_throws() {
         assertThatThrownBy(() -> new CapacitySignal("a", null, 0.5, Instant.now()))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    void null_timestamp_defaults_to_now() {
+    void null_observedAt_defaults_to_now() {
         var before = Instant.now();
         var signal = new CapacitySignal("a", "s", 0.5, null);
-        assertThat(signal.timestamp()).isAfterOrEqualTo(before);
+        assertThat(signal.observedAt()).isAfterOrEqualTo(before);
     }
 }

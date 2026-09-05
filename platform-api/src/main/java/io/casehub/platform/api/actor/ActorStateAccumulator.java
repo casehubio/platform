@@ -1,6 +1,7 @@
 package io.casehub.platform.api.actor;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -50,4 +51,6 @@ public interface ActorStateAccumulator {
      * Best-effort snapshot — may include cases whose work completed since the scan started.
      */
     void engineActiveCaseId(UUID caseId);
+
+    void capacity(double aggregatePressure, Map<String, Double> pressureBySignalType);
 }

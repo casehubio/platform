@@ -1,73 +1,6 @@
-# casehub-platform Workspace
+# CLAUDE.md
 
 **Name:** casehub-platform
-
-**Physical path:** `proj/`
-**Symlinked at:** `wksp/`
-**Project repo:** `proj/`
-**Workspace:** `wksp/`
-**Workspace type:** public
-
-## Session Start
-
-Run `# add-dir removed — use proj/ symlink instead and `# add-dir removed — use proj/ symlink instead before any other work.
-
-## Artifact Locations
-
-| Skill | Writes to |
-|-------|-----------|
-| brainstorming (specs) | `specs/` |
-| writing-plans (plans) | `plans/` |
-| handover | `HANDOFF.md` |
-| idea-log | `IDEAS.md` |
-| design-snapshot | `snapshots/` |
-| java-update-design / update-primary-doc | `design/JOURNAL.md` (created by `epic`) |
-| adr | `adr/` |
-| write-blog | `blog/` |
-
-## Git Discipline
-
-Two git repositories are active in every session:
-- **Workspace** (wksp/) — plans, blog, specs, snapshots, handover
-- **Project repo** (proj/) — source code, ADRs
-
-Never rely on CWD for git operations:
-```bash
-git -C proj/ ...   # workspace artifacts
-git -C proj/ ...          # project artifacts
-```
-
-Two remotes are configured on the project repo:
-- `origin` → `casehubio/platform` (canonical)
-- `mdproctor` → `mdproctor/platform` (personal fork)
-
-**Git hooks:** `.githooks/pre-push` is committed. Activate on each clone:
-```bash
-git config core.hooksPath .githooks
-```
-
-Push to both after squash or significant merges:
-```bash
-git push --force-with-lease origin main
-git push --force mdproctor main   # --force on first push after fork creation
-```
-
-## Routing
-
-| Artifact   | Destination | Notes |
-|------------|-------------|-------|
-| adr        | project     | lands in `adr/` |
-| protocols  | garden      | `proj/` — never create local protocol files |
-| specs      | project     | lands in `docs/` |
-| blog       | project     | lands in `docs/blog/` — promoted at work end |
-| plans      | workspace   | stay in workspace permanently |
-| design     | workspace   | epic journal stays in workspace |
-| snapshots  | workspace   | |
-| handover   | workspace   | |
-
-
-Living docs — check for drift after significant changes:
-- `ARC42STORIES.MD` — primary architecture record; check §4 (layer taxonomy), §5 (building block view), §8 (new layers), §13 (glossary) after module, SPI, or structural changes
 
 ## Platform Docs
 - [Platform Index](https://raw.githubusercontent.com/casehubio/parent/main/docs/INDEX.md) — discovery index (start here)
@@ -189,7 +122,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `callback-generator/` | `casehub-platform-callback-generator` | Java annotation processor (APT) — scans Jandex indexes for @CallbackEligible on SPI interfaces, generates @Decorator classes that route to CallbackInvoker when registrations exist, delegate to wrapped bean otherwise. Fan-out (invoke all) vs single-impl (first wins) controlled by @CallbackEligible(fanOut). Kebab-case SPI name derivation from class name when @CallbackEligible(name=""). No quarkus:build goal |
 | `yaml-core/` | `casehub-platform-yaml-core` | Pure Java YAML declaration primitives — VariableResolver (pluggable VariableSource chain, deferred prefixes, each/row context, DeferredPrefixHandler callback), ForEachExpander (generic adapter pattern via ForEachDirective sealed type (GroupRef + InlineIteration), when conditions via Truthiness, stamped IDs, LinkedHashMap result keyed by ID, post-expansion reference rewriting via ForEachAdapter.Reference), Truthiness (boolean string evaluation), CsvParser (typed columns: STRING/INTEGER/BOOLEAN/NUMBER, parse-time validation). Module system: YamlModule (generic sections Map), YamlModuleParameter (typed constraints: minLength/maxLength/pattern/minimum/maximum/allowedValues/constraintDescription + Builder with constraint/type coherence validation), ParameterValidator (collect-all, dual API: validate() returns List + validateOrThrow()), ParameterType enum (STRING/LIST/INTEGER/NUMBER/BOOLEAN + canAccept type compatibility, parse() → ParsedValue sealed type), ModuleExpander (alias prefixing, parameter resolution, import merging, structural validation + validateModuleRefs cross-module type checking), ModuleBridge<T> (typed bridge: fromSections/toSections/rewriter/deriveOutputs), TypedExpandedModule<T> (typed expansion result: T content + moduleScopes/importConditions/moduleOutputs/outputSource()), YamlImport, YamlModuleFile. JSON Schema fragments in src/main/resources/schema/. Zero dependencies, J2CL-transpilable. No quarkus:build goal |
 | `yaml-jackson/` | `casehub-platform-yaml-jackson` | Jackson mixins for yaml-core types — YamlCoreJacksonModule (registers mixins via setupModule), YamlModuleFileMixin + YamlModuleFileBuilder (@JsonAnySetter dynamic section capture: top-level YAML keys become sections, module/imports are known fields). Case-insensitive ParameterType via MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS. No quarkus:build goal |
-| `schema-generator/` | `casehub-platform-schema-generator` | Shared JSON Schema generation from Java types — victools/jsonschema-generator (Draft 2020-12, OptionPreset.PLAIN_JSON). PlatformSchemaGenerator(Module... customModules) → generate(Class<?>) → JsonNode. Built-in modules: JacksonModule, JakartaValidationModule, EnumInliningModule (inline enum values, no $ref), UnevaluatedPropertiesModule. SchemaPostProcessor ($schema insertion). Domain-specific modules stay in consuming repos. No quarkus:build goal |
+| `schema-generator/` | `casehub-platform-schema-generator` | Shared JSON Schema generation from Java types — victools/jsonschema-generator (Draft 2020-12, OptionPreset.PLAIN_JSON). PlatformSchemaGenerator(Module... customModules) → generate(Class<?>) → JsonNode. Built-in modules: JacksonModule, JakartaValidationModule, EnumInliningModule (inline enum values, no $ref), UnevaluatedPropertiesModule. Opt-in modules: SealedHierarchyModule (sealed interface oneOf+discriminator, configurable overrides via `Map<Class<?>, Map<Class<?>, String>>`). SchemaPostProcessor ($schema insertion). Domain-specific modules stay in consuming repos. No quarkus:build goal |
 | `platform-pdf/` | `casehub-platform-pdf` | HTML-to-PDF generation with PDF/A-2b conformance via OpenHTMLtoPDF + PDFBox 3.0.3. Implements `PdfGenerator` SPI from platform-api. `@ApplicationScoped` displaces `NoOpPdfGenerator @DefaultBean`. Optional module activated by classpath presence. No quarkus:build goal |
 | `platform-signing/` | `casehub-platform-signing` | EU DSS 6.2-backed document signing — PAdES PDF embedded signatures + CAdES detached (.p7s). `DssDocumentSigningService @ApplicationScoped` displaces `NoOpDocumentSigningService @DefaultBean`. `DssDocumentVerificationService @ApplicationScoped` displaces `NoOpDocumentVerificationService @DefaultBean`. `KeyStoreManager @ApplicationScoped` (PKCS#12 loading, `@Inject` from DssSigningConfig, per-tenant alias resolution). `DssSigningConfig @ConfigMapping(prefix = "casehub.signing")` — keystorePath, keystorePassword, keystoreType (PKCS12), keyAlias, padesProfile (B_T), tsaUrl, expiryWarningDays (default 30), trustedListUrl. `lifecycle/` subpackage: `CertificateExpiryMonitor` (scans keystore certs, fires `CertificateExpiryEvent` CDI event), `CertificateExpiryScheduler` (`@Scheduled` every 6h), `KeyStoreRotationService` (AtomicReference swap — failed rotations keep old manager). `tenant/` subpackage: `TenantKeyStoreResolver` (maps tenancyId to per-tenant PKCS#12 via `TenantKeyStoreConfig`, ConcurrentHashMap cache, fallback to default). `TrustedListManager @ApplicationScoped` — EU LOTL loading via `dss-tsl-validation`, integrated into `DssDocumentVerificationService` as trusted cert source (config: `casehub.signing.trusted-list-url`; disabled by default; file-cached 24h). Profile enforcement: B_T+ without TSA throws (no silent B_B downgrade). PDFBox 3.0.4 via DSS (compatible with platform-pdf's 3.0.3). Optional module activated by classpath presence. No quarkus:build goal |
 | `callback-client/` | `casehub-platform-callback-client` | Client-side callback infrastructure — CallbackAutoRegistrar @Startup (discovers local @CallbackEligible SPIs via CDI, registers with CaseHub server over HTTP, heartbeat renewal at configurable interval, @Readiness health check, graceful deregister on @PreDestroy; skips @DefaultBean and @Decorator beans). CallbackDispatchResource @Path("/casehub/callbacks/{spiName}/{methodName}") — receives invocations from CallbackInvoker, X-CaseHub-SPI header validation, parameter-count method disambiguation, routes to local CDI beans. CallbackObjectMapperCustomizer (Preferences→MapPreferences mapping). Config: casehub.callback.server-url, casehub.callback.public-url (both Optional — disabled when absent). No quarkus:build goal |

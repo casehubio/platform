@@ -57,13 +57,18 @@ public class RecordEmitter {
 
     private GeneratedFile emitRecord(
             TypeGraph.TypeDef typeDef, MappingConfig mapping, EmitConfig config) {
-        String className = config.prefix() + typeDef.name();
-        String fileName = className + ".java";
-        String packagePath = config.targetPackage().replace('.', '/');
-
         MappingConfig.TypeMapping typeMapping = mapping.forType(typeDef.name()).orElse(null);
 
-        List<ResolvedField> fields = resolveFields(typeDef, typeMapping, config.prefix());
+        String className;
+        if (typeMapping != null && typeMapping.recordName() != null) {
+            className = typeMapping.recordName();
+        } else {
+            className = config.prefix() + typeDef.name();
+        }
+        String fileName    = className + ".java";
+        String packagePath = config.targetPackage().replace('.', '/');
+
+        List<ResolvedField> fields = resolveFields(typeDef, typeMapping, mapping, config.prefix());
 
         Set<String> imports = new TreeSet<>();
         for (ResolvedField f : fields) {
@@ -82,8 +87,8 @@ public class RecordEmitter {
                 fields.stream().anyMatch(f -> f.type.typeName().startsWith("List<"));
         boolean hasMapFields =
                 fields.stream().anyMatch(f -> f.type.typeName().startsWith("Map<"));
-        if (hasListFields) imports.add("java.util.List");
-        if (hasMapFields) imports.add("java.util.Map");
+        if (hasListFields) {imports.add("java.util.List");}
+        if (hasMapFields) {imports.add("java.util.Map");}
 
         StringBuilder sb = new StringBuilder();
         sb.append(LICENSE_HEADER);
@@ -94,7 +99,7 @@ public class RecordEmitter {
                 sb.append("import ").append(imp).append(";\n");
             }
         }
-        if (!imports.isEmpty()) sb.append("\n");
+        if (!imports.isEmpty()) {sb.append("\n");}
 
         for (String globalAnnotation : mapping.globalAnnotations()) {
             String simpleName = extractSimpleAnnotation(globalAnnotation);
@@ -115,25 +120,40 @@ public class RecordEmitter {
             }
         }
 
-        List<ResolvedField> nullSafeFields =
-                fields.stream()
-                        .filter(
-                                f ->
-                                        f.type.typeName().startsWith("List<")
-                                                || f.type.typeName().startsWith("Map<"))
-                        .toList();
+        List<ResolvedField> defaultableFields = fields.stream()
+                                                      .filter(f -> f.defaultValue != null
+                                                                   || f.type.typeName().startsWith("List<")
+                                                                   || f.type.typeName().startsWith("Map<"))
+                                                      .toList();
 
-        if (!nullSafeFields.isEmpty()) {
-            sb.append("\n");
-            sb.append("  public ").append(className).append(" {\n");
-            for (ResolvedField f : nullSafeFields) {
-                String defaultValue =
-                        f.type.typeName().startsWith("List<") ? "List.of()" : "Map.of()";
-                sb.append("    if (").append(f.name).append(" == null) {\n");
-                sb.append("      ").append(f.name).append(" = ").append(defaultValue).append(";\n");
-                sb.append("    }\n");
+        boolean hasBody = typeMapping != null && typeMapping.body() != null
+                          && !typeMapping.body().isBlank();
+
+        if (!defaultableFields.isEmpty() || hasBody) {
+            if (!defaultableFields.isEmpty()) {
+                sb.append("\n");
+                sb.append("  public ").append(className).append(" {\n");
+                for (ResolvedField f : defaultableFields) {
+                    String defVal;
+                    if (f.defaultValue != null) {
+                        defVal = f.defaultValue;
+                    } else if (f.type.typeName().startsWith("List<")) {
+                        defVal = "List.of()";
+                    } else {
+                        defVal = "Map.of()";
+                    }
+                    sb.append("    if (").append(f.name).append(" == null) {\n");
+                    sb.append("      ").append(f.name).append(" = ").append(defVal).append(";\n");
+                    sb.append("    }\n");
+                }
+                sb.append("  }\n");
             }
-            sb.append("  }\n");
+            if (hasBody) {
+                sb.append("\n");
+                for (String line : typeMapping.body().lines().toList()) {
+                    sb.append("  ").append(line).append("\n");
+                }
+            }
         }
 
         sb.append("}\n");
@@ -142,11 +162,16 @@ public class RecordEmitter {
     }
 
     private List<ResolvedField> resolveFields(
-            TypeGraph.TypeDef typeDef, MappingConfig.TypeMapping typeMapping, String prefix) {
+            TypeGraph.TypeDef typeDef, MappingConfig.TypeMapping typeMapping,
+            MappingConfig mapping, String prefix) {
         List<ResolvedField> resolved = new ArrayList<>();
         for (TypeGraph.FieldDef field : typeDef.fields()) {
-            MappingConfig.FieldMapping fieldMapping = null;
-            String componentName = field.name();
+            if (shouldSkipGlobal(field.name(), mapping)) {
+                continue;
+            }
+
+            MappingConfig.FieldMapping fieldMapping  = null;
+            String                     componentName = field.name();
 
             if (typeMapping != null) {
                 fieldMapping = typeMapping.forField(field.name()).orElse(null);
@@ -171,49 +196,69 @@ public class RecordEmitter {
             }
 
             JavaTypeResolver.ResolvedType resolvedType =
-                    typeResolver.resolve(field, fieldMapping, prefix);
+                    typeResolver.resolve(field, fieldMapping, prefix, mapping);
 
-            AnnotationResult ar = buildAnnotations(fieldMapping);
+            AnnotationResult ar           = buildAnnotations(fieldMapping, mapping);
+            String           defaultValue = fieldMapping != null ? fieldMapping.defaultValue() : null;
 
             resolved.add(new ResolvedField(componentName, resolvedType, ar.annotations,
-                    ar.imports));
+                                           ar.imports, defaultValue));
         }
 
         if (typeMapping != null) {
             Set<String> schemaFieldNames = typeDef.fields().stream()
-                    .map(TypeGraph.FieldDef::name)
-                    .collect(java.util.stream.Collectors.toSet());
+                                                  .map(TypeGraph.FieldDef::name)
+                                                  .collect(java.util.stream.Collectors.toSet());
 
             for (var entry : typeMapping.fields().entrySet()) {
-                String mappingKey = entry.getKey();
-                MappingConfig.FieldMapping fm = entry.getValue();
-                if (fm.skip()) continue;
+                String                     mappingKey = entry.getKey();
+                MappingConfig.FieldMapping fm         = entry.getValue();
+                if (fm.skip()) {continue;}
 
                 boolean isSchemaField = schemaFieldNames.contains(mappingKey);
                 boolean isJsonPropertyOfSchemaField = fm.jsonProperty() != null
-                        && schemaFieldNames.contains(fm.jsonProperty());
+                                                      && schemaFieldNames.contains(fm.jsonProperty());
 
                 if (!isSchemaField && !isJsonPropertyOfSchemaField) {
                     String componentName = mappingKey;
                     String javaType = fm.type() != null ? fm.type()
-                            : "com.fasterxml.jackson.databind.JsonNode";
+                                                        : "com.fasterxml.jackson.databind.JsonNode";
 
-                    String simpleType = simpleName(javaType);
+                    String      resolvedFqcn = resolveTypeFqcn(javaType, mapping);
+                    String      simpleType   = simpleName(resolvedFqcn);
                     Set<String> fieldImports = new TreeSet<>();
-                    if (javaType.contains(".")) fieldImports.add(javaType);
+                    if (resolvedFqcn.contains(".")) {fieldImports.add(resolvedFqcn);}
 
                     JavaTypeResolver.ResolvedType resolvedType =
                             new JavaTypeResolver.ResolvedType(simpleType, simpleType, fieldImports);
 
-                    AnnotationResult ar = buildAnnotations(fm);
+                    AnnotationResult ar = buildAnnotations(fm, mapping);
 
                     resolved.add(new ResolvedField(componentName, resolvedType, ar.annotations,
-                            ar.imports));
+                                                   ar.imports, fm.defaultValue()));
                 }
             }
         }
 
         return resolved;
+    }
+
+    private boolean shouldSkipGlobal(String fieldName, MappingConfig mapping) {
+        for (String pattern : mapping.skipPatterns()) {
+            if (pattern.endsWith("*")) {
+                String prefix = pattern.substring(0, pattern.length() - 1);
+                if (fieldName.startsWith(prefix)) {return true;}
+            } else if (pattern.equals(fieldName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String resolveTypeFqcn(String typeName, MappingConfig mapping) {
+        if (typeName.contains(".")) {return typeName;}
+        String fqcn = mapping.imports().get(typeName);
+        return fqcn != null ? fqcn : typeName;
     }
 
     private MappingConfig.FieldMapping findByJsonProperty(
@@ -248,9 +293,10 @@ public class RecordEmitter {
 
     private record AnnotationResult(List<String> annotations, Set<String> imports) {}
 
-    private AnnotationResult buildAnnotations(MappingConfig.FieldMapping fieldMapping) {
+    private AnnotationResult buildAnnotations(MappingConfig.FieldMapping fieldMapping,
+                                              MappingConfig mapping) {
         List<String> annotations = new ArrayList<>();
-        Set<String> imports = new TreeSet<>();
+        Set<String>  imports     = new TreeSet<>();
         if (fieldMapping == null) {
             return new AnnotationResult(annotations, imports);
         }
@@ -259,10 +305,13 @@ public class RecordEmitter {
             imports.add("com.fasterxml.jackson.annotation.JsonProperty");
         }
         if (fieldMapping.deserializer() != null) {
-            String simpleDeser = simpleName(fieldMapping.deserializer());
+            String deserFqcn   = resolveDeserializerFqcn(fieldMapping.deserializer(), mapping);
+            String simpleDeser = simpleName(deserFqcn);
             annotations.add("@JsonDeserialize(using = " + simpleDeser + ".class)");
             imports.add("com.fasterxml.jackson.databind.annotation.JsonDeserialize");
-            imports.add(fieldMapping.deserializer());
+            if (deserFqcn.contains(".")) {
+                imports.add(deserFqcn);
+            }
         }
         if (!fieldMapping.aliases().isEmpty()) {
             if (fieldMapping.aliases().size() == 1) {
@@ -270,7 +319,7 @@ public class RecordEmitter {
             } else {
                 StringBuilder ab = new StringBuilder("@JsonAlias({");
                 for (int i = 0; i < fieldMapping.aliases().size(); i++) {
-                    if (i > 0) ab.append(", ");
+                    if (i > 0) {ab.append(", ");}
                     ab.append("\"").append(fieldMapping.aliases().get(i)).append("\"");
                 }
                 ab.append("})");
@@ -281,22 +330,28 @@ public class RecordEmitter {
         return new AnnotationResult(annotations, imports);
     }
 
+    private String resolveDeserializerFqcn(String deserializer, MappingConfig mapping) {
+        if (deserializer.contains(".")) {return deserializer;}
+        String fqcn = mapping.deserializers().get(deserializer);
+        return fqcn != null ? fqcn : deserializer;
+    }
+
     private String extractAnnotationClass(String globalAnnotation) {
-        int parenIndex = globalAnnotation.indexOf('(');
-        String className = parenIndex >= 0 ? globalAnnotation.substring(0, parenIndex) : globalAnnotation;
+        int    parenIndex = globalAnnotation.indexOf('(');
+        String className  = parenIndex >= 0 ? globalAnnotation.substring(0, parenIndex) : globalAnnotation;
         return className.contains(".") ? className : null;
     }
 
     private String extractSimpleAnnotation(String globalAnnotation) {
-        int parenIndex = globalAnnotation.indexOf('(');
+        int    parenIndex = globalAnnotation.indexOf('(');
         String className;
         String params;
         if (parenIndex >= 0) {
             className = globalAnnotation.substring(0, parenIndex);
-            params = globalAnnotation.substring(parenIndex);
+            params    = globalAnnotation.substring(parenIndex);
         } else {
             className = globalAnnotation;
-            params = "";
+            params    = "";
         }
         return simpleName(className) + params;
     }
@@ -310,5 +365,6 @@ public class RecordEmitter {
             String name,
             JavaTypeResolver.ResolvedType type,
             List<String> annotations,
-            Set<String> annotationImports) {}
+            Set<String> annotationImports,
+            String defaultValue) {}
 }

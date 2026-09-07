@@ -25,13 +25,15 @@ public class JavaTypeResolver {
     public ResolvedType resolve(
             TypeGraph.FieldDef field,
             MappingConfig.FieldMapping mapping,
-            String prefix) {
+            String prefix,
+            MappingConfig globalMapping) {
 
         Set<String> imports = new TreeSet<>();
 
         if (mapping != null && mapping.type() != null) {
-            String fqcn = mapping.type();
-            String simple = simpleName(fqcn);
+            String typeName = mapping.type();
+            String fqcn     = resolveFromGlobalImports(typeName, globalMapping);
+            String simple   = simpleName(fqcn);
             if (fqcn.contains(".")) {
                 imports.add(fqcn);
             }
@@ -56,6 +58,16 @@ public class JavaTypeResolver {
         }
 
         return resolveSchemaType(field.schemaType(), imports);
+    }
+
+
+    private String resolveFromGlobalImports(String typeName, MappingConfig globalMapping) {
+        if (typeName.contains(".")) {return typeName;}
+        if (globalMapping != null) {
+            String fqcn = globalMapping.imports().get(typeName);
+            if (fqcn != null) {return fqcn;}
+        }
+        return typeName;
     }
 
     private String resolveItemType(

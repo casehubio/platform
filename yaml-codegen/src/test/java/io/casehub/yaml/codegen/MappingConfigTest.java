@@ -15,10 +15,11 @@
  */
 package io.casehub.yaml.codegen;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class MappingConfigTest {
 
@@ -72,4 +73,59 @@ class MappingConfigTest {
         assertThat(empty.forType("Anything")).isEmpty();
         assertThat(empty.globalAnnotations()).isEmpty();
     }
+
+    private final MappingConfig enhanced =
+            MappingConfig.load(new File("src/test/resources/schema/enhanced-mappings.yaml"));
+
+    @Test
+    void loadsSkipPatterns() {
+        assertThat(enhanced.skipPatterns()).containsExactly("x-*", "internal");
+    }
+
+    @Test
+    void loadsGlobalImports() {
+        assertThat(enhanced.imports()).containsEntry("Duration", "java.time.Duration");
+        assertThat(enhanced.imports()).containsEntry("Instant", "java.time.Instant");
+    }
+
+    @Test
+    void loadsGlobalDeserializers() {
+        assertThat(enhanced.deserializers())
+                .containsEntry("DurationDeserializer", "io.casehub.deser.DurationDeserializer");
+    }
+
+    @Test
+    void loadsRecordName() {
+        var tm = enhanced.forType("CaseDefinition").orElseThrow();
+        assertThat(tm.recordName()).isEqualTo("CaseDef");
+    }
+
+    @Test
+    void loadsBody() {
+        var tm = enhanced.forType("CaseDefinition").orElseThrow();
+        assertThat(tm.body()).contains("public String key()");
+    }
+
+    @Test
+    void loadsFieldDefaultValue() {
+        var tm        = enhanced.forType("CaseDefinition").orElseThrow();
+        var nameField = tm.forField("name").orElseThrow();
+        assertThat(nameField.defaultValue()).isEqualTo("\"unnamed\"");
+    }
+
+    @Test
+    void loadsAdditionalFieldDefaultValue() {
+        var tm = enhanced.forType("CaseDefinition").orElseThrow();
+        assertThat(tm.additionalFields()).hasSize(1);
+    }
+
+    @Test
+    void emptyConfig_hasEmptyNewFields() {
+        MappingConfig empty = MappingConfig.empty();
+        assertThat(empty.skipPatterns()).isEmpty();
+        assertThat(empty.imports()).isEmpty();
+        assertThat(empty.deserializers()).isEmpty();
+    }
+
+
 }

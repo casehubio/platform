@@ -1,0 +1,32 @@
+globalAnnotations:
+  - "com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)"
+
+skipPatterns:
+  - "x-*"
+  - "internal"
+
+imports:
+  Duration: "java.time.Duration"
+  Instant: "java.time.Instant"
+
+deserializers:
+  DurationDeserializer: "io.casehub.deser.DurationDeserializer"
+
+types:
+  CaseDefinition:
+    recordName: CaseDef
+    body: |
+      public String key() {
+        return name() != null ? name() : "unnamed";
+      }
+    fields:
+      name:
+        alias: title
+        defaultValue: "\"unnamed\""
+      duration:
+        type: Duration
+        deserializer: DurationDeserializer
+    additionalFields:
+      - name: version
+        type: Integer
+        defaultValue: "0"

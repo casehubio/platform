@@ -190,7 +190,7 @@ private void registerOperationTool(String domain, OperationDescriptor op,
 - `DynamicToolRegistrarTest.java` (mcp/) — test file
 - `ToolManager` (quarkus-mcp-server-core) — `newTool()`, `getTool()`,
   `removeTool()`, `addArgument()`, `ToolAnnotations`
-- `ModelRegistry.java` (mcp/) — domain lookup
+- `DomainModelRegistry.java` (mcp/) — domain lookup
 - `OperationDescriptor.java` (mcp/) — operation metadata
 - `ReflectiveOperationDispatcher.java` (mcp/) — dispatch target
 - `CaseHubMcpTools.java` (mcp/) — `casehub_model` static tool pattern

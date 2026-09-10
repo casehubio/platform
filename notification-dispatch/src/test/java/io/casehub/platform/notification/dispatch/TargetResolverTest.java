@@ -8,6 +8,7 @@ import io.casehub.platform.api.subscription.NotificationTarget;
 import io.casehub.platform.api.subscription.NotificationTemplate;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionScope;
+import io.casehub.platform.api.subscription.ResolvedTarget;
 import io.casehub.platform.api.subscription.TargetType;
 import io.casehub.platform.subscription.NoOpEntityWatcherProvider;
 
@@ -64,7 +65,7 @@ class TargetResolverTest {
 
         var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactly("user-42");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactly("user-42");
     }
 
     @Test
@@ -76,7 +77,7 @@ class TargetResolverTest {
 
         var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactlyInAnyOrder("user-1", "user-2", "user-3");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder("user-1", "user-2", "user-3");
     }
 
     @Test
@@ -100,7 +101,7 @@ class TargetResolverTest {
 
         var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactly("user-assignee");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactly("user-assignee");
     }
 
     @Test
@@ -127,7 +128,7 @@ class TargetResolverTest {
         var result = resolver.resolve(sub, pojo);
 
         // user-1 appears in both USER target and GROUP, should be deduplicated
-        assertThat(result).containsExactlyInAnyOrder("user-1", "user-2", "user-3");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder("user-1", "user-2", "user-3");
     }
 
     @Test
@@ -151,7 +152,7 @@ class TargetResolverTest {
 
         var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactly("actor-user");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactly("actor-user");
     }
 
     @Test
@@ -179,7 +180,7 @@ class TargetResolverTest {
 
         var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactlyInAnyOrder(
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder(
                 "direct-user", "user-1", "user-2", "user-3", "user-assignee");
     }
 
@@ -189,9 +190,9 @@ class TargetResolverTest {
         var sub = subscription(targets, false);
         var pojo = new TestEvent("entity-1", "actor-1");
 
-        Set<String> result = resolver.resolve(sub, pojo);
+        var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder("watcher-1", "watcher-2");
     }
 
     @Test
@@ -200,10 +201,10 @@ class TargetResolverTest {
         var sub = subscription(targets, false);
         var pojo = new TestEvent("entity-1", "actor-1");
 
-        Set<String> result = resolver.resolve(sub, pojo);
+        var result = resolver.resolve(sub, pojo);
 
         // template.entityType() is "work-item" — should resolve the same watchers
-        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder("watcher-1", "watcher-2");
     }
 
     @Test
@@ -214,7 +215,7 @@ class TargetResolverTest {
         var sub = subscription(targets, false);
         var pojo = new TestEvent("entity-1", "actor-1");
 
-        Set<String> result = noOpResolver.resolve(sub, pojo);
+        var result = noOpResolver.resolve(sub, pojo);
 
         assertThat(result).isEmpty();
     }
@@ -231,9 +232,9 @@ class TargetResolverTest {
                 false, template, true, SubscriptionScope.USER, NOW, NOW);
         var pojo = new TestEvent("entity-2", "actor-1");
 
-        Set<String> result = resolver.resolve(sub, pojo);
+        var result = resolver.resolve(sub, pojo);
 
-        assertThat(result).containsExactly("watcher-3");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactly("watcher-3");
     }
 
     @Test
@@ -242,7 +243,7 @@ class TargetResolverTest {
         var sub = subscription(targets, false);
         var pojo = new TestEventNoEntityId("actor-1");
 
-        Set<String> result = resolver.resolve(sub, pojo);
+        var result = resolver.resolve(sub, pojo);
 
         assertThat(result).isEmpty();
     }
@@ -261,10 +262,10 @@ class TargetResolverTest {
         var sub = subscription(targets, false);
         var pojo = new TestEvent("entity-1", "actor-1");
 
-        Set<String> result = resolverWithActor.resolve(sub, pojo);
+        var result = resolverWithActor.resolve(sub, pojo);
 
         // actor-1 should be excluded (includeActor = false)
-        assertThat(result).containsExactlyInAnyOrder("watcher-1", "watcher-2");
+        assertThat(result).extracting(ResolvedTarget::targetId).containsExactlyInAnyOrder("watcher-1", "watcher-2");
     }
 
     // --- helpers ---

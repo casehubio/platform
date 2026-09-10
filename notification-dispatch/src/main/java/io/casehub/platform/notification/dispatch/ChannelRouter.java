@@ -121,4 +121,20 @@ public class ChannelRouter {
 
         return result;
     }
+
+    /**
+     * Route for non-user targets (agents, systems). No preference routing, no digest.
+     * Returns the CdiEventDeliverer channel.
+     */
+    public Set<ResolvedChannel> routeNonUser() {
+        var deliverer = channelRegistry.resolveDeliverer(CdiEventDeliverer.CHANNEL_ID);
+        if (deliverer.isEmpty()) {
+            LOG.warnf("CdiEventDeliverer not registered — non-user delivery will fail");
+            return Set.of();
+        }
+        return Set.of(new ResolvedChannel(
+                CdiEventDeliverer.CHANNEL_ID, deliverer.get(),
+                false, false, null,
+                io.casehub.platform.api.delivery.DestinationScope.PER_USER));
+    }
 }

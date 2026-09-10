@@ -11,8 +11,10 @@ import io.casehub.platform.api.notification.settings.NotificationPreferences;
 import io.casehub.platform.api.notification.settings.QuietHours;
 import io.casehub.platform.api.notification.settings.QuietHoursAction;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
+import io.casehub.platform.api.subscription.ResolvedTarget;
 import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
+import io.casehub.platform.api.subscription.TargetKind;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
@@ -80,17 +82,60 @@ public class NotificationDispatcher {
         final Object       pojo         = event.pojo();
         final String       tenancyId    = subscription.tenancyId();
 
-        final Set<String> recipientUserIds = targetResolver.resolve(subscription, pojo);
-        if (recipientUserIds.isEmpty()) {
+        final Set<ResolvedTarget> recipients = targetResolver.resolve(subscription, pojo);
+        if (recipients.isEmpty()) {
             return;
         }
 
         final Map<String, DeliveryResult> perTenantResults = new HashMap<>();
 
-        for (final String userId : recipientUserIds) {
-            dispatchToUser(userId, tenancyId, subscription, pojo, perTenantResults);
+        for (final ResolvedTarget target : recipients) {
+            if (target.kind() == TargetKind.NON_USER) {
+                dispatchToNonUser(target.targetId(), tenancyId, subscription, pojo);
+            } else {
+                dispatchToUser(target.targetId(), tenancyId, subscription, pojo, perTenantResults);
+            }
         }
     }
+
+    private void dispatchToNonUser(final String targetId,
+                                   final String tenancyId,
+                                   final Subscription subscription,
+                                   final Object pojo) {
+        final NotificationInput notificationInput = TemplateResolver.resolve(
+                subscription.template(), pojo, targetId, tenancyId);
+        if (notificationInput == null) {
+            return;
+        }
+
+        final Set<ResolvedChannel> channels = channelRouter.routeNonUser();
+
+        for (final ResolvedChannel channel : channels) {
+            try {
+                final DeliveryResult result = channel.deliverer().deliver(notificationInput);
+                if (result.success()) {
+                    deliveryTracker.recordSuccess(
+                            channel.channelId(), notificationInput, null,
+                            DeliverySourceType.NOTIFICATION);
+                } else {
+                    LOG.warnf("Non-user delivery failed for channel '%s', target '%s': %s",
+                              channel.channelId(), targetId, result.failureReason());
+                    deliveryTracker.recordFailure(
+                            channel.channelId(), notificationInput, null,
+                            DeliverySourceType.NOTIFICATION,
+                            null, result.failureReason());
+                }
+            } catch (Exception e) {
+                LOG.warnf(e, "Non-user delivery error for channel '%s', target '%s'",
+                          channel.channelId(), targetId);
+                deliveryTracker.recordFailure(
+                        channel.channelId(), notificationInput, null,
+                        DeliverySourceType.NOTIFICATION,
+                        null, e.getMessage());
+            }
+        }
+    }
+
 
     private void dispatchToUser(final String userId,
                                 final String tenancyId,

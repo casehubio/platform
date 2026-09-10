@@ -4,6 +4,7 @@ import io.casehub.platform.api.identity.GroupMember;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.casehub.platform.api.subscription.EntityWatcherProvider;
 import io.casehub.platform.api.subscription.NotificationTarget;
+import io.casehub.platform.api.subscription.ResolvedTarget;
 import io.casehub.platform.api.subscription.Subscription;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -47,12 +48,12 @@ public class TargetResolver {
      * @param pojo         the event POJO
      * @return deduplicated set of recipient user IDs (may be empty)
      */
-    public Set<String> resolve(final Subscription subscription, final Object pojo) {
-        final Set<String> recipients = new LinkedHashSet<>();
+    public Set<ResolvedTarget> resolve(final Subscription subscription, final Object pojo) {
+        final Set<ResolvedTarget> recipients = new LinkedHashSet<>();
 
         for (final NotificationTarget target : subscription.targets()) {
             switch (target.type()) {
-                case USER -> recipients.add(target.id());
+                case USER -> recipients.add(ResolvedTarget.user(target.id()));
 
                 case GROUP -> {
                     final Set<GroupMember> members = groupMembershipProvider.membersOf(target.id(), subscription.tenancyId());
@@ -61,7 +62,7 @@ public class TargetResolver {
                                   target.id(), subscription.id());
                     }
                     for (final GroupMember member : members) {
-                        recipients.add(member.actorId());
+                        recipients.add(ResolvedTarget.user(member.actorId()));
                     }
                 }
 
@@ -71,7 +72,7 @@ public class TargetResolver {
                         LOG.warnf("EVENT_FIELD target '%s' resolved to null on %s for subscription '%s'",
                                   target.id(), pojo.getClass().getSimpleName(), subscription.id());
                     } else {
-                        recipients.add(userId);
+                        recipients.add(ResolvedTarget.user(userId));
                     }
                 }
 
@@ -88,12 +89,18 @@ public class TargetResolver {
                             LOG.debugf("ENTITY_WATCHERS for %s/%s resolved to no watchers",
                                        entityType, entityId);
                         }
-                        recipients.addAll(watchers);
+                        for (final String watcher : watchers) {
+                            recipients.add(ResolvedTarget.user(watcher));
+                        }
                     } else {
                         LOG.warnf("ENTITY_WATCHERS target: entityIdField '%s' resolved to null on %s",
                                   subscription.template().entityIdField(), pojo.getClass().getSimpleName());
                     }
                 }
+
+                case AGENT -> recipients.add(ResolvedTarget.nonUser(target.id()));
+
+                case SYSTEM -> recipients.add(ResolvedTarget.nonUser(target.id()));
             }
         }
 
@@ -101,7 +108,7 @@ public class TargetResolver {
             final String actorId = TemplateResolver.extractField(pojo,
                                                                  subscription.template().actorIdField());
             if (actorId != null) {
-                recipients.remove(actorId);
+                recipients.remove(ResolvedTarget.user(actorId));
             }
         }
 

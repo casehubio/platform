@@ -9,12 +9,12 @@ import io.casehub.platform.api.datasource.DataSourceRegistry;
 import io.casehub.platform.api.datasource.FilterExpression;
 import io.casehub.platform.api.datasource.SubscriptionHandle;
 import io.casehub.platform.api.expression.CompiledExpression;
-import io.casehub.platform.api.expression.ExpressionEvaluator;
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
+import io.casehub.platform.api.expression.ExpressionEvaluator;
 import io.casehub.platform.api.expression.JQExpressionEvaluator;
 import io.casehub.platform.api.expression.MvelExpressionEvaluator;
-import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscribableEvent;
+import io.casehub.platform.api.subscription.Subscription;
 import io.casehub.platform.api.subscription.SubscriptionCreated;
 import io.casehub.platform.api.subscription.SubscriptionDeleted;
 import io.casehub.platform.api.subscription.SubscriptionMatched;
@@ -81,6 +81,21 @@ public class SubscriptionEngine {
 
         LOG.infof("Subscription engine started — %d subscriptions wired", handles.size());
     }
+
+    /**
+     * Publish an event into the subscription engine for matching against active subscriptions.
+     * This is the entry point for migrating bespoke CDI event paths to the unified pipeline.
+     *
+     * @param event the event POJO to match against subscriptions
+     */
+    public void publish(Object event) {
+        if (notificationDataSource == null) {
+            LOG.warnf("Cannot publish event — notification DataSource not available");
+            return;
+        }
+        notificationDataSource.add(event);
+    }
+
 
     private void wireSubscription(final Subscription subscription) {
         if (notificationDataSource == null) {

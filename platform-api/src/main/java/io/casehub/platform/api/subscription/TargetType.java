@@ -24,5 +24,17 @@ public enum TargetType {
      * Users watching the entity involved in the event — expanded via
      * {@code EntityWatcherProvider.watchersOf(entityType, entityId, tenancyId)} at dispatch time.
      */
-    ENTITY_WATCHERS
+    ENTITY_WATCHERS,
+
+    /**
+     * Agent target — resolved to {@link TargetKind#NON_USER}. No suppression, fire-and-forget
+     * delivery via CDI event.
+     */
+    AGENT,
+
+    /**
+     * System/operational target — resolved to {@link TargetKind#NON_USER}. For operational alerts,
+     * dashboards, and monitoring systems.
+     */
+    SYSTEM
 }

@@ -376,6 +376,16 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 **Well-known resource types:** Constants in `AclResourceType`: `CASE`, `PLAN_ITEM`, `WORK_ITEM`, `EVENT_LOG`, `CASE_DEFINITION`.
 
+### Modular Notification Targets
+
+The notification pipeline supports two target kinds:
+- **USER** (TargetType: `USER`, `GROUP`, `EVENT_FIELD`, `ENTITY_WATCHERS`) — full pipeline with preferences, suppression, digest, inbox persistence
+- **NON_USER** (TargetType: `AGENT`, `SYSTEM`) — skip suppression, fire-and-forget via `CdiEventDeliverer`
+
+To make a domain event subscribable, implement `SubscribableEvent` (`type()`, `tenancyId()`). The subscription engine matches it automatically. Create subscriptions with `AGENT` or `SYSTEM` targets for operational alerts.
+
+Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `CertificateExpiryEvent` (`certificate.expiry`).
+
 ### Subject Views and Labels
 
 **SubjectViewSpec:** A view definition with `id`, `name`, `tenancyId`, `labelPattern` (supports glob patterns `/**` and `/*`), `scope` (Path, optional), `sortField`, `sortDirection`, `additionalConditions`, and `createdAt`.
@@ -516,6 +526,16 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `casehub.delivery.retention.attempt-days` | Delivery attempt retention | -- |
 | `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | -- |
 | `casehub.delivery.retention.engagement-days` | Engagement event retention | -- |
+
+### Modular Notification Targets
+
+The notification pipeline supports two target kinds:
+- **USER** (TargetType: `USER`, `GROUP`, `EVENT_FIELD`, `ENTITY_WATCHERS`) — full pipeline with preferences, suppression, digest, inbox persistence
+- **NON_USER** (TargetType: `AGENT`, `SYSTEM`) — skip suppression, fire-and-forget via `CdiEventDeliverer`
+
+To make a domain event subscribable, implement `SubscribableEvent` (`type()`, `tenancyId()`). The subscription engine matches it automatically. Create subscriptions with `AGENT` or `SYSTEM` targets for operational alerts.
+
+Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `CertificateExpiryEvent` (`certificate.expiry`).
 
 ### Subject Views
 

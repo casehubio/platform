@@ -172,6 +172,8 @@ Same composite pattern for `ActorDIDProvider` -- `ConfiguredActorDIDProvider` (@
 
 **Quiet hours integration:** `QuietHoursAction.BUFFER_FOR_DIGEST` buffers suppressed notifications instead of dropping them. They are flushed to digest on the next scheduled flush.
 
+**Modular target kinds:** `TargetResolver.resolve()` returns `Set<ResolvedTarget>` (record: targetId + `TargetKind`). USER targets (USER, GROUP, EVENT_FIELD, ENTITY_WATCHERS) get the full pipeline. NON_USER targets (AGENT, SYSTEM) skip suppression/preferences and route via `ChannelRouter.routeNonUser()` to `CdiEventDeliverer` (fire-and-forget CDI async event). To add a new subscribable event: implement `SubscribableEvent` on the event record (provide `type()` and `tenancyId()`). The data source pipeline matches it automatically against active subscriptions. `SubscriptionEngine.publish(Object)` provides programmatic event injection.
+
 ### Expression Engines
 
 | Engine | Type Key | Backend | Context Type | Compilation | Notes |

@@ -324,6 +324,10 @@ io.casehub.platform.api
 
 
 
+## Modular Notification Pipeline
+
+The notification service supports three target kinds: **USER** (full pipeline — preferences, suppression, digest, inbox), **NON_USER** (agents and systems — skip suppression, fire-and-forget via `CdiEventDeliverer`). `TargetType` enum: `USER`, `GROUP`, `EVENT_FIELD`, `ENTITY_WATCHERS`, `AGENT`, `SYSTEM`. `TargetResolver.resolve()` returns `Set<ResolvedTarget>` (record: `targetId`, `TargetKind`). `NotificationDispatcher` dispatches USER targets through the full pipeline; NON_USER targets skip preferences/suppression and route via `ChannelRouter.routeNonUser()` to `CdiEventDeliverer`. To make an event subscribable: implement `SubscribableEvent` (`type()`, `tenancyId()`), then the existing data source pipeline matches it against subscriptions. Migrated events: `CapacityPressureEvent` (`capacity.pressure`), `CertificateExpiryEvent` (`certificate.expiry`). Engine events: `PathologyAlertEvent` (`pathology.alert`), `CaseLifecycleEvent` (`case.lifecycle.*`). Refs parent#471.
+
 ## Writing Style Guide
 
 **The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries.** Load it in full before drafting. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without verifying it against the style guide.

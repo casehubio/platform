@@ -2,6 +2,7 @@
 capability: expressions
 audience: consumer
 repo: casehub-platform
+verified-current: 2026-09-11
 anchors:
   classes:
     - io.casehub.platform.api.expression.ExpressionEngineRegistry
@@ -44,7 +45,7 @@ Multi-engine expression evaluation: JQ, MVEL3, and JEXL3, with config and secret
 
 **SecretManager SPI:** Resolves secrets in JQ expressions via `$secret.{secretName}.{property}`. Default reads from `casehub.platform.secrets.{secretName}.{property}` config keys. Supports Kubernetes Secrets via optional `quarkus-kubernetes-config`.
 
-**StringExpressionEvaluator:** Sub-interface of `ExpressionEvaluator` for string-based evaluators (carries `expression()` string). Concrete records: `JQExpressionEvaluator`, `MvelExpressionEvaluator`.
+**ExpressionEvaluator.expression():** The base `ExpressionEvaluator` interface provides a default `expression()` method (returns `null`). `StringExpressionEvaluator` overrides it with the expression string for string-based evaluators. Lambda-based evaluators return an optional human-readable description. Concrete records: `JQExpressionEvaluator`, `MvelExpressionEvaluator`.
 
 ## Configuration
 

@@ -4,12 +4,12 @@ audience: consumer
 repo: casehub-platform
 anchors:
   classes:
-    - io.casehub.platform.identity.CurrentPrincipal
-    - io.casehub.platform.identity.GroupMembershipProvider
-    - io.casehub.platform.identity.ActorTypeResolver
+    - io.casehub.platform.api.identity.CurrentPrincipal
+    - io.casehub.platform.api.identity.GroupMembershipProvider
+    - io.casehub.platform.api.identity.ActorTypeResolver
   spis:
-    - io.casehub.platform.identity.CurrentPrincipal
-    - io.casehub.platform.identity.GroupMembershipProvider
+    - io.casehub.platform.api.identity.CurrentPrincipal
+    - io.casehub.platform.api.identity.GroupMembershipProvider
   config-keys:
     - casehub.tenancy.default-id
     - casehub.platform.scim.token

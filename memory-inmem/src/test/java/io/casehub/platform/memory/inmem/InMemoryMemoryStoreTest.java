@@ -1,7 +1,8 @@
 package io.casehub.platform.memory.inmem;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
-import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
+import io.casehub.neocortex.memory.*;
+import io.casehub.neocortex.memory.testing.CaseMemoryStoreContractTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +60,7 @@ class InMemoryMemoryStoreTest extends CaseMemoryStoreContractTest {
             @Override public boolean isCrossTenantAdmin() { return true; }
         };
         var adminStore = new InMemoryMemoryStore(adminPrincipal);
-        adminStore.store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "data", Map.of()));
+        adminStore.store(MemoryInput.of("entity-1", DOMAIN, TENANT, "data"));
         int count = adminStore.eraseEntityAcrossTenants("entity-1", Set.of(TENANT));
         assertEquals(1, count);
         assertTrue(adminStore.query(MemoryQuery.forEntity("entity-1", DOMAIN, TENANT)).isEmpty());

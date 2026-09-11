@@ -1,5 +1,6 @@
 package io.casehub.platform.memory.jpa;
 
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -28,7 +29,7 @@ class PostgresDialectFtsTest {
     }
 
     private MemoryInput input(String text) {
-        return new MemoryInput("entity-fts", DOMAIN, TENANT, null, text, Map.of());
+        return MemoryInput.of("entity-fts", DOMAIN, TENANT, text);
     }
 
     private MemoryQuery ftsQuery(String question) {
@@ -64,8 +65,8 @@ class PostgresDialectFtsTest {
 
     @Test @TestTransaction
     void fts_multi_entity_returns_results_from_all_entities() {
-        store.store(new MemoryInput("entity-a", DOMAIN, TENANT, null, "The cat sat on the mat", Map.of()));
-        store.store(new MemoryInput("entity-b", DOMAIN, TENANT, null, "The cat chased the mouse", Map.of()));
+        store.store(MemoryInput.of("entity-a", DOMAIN, TENANT, "The cat sat on the mat"));
+        store.store(MemoryInput.of("entity-b", DOMAIN, TENANT, "The cat chased the mouse"));
         var q = MemoryQuery.forEntities(List.of("entity-a", "entity-b"), DOMAIN, TENANT)
             .withQuestion("cat").withOrder(MemoryOrder.RELEVANCE);
         var results = store.query(q);

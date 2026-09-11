@@ -1,5 +1,6 @@
 package io.casehub.platform.memory.jpa;
 
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -38,7 +39,7 @@ class PostgresDialectFtsFrenchTest {
     }
 
     private MemoryInput input(String text) {
-        return new MemoryInput("entity-fr", DOMAIN, TENANT, null, text, Map.of());
+        return MemoryInput.of("entity-fr", DOMAIN, TENANT, text);
     }
 
     private MemoryQuery ftsQuery(String question) {

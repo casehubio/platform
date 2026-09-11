@@ -1,7 +1,8 @@
 package io.casehub.platform.memory.jpa;
 
 import io.casehub.platform.testing.FixedCurrentPrincipal;
-import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
+import io.casehub.neocortex.memory.*;
+import io.casehub.neocortex.memory.testing.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
@@ -60,17 +61,17 @@ class JpaMemoryStoreTest extends CaseMemoryStoreContractTest {
     // JPA-specific: assertTenant guard fires before any backend call
     @Test
     void assertTenant_mismatch_throws_before_backend_call() {
-        var bad = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "x", Map.of());
+        var bad = MemoryInput.of("entity-1", DOMAIN, OTHER_TENANT, "x");
         assertThrows(SecurityException.class, () -> store().store(bad));
     }
 
     @Test
     void eraseEntityAcrossTenants_deletes_across_tenants() {
         // Seed under TENANT (principal already set to TENANT in @BeforeEach)
-        store().store(new MemoryInput("entity-1", DOMAIN, TENANT, null, "data-a", Map.of()));
+        store().store(MemoryInput.of("entity-1", DOMAIN, TENANT, "data-a"));
         // Seed under OTHER_TENANT
         principal.setTenancyId(OTHER_TENANT);
-        store().store(new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "data-b", Map.of()));
+        store().store(MemoryInput.of("entity-1", DOMAIN, OTHER_TENANT, "data-b"));
         // Erase as cross-tenant admin
         principal.setTenancyId(TENANT);
         principal.setCrossTenantAdmin(true);
@@ -87,8 +88,8 @@ class JpaMemoryStoreTest extends CaseMemoryStoreContractTest {
 
     @Test
     void storeAll_mixed_tenant_does_not_persist_any_entry() {
-        var good = new MemoryInput("entity-1", DOMAIN, TENANT,       null, "good", Map.of());
-        var bad  = new MemoryInput("entity-1", DOMAIN, OTHER_TENANT, null, "bad",  Map.of());
+        var good = MemoryInput.of("entity-1", DOMAIN, TENANT, "good");
+        var bad  = MemoryInput.of("entity-1", DOMAIN, OTHER_TENANT, "bad");
 
         assertThrows(SecurityException.class,
             () -> store().storeAll(List.of(good, bad)));

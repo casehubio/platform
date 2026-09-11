@@ -2,7 +2,11 @@ package io.casehub.platform.memory.jpa;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.neocortex.cognitive.Confidence;
+import io.casehub.neocortex.cognitive.ConfidenceOrigin;
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.PrincipalId;
+import io.casehub.neocortex.memory.*;
 import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -61,6 +65,13 @@ public class JpaMemoryStore implements CaseMemoryStore {
         entry.text       = input.text();
         entry.attributes = serializeAttributes(input.attributes());
         entry.createdAt  = Instant.now();
+        entry.subjectType = input.subject() != null ? input.subject().type() : null;
+        entry.confidence  = serializeConfidence(input.confidence());
+        entry.pleasure    = input.pleasure();
+        entry.arousal     = input.arousal();
+        entry.dominance   = input.dominance();
+        entry.principalId = input.principalId() != null ? input.principalId().value() : null;
+        entry.sharedWith  = input.sharedWith() != null ? serializeStringSet(input.sharedWith()) : null;
 
         MemoryEntry.persist(entry);
         return entry.memoryId;
@@ -82,6 +93,13 @@ public class JpaMemoryStore implements CaseMemoryStore {
             e.text       = input.text();
             e.attributes = serializeAttributes(input.attributes());
             e.createdAt  = Instant.now();
+            e.subjectType = input.subject() != null ? input.subject().type() : null;
+            e.confidence  = serializeConfidence(input.confidence());
+            e.pleasure    = input.pleasure();
+            e.arousal     = input.arousal();
+            e.dominance   = input.dominance();
+            e.principalId = input.principalId() != null ? input.principalId().value() : null;
+            e.sharedWith  = input.sharedWith() != null ? serializeStringSet(input.sharedWith()) : null;
             return e;
         }).toList();
         MemoryEntry.persist(entries);
@@ -118,7 +136,8 @@ public class JpaMemoryStore implements CaseMemoryStore {
         if (query.caseId() != null) jq.setParameter("caseId", query.caseId());
         if (query.since()  != null) jq.setParameter("since",  query.since());
 
-        return jq.getResultList().stream().map(this::toMemory).toList();
+        return jq.getResultList().stream().map(this::toMemory)
+            .filter(m -> isVisible(m, query.callerPrincipalId())).toList();
     }
 
     @SuppressWarnings("unchecked")
@@ -149,7 +168,8 @@ public class JpaMemoryStore implements CaseMemoryStore {
         if (query.caseId() != null) nq.setParameter("caseId", query.caseId());
         if (query.since()  != null) nq.setParameter("since",  query.since());
 
-        return ((List<MemoryEntry>) nq.getResultList()).stream().map(this::toMemory).toList();
+        return ((List<MemoryEntry>) nq.getResultList()).stream().map(this::toMemory)
+            .filter(m -> isVisible(m, query.callerPrincipalId())).toList();
     }
 
     @Timed(value = "casehub.memory.jpa", histogram = true, extraTags = {"operation", "erase"})
@@ -218,15 +238,22 @@ public class JpaMemoryStore implements CaseMemoryStore {
     }
 
     private Memory toMemory(MemoryEntry e) {
+        Subject subject = e.subjectType != null
+            ? new Subject(e.subjectType, e.entityId)
+            : new Subject("unknown", e.entityId);
         return new Memory(
             e.memoryId,
-            e.entityId,
+            subject,
             new MemoryDomain(e.domain),
             e.tenantId,
             e.caseId,
             e.text,
             deserializeAttributes(e.attributes),
-            e.createdAt
+            e.createdAt,
+            deserializeConfidence(e.confidence),
+            e.pleasure, e.arousal, e.dominance,
+            e.principalId != null ? PrincipalId.parse(e.principalId) : null,
+            e.sharedWith != null ? deserializeStringSet(e.sharedWith) : null
         );
     }
 
@@ -245,5 +272,43 @@ public class JpaMemoryStore implements CaseMemoryStore {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to deserialize attributes: " + json, e);
         }
+    }
+
+    private String serializeConfidence(Confidence c) {
+        if (c == null) return null;
+        return c.origin().name() + ":" + c.value() + ":" + (c.decayReference() != null ? c.decayReference() : "");
+    }
+
+    private Confidence deserializeConfidence(String s) {
+        if (s == null || s.isEmpty()) return null;
+        String[] parts = s.split(":", 3);
+        ConfidenceOrigin origin = ConfidenceOrigin.valueOf(parts[0]);
+        double value = Double.parseDouble(parts[1]);
+        Instant decay = parts.length > 2 && !parts[2].isEmpty() ? Instant.parse(parts[2]) : null;
+        return new Confidence(origin, value, decay);
+    }
+
+    private String serializeStringSet(Set<String> set) {
+        try {
+            return objectMapper.writeValueAsString(set);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize set", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> deserializeStringSet(String json) {
+        try {
+            return objectMapper.readValue(json, Set.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize set: " + json, e);
+        }
+    }
+
+    private static boolean isVisible(Memory m, PrincipalId caller) {
+        if (caller == null || m.principalId() == null) return true;
+        if (caller.equals(m.principalId())) return true;
+        var shared = m.sharedWith();
+        return shared != null && shared.contains(caller.value());
     }
 }

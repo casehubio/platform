@@ -1,5 +1,6 @@
 package io.casehub.platform.memory.sqlite;
 
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -36,10 +37,8 @@ class SqliteMemoryStoreFtsDisabledTest {
 
     @Test
     void relevanceOrderWithQuestionFallsBackToChronologicalWhenFtsDisabled() {
-        store.store(new MemoryInput("entity-1", DOMAIN, TENANT, null,
-            "first stored — contains target word ibuprofen", Map.of()));
-        store.store(new MemoryInput("entity-1", DOMAIN, TENANT, null,
-            "second stored — also mentions ibuprofen", Map.of()));
+        store.store(MemoryInput.of("entity-1", DOMAIN, TENANT, "first stored — contains target word ibuprofen"));
+        store.store(MemoryInput.of("entity-1", DOMAIN, TENANT, "second stored — also mentions ibuprofen"));
 
         // With fts.enabled=false, RELEVANCE+question → chronological fallback (most-recent first)
         var results = store.query(

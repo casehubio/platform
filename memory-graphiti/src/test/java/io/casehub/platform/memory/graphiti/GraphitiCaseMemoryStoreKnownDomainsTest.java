@@ -2,6 +2,7 @@ package io.casehub.platform.memory.graphiti;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
+import io.casehub.neocortex.memory.GraphCaseMemoryStore;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;

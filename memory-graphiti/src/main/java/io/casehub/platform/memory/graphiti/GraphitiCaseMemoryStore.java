@@ -1,7 +1,7 @@
 package io.casehub.platform.memory.graphiti;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
-import io.casehub.memory.*;
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.memory.graphiti.dto.*;
 import io.quarkus.arc.Arc;
 import io.micrometer.core.annotation.Timed;
@@ -403,7 +403,8 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
             null,
             f.fact() != null ? f.fact() : "",
             Map.copyOf(attrs),
-            f.createdAt() != null ? f.createdAt() : Instant.EPOCH
+            f.createdAt() != null ? f.createdAt() : Instant.EPOCH,
+            null, null, null, null
         );
     }
 
@@ -424,7 +425,8 @@ public class GraphitiCaseMemoryStore implements GraphCaseMemoryStore {
             null,
             ep.content() != null ? ep.content() : "",
             Map.copyOf(attrs),
-            ep.createdAt() != null ? ep.createdAt() : Instant.EPOCH
+            ep.createdAt() != null ? ep.createdAt() : Instant.EPOCH,
+            null, null, null, null
         );
     }
 

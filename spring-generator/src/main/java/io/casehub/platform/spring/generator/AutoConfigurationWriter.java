@@ -12,6 +12,12 @@ public class AutoConfigurationWriter {
 
         sb.append("package ").append(packageName).append(";\n\n");
 
+        String anchorType = descriptors.stream()
+                .filter(d -> !d.requiresManualConfig())
+                .findFirst()
+                .map(ProducerDescriptor::returnTypeSimpleName)
+                .orElse(descriptors.isEmpty() ? null : descriptors.get(0).returnTypeSimpleName());
+
         Set<String> imports = collectImports(descriptors);
         imports.add("org.springframework.boot.autoconfigure.AutoConfiguration");
         imports.add("org.springframework.context.annotation.Bean");
@@ -23,17 +29,18 @@ public class AutoConfigurationWriter {
                 imports.add("org.springframework.context.annotation.Primary");
             }
         }
-        imports.add("org.springframework.boot.autoconfigure.condition.ConditionalOnClass");
-
+        if (anchorType != null) {
+            imports.add("org.springframework.boot.autoconfigure.condition.ConditionalOnClass");
+        }
         for (String imp : imports.stream().sorted().collect(Collectors.toList())) {
             sb.append("import ").append(imp).append(";\n");
         }
         sb.append("\n");
 
-        String anchorType = descriptors.isEmpty() ? "Object" :
-                descriptors.get(0).returnTypeSimpleName();
         sb.append("@AutoConfiguration\n");
-        sb.append("@ConditionalOnClass(").append(anchorType).append(".class)\n");
+        if (anchorType != null) {
+            sb.append("@ConditionalOnClass(").append(anchorType).append(".class)\n");
+        }
         sb.append("public class ").append(className).append(" {\n");
 
         for (ProducerDescriptor d : descriptors) {

@@ -5,7 +5,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.casehub.neocortex.cognitive.Confidence;
+import io.casehub.neocortex.cognitive.ConfidenceOrigin;
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.identity.PrincipalId;
+import io.casehub.neocortex.memory.*;
 import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.annotation.PostConstruct;
@@ -110,7 +114,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
         String memoryId = UUID.randomUUID().toString();
         String createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
-        String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at) VALUES (?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at, subject_type, confidence, pleasure, arousal, dominance, principal_id, shared_with) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, memoryId);
@@ -121,6 +125,13 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             ps.setString(6, input.text());
             ps.setString(7, toJson(input.attributes()));
             ps.setString(8, createdAt);
+            ps.setString(9, input.subject() != null ? input.subject().type() : null);
+            ps.setString(10, serializeConfidence(input.confidence()));
+            setNullableDouble(ps, 11, input.pleasure());
+            setNullableDouble(ps, 12, input.arousal());
+            setNullableDouble(ps, 13, input.dominance());
+            ps.setString(14, input.principalId() != null ? input.principalId().value() : null);
+            ps.setString(15, input.sharedWith() != null ? toJson(input.sharedWith()) : null);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("store() failed", e);
@@ -133,13 +144,12 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     public StoreAllResult storeAll(List<MemoryInput> inputs) {
         if (inputs.isEmpty()) return StoreAllResult.empty();
         inputs.forEach(i -> MemoryPermissions.assertTenant(i.tenantId(), principal, requestContextActive()));
-        String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at) VALUES (?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO memory_entry (memory_id, tenant_id, entity_id, domain, case_id, text, attributes, created_at, subject_type, confidence, pleasure, arousal, dominance, principal_id, shared_with) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         List<String> ids = new ArrayList<>(inputs.size());
         try (Connection conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 for (MemoryInput input : inputs) {
-                    // guard each item — detects mixed-tenant batches where item 0 passes but a later item has a different tenantId
                     MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
                     String memoryId = UUID.randomUUID().toString();
                     String createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
@@ -151,6 +161,13 @@ public class SqliteMemoryStore implements CaseMemoryStore {
                     ps.setString(6, input.text());
                     ps.setString(7, toJson(input.attributes()));
                     ps.setString(8, createdAt);
+                    ps.setString(9, input.subject() != null ? input.subject().type() : null);
+                    ps.setString(10, serializeConfidence(input.confidence()));
+                    setNullableDouble(ps, 11, input.pleasure());
+                    setNullableDouble(ps, 12, input.arousal());
+                    setNullableDouble(ps, 13, input.dominance());
+                    ps.setString(14, input.principalId() != null ? input.principalId().value() : null);
+                    ps.setString(15, input.sharedWith() != null ? toJson(input.sharedWith()) : null);
                     ps.executeUpdate();
                     ids.add(memoryId);
                 }
@@ -260,6 +277,15 @@ public class SqliteMemoryStore implements CaseMemoryStore {
         }
     }
 
+    void deleteAll() {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM memory_entry")) {
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("deleteAll() failed", e);
+        }
+    }
+
     // --- private helpers ---
 
     private List<Memory> queryChronological(MemoryQuery query) {
@@ -285,7 +311,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) results.add(toMemory(rs));
             }
-            return results;
+            return results.stream().filter(m -> isVisible(m, query.callerPrincipalId())).toList();
         } catch (SQLException e) {
             throw new IllegalStateException("query() failed", e);
         }
@@ -326,7 +352,7 @@ public class SqliteMemoryStore implements CaseMemoryStore {
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) results.add(toMemory(rs));
             }
-            return results;
+            return results.stream().filter(m -> isVisible(m, query.callerPrincipalId())).toList();
         } catch (SQLException e) {
             throw new IllegalStateException("queryFts() failed", e);
         }
@@ -349,19 +375,78 @@ public class SqliteMemoryStore implements CaseMemoryStore {
     }
 
     private Memory toMemory(ResultSet rs) throws SQLException {
+        String subjectType = rs.getString("subject_type");
+        String entityId = rs.getString("entity_id");
+        Subject subject = subjectType != null ? new Subject(subjectType, entityId) : new Subject("unknown", entityId);
+        String principalIdStr = rs.getString("principal_id");
+        String sharedWithStr = rs.getString("shared_with");
         return new Memory(
             rs.getString("memory_id"),
-            rs.getString("entity_id"),
+            subject,
             new MemoryDomain(rs.getString("domain")),
             rs.getString("tenant_id"),
             rs.getString("case_id"),
             rs.getString("text"),
             fromJson(rs.getString("attributes")),
-            Instant.parse(rs.getString("created_at"))
+            Instant.parse(rs.getString("created_at")),
+            deserializeConfidence(rs.getString("confidence")),
+            getNullableDouble(rs, "pleasure"),
+            getNullableDouble(rs, "arousal"),
+            getNullableDouble(rs, "dominance"),
+            principalIdStr != null ? PrincipalId.parse(principalIdStr) : null,
+            sharedWithStr != null ? fromJsonSet(sharedWithStr) : null
         );
     }
 
     private String placeholders(int count) {
         return ",?".repeat(count).substring(1);
+    }
+
+    private String serializeConfidence(Confidence c) {
+        if (c == null) return null;
+        return c.origin().name() + ":" + c.value() + ":" + (c.decayReference() != null ? c.decayReference() : "");
+    }
+
+    private Confidence deserializeConfidence(String s) {
+        if (s == null || s.isEmpty()) return null;
+        String[] parts = s.split(":", 3);
+        ConfidenceOrigin origin = ConfidenceOrigin.valueOf(parts[0]);
+        double value = Double.parseDouble(parts[1]);
+        Instant decay = parts.length > 2 && !parts[2].isEmpty() ? Instant.parse(parts[2]) : null;
+        return new Confidence(origin, value, decay);
+    }
+
+    private String toJson(Set<String> set) {
+        try {
+            return objectMapper.writeValueAsString(set);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize set", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> fromJsonSet(String json) {
+        try {
+            return objectMapper.readValue(json, Set.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize set: " + json, e);
+        }
+    }
+
+    private static void setNullableDouble(PreparedStatement ps, int idx, Double value) throws SQLException {
+        if (value != null) ps.setDouble(idx, value);
+        else ps.setNull(idx, java.sql.Types.DOUBLE);
+    }
+
+    private static Double getNullableDouble(ResultSet rs, String col) throws SQLException {
+        double v = rs.getDouble(col);
+        return rs.wasNull() ? null : v;
+    }
+
+    private static boolean isVisible(Memory m, PrincipalId caller) {
+        if (caller == null || m.principalId() == null) return true;
+        if (caller.equals(m.principalId())) return true;
+        var shared = m.sharedWith();
+        return shared != null && shared.contains(caller.value());
     }
 }

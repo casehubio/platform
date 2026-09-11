@@ -1,6 +1,7 @@
 package io.casehub.platform.memory.mem0;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.memory.mem0.dto.*;
 import io.quarkus.arc.Arc;
 import io.micrometer.core.annotation.Timed;
@@ -291,7 +292,8 @@ public class Mem0CaseMemoryStore implements CaseMemoryStore {
             m.runId(),
             m.memory() != null ? m.memory() : "",
             m.metadata() != null ? m.metadata() : Map.of(),
-            parseCreatedAt(m.createdAt())
+            parseCreatedAt(m.createdAt()),
+            null, null, null, null
         );
     }
 

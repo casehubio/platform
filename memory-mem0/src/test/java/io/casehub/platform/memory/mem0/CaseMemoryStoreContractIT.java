@@ -1,8 +1,8 @@
 package io.casehub.platform.memory.mem0;
 
-import io.casehub.memory.CaseMemoryStore;
+import io.casehub.neocortex.memory.*;
 import io.casehub.platform.testing.FixedCurrentPrincipal;
-import io.casehub.platform.testing.memory.CaseMemoryStoreContractTest;
+import io.casehub.neocortex.memory.testing.CaseMemoryStoreContractTest;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;

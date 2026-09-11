@@ -1,12 +1,15 @@
 package io.casehub.platform.memory.inmem;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.neocortex.memory.*;
 import io.micrometer.core.annotation.Timed;
 import io.quarkus.arc.Arc;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
+
+import io.casehub.platform.api.identity.PrincipalId;
 
 import java.time.Instant;
 import java.util.*;
@@ -55,8 +58,10 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
         MemoryPermissions.assertTenant(input.tenantId(), principal, requestContextActive());
         String memoryId = UUID.randomUUID().toString();
         Memory memory = new Memory(
-            memoryId, input.entityId(), input.domain(), input.tenantId(),
-            input.caseId(), input.text(), input.attributes(), Instant.now()
+            memoryId, input.subject(), input.domain(), input.tenantId(),
+            input.caseId(), input.text(), input.attributes(), Instant.now(),
+            input.confidence(), input.pleasure(), input.arousal(), input.dominance(),
+            input.principalId(), input.sharedWith()
         );
         store.computeIfAbsent(
             new BucketKey(input.tenantId(), input.entityId(), input.domain()),
@@ -88,6 +93,7 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
             .filter(m -> query.since() == null || !m.createdAt().isBefore(query.since()))
             .filter(m -> query.question() == null
                 || m.text().toLowerCase().contains(query.question().toLowerCase()))
+            .filter(m -> isVisible(m, query.callerPrincipalId()))
             .sorted(Comparator.comparing(Memory::createdAt).reversed())
             .limit(query.limit())
             .toList();
@@ -148,5 +154,12 @@ public class InMemoryMemoryStore implements CaseMemoryStore {
             return false;
         });
         return count.get();
+    }
+
+    private static boolean isVisible(Memory m, PrincipalId caller) {
+        if (caller == null || m.principalId() == null) return true;
+        if (caller.equals(m.principalId())) return true;
+        var shared = m.sharedWith();
+        return shared != null && shared.contains(caller.value());
     }
 }

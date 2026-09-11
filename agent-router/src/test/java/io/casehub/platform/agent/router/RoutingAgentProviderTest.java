@@ -5,10 +5,20 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.api.model.ModelDescriptor;
+import io.casehub.platform.api.model.ModelLocality;
+import io.casehub.platform.api.model.ModelQuery;
+import io.casehub.platform.api.model.ModelRegistry;
+import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,10 +40,68 @@ class RoutingAgentProviderTest {
         };
     }
 
+    static AgentBackend capturingBackend(String key, AtomicReference<AgentSessionConfig> configCapture,
+                                         AtomicReference<AgentSessionInit> initCapture) {
+        return new AgentBackend() {
+            @Override
+            public String key() { return key; }
+
+            @Override
+            public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+                configCapture.set(config);
+                return Multi.createFrom().item(new AgentEvent.TextDelta("from-" + key));
+            }
+
+            @Override
+            public AgentSession openSession(AgentSessionInit init) {
+                initCapture.set(init);
+                return null;
+            }
+        };
+    }
+
+    static ModelRegistry emptyRegistry() {
+        return new ModelRegistry() {
+            @Override
+            public Optional<ModelDescriptor> resolveById(String id) { return Optional.empty(); }
+
+            @Override
+            public List<ModelDescriptor> query(ModelQuery query) { return List.of(); }
+
+            @Override
+            public List<ModelDescriptor> all() { return List.of(); }
+        };
+    }
+
+    static ModelRegistry registryWith(ModelDescriptor... descriptors) {
+        Map<String, ModelDescriptor> map = new HashMap<>();
+        for (var d : descriptors) map.put(d.id(), d);
+        return new ModelRegistry() {
+            @Override
+            public Optional<ModelDescriptor> resolveById(String id) {
+                return Optional.ofNullable(map.get(id));
+            }
+
+            @Override
+            public List<ModelDescriptor> query(ModelQuery query) { return List.copyOf(map.values()); }
+
+            @Override
+            public List<ModelDescriptor> all() { return List.copyOf(map.values()); }
+        };
+    }
+
+    static ModelDescriptor descriptor(String id, String backendKey) {
+        return new ModelDescriptor(id, backendKey, "test-vendor", "test-family",
+                "Test " + id, ModelTier.STANDARD, Set.of(), 128000, 16384,
+                ModelLocality.CLOUD, null, null, Map.of());
+    }
+
+    // --- Existing behavior (key-based routing) ---
+
     @Test
     void routesByModelKey() {
         var router = new RoutingAgentProvider(
-                List.of(stubBackend("claude"), stubBackend("openai")), "claude");
+                List.of(stubBackend("claude"), stubBackend("openai")), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user", "openai");
         var events = router.invoke(config).collect().asList().await().indefinitely();
         assertThat(events).hasSize(1);
@@ -43,25 +111,16 @@ class RoutingAgentProviderTest {
     @Test
     void nullModelUsesDefault() {
         var router = new RoutingAgentProvider(
-                List.of(stubBackend("claude"), stubBackend("openai")), "claude");
+                List.of(stubBackend("claude"), stubBackend("openai")), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user");
         var events = router.invoke(config).collect().asList().await().indefinitely();
         assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("from-claude");
     }
 
     @Test
-    void unknownKeyWithCatchAllFallsThrough() {
+    void unknownKeyWithNoRegistryMatchThrows() {
         var router = new RoutingAgentProvider(
-                List.of(stubBackend("claude"), stubBackend("langchain4j")), "claude");
-        var config = AgentSessionConfig.of("sys", "user", "mistral");
-        var events = router.invoke(config).collect().asList().await().indefinitely();
-        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("from-langchain4j");
-    }
-
-    @Test
-    void unknownKeyWithNoCatchAllThrows() {
-        var router = new RoutingAgentProvider(
-                List.of(stubBackend("claude")), "claude");
+                List.of(stubBackend("claude")), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user", "mistral");
         assertThatThrownBy(() -> router.invoke(config))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -71,7 +130,7 @@ class RoutingAgentProviderTest {
     @Test
     void noDefaultBackendThrowsOnNullModel() {
         var router = new RoutingAgentProvider(
-                List.of(stubBackend("openai")), "claude");
+                List.of(stubBackend("openai")), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user");
         assertThatThrownBy(() -> router.invoke(config))
                 .isInstanceOf(IllegalStateException.class)
@@ -81,17 +140,88 @@ class RoutingAgentProviderTest {
     @Test
     void openSessionRoutesToCorrectBackend() {
         var router = new RoutingAgentProvider(
-                List.of(stubBackend("claude"), stubBackend("openai")), "claude");
+                List.of(stubBackend("claude"), stubBackend("openai")), "claude", emptyRegistry());
         var init = AgentSessionInit.of("sys", "openai");
-        // stubBackend returns null for openSession — just verifying no exception on routing
         assertThat(router.openSession(init)).isNull();
     }
 
     @Test
     void emptyBackendsThrowsOnAnyCall() {
-        var router = new RoutingAgentProvider(List.of(), "claude");
+        var router = new RoutingAgentProvider(List.of(), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user");
         assertThatThrownBy(() -> router.invoke(config))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    // --- Registry-path resolution ---
+
+    @Test
+    void registryPathResolvesModelToBackend() {
+        var registry = registryWith(descriptor("claude-sonnet-5", "claude"));
+        var router = new RoutingAgentProvider(
+                List.of(stubBackend("claude"), stubBackend("openai")), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "claude-sonnet-5");
+        var events = router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("from-claude");
+    }
+
+    @Test
+    void registryPathRewritesModelInConfig() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture = new AtomicReference<AgentSessionInit>();
+        var registry = registryWith(descriptor("claude-sonnet-5", "claude"));
+        var router = new RoutingAgentProvider(
+                List.of(capturingBackend("claude", configCapture, initCapture)), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "claude-sonnet-5");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-sonnet-5");
+    }
+
+    @Test
+    void registryPathRewritesModelInSessionInit() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture = new AtomicReference<AgentSessionInit>();
+        var registry = registryWith(descriptor("gpt-4.1", "openai"));
+        var router = new RoutingAgentProvider(
+                List.of(capturingBackend("openai", configCapture, initCapture)), "openai", registry);
+        var init = AgentSessionInit.of("sys", "gpt-4.1");
+        router.openSession(init);
+        assertThat(initCapture.get().model()).isEqualTo("gpt-4.1");
+    }
+
+    @Test
+    void keyBasedPathNullsModelInConfig() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture = new AtomicReference<AgentSessionInit>();
+        var router = new RoutingAgentProvider(
+                List.of(capturingBackend("claude", configCapture, initCapture)), "claude", emptyRegistry());
+        var config = AgentSessionConfig.of("sys", "user", "claude");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isNull();
+    }
+
+    @Test
+    void registryPathMissingBackendThrows() {
+        var registry = registryWith(descriptor("gemini-2.5-pro", "gemini"));
+        var router = new RoutingAgentProvider(
+                List.of(stubBackend("claude")), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "gemini-2.5-pro");
+        assertThatThrownBy(() -> router.invoke(config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("gemini")
+                .hasMessageContaining("no backend with that key");
+    }
+
+    @Test
+    void registryTakesPriorityOverKeyMatch() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture = new AtomicReference<AgentSessionInit>();
+        var registry = registryWith(descriptor("claude", "claude"));
+        var router = new RoutingAgentProvider(
+                List.of(capturingBackend("claude", configCapture, initCapture)), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "claude");
+        router.invoke(config).collect().asList().await().indefinitely();
+        // Registry path sets the model ID; key-based path would null it
+        assertThat(configCapture.get().model()).isEqualTo("claude");
     }
 }

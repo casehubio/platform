@@ -19,7 +19,7 @@ public class DomainResourceRegistrar {
     McpResourceRegistry resourceRegistry;
 
     @Inject
-    ModelRegistry modelRegistry;
+    DomainModelRegistry domainModelRegistry;
 
     private final ObjectMapper mapper;
 
@@ -36,7 +36,7 @@ public class DomainResourceRegistrar {
                         "Lists all CaseHub domains with summaries and operation counts"))
                 .handler(request -> {
                     String json = mapper.writeValueAsString(
-                            DomainContentFormatter.formatIndex(modelRegistry.getDomains()));
+                            DomainContentFormatter.formatIndex(domainModelRegistry.getDomains()));
                     return McpResourceContent.of(request.uri(), json, "application/json");
                 })
                 .register();
@@ -48,18 +48,18 @@ public class DomainResourceRegistrar {
                         "Domain detail: operations, params, state, events"))
                 .handler(request -> {
                     String domainName = request.templateArgs().get("domain");
-                    var domain = modelRegistry.getDomain(domainName)
-                            .orElseThrow(() -> new IllegalArgumentException(
+                    var domain = domainModelRegistry.getDomain(domainName)
+                                                    .orElseThrow(() -> new IllegalArgumentException(
                                     "Unknown domain: " + domainName));
                     String json = mapper.writeValueAsString(
                             DomainContentFormatter.formatDomain(domain));
                     return McpResourceContent.of(request.uri(), json, "application/json");
                 })
-                .completion("domain", () -> modelRegistry.getDomains().stream()
-                        .map(DomainModel::name).toList())
+                .completion("domain", () -> domainModelRegistry.getDomains().stream()
+                                                               .map(DomainModel::name).toList())
                 .register();
 
         LOG.infof("Registered domain metadata resources: casehub://domain-index + casehub://domains/{domain} (%d domains)",
-                modelRegistry.getDomains().size());
+                  domainModelRegistry.getDomains().size());
     }
 }

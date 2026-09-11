@@ -49,8 +49,8 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `agent-codex/` | `casehub-platform-agent-codex` | `@ApplicationScoped` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `agent-gemini/` | `casehub-platform-agent-gemini` | `@ApplicationScoped` | AgentBackend "gemini" -- native Google GenAI SDK (v1.65.0), explicit caching |
 | `agent-gemini-cli/` | `casehub-platform-agent-gemini-cli` | `@ApplicationScoped` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@ApplicationScoped` | AgentBackend "langchain4j" -- catch-all fallback; bidirectional LangChain4j interop |
-| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- dispatches to AgentBackend by key via CDI `Instance` |
+| `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@ApplicationScoped` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
+| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- three-step model resolution (ModelRegistry → key → fail-fast) with config rewriting; `NoOpModelRegistry @DefaultBean` fallback |
 | `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps RoutingAgentProvider |
 | `endpoints-memory/` | `casehub-platform-endpoints-memory` | `@Alternative @Priority(100)` | In-memory `EndpointRegistry` -- volatile, Tier 4 CDI |
 | `endpoints-config/` | `casehub-platform-endpoints-config` | `@Startup @ApplicationScoped` | YAML endpoint populator -- `${VAR}` interpolation, multi-file |

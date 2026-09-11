@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GraphQLModelScannerTest {
 
     @Inject
-    ModelRegistry registry;
+    DomainModelRegistry registry;
 
     @Test
     void scansTestDomain() {

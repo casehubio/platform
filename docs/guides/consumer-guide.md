@@ -83,19 +83,19 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 
 ### Agent infrastructure
 
-Callers inject `AgentProvider` — the `RoutingAgentProvider` dispatches to `AgentBackend` implementations by the `model` key on `AgentSessionConfig`. Add one or more backend modules to the classpath; the router discovers them automatically.
+Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `model` field via three-step resolution: (1) `ModelRegistry` lookup by model ID (routes to backend via descriptor's `backendKey`), (2) direct backend key match, (3) fail-fast. Add one or more backend modules to the classpath; the router discovers them automatically.
 
 | Artifact | What it provides |
 |----------|------------------|
 | `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
 | `casehub-platform-agent-runtime` | `SubprocessRuntime` -- local process execution for CLI agent providers |
-| `casehub-platform-agent-router` | `RoutingAgentProvider` -- dispatches to `AgentBackend` implementations by `model` key. Config: `casehub.platform.agent.default-backend` |
+| `casehub-platform-agent-router` | `RoutingAgentProvider` -- three-step model resolution (registry → key → fail-fast) with config rewriting. Config: `casehub.platform.agent.default-backend` |
 | `casehub-platform-agent-claude` | AgentBackend "claude" -- Claude CLI subprocess via `claude-code-sdk` |
 | `casehub-platform-agent-openai` | AgentBackend "openai" -- native OpenAI Java SDK with `prompt_cache_key` support |
 | `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `casehub-platform-agent-gemini` | AgentBackend "gemini" -- native Google GenAI SDK with explicit caching |
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- catch-all fallback; bidirectional LangChain4j interop |
+| `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
 ### Access control
@@ -426,13 +426,13 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 
 ### Agent Infrastructure
 
-**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and dispatches by the `model` field on config records. Callers always inject `AgentProvider`, never `AgentBackend`.
+**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and resolves the `model` field via three-step resolution: (1) `ModelRegistry.resolveById` — routes to backend from `descriptor.backendKey()`, rewrites config with the API model ID, (2) direct `backends.get(model)` — model nulled so backend uses its default, (3) fail-fast `IllegalArgumentException`. Callers always inject `AgentProvider`, never `AgentBackend`.
 
 `AgentProvider` has two execution paths:
 - `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model` (provider key).
 - `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). `AgentSessionInit` carries `systemPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model`.
 
-`AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no native key, the "langchain4j" backend acts as a catch-all fallback.
+`AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no backend key and no `ModelRegistry` entry, resolution fails fast with `IllegalArgumentException`.
 
 `AgentRuntime` abstracts subprocess lifecycle for CLI-based providers. `SubprocessRuntime` wraps `ProcessBuilder`; future runtimes (Kubernetes, container) would slot in without touching provider code. Only CLI providers (`agent-codex`, `agent-gemini-cli`) inject `AgentRuntime`.
 

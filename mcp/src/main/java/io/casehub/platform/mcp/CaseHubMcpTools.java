@@ -16,7 +16,7 @@ import jakarta.inject.Inject;
 public class CaseHubMcpTools {
 
     @Inject
-    ModelRegistry registry;
+    DomainModelRegistry registry;
 
     private final ObjectMapper mapper;
 

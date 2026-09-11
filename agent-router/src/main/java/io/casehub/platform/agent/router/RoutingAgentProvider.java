@@ -6,6 +6,8 @@ import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.api.model.ModelDescriptor;
+import io.casehub.platform.api.model.ModelRegistry;
 import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
@@ -15,6 +17,7 @@ import org.jboss.logging.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @ApplicationScoped
 public class RoutingAgentProvider implements AgentProvider {
@@ -23,11 +26,17 @@ public class RoutingAgentProvider implements AgentProvider {
 
     private final Map<String, AgentBackend> backends;
     private final AgentBackend defaultBackend;
+    private final ModelRegistry modelRegistry;
+
+    private record ResolvedRoute(AgentBackend backend, String apiModelId) {}
+
 
     @Inject
     public RoutingAgentProvider(@Any Instance<AgentBackend> backends,
-                                RoutingAgentProperties properties) {
-        this.backends = new HashMap<>();
+                                RoutingAgentProperties properties,
+                                ModelRegistry modelRegistry) {
+        this.backends      = new HashMap<>();
+        this.modelRegistry = modelRegistry;
         AgentBackend fallback = null;
         for (AgentBackend backend : backends) {
             this.backends.put(backend.key(), backend);
@@ -37,12 +46,14 @@ public class RoutingAgentProvider implements AgentProvider {
         }
         this.defaultBackend = fallback;
         LOG.infof("Agent router initialized: %d backend(s) [%s], default=%s",
-                this.backends.size(), String.join(", ", this.backends.keySet()),
-                properties.defaultBackend());
+                  this.backends.size(), String.join(", ", this.backends.keySet()),
+                  properties.defaultBackend());
     }
 
-    RoutingAgentProvider(Iterable<AgentBackend> backends, String defaultKey) {
-        this.backends = new HashMap<>();
+    RoutingAgentProvider(Iterable<AgentBackend> backends, String defaultKey,
+                         ModelRegistry modelRegistry) {
+        this.backends      = new HashMap<>();
+        this.modelRegistry = modelRegistry;
         AgentBackend fallback = null;
         for (AgentBackend backend : backends) {
             this.backends.put(backend.key(), backend);
@@ -55,27 +66,47 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
-        return resolve(config.model()).invoke(config);
+        var route = resolve(config.model());
+        var rewritten = new AgentSessionConfig(
+                config.systemPrompt(), config.userPrompt(), config.mcpServers(),
+                config.timeout(), config.correlationId(), route.apiModelId());
+        return route.backend().invoke(rewritten);
     }
 
     @Override
     public AgentSession openSession(AgentSessionInit init) {
-        return resolve(init.model()).openSession(init);
+        var route = resolve(init.model());
+        var rewritten = new AgentSessionInit(
+                init.systemPrompt(), init.mcpServers(),
+                init.timeout(), init.correlationId(), route.apiModelId());
+        return route.backend().openSession(rewritten);
     }
 
-    private AgentBackend resolve(String model) {
+    private ResolvedRoute resolve(String model) {
         if (model == null) {
             if (defaultBackend == null) {
                 throw new IllegalStateException(
                         "No default backend configured — set casehub.platform.agent.default-backend");
             }
-            return defaultBackend;
+            return new ResolvedRoute(defaultBackend, null);
         }
+
+        Optional<ModelDescriptor> descriptor = modelRegistry.resolveById(model);
+        if (descriptor.isPresent()) {
+            AgentBackend backend = backends.get(descriptor.get().backendKey());
+            if (backend == null) {
+                throw new IllegalStateException(
+                        "ModelRegistry resolved '" + model + "' to backend '" +
+                        descriptor.get().backendKey() +
+                        "', but no backend with that key is available");
+            }
+            return new ResolvedRoute(backend, descriptor.get().id());
+        }
+
         AgentBackend backend = backends.get(model);
-        if (backend != null) return backend;
-        AgentBackend catchAll = backends.get("langchain4j");
-        if (catchAll != null) return catchAll;
-        throw new IllegalArgumentException("No backend for key: " + model +
-                ". Available: " + backends.keySet());
+        if (backend != null) return new ResolvedRoute(backend, null);
+
+        throw new IllegalArgumentException("No model or backend for: " + model +
+                                           ". Available backends: " + backends.keySet());
     }
 }

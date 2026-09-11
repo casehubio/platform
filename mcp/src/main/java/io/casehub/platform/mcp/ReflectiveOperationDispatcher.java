@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 public class ReflectiveOperationDispatcher {
 
     @Inject
-    ModelRegistry registry;
+    DomainModelRegistry registry;
 
     private final ObjectMapper mapper;
 

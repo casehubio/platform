@@ -27,7 +27,7 @@ public class DynamicToolRegistrar {
     ToolManager toolManager;
 
     @Inject
-    ModelRegistry registry;
+    DomainModelRegistry registry;
 
     @Inject
     ReflectiveOperationDispatcher dispatcher;

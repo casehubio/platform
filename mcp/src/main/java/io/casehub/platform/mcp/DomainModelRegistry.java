@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
-public class ModelRegistry {
+public class DomainModelRegistry {
 
     private final Map<String, DomainModel> domains = new ConcurrentHashMap<>();
 

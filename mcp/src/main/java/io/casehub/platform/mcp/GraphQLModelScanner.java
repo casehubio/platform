@@ -33,7 +33,7 @@ public class GraphQLModelScanner {
     private static final Logger LOG = Logger.getLogger(GraphQLModelScanner.class);
 
     @Inject
-    ModelRegistry registry;
+    DomainModelRegistry registry;
 
     @Inject
     @Any

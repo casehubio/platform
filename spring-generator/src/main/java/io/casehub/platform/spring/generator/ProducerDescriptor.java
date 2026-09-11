@@ -9,7 +9,8 @@ public record ProducerDescriptor(
         List<ParameterDescriptor> parameters,
         boolean defaultBean,
         boolean alternative,
-        int priority) {
+        int priority,
+        boolean cdiDeps) {
 
     public record ParameterDescriptor(String type, String name, String configProperty) {
 
@@ -20,6 +21,14 @@ public record ProducerDescriptor(
 
     public boolean hasConfigProperties() {
         return parameters.stream().anyMatch(ParameterDescriptor::isConfigProperty);
+    }
+
+    public boolean hasCdiDependencies() {
+        return cdiDeps;
+    }
+
+    public boolean requiresManualConfig() {
+        return hasConfigProperties() || hasCdiDependencies();
     }
 
     public String returnTypeSimpleName() {

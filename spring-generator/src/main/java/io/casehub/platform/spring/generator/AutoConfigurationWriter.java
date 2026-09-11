@@ -1,7 +1,5 @@
 package io.casehub.platform.spring.generator;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,7 +37,7 @@ public class AutoConfigurationWriter {
         sb.append("public class ").append(className).append(" {\n");
 
         for (ProducerDescriptor d : descriptors) {
-            if (d.hasConfigProperties()) continue;
+            if (d.requiresManualConfig()) continue;
             sb.append("\n");
             sb.append("    @Bean\n");
             if (d.defaultBean()) {
@@ -86,6 +84,7 @@ public class AutoConfigurationWriter {
     private Set<String> collectImports(List<ProducerDescriptor> descriptors) {
         Set<String> imports = new LinkedHashSet<>();
         for (ProducerDescriptor d : descriptors) {
+            if (d.requiresManualConfig()) {continue;}
             imports.add(d.returnType());
             for (ProducerDescriptor.ParameterDescriptor p : d.parameters()) {
                 if (!p.isConfigProperty()) {
@@ -94,6 +93,5 @@ public class AutoConfigurationWriter {
             }
         }
         imports.removeIf(t -> t.startsWith("java.lang."));
-        return imports;
-    }
+        return imports;}
 }

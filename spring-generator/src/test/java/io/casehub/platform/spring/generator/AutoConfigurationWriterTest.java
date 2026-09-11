@@ -18,7 +18,7 @@ class AutoConfigurationWriterTest {
                         "subjectViewEvaluator",
                         "io.casehub.platform.view.SubjectViewEvaluator",
                         List.of(),
-                        false, false, 0),
+                        false, false, 0, false),
                 new ProducerDescriptor(
                         "io.casehub.platform.view.quarkus.ViewBeans",
                         "subjectViewOrchestrator",
@@ -31,7 +31,7 @@ class AutoConfigurationWriterTest {
                                         "io.casehub.platform.api.view.SubjectViewStore",
                                         "viewStore", null)
                         ),
-                        false, false, 0)
+                        false, false, 0, false)
         );
 
         String source = writer.generate("io.casehub.platform.view.spring",
@@ -53,7 +53,7 @@ class AutoConfigurationWriterTest {
                         "noOpStore",
                         "io.casehub.platform.mock.NoOpStore",
                         List.of(),
-                        true, false, 0)
+                        true, false, 0, false)
         );
 
         String source = writer.generate("io.casehub.platform.spring",
@@ -71,7 +71,7 @@ class AutoConfigurationWriterTest {
                         "overrideService",
                         "io.casehub.platform.SomeService",
                         List.of(),
-                        false, true, 100)
+                        false, true, 100, false)
         );
 
         String source = writer.generate("io.casehub.platform.spring",
@@ -80,6 +80,36 @@ class AutoConfigurationWriterTest {
         assertThat(source).contains("@Primary");
         assertThat(source).contains("public SomeService overrideService()");
     }
+
+    @Test
+    void skipsCdiDependentMethods() {
+        var descriptors = List.of(
+                new ProducerDescriptor(
+                        "io.casehub.engine.common.quarkus.CommonBeans",
+                        "simpleBean",
+                        "io.casehub.engine.common.SimpleBean",
+                        List.of(),
+                        false, false, 0, false),
+                new ProducerDescriptor(
+                        "io.casehub.engine.common.quarkus.CommonBeans",
+                        "cdiBean",
+                        "io.casehub.engine.common.CdiBean",
+                        List.of(
+                                new ProducerDescriptor.ParameterDescriptor(
+                                        "jakarta.enterprise.inject.Instance",
+                                        "resolvers", null)
+                               ),
+                        false, false, 0, true)
+                                 );
+
+        String source = writer.generate("io.casehub.engine.common.spring",
+                                        "CommonAutoConfiguration", descriptors);
+
+        assertThat(source).contains("public SimpleBean simpleBean()");
+        assertThat(source).doesNotContain("cdiBean");
+        assertThat(source).doesNotContain("CdiBean");
+    }
+
 
     @Test
     void generatesImportsFile() {

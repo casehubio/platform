@@ -18,6 +18,8 @@ public class JandexProducerScanner {
     private static final DotName ALTERNATIVE = DotName.createSimple("jakarta.enterprise.inject.Alternative");
     private static final DotName PRIORITY = DotName.createSimple("jakarta.annotation.Priority");
     private static final DotName CONFIG_PROPERTY = DotName.createSimple("org.eclipse.microprofile.config.inject.ConfigProperty");
+    private static final DotName CDI_INSTANCE = DotName.createSimple("jakarta.enterprise.inject.Instance");
+    private static final DotName CDI_EVENT = DotName.createSimple("jakarta.enterprise.event.Event");
 
     public List<ProducerDescriptor> scan(Index index) {
         List<ProducerDescriptor> result = new ArrayList<>();
@@ -27,24 +29,40 @@ public class JandexProducerScanner {
                 continue;
             }
 
-            MethodInfo method = produces.target().asMethod();
-            ClassInfo declaringClass = method.declaringClass();
+            MethodInfo method         = produces.target().asMethod();
+            ClassInfo  declaringClass = method.declaringClass();
 
-            boolean isDefaultBean = method.hasAnnotation(DEFAULT_BEAN);
-            boolean isAlternative = method.hasAnnotation(ALTERNATIVE);
-            int priority = 0;
-            AnnotationInstance priorityAnn = method.annotation(PRIORITY);
+            boolean            isDefaultBean = method.hasAnnotation(DEFAULT_BEAN);
+            boolean            isAlternative = method.hasAnnotation(ALTERNATIVE);
+            int                priority      = 0;
+            AnnotationInstance priorityAnn   = method.annotation(PRIORITY);
             if (priorityAnn != null) {
                 priority = priorityAnn.value().asInt();
             }
 
-            List<ProducerDescriptor.ParameterDescriptor> params = new ArrayList<>();
+            boolean                                      hasCdiDeps = false;
+            List<ProducerDescriptor.ParameterDescriptor> params     = new ArrayList<>();
             for (MethodParameterInfo param : method.parameters()) {
+                DotName typeName = param.type().kind() == Type.Kind.PARAMETERIZED_TYPE
+                                   ? param.type().asParameterizedType().name()
+                                   : param.type().name();
+
+                if (CDI_INSTANCE.equals(typeName) || CDI_EVENT.equals(typeName)) {
+                    hasCdiDeps = true;
+                }
+
+                boolean hasQuarkusQualifier = param.annotations().stream()
+                                                   .anyMatch(a -> a.name().toString().startsWith("io.quarkus."));
+
+                if (hasQuarkusQualifier) {
+                    hasCdiDeps = true;
+                }
+
                 String paramType = param.type().name().toString();
                 String paramName = param.name() != null ? param.name() : inferParamName(paramType);
 
-                String configProp = null;
-                AnnotationInstance configAnn = param.annotation(CONFIG_PROPERTY);
+                String             configProp = null;
+                AnnotationInstance configAnn  = param.annotation(CONFIG_PROPERTY);
                 if (configAnn != null && configAnn.value("name") != null) {
                     configProp = configAnn.value("name").asString();
                 }
@@ -59,7 +77,8 @@ public class JandexProducerScanner {
                     params,
                     isDefaultBean,
                     isAlternative,
-                    priority));
+                    priority,
+                    hasCdiDeps));
         }
 
         return result;

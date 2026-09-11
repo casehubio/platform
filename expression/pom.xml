@@ -93,6 +93,13 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <forkedProcessExitTimeoutInSeconds>10</forkedProcessExitTimeoutInSeconds>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>
                 <version>${jandex-maven-plugin.version}</version>

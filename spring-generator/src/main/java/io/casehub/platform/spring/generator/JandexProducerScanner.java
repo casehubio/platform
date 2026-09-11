@@ -52,7 +52,7 @@ public class JandexProducerScanner {
 
             // Skip methods from classes with @Inject fields (field-injected CDI beans)
             if (declaringClass.fields().stream()
-                              .anyMatch(f -> f.hasAnnotation(INJECT))) {
+                              .anyMatch(f -> f.hasAnnotation(INJECT) || f.hasAnnotation(CONFIG_PROPERTY))) {
                 hasCdiDeps = true;
             }
 

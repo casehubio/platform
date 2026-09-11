@@ -4,17 +4,16 @@ audience: consumer
 repo: casehub-platform
 anchors:
   classes:
-    - io.casehub.platform.notification.NotificationBridge
-    - io.casehub.platform.notification.SubscriptionEngine
+    - io.casehub.platform.notification.dispatch.NotificationDispatcher
+    - io.casehub.platform.subscription.engine.SubscriptionEngine
     - io.casehub.platform.notification.dispatch.DeliveryRetryProcessor
     - io.casehub.platform.notification.dispatch.DigestFlushScheduler
-    - io.casehub.platform.notification.CloudEventTypeDispatcher
+    - io.casehub.platform.event.CloudEventTypeDispatcher
   spis:
-    - io.casehub.platform.notification.spi.DeliveryChannel
-    - io.casehub.platform.notification.spi.NotificationDeliverer
-    - io.casehub.platform.notification.spi.DestinationResolver
-    - io.casehub.platform.notification.spi.EngagementCallbackHandler
-    - io.casehub.platform.subscription.SubscribableEvent
+    - io.casehub.platform.api.delivery.NotificationDeliverer
+    - io.casehub.platform.api.delivery.DestinationResolver
+    - io.casehub.platform.api.delivery.EngagementCallbackHandler
+    - io.casehub.platform.api.subscription.SubscribableEvent
   config-keys:
     - casehub.notification.digest.max-buffer-size
     - casehub.delivery.tracking.inmem.max-size

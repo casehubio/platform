@@ -4,16 +4,16 @@ audience: consumer
 repo: casehub-platform
 anchors:
   classes:
-    - io.casehub.platform.expression.ExpressionEngineRegistry
+    - io.casehub.platform.api.expression.ExpressionEngineRegistry
     - io.casehub.platform.expression.JQExpressionEngine
     - io.casehub.platform.expression.MvelExpressionEngine
     - io.casehub.platform.expression.JexlExpressionEngine
-    - io.casehub.platform.expression.ConfigManager
-    - io.casehub.platform.expression.SecretManager
+    - io.casehub.platform.api.expression.ConfigManager
+    - io.casehub.platform.api.expression.SecretManager
   spis:
-    - io.casehub.platform.expression.ExpressionEvaluator
-    - io.casehub.platform.expression.ConfigManager
-    - io.casehub.platform.expression.SecretManager
+    - io.casehub.platform.api.expression.ExpressionEvaluator
+    - io.casehub.platform.api.expression.ConfigManager
+    - io.casehub.platform.api.expression.SecretManager
   config-keys:
     - casehub.platform.secrets
 ---

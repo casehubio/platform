@@ -1,0 +1,227 @@
+models:
+  # --- Anthropic (Claude 5 family) ---
+  - id: claude-opus-5
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Opus 5
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
+  - id: claude-sonnet-5
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Sonnet 5
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: HIGH
+    authMethod: api-key
+
+  - id: claude-fable-5-1
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Fable 5.1
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  # --- Anthropic (Claude 4 family) ---
+  - id: claude-opus-4-6
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Opus 4.6
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
+  - id: claude-opus-4
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Opus 4
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
+  - id: claude-sonnet-4
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Sonnet 4
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: HIGH
+    authMethod: api-key
+
+  - id: claude-haiku-4-5
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Haiku 4.5
+    tier: FAST
+    capabilities: [text, vision, tool-use, code]
+    contextWindow: 200000
+    maxOutput: 8192
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
+
+  # --- OpenAI ---
+  - id: gpt-4.1
+    backendKey: openai
+    vendor: openai
+    family: gpt-4
+    displayName: GPT-4.1
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 1048576
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  - id: o3
+    backendKey: openai
+    vendor: openai
+    family: o3
+    displayName: o3
+    tier: FLAGSHIP
+    capabilities: [text, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 100000
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
+  - id: o4-mini
+    backendKey: openai
+    vendor: openai
+    family: o4
+    displayName: o4-mini
+    tier: FAST
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 100000
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
+
+  - id: gpt-4o-mini
+    backendKey: openai
+    vendor: openai
+    family: gpt-4
+    displayName: GPT-4o mini
+    tier: FAST
+    capabilities: [text, vision, tool-use, code]
+    contextWindow: 128000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
+
+  # --- Google ---
+  - id: gemini-2.5-pro
+    backendKey: gemini
+    vendor: google
+    family: gemini
+    displayName: Gemini 2.5 Pro
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 1048576
+    maxOutput: 65536
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  - id: gemini-2.5-flash
+    backendKey: gemini
+    vendor: google
+    family: gemini
+    displayName: Gemini 2.5 Flash
+    tier: FAST
+    capabilities: [text, vision, tool-use, code]
+    contextWindow: 1048576
+    maxOutput: 65536
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
+
+  # --- Meta (local) ---
+  - id: llama-4-scout
+    backendKey: ollama
+    vendor: meta
+    family: llama
+    displayName: Llama 4 Scout
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code]
+    contextWindow: 131072
+    maxOutput: 16384
+    locality: LOCAL
+    costTier: FREE
+    authMethod: local
+
+  - id: llama-4-maverick
+    backendKey: ollama
+    vendor: meta
+    family: llama
+    displayName: Llama 4 Maverick
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 131072
+    maxOutput: 16384
+    locality: LOCAL
+    costTier: FREE
+    authMethod: local
+
+  # --- Mistral ---
+  - id: mistral-large
+    backendKey: mistral
+    vendor: mistral
+    family: mistral
+    displayName: Mistral Large
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 131072
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  - id: codestral
+    backendKey: mistral
+    vendor: mistral
+    family: codestral
+    displayName: Codestral
+    tier: STANDARD
+    capabilities: [text, tool-use, code]
+    contextWindow: 262144
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key

@@ -20,6 +20,14 @@ public class JandexProducerScanner {
     private static final DotName CONFIG_PROPERTY = DotName.createSimple("org.eclipse.microprofile.config.inject.ConfigProperty");
     private static final DotName CDI_INSTANCE = DotName.createSimple("jakarta.enterprise.inject.Instance");
     private static final DotName CDI_EVENT = DotName.createSimple("jakarta.enterprise.event.Event");
+    private static final DotName INJECT = DotName.createSimple("jakarta.inject.Inject");
+
+    private static final java.util.Set<DotName> KNOWN_METHOD_ANNOTATIONS = java.util.Set.of(
+            PRODUCES, DEFAULT_BEAN, ALTERNATIVE, PRIORITY,
+            DotName.createSimple("jakarta.enterprise.context.ApplicationScoped"),
+            DotName.createSimple("jakarta.inject.Singleton"),
+            DotName.createSimple("jakarta.enterprise.context.Dependent"),
+            DotName.createSimple("jakarta.enterprise.context.RequestScoped"));
 
     public List<ProducerDescriptor> scan(Index index) {
         List<ProducerDescriptor> result = new ArrayList<>();
@@ -40,8 +48,20 @@ public class JandexProducerScanner {
                 priority = priorityAnn.value().asInt();
             }
 
-            boolean                                      hasCdiDeps = false;
-            List<ProducerDescriptor.ParameterDescriptor> params     = new ArrayList<>();
+            boolean hasCdiDeps = false;
+
+            // Skip methods from classes with @Inject fields (field-injected CDI beans)
+            if (declaringClass.fields().stream()
+                              .anyMatch(f -> f.hasAnnotation(INJECT))) {
+                hasCdiDeps = true;
+            }
+
+            // Skip methods with CDI qualifier annotations beyond the known set
+            if (hasUnknownCdiQualifiers(method)) {
+                hasCdiDeps = true;
+            }
+
+            List<ProducerDescriptor.ParameterDescriptor> params = new ArrayList<>();
             for (MethodParameterInfo param : method.parameters()) {
                 DotName typeName = param.type().kind() == Type.Kind.PARAMETERIZED_TYPE
                                    ? param.type().asParameterizedType().name()
@@ -88,4 +108,20 @@ public class JandexProducerScanner {
         String simple = typeName.substring(typeName.lastIndexOf('.') + 1);
         return Character.toLowerCase(simple.charAt(0)) + simple.substring(1);
     }
+
+    private boolean hasUnknownCdiQualifiers(MethodInfo method) {
+        for (AnnotationInstance ann : method.annotations()) {
+            if (ann.target().kind() != org.jboss.jandex.AnnotationTarget.Kind.METHOD) {
+                continue;
+            }
+            DotName name = ann.name();
+            if (!KNOWN_METHOD_ANNOTATIONS.contains(name)
+                && !name.toString().startsWith("java.")
+                && !name.toString().startsWith("javax.")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

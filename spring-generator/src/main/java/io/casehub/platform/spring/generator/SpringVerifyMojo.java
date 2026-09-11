@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 public class SpringVerifyMojo extends AbstractMojo {
 
     private static final Pattern BEAN_RETURN_TYPE = Pattern.compile(
-            "public\\s+(\\w+)\\s+\\w+\\s*\\(");
+            "public\\s+([\\w.]+)\\s+\\w+\\s*\\(");
 
     @Parameter(required = true)
     private File quarkusModule;
@@ -91,7 +91,7 @@ public class SpringVerifyMojo extends AbstractMojo {
     }
 
     private void collectBeanReturnTypes(Path dir, Set<String> types) throws IOException {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) {return;}
 
         Files.walkFileTree(dir, new SimpleFileVisitor<>() {
             @Override
@@ -101,12 +101,13 @@ public class SpringVerifyMojo extends AbstractMojo {
                     if (content.contains("@Bean")) {
                         Matcher m = BEAN_RETURN_TYPE.matcher(content);
                         while (m.find()) {
-                            types.add(m.group(1));
+                            String type = m.group(1);
+                            int    dot  = type.lastIndexOf('.');
+                            types.add(dot >= 0 ? type.substring(dot + 1) : type);
                         }
                     }
                 }
                 return FileVisitResult.CONTINUE;
             }
-        });
-    }
+        });}
 }

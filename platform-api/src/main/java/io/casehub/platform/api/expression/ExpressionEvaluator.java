@@ -10,4 +10,6 @@ package io.casehub.platform.api.expression;
 public interface ExpressionEvaluator {
 
     String type();
+
+    default String expression() { return null; }
 }

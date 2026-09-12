@@ -100,7 +100,7 @@ public class RoutingAgentProvider implements AgentProvider {
                         descriptor.get().backendKey() +
                         "', but no backend with that key is available");
             }
-            return new ResolvedRoute(backend, descriptor.get().id());
+            return new ResolvedRoute(backend, descriptor.get().apiModelId());
         }
 
         AgentBackend backend = backends.get(model);

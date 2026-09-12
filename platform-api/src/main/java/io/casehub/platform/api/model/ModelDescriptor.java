@@ -6,6 +6,7 @@ import java.util.Set;
 
 public record ModelDescriptor(
     String id,
+    String apiModelId,
     String backendKey,
     String vendor,
     String family,
@@ -21,6 +22,7 @@ public record ModelDescriptor(
 ) {
     public ModelDescriptor {
         Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(apiModelId, "apiModelId");
         Objects.requireNonNull(backendKey, "backendKey");
         Objects.requireNonNull(vendor, "vendor");
         Objects.requireNonNull(family, "family");

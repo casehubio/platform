@@ -2,7 +2,7 @@ package io.casehub.platform.model;
 
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
-import io.casehub.platform.api.model.ModelRegistry;
+import io.casehub.platform.api.model.MutableModelRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,19 +15,14 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
-public class InMemoryModelRegistry implements ModelRegistry {
+public class InMemoryModelRegistry implements MutableModelRegistry {
 
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, ModelDescriptor>> sources
         = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> sourcePriorities = new ConcurrentHashMap<>();
     private volatile Map<String, ModelDescriptor> resolvedView = Map.of();
 
-    public record CatalogDelta(Set<String> addedIds, Set<String> removedIds, Set<String> updatedIds) {
-        public boolean hasChanges() {
-            return !addedIds.isEmpty() || !removedIds.isEmpty() || !updatedIds.isEmpty();
-        }
-    }
-
+    @Override
     public CatalogDelta replaceSource(String sourceId, int priority, List<ModelDescriptor> models) {
         var oldEntries = sources.getOrDefault(sourceId, new ConcurrentHashMap<>());
         var newEntries = new ConcurrentHashMap<String, ModelDescriptor>();

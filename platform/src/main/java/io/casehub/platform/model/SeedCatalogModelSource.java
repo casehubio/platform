@@ -71,6 +71,7 @@ public class SeedCatalogModelSource implements ModelSource {
 
         return new ModelDescriptor(
             node.get("id").asText(),
+            node.get("id").asText(),
             node.get("backendKey").asText(),
             node.get("vendor").asText(),
             node.get("family").asText(),

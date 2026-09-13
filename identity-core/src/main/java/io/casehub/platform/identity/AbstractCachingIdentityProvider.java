@@ -12,7 +12,10 @@ public abstract class AbstractCachingIdentityProvider<C> {
     }
 
     private final ConcurrentHashMap<String, CacheEntry<C>> cache = new ConcurrentHashMap<>();
-    private final Duration ttl;
+    private Duration ttl;
+
+
+    protected AbstractCachingIdentityProvider() {this.ttl = Duration.ZERO;}
 
     protected AbstractCachingIdentityProvider(Duration ttl) {
         this.ttl = ttl;

@@ -27,8 +27,11 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
     private static final Logger LOG = Logger.getLogger(JwtVCValidator.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final Map<String, String> credentials;
-    private final DIDResolver resolver;
+    private Map<String, String> credentials;
+    private DIDResolver resolver;
+
+
+    JwtVCValidator() {}
 
     public JwtVCValidator(final Map<String, String> credentials,
                    final DIDResolver resolver,

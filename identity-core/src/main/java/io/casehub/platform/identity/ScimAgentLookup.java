@@ -23,11 +23,14 @@ public class ScimAgentLookup extends AbstractCachingIdentityProvider<ScimAgentRe
     private static final String EXTENSION_KEY =
             "urn:ietf:params:scim:schemas:extension:casehub:2.0:Agent";
 
-    private final String scimEndpoint;
-    private final String authToken;
-    private final int timeoutMs;
-    private final boolean requireHttps;
-    private final HttpClient httpClient;
+    private String scimEndpoint;
+    private String authToken;
+    private int timeoutMs;
+    private boolean requireHttps;
+    private HttpClient httpClient;
+
+
+    ScimAgentLookup() {}
 
     public ScimAgentLookup(final String endpoint, final String authToken,
                             final int timeoutMs, final Duration cacheTtl,

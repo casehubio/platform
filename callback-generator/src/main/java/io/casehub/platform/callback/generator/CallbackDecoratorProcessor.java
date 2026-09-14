@@ -14,7 +14,6 @@ import org.jboss.jandex.Type;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
@@ -30,8 +29,12 @@ import java.util.List;
 import java.util.Set;
 
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class CallbackDecoratorProcessor extends AbstractProcessor {
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
+    }
+
 
     private static final DotName CALLBACK_ELIGIBLE =
             DotName.createSimple("io.casehub.platform.api.mcp.CallbackEligible");

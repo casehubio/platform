@@ -32,6 +32,7 @@ import java.util.Set;
 
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
+@javax.annotation.processing.SupportedOptions({"generateGraphQL", "generateRest", "domainFilter"})
 public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private static final DotName MCP_DOMAIN = DotName.createSimple("io.casehub.platform.api.mcp.McpDomain");
@@ -72,9 +73,23 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             return false;
         }
 
+        boolean generateGraphQL = !"false".equals(processingEnv.getOptions().get("generateGraphQL"));
+        boolean generateRest = !"false".equals(processingEnv.getOptions().get("generateRest"));
+        String domainFilter = processingEnv.getOptions().get("domainFilter");
+        Set<String> allowedDomains = domainFilter != null
+            ? java.util.Arrays.stream(domainFilter.split(",")).map(String::trim).collect(java.util.stream.Collectors.toSet())
+            : null;
+
         for (var entry : domains.entrySet()) {
-            generateResolverSource(entry.getKey(), entry.getValue(), graphqlSkipMethods);
-            generateRestResourceSource(entry.getKey(), entry.getValue(), restSkipMethods);
+            if (allowedDomains != null && !allowedDomains.contains(entry.getKey())) {
+                continue;
+            }
+            if (generateGraphQL) {
+                generateResolverSource(entry.getKey(), entry.getValue(), graphqlSkipMethods);
+            }
+            if (generateRest) {
+                generateRestResourceSource(entry.getKey(), entry.getValue(), restSkipMethods);
+            }
         }
 
         return false;
@@ -518,11 +533,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             case ARRAY -> typeToJava(type.asArrayType().constituent()) + "[]";
             default -> type.name().toString();
         };
-    }
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private static String decapitalize(String s) {

@@ -25,7 +25,7 @@ class CallbackRegistrationResourceTest {
                 }
                 """)
         .when()
-            .post("/casehub/callbacks/register")
+            .post("/api/callbacks/register")
         .then()
             .statusCode(200)
             .body("id", notNullValue())
@@ -48,14 +48,14 @@ class CallbackRegistrationResourceTest {
                 }
                 """)
         .when()
-            .post("/casehub/callbacks/register")
+            .post("/api/callbacks/register")
         .then()
             .statusCode(200)
             .extract().path("id");
 
         given()
         .when()
-            .put("/casehub/callbacks/" + id + "/heartbeat")
+            .put("/api/callbacks/heartbeat/" + id)
         .then()
             .statusCode(204);
     }
@@ -64,7 +64,7 @@ class CallbackRegistrationResourceTest {
     void heartbeat_unknownId_returns404() {
         given()
         .when()
-            .put("/casehub/callbacks/nonexistent/heartbeat")
+            .put("/api/callbacks/heartbeat/nonexistent")
         .then()
             .statusCode(404);
     }
@@ -83,14 +83,14 @@ class CallbackRegistrationResourceTest {
                 }
                 """)
         .when()
-            .post("/casehub/callbacks/register")
+            .post("/api/callbacks/register")
         .then()
             .statusCode(200)
             .extract().path("id");
 
         given()
         .when()
-            .delete("/casehub/callbacks/" + id)
+            .delete("/api/callbacks/deregister/" + id)
         .then()
             .statusCode(204);
     }
@@ -99,7 +99,7 @@ class CallbackRegistrationResourceTest {
     void deregister_unknownId_returns204() {
         given()
         .when()
-            .delete("/casehub/callbacks/nonexistent")
+            .delete("/api/callbacks/deregister/nonexistent")
         .then()
             .statusCode(204);
     }

@@ -48,13 +48,6 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void processorCapitalizeWorks() {
-        assertThat(capitalize("engine")).isEqualTo("Engine");
-        assertThat(capitalize("")).isEmpty();
-        assertThat(capitalize(null)).isNull();
-    }
-
-    @Test
     void processorDecapitalizeWorks() {
         assertThat(decapitalize("TestItemService")).isEqualTo("testItemService");
         assertThat(decapitalize("")).isEmpty();
@@ -176,11 +169,6 @@ class GraphQLResolverProcessorTest {
                 .isEqualTo("return Response.ok(spi.listItems()).build();");
     }
 
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
 
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;

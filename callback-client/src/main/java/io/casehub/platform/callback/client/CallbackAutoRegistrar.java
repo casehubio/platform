@@ -156,7 +156,7 @@ public class CallbackAutoRegistrar implements HealthCheck {
         try {
             final String body = mapper.writeValueAsString(request);
             final HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(serverUrl.orElseThrow() + "/casehub/callbacks/register"))
+                    .uri(URI.create(serverUrl.orElseThrow() + "/api/callbacks/register"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
@@ -187,7 +187,7 @@ public class CallbackAutoRegistrar implements HealthCheck {
             final CallbackRegistration reg = entry.getValue();
             try {
                 final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(serverUrl.orElseThrow() + "/casehub/callbacks/" + reg.id() + "/heartbeat"))
+                        .uri(URI.create(serverUrl.orElseThrow() + "/api/callbacks/heartbeat/" + reg.id()))
                         .PUT(HttpRequest.BodyPublishers.noBody())
                         .build();
 
@@ -210,7 +210,7 @@ public class CallbackAutoRegistrar implements HealthCheck {
         for (final var entry : activeRegistrations.entrySet()) {
             try {
                 final HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(serverUrl.orElseThrow() + "/casehub/callbacks/" + entry.getValue().id()))
+                        .uri(URI.create(serverUrl.orElseThrow() + "/api/callbacks/deregister/" + entry.getValue().id()))
                         .DELETE()
                         .build();
                 httpClient.send(request, HttpResponse.BodyHandlers.ofString());

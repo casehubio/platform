@@ -41,7 +41,7 @@ class DeliveryChannelResourceTest {
     @Test
     void getChannels_returnsRegisteredChannels() {
         given()
-            .when().get("/notifications/channels")
+            .when().get("/api/delivery-channels/list-channels")
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)

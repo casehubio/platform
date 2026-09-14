@@ -26,7 +26,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 /**
- * Tests for {@link NotificationPreferenceResource}.
+ * Tests for notification preference endpoint (generated from {@link io.casehub.platform.api.notification.settings.NotificationPreferenceApi}).
  *
  * <p>Uses in-memory store from notification-settings-inmem (test dep).
  */
@@ -53,7 +53,7 @@ class NotificationPreferenceResourceTest {
     @Test
     void get_returnsEmptyPreferences_whenNoneStored() {
         given()
-            .when().get("/notifications/preferences")
+            .when().get("/api/notification-preferences/get")
             .then()
             .statusCode(200)
             .body("userId", equalTo("user-1"))
@@ -73,7 +73,7 @@ class NotificationPreferenceResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(update)
-            .when().put("/notifications/preferences")
+            .when().put("/api/notification-preferences/update")
             .then()
             .statusCode(200)
             .body("userId", equalTo("user-1"))
@@ -87,7 +87,7 @@ class NotificationPreferenceResourceTest {
 
         // Verify GET returns the same
         given()
-            .when().get("/notifications/preferences")
+            .when().get("/api/notification-preferences/get")
             .then()
             .statusCode(200)
             .body("channelDefaults.email.enabled", is(true))
@@ -105,7 +105,7 @@ class NotificationPreferenceResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(setUpdate)
-            .when().put("/notifications/preferences")
+            .when().put("/api/notification-preferences/update")
             .then()
             .statusCode(200)
             .body("quietHours", notNullValue());
@@ -115,14 +115,14 @@ class NotificationPreferenceResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(clearUpdate)
-            .when().put("/notifications/preferences")
+            .when().put("/api/notification-preferences/update")
             .then()
             .statusCode(200)
             .body("quietHours", nullValue());
 
         // Verify GET returns no quiet hours
         given()
-            .when().get("/notifications/preferences")
+            .when().get("/api/notification-preferences/get")
             .then()
             .statusCode(200)
             .body("quietHours", nullValue());
@@ -139,7 +139,7 @@ class NotificationPreferenceResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(update)
-            .when().put("/notifications/preferences")
+            .when().put("/api/notification-preferences/update")
             .then()
             .statusCode(200);
 
@@ -148,7 +148,7 @@ class NotificationPreferenceResourceTest {
         principal.setTenancyId("tenant-2");
 
         given()
-            .when().get("/notifications/preferences")
+            .when().get("/api/notification-preferences/get")
             .then()
             .statusCode(200)
             .body("tenancyId", equalTo("tenant-2"))
@@ -167,7 +167,7 @@ class NotificationPreferenceResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(update)
-            .when().put("/notifications/preferences")
+            .when().put("/api/notification-preferences/update")
             .then()
             .statusCode(200)
             .body("userId", equalTo("user-1"))

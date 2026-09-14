@@ -17,9 +17,9 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 /**
- * Tests for {@link DigestStatusResource}.
+ * Tests for digest status endpoint (generated from {@link io.casehub.platform.api.delivery.DigestApi}).
  *
- * <p>Uses {@link InMemoryDigestBuffer} from notification-dispatch (test dep).
+ * <p>Uses InMemoryDigestBuffer from notification-dispatch (test dep).
  */
 @QuarkusTest
 class DigestStatusResourceTest {
@@ -68,7 +68,7 @@ class DigestStatusResourceTest {
 
         // Act & Assert
         given()
-                .when().get("/notifications/digest/status")
+                .when().get("/api/digest/status")
                 .then()
                 .statusCode(200)
                 .body("email", equalTo(2))
@@ -78,7 +78,7 @@ class DigestStatusResourceTest {
     @Test
     void digestStatus_returnsEmptyMap_whenNoPending() {
         given()
-            .when().get("/notifications/digest/status")
+            .when().get("/api/digest/status")
             .then()
             .statusCode(200)
             .body("size()", is(0));
@@ -97,7 +97,7 @@ class DigestStatusResourceTest {
 
         // Act: user-1 in default tenant queries
         given()
-            .when().get("/notifications/digest/status")
+            .when().get("/api/digest/status")
             .then()
             .statusCode(200)
             .body("size()", is(0));
@@ -116,7 +116,7 @@ class DigestStatusResourceTest {
 
         // Act: user-1 queries
         given()
-            .when().get("/notifications/digest/status")
+            .when().get("/api/digest/status")
             .then()
             .statusCode(200)
             .body("size()", is(0));

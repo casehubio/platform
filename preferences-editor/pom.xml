@@ -39,6 +39,10 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
 
         <!-- Test -->
         <dependency>
@@ -96,6 +100,27 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.casehub</groupId>
+                            <artifactId>casehub-platform-graphql-generator</artifactId>
+                            <version>${project.version}</version>
+                        </path>
+                        <path>
+                            <groupId>io.casehub</groupId>
+                            <artifactId>casehub-platform-preferences-editor-core</artifactId>
+                            <version>${project.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <arg>-AgenerateGraphQL=false</arg>
+                        <arg>-AdomainFilter=preferences,preference-schemas</arg>
+                    </compilerArgs>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>io.smallrye</groupId>

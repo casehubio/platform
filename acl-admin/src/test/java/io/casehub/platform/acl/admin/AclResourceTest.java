@@ -47,14 +47,14 @@ class AclResourceTest {
         given()
                 .contentType("application/json")
                 .body(Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"))
-                .when().post("/acl/grants")
+                .when().post("/api/acl/grants")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -66,14 +66,14 @@ class AclResourceTest {
                 .body(List.of(
                         Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"),
                         Map.of("actorId", "actor1", "resourceId", "case:def", "action", "WRITE")))
-                .when().post("/acl/grants/batch")
+                .when().post("/api/acl/grants/batch")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
 
@@ -81,7 +81,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:def")
                 .queryParam("action", "WRITE")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -94,14 +94,14 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().delete("/acl/grants")
+                .when().delete("/api/acl/grants")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(false));
     }
@@ -116,14 +116,14 @@ class AclResourceTest {
                 .body(List.of(
                         Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"),
                         Map.of("actorId", "actor1", "resourceId", "case:def", "action", "WRITE")))
-                .when().delete("/acl/grants/batch")
+                .when().post("/api/acl/grants/revoke-batch")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(false));
     }
@@ -136,7 +136,7 @@ class AclResourceTest {
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
-                .when().delete("/acl/grants/all")
+                .when().delete("/api/acl/grants/all")
                 .then().statusCode(204);
 
         acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
@@ -144,7 +144,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -158,14 +158,14 @@ class AclResourceTest {
         given()
                 .contentType("application/json")
                 .body(Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"))
-                .when().post("/acl/denies")
+                .when().post("/api/acl/denies")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(false));
     }
@@ -180,14 +180,14 @@ class AclResourceTest {
                 .body(List.of(
                         Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"),
                         Map.of("actorId", "actor1", "resourceId", "case:def", "action", "WRITE")))
-                .when().post("/acl/denies/batch")
+                .when().post("/api/acl/denies/batch")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(false));
     }
@@ -201,14 +201,14 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().delete("/acl/denies")
+                .when().delete("/api/acl/denies")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -225,14 +225,14 @@ class AclResourceTest {
                 .body(List.of(
                         Map.of("actorId", "actor1", "resourceId", "case:abc", "action", "READ"),
                         Map.of("actorId", "actor1", "resourceId", "case:def", "action", "WRITE")))
-                .when().delete("/acl/denies/batch")
+                .when().post("/api/acl/denies/revoke-batch")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -244,16 +244,16 @@ class AclResourceTest {
         acl.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
         given()
-                .contentType("application/json")
-                .body(Map.of("childResourceId", "planitem:child", "parentResourceId", "case:abc"))
-                .when().post("/acl/parents")
+                .queryParam("childResourceId", "planitem:child")
+                .queryParam("parentResourceId", "case:abc")
+                .when().post("/api/acl/parents")
                 .then().statusCode(204);
 
         given()
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "planitem:child")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -266,7 +266,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(false));
     }
@@ -275,7 +275,7 @@ class AclResourceTest {
     void check_missingParams_returns400() {
         given()
                 .queryParam("actorId", "actor1")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(400);
     }
 
@@ -290,7 +290,7 @@ class AclResourceTest {
                 .queryParam("actorId", "nonadmin")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(200)
                 .body("allowed", equalTo(true));
     }
@@ -305,7 +305,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceId", "case:abc")
                 .queryParam("action", "READ")
-                .when().get("/acl/check")
+                .when().get("/api/acl/check")
                 .then().statusCode(403);
     }
 
@@ -320,7 +320,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceType", "case")
                 .queryParam("action", "READ")
-                .when().get("/acl/accessible")
+                .when().get("/api/acl/accessible")
                 .then().statusCode(200)
                 .body("resourceIds", hasSize(2))
                 .body("resourceIds", containsInAnyOrder("case:abc", "case:def"));
@@ -334,7 +334,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceType", "case")
                 .queryParam("action", "READ")
-                .when().get("/acl/accessible")
+                .when().get("/api/acl/accessible")
                 .then().statusCode(200)
                 .body("resourceIds", hasItem("case:*"));
     }
@@ -343,7 +343,7 @@ class AclResourceTest {
     void accessible_missingParams_returns400() {
         given()
                 .queryParam("actorId", "actor1")
-                .when().get("/acl/accessible")
+                .when().get("/api/acl/accessible")
                 .then().statusCode(400);
     }
 
@@ -357,7 +357,7 @@ class AclResourceTest {
                 .queryParam("actorId", "actor1")
                 .queryParam("resourceType", "case")
                 .queryParam("action", "READ")
-                .when().get("/acl/accessible")
+                .when().get("/api/acl/accessible")
                 .then().statusCode(403);
     }
 
@@ -367,7 +367,7 @@ class AclResourceTest {
     void revoke_missingParams_returns400() {
         given()
                 .queryParam("actorId", "actor1")
-                .when().delete("/acl/grants")
+                .when().delete("/api/acl/grants")
                 .then().statusCode(400);
     }
 
@@ -375,7 +375,7 @@ class AclResourceTest {
     void revokeAll_missingParams_returns400() {
         given()
                 .queryParam("actorId", "actor1")
-                .when().delete("/acl/grants/all")
+                .when().delete("/api/acl/grants/all")
                 .then().statusCode(400);
     }
 
@@ -383,7 +383,7 @@ class AclResourceTest {
     void removeDeny_missingParams_returns400() {
         given()
                 .queryParam("actorId", "actor1")
-                .when().delete("/acl/denies")
+                .when().delete("/api/acl/denies")
                 .then().statusCode(400);
     }
 }

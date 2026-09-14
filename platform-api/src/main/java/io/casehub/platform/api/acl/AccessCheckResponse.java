@@ -1,4 +1,4 @@
-package io.casehub.platform.acl.admin;
+package io.casehub.platform.api.acl;
 
 public record AccessCheckResponse(boolean allowed) {
 }

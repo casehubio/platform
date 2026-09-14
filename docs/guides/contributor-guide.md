@@ -39,7 +39,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `identity/` | `casehub-platform-identity` | `@ApplicationScoped` | DID resolution (did:key, did:web, SCIM), actor-to-DID mapping, VC validation |
 | `acl-inmem/` | `casehub-platform-acl-inmem` | `@Alternative @Priority(10)` | In-memory ACL -- ConcurrentHashMap, group-based grants, parent-child hierarchy, deny entries, wildcard grants |
 | `acl-jpa/` | `casehub-platform-acl-jpa` | `@ApplicationScoped` | JPA ACL -- Hibernate ORM Panache, audit logging, deny entries, recursive CTE hierarchy, tenant-filtered queries, retention purge |
-| `acl-admin/` | `casehub-platform-acl-admin` | `@ApplicationScoped` | REST API for ACL admin -- `@RunOnVirtualThread`, `@RolesAllowed("admin")` |
+| `acl-admin/` | `casehub-platform-acl-admin` | `@ApplicationScoped` | ACL admin -- `AclService implements AclApi`, generated REST via `@McpDomain("acl")`, `@RolesAllowed("admin")` |
 | `governance/` | `casehub-platform-governance` | `@ApplicationScoped` | `DefaultPolicyEnforcer` -- retry/timeout/backoff on virtual thread executor |
 | `credentials-quarkus/` | `casehub-platform-credentials-quarkus` | `@Alternative @Priority(1)` | Bridge `CredentialResolver` to Quarkus `CredentialsProvider` |
 | `scim/` | `casehub-platform-scim` | `@ApplicationScoped` | SCIM 2.0 `GroupMembershipProvider` |

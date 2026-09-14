@@ -57,7 +57,7 @@ class NotificationResourceTest {
         // When: list notifications
         given()
             .when()
-            .get("/notifications")
+            .get("/api/notifications/list")
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -101,7 +101,7 @@ class NotificationResourceTest {
         given()
             .queryParam("status", "UNREAD")
             .when()
-            .get("/notifications")
+            .get("/api/notifications/list")
             .then()
             .statusCode(200)
             .body("notifications", hasSize(1))
@@ -140,7 +140,7 @@ class NotificationResourceTest {
         given()
             .queryParam("category", "sla.breached")
             .when()
-            .get("/notifications")
+            .get("/api/notifications/list")
             .then()
             .statusCode(200)
             .body("notifications", hasSize(1))
@@ -169,7 +169,7 @@ class NotificationResourceTest {
         given()
             .queryParam("limit", 2)
             .when()
-            .get("/notifications")
+            .get("/api/notifications/list")
             .then()
             .statusCode(200)
             .body("notifications", hasSize(2))
@@ -197,7 +197,7 @@ class NotificationResourceTest {
         // When: get unread count
         given()
             .when()
-            .get("/notifications/unread-count")
+            .get("/api/notifications/unread-count")
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -223,7 +223,7 @@ class NotificationResourceTest {
         // When: mark as read
         given()
             .when()
-            .patch("/notifications/{id}/read", notification.id())
+            .patch("/api/notifications/read/{id}", notification.id())
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -236,7 +236,7 @@ class NotificationResourceTest {
     void markRead_returns404ForNonexistentNotification() {
         given()
             .when()
-            .patch("/notifications/{id}/read", "nonexistent-id")
+            .patch("/api/notifications/read/{id}", "nonexistent-id")
             .then()
             .statusCode(404);
     }
@@ -260,7 +260,7 @@ class NotificationResourceTest {
         // When: try to mark as read with current principal (different tenant)
         given()
             .when()
-            .patch("/notifications/{id}/read", notification.id())
+            .patch("/api/notifications/read/{id}", notification.id())
             .then()
             .statusCode(404);
     }
@@ -284,7 +284,7 @@ class NotificationResourceTest {
         // When: try to mark as read with current principal (different user)
         given()
             .when()
-            .patch("/notifications/{id}/read", notification.id())
+            .patch("/api/notifications/read/{id}", notification.id())
             .then()
             .statusCode(404);
     }
@@ -308,7 +308,7 @@ class NotificationResourceTest {
         // When: dismiss
         given()
             .when()
-            .patch("/notifications/{id}/dismiss", notification.id())
+            .patch("/api/notifications/dismiss/{id}", notification.id())
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -321,7 +321,7 @@ class NotificationResourceTest {
     void dismiss_returns404ForNonexistentNotification() {
         given()
             .when()
-            .patch("/notifications/{id}/dismiss", "nonexistent-id")
+            .patch("/api/notifications/dismiss/{id}", "nonexistent-id")
             .then()
             .statusCode(404);
     }
@@ -347,7 +347,7 @@ class NotificationResourceTest {
         // When: mark all as read
         given()
             .when()
-            .post("/notifications/mark-all-read")
+            .post("/api/notifications/mark-all-read")
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -359,7 +359,7 @@ class NotificationResourceTest {
         // When: mark all as read with no notifications
         given()
             .when()
-            .post("/notifications/mark-all-read")
+            .post("/api/notifications/mark-all-read")
             .then()
             .statusCode(200)
             .body("count", equalTo(0));

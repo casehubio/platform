@@ -1,5 +1,6 @@
 package io.casehub.platform.preferences.editor;
 
+import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.preferences.PreferenceSchemaDescriptor;
 import io.casehub.platform.api.preferences.PreferenceSchemaRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,6 +18,7 @@ import java.util.List;
 
 @ApplicationScoped
 @Path("/preferences/schema")
+@McpDomain("preference-schemas")
 public class PreferenceSchemaResource {
 
     @Inject PreferenceSchemaRegistry registry;

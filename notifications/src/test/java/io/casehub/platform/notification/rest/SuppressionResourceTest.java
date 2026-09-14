@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 /**
- * Tests for {@link SuppressionResource}.
+ * Tests for notification suppression endpoints (mute + snooze).
  *
  * <p>Uses in-memory store from notification-settings-inmem (test dep).
  */
@@ -63,9 +63,9 @@ class SuppressionResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(input)
-            .when().post("/notifications/mute")
+            .when().post("/api/notification-suppression/mute")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("id", notNullValue())
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
@@ -100,7 +100,7 @@ class SuppressionResourceTest {
         store.addMute(input2);
 
         given()
-            .when().get("/notifications/mute")
+            .when().get("/api/notification-suppression/mute")
             .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -120,13 +120,13 @@ class SuppressionResourceTest {
         var rule = store.addMute(input);
 
         given()
-            .when().delete("/notifications/mute/{id}", rule.id())
+            .when().delete("/api/notification-suppression/mute/{id}", rule.id())
             .then()
             .statusCode(204);
 
         // Verify it's gone
         given()
-            .when().get("/notifications/mute")
+            .when().get("/api/notification-suppression/mute")
             .then()
             .statusCode(200)
             .body("$", hasSize(0));
@@ -135,7 +135,7 @@ class SuppressionResourceTest {
     @Test
     void deleteMute_returns404ForNonexistentRule() {
         given()
-            .when().delete("/notifications/mute/{id}", "nonexistent-id")
+            .when().delete("/api/notification-suppression/mute/{id}", "nonexistent-id")
             .then()
             .statusCode(404);
     }
@@ -158,7 +158,7 @@ class SuppressionResourceTest {
 
         // Try to delete user-1's rule
         given()
-            .when().delete("/notifications/mute/{id}", rule.id())
+            .when().delete("/api/notification-suppression/mute/{id}", rule.id())
             .then()
             .statusCode(404);
     }
@@ -182,7 +182,7 @@ class SuppressionResourceTest {
 
         // user-2 should not see user-1's mute rules
         given()
-            .when().get("/notifications/mute")
+            .when().get("/api/notification-suppression/mute")
             .then()
             .statusCode(200)
             .body("$", hasSize(0));
@@ -202,9 +202,9 @@ class SuppressionResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(input)
-            .when().post("/notifications/snooze")
+            .when().post("/api/notification-suppression/snooze")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
             .body("until", notNullValue())
@@ -225,14 +225,14 @@ class SuppressionResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body(input2)
-            .when().post("/notifications/snooze")
+            .when().post("/api/notification-suppression/snooze")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("until", notNullValue());
 
         // Verify GET returns the second snooze
         given()
-            .when().get("/notifications/snooze")
+            .when().get("/api/notification-suppression/snooze")
             .then()
             .statusCode(200)
             .body("until", notNullValue());
@@ -245,7 +245,7 @@ class SuppressionResourceTest {
         store.activateSnooze(input);
 
         given()
-            .when().get("/notifications/snooze")
+            .when().get("/api/notification-suppression/snooze")
             .then()
             .statusCode(200)
             .body("userId", equalTo("user-1"))
@@ -256,7 +256,7 @@ class SuppressionResourceTest {
     @Test
     void getSnooze_returns404WhenNoActiveSnooze() {
         given()
-            .when().get("/notifications/snooze")
+            .when().get("/api/notification-suppression/snooze")
             .then()
             .statusCode(404);
     }
@@ -268,13 +268,13 @@ class SuppressionResourceTest {
         store.activateSnooze(input);
 
         given()
-            .when().delete("/notifications/snooze")
+            .when().delete("/api/notification-suppression/snooze")
             .then()
             .statusCode(204);
 
         // Verify it's gone
         given()
-            .when().get("/notifications/snooze")
+            .when().get("/api/notification-suppression/snooze")
             .then()
             .statusCode(404);
     }
@@ -282,7 +282,7 @@ class SuppressionResourceTest {
     @Test
     void deleteSnooze_returns404WhenNoActiveSnooze() {
         given()
-            .when().delete("/notifications/snooze")
+            .when().delete("/api/notification-suppression/snooze")
             .then()
             .statusCode(404);
     }
@@ -300,7 +300,7 @@ class SuppressionResourceTest {
 
         // user-2 should not see user-1's snooze
         given()
-            .when().get("/notifications/snooze")
+            .when().get("/api/notification-suppression/snooze")
             .then()
             .statusCode(404);
     }

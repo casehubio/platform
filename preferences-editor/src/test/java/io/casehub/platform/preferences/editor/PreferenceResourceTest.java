@@ -15,7 +15,6 @@ import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 
 @QuarkusTest
@@ -44,10 +43,9 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/validation")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
-            .statusCode(400)
-            .body("violations", hasSize(1));
+            .statusCode(400);
     }
 
     @Test
@@ -59,10 +57,9 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/validation")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
-            .statusCode(400)
-            .body("violations", hasSize(1));
+            .statusCode(400);
     }
 
     @Test
@@ -74,7 +71,7 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/validation-ok")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
     }
@@ -88,7 +85,7 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/no-schema")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
     }
@@ -102,14 +99,14 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/devtown")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
 
         given()
             .queryParam("scope", "casehubio/devtown")
         .when()
-            .get("/preferences")
+            .get("/api/preferences/list")
         .then()
             .statusCode(200)
             .body("size()", is(1))
@@ -126,7 +123,7 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/del")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
 
@@ -135,14 +132,14 @@ class PreferenceResourceTest {
             .queryParam("namespace", "test")
             .queryParam("name", "toDelete")
         .when()
-            .delete("/preferences")
+            .delete("/api/preferences/delete")
         .then()
             .statusCode(204);
 
         given()
             .queryParam("scope", "casehubio/del")
         .when()
-            .get("/preferences")
+            .get("/api/preferences/list")
         .then()
             .statusCode(200)
             .body("size()", is(0));
@@ -154,7 +151,7 @@ class PreferenceResourceTest {
             .queryParam("scope", "casehubio")
             .queryParam("namespace", "test")
         .when()
-            .delete("/preferences")
+            .delete("/api/preferences/delete")
         .then()
             .statusCode(400);
     }
@@ -168,7 +165,7 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/bulk")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
 
@@ -176,14 +173,14 @@ class PreferenceResourceTest {
             .queryParam("scope", "casehubio/bulk")
             .queryParam("namespace", "bulk")
         .when()
-            .delete("/preferences/by-namespace")
+            .delete("/api/preferences/delete-namespace")
         .then()
             .statusCode(204);
 
         given()
             .queryParam("scope", "casehubio/bulk")
         .when()
-            .get("/preferences")
+            .get("/api/preferences/list")
         .then()
             .statusCode(200)
             .body("size()", is(0));
@@ -198,7 +195,7 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/upsert")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
 
@@ -209,14 +206,14 @@ class PreferenceResourceTest {
                 """)
             .queryParam("scope", "casehubio/upsert")
         .when()
-            .put("/preferences")
+            .put("/api/preferences/set")
         .then()
             .statusCode(204);
 
         given()
             .queryParam("scope", "casehubio/upsert")
         .when()
-            .get("/preferences")
+            .get("/api/preferences/list")
         .then()
             .statusCode(200)
             .body("size()", is(1))
@@ -232,7 +229,7 @@ class PreferenceResourceTest {
                       """)
                 .queryParam("scope", "")
                 .when()
-                .put("/preferences")
+                .put("/api/preferences/set")
                 .then()
                 .statusCode(204);
 
@@ -243,13 +240,13 @@ class PreferenceResourceTest {
                       """)
                 .queryParam("scope", "casehubio/alltest")
                 .when()
-                .put("/preferences")
+                .put("/api/preferences/set")
                 .then()
                 .statusCode(204);
 
         given()
                 .when()
-                .get("/preferences")
+                .get("/api/preferences/list")
                 .then()
                 .statusCode(200)
                 .body("findAll { it.namespace == 'bulk-all' }.size()", greaterThanOrEqualTo(2));

@@ -589,6 +589,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     static String toPascalCase(String kebab) {
         if (kebab == null || kebab.isEmpty()) {return kebab;}
+        kebab = kebab.replace('/', '-');
         StringBuilder sb = new StringBuilder();
         for (String part : kebab.split("-")) {
             if (!part.isEmpty()) {

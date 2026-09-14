@@ -152,7 +152,7 @@
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>-AgenerateGraphQL=false</arg>
-                        <arg>-AdomainFilter=delivery-channels,digest,notification-preferences</arg>
+                        <arg>-AdomainFilter=delivery-channels,digest,notification-preferences,notifications,notification-suppression</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>

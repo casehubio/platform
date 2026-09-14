@@ -449,7 +449,7 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 - `casehub_activate` — on-demand per-operation tool registration. Agents discover and activate tools at runtime instead of exposing all tools at startup.
 - **Resource subscriptions:** `McpResourceRegistry` SPI for registering subscribable MCP resources. `McpResourceRegistryBridge` tracks subscriptions and fires notifications on resource changes.
 - **Dynamic tool schema:** The operation catalog is injected into the `casehub_action` tool definition at runtime, providing contextual tool descriptions.
-- `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations.
+- `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations. The `graphql-generator` APT generates both `@GraphQLApi` resolvers and `@Path` JAX-RS REST resources from these interfaces. Use `@RestMethod(HttpMethod.DELETE)` for non-POST mutations, `@PathParam` for path segments. Processor options: `-AdomainFilter` to scope generation per module.
 
 ---
 

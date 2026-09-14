@@ -111,6 +111,37 @@ class RoutingAgentProviderTest {
                                    ModelLocality.CLOUD, null, null, Map.of());
     }
 
+    static ModelDescriptor descriptorWithTier(String id, String apiModelId,
+                                              String backendKey, ModelTier tier) {
+        return new ModelDescriptor(id, apiModelId, backendKey, null, "test-vendor", "test-family",
+                                   "Test " + id, tier, Set.of(), 128000, 16384,
+                                   ModelLocality.CLOUD, null, null, Map.of());
+    }
+
+    static ModelRegistry tierAwareRegistry(ModelDescriptor... descriptors) {
+        Map<String, ModelDescriptor> map = new HashMap<>();
+        List<ModelDescriptor>        all = List.of(descriptors);
+        for (var d : descriptors) {map.put(d.id(), d);}
+        return new ModelRegistry() {
+            @Override
+            public Optional<ModelDescriptor> resolveById(String id) {
+                return Optional.ofNullable(map.get(id));
+            }
+
+            @Override
+            public List<ModelDescriptor> query(ModelQuery query) {
+                return all.stream()
+                          .filter(d -> query.tier() == null || d.tier() == query.tier())
+                          .filter(d -> query.vendor() == null || d.vendor().equals(query.vendor()))
+                          .filter(d -> query.family() == null || d.family().equals(query.family()))
+                          .toList();
+            }
+
+            @Override
+            public List<ModelDescriptor> all() {return all;}
+        };
+    }
+
 
     // --- Existing behavior (key-based routing) ---
 
@@ -275,4 +306,149 @@ class RoutingAgentProviderTest {
                   .hasMessageContaining("claude")
                   .hasMessageContaining("vertex");
     }
+// --- Tier-based resolution ---
+
+    @Test
+    void tierRef_resolvesToDefaultBackendModel() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP),
+                descriptorWithTier("gpt-4.1", "gpt-4.1", "openai", ModelTier.STANDARD));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture),
+                                stubBackend("openai")),
+                "claude", registry);
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void tierRef_prefersDefaultBackend() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("o3", "o3", "openai", ModelTier.FLAGSHIP),
+                descriptorWithTier("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture),
+                                stubBackend("openai")),
+                "claude", registry);
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void tierRef_fallsBackToNonDefaultBackend() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("o3", "o3", "openai", ModelTier.FLAGSHIP));
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("claude"),
+                                capturingBackend("openai", configCapture, initCapture)),
+                "claude", registry);
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("o3");
+    }
+
+    @Test
+    void tierRef_emptyRegistry_throwsWithNoSourcesMessage() {
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("claude")), "claude", emptyRegistry());
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        assertThatThrownBy(() -> router.invoke(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No model sources configured");
+    }
+
+    @Test
+    void tierRef_noMatchingTier_throwsWithAvailableTiers() {
+        var registry = tierAwareRegistry(
+                descriptorWithTier("claude-haiku", "claude-haiku", "claude", ModelTier.FAST));
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("claude")), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        assertThatThrownBy(() -> router.invoke(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("FLAGSHIP")
+                .hasMessageContaining("FAST");
+    }
+
+    @Test
+    void tierRef_missingBackend_throwsIllegalState() {
+        var registry = tierAwareRegistry(
+                descriptorWithTier("gemini-pro", "gemini-pro", "gemini", ModelTier.FLAGSHIP));
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("claude")), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        assertThatThrownBy(() -> router.invoke(config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("gemini");
+    }
+
+    @Test
+    void tierRef_openSession_resolvesToCorrectModel() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("claude-haiku", "claude-haiku", "claude", ModelTier.FAST));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry);
+
+        var init = AgentSessionInit.of("sys", "tier:FAST");
+        router.openSession(init);
+        assertThat(initCapture.get().model()).isEqualTo("claude-haiku");
+    }
+
+    @Test
+    void tierRef_checkedBeforeRegistryId() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("tier:FLAGSHIP", "literal-id", "claude", ModelTier.STANDARD),
+                descriptorWithTier("real-flagship", "real-flagship", "claude", ModelTier.FLAGSHIP));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry);
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("real-flagship");
+    }
+
+    @Test
+    void tierRef_invalidTierName_throwsIllegalArgument() {
+        var registry = tierAwareRegistry(
+                descriptorWithTier("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP));
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("claude")), "claude", registry);
+        var config = AgentSessionConfig.of("sys", "user", "tier:INVALID");
+        assertThatThrownBy(() -> router.invoke(config))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void tierRef_existingResolutionPaths_unchanged() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithTier("claude-sonnet-5", "claude-sonnet-5", "claude", ModelTier.STANDARD));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry);
+
+        var config = AgentSessionConfig.of("sys", "user", "claude-sonnet-5");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-sonnet-5");
+    }
+
+
 }

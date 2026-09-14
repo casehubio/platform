@@ -49,9 +49,11 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName JAX_PUT = DotName.createSimple("jakarta.ws.rs.PUT");
     private static final DotName JAX_DELETE = DotName.createSimple("jakarta.ws.rs.DELETE");
     private static final DotName JAX_PATCH = DotName.createSimple("jakarta.ws.rs.PATCH");
+    private static final DotName REST_PATH_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
 
 
     private boolean processed = false;
+    private IndexView jandexIndex;
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -64,6 +66,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         if (index == null) {
             return false;
         }
+        this.jandexIndex = index;
 
         Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index);
         Set<String> restSkipMethods = scanHandWrittenRestMethods(index);
@@ -183,7 +186,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     if (restMethodAnn != null && restMethodAnn.value() != null) {
                         restMethodOverride = restMethodAnn.value().asEnum();
                     }
-                    ops.operations.add(new OperationInfo(method, classInfo, opType, desc, restMethodOverride));
+                    String restPathOverride = null;
+                    AnnotationInstance restPathAnn = method.annotation(REST_PATH_ANN);
+                    if (restPathAnn != null && restPathAnn.value() != null) {
+                        restPathOverride = restPathAnn.value().asString();
+                    }
+                    ops.operations.add(new OperationInfo(method, classInfo, opType, desc, restMethodOverride, restPathOverride));
                 }
             }
         }
@@ -383,7 +391,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 pathParamPositions.add(i);
             } else if (isBodyVerb
                        && method.parameterTypes().get(i).kind() != Type.Kind.PRIMITIVE
-                       && !isSimpleType(method.parameterTypes().get(i).name().toString())) {
+                       && !isSimpleType(method.parameterTypes().get(i).name().toString(), jandexIndex)) {
                 complexCount++;
                 if (bodyParamIndex < 0) {
                     bodyParamIndex = i;
@@ -403,7 +411,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         boolean hasBody = bodyParamIndex >= 0;
 
         StringBuilder pathSuffix = new StringBuilder();
-        pathSuffix.append("/").append(toKebabCase(method.name()));
+        pathSuffix.append("/").append(resolveRestPath(op.restPathOverride, method.name()));
         for (String pp : pathParams) {
             pathSuffix.append("/{").append(pp).append("}");
         }
@@ -600,6 +608,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return type == OperationType.QUERY ? "GET" : "POST";
     }
 
+    static String resolveRestPath(String restPathOverride, String methodName) {
+        if (restPathOverride != null) {
+            return restPathOverride;
+        }
+        return toKebabCase(methodName);
+    }
+
+
     private static final Set<String> SIMPLE_TYPES = Set.of(
             "java.lang.String",
             "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte",
@@ -608,8 +624,33 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                           );
 
     static boolean isSimpleType(String fqcn) {
+        return isSimpleType(fqcn, null);
+    }
+
+    static boolean isSimpleType(String fqcn, IndexView index) {
         if (SIMPLE_TYPES.contains(fqcn)) {return true;}
         if (fqcn.startsWith("java.time.")) {return true;}
+        if (index != null) {
+            ClassInfo ci = index.getClassByName(fqcn);
+            if (ci != null) {
+                if (ci.isEnum()) {return true;}
+                if (hasStaticStringMethod(ci, "fromString")) {return true;}
+                if (!ci.isEnum() && hasStaticStringMethod(ci, "valueOf")) {return true;}
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasStaticStringMethod(ClassInfo ci, String methodName) {
+        DotName stringType = DotName.createSimple("java.lang.String");
+        for (MethodInfo m : ci.methods()) {
+            if (m.name().equals(methodName)
+                && java.lang.reflect.Modifier.isStatic(m.flags())
+                && m.parameterTypes().size() == 1
+                && m.parameterTypes().get(0).name().equals(stringType)) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -633,17 +674,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     static class OperationInfo {
-        final MethodInfo method;
-        final ClassInfo declaringClass;
+        final MethodInfo    method;
+        final ClassInfo     declaringClass;
         final OperationType type;
-        final String description;
-        final String restMethodOverride;
-        OperationInfo(MethodInfo method, ClassInfo declaringClass, OperationType type, String description, String restMethodOverride) {
-            this.method = method;
-            this.declaringClass = declaringClass;
-            this.type = type;
-            this.description = description;
+        final String        description;
+        final String        restMethodOverride;
+        final String        restPathOverride;
+
+        OperationInfo(MethodInfo method, ClassInfo declaringClass, OperationType type, String description, String restMethodOverride, String restPathOverride) {
+            this.method             = method;
+            this.declaringClass     = declaringClass;
+            this.type               = type;
+            this.description        = description;
             this.restMethodOverride = restMethodOverride;
+            this.restPathOverride   = restPathOverride;
         }
     }
 }

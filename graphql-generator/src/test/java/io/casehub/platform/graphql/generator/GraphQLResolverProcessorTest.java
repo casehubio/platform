@@ -169,6 +169,51 @@ class GraphQLResolverProcessorTest {
                 .isEqualTo("return Response.ok(spi.listItems()).build();");
     }
 
+    @Test
+    void restPathOverride_usesLiteralValue() {
+        assertThat(GraphQLResolverProcessor.resolveRestPath("grants", "grant")).isEqualTo("grants");
+    }
+
+    @Test
+    void restPathOverride_absent_fallsBackToKebab() {
+        assertThat(GraphQLResolverProcessor.resolveRestPath(null, "grantBatch")).isEqualTo("grant-batch");
+    }
+
+    @Test
+    void restPathOverride_nestedSegments() {
+        assertThat(GraphQLResolverProcessor.resolveRestPath("grants/batch", "grantBatch")).isEqualTo("grants/batch");
+    }
+
+    @Test
+    void isSimpleType_enumViaJandex() throws IOException {
+        var indexer = new org.jboss.jandex.Indexer();
+        indexer.indexClass(io.casehub.platform.api.acl.AclAction.class);
+        var index = indexer.complete();
+        assertThat(GraphQLResolverProcessor.isSimpleType("io.casehub.platform.api.acl.AclAction", index)).isTrue();
+    }
+
+    @Test
+    void isSimpleType_fromStringViaJandex() throws IOException {
+        var indexer = new org.jboss.jandex.Indexer();
+        indexer.indexClass(io.casehub.platform.api.acl.ResourceId.class);
+        var index = indexer.complete();
+        assertThat(GraphQLResolverProcessor.isSimpleType("io.casehub.platform.api.acl.ResourceId", index)).isTrue();
+    }
+
+    @Test
+    void isSimpleType_complexTypeWithJandex() throws IOException {
+        var indexer = new org.jboss.jandex.Indexer();
+        indexer.indexClass(io.casehub.platform.api.acl.AclEntryRequest.class);
+        var index = indexer.complete();
+        assertThat(GraphQLResolverProcessor.isSimpleType("io.casehub.platform.api.acl.AclEntryRequest", index)).isFalse();
+    }
+
+    @Test
+    void isSimpleType_staticFallback_stillWorks() {
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.lang.String", null)).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.time.Instant", null)).isTrue();
+    }
+
 
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;

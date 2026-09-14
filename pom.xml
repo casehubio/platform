@@ -40,6 +40,7 @@
         <module>agent-claude</module>
         <module>agent-openai-core</module>
         <module>agent-openai</module>
+        <module>agent-ollama</module>
         <module>agent-codex-core</module>
         <module>agent-codex</module>
         <module>agent-gemini-core</module>
@@ -117,6 +118,8 @@
         <module>platform-pdf</module>
         <module>platform-signing</module>
         <module>llm-config</module>
+        <module>llm-config-vertex</module>
+        <module>llm-config-bedrock</module>
         <module>spring-testing</module>
         <module>spring-generator</module>
     </modules>

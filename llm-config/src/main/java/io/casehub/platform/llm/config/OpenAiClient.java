@@ -2,7 +2,6 @@ package io.casehub.platform.llm.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.api.model.CostTier;
 import io.casehub.platform.api.model.ModelCapabilities;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
@@ -11,6 +10,7 @@ import io.casehub.platform.api.model.ModelRegistry;
 import io.casehub.platform.api.model.ModelTier;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -27,6 +27,8 @@ public class OpenAiClient implements VendorClient {
     private static final String API_URL = "https://api.openai.com/v1/models";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+
+    private final HttpClient                                  httpClient = HttpClient.newHttpClient();
     private final Function<ModelQuery, List<ModelDescriptor>> seedLookup;
 
     @Inject
@@ -51,13 +53,12 @@ public class OpenAiClient implements VendorClient {
             return ValidationResult.failure("api-key is required");
         }
         try {
-            var client = HttpClient.newHttpClient();
             var request = HttpRequest.newBuilder()
                 .uri(URI.create(API_URL))
                 .header("Authorization", "Bearer " + apiKey)
                 .GET()
                 .build();
-            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 401) {
                 return ValidationResult.failure("Invalid API key");
             }
@@ -90,12 +91,12 @@ public class OpenAiClient implements VendorClient {
                 ModelDescriptor seed = seedIndex.get(id);
                 if (seed != null) {
                     result.add(new ModelDescriptor(
-                        id, id, seed.backendKey(), seed.vendor(), seed.family(), seed.displayName(),
+                        id, id, seed.backendKey(), null, seed.vendor(), seed.family(), seed.displayName(),
                         seed.tier(), seed.capabilities(), seed.contextWindow(), seed.maxOutput(),
                         seed.locality(), seed.costTier(), seed.authMethod(), seed.properties()));
                 } else {
                     result.add(new ModelDescriptor(
-                        id, id, "openai", "openai", "openai", id,
+                        id, id, "openai", null, "openai", "openai", id,
                         ModelTier.STANDARD, Set.of(ModelCapabilities.TEXT), 0, 0,
                         ModelLocality.CLOUD, null, "api-key", Map.of()));
                 }

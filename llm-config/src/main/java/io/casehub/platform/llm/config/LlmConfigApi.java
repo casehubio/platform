@@ -22,4 +22,23 @@ public interface LlmConfigApi {
 
     @PlatformMutation("Remove a provider configuration and deregister its ModelSource")
     void unconfigure(String providerId);
+
+    @PlatformQuery("List cloud model source status — active, inactive, or error with guidance")
+    List<CloudSourceStatus> cloudSourceStatus();
+
+    @PlatformQuery("Ollama runtime status — reachability, version, loaded models with VRAM")
+    OllamaSourceStatus ollamaStatus();
+
+    @PlatformMutation("Pull a model into Ollama — accepts library names or hf.co/ references")
+    PullOperation pullModel(PullRequest request);
+
+    @PlatformQuery("Check pull operation progress")
+    PullProgress pullStatus(String operationId);
+
+    @PlatformMutation("Cancel an in-progress pull operation")
+    void cancelPull(String operationId);
+
+    @PlatformMutation("Delete a model from Ollama")
+    void deleteModel(String modelName);
+
 }

@@ -36,6 +36,9 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
             return;
         }
 
+        var providerScanner = new ProviderScanner();
+        List<ProviderDescriptor> providers = providerScanner.scan(index);
+
         try {
             var writer = new RestControllerWriter();
             int count = 0;
@@ -46,8 +49,17 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
                 count++;
             }
 
+            var providerWriter = new ProviderWriter();
+            for (ProviderDescriptor provider : providers) {
+                String targetPackage = deriveSpringPackage(provider.className());
+                JavaFile javaFile = providerWriter.generate(provider, targetPackage);
+                javaFile.writeTo(outputDirectory);
+                count++;
+            }
+
             registerSourceRoot();
-            getLog().info("Generated " + count + " @RestController class(es)");
+            getLog().info("Generated " + count + " Spring class(es) ("
+                    + descriptors.size() + " controllers, " + providers.size() + " providers)");
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate REST controllers", e);

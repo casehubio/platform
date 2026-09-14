@@ -124,6 +124,7 @@
         <module>generator-common</module>
         <module>spring-generator</module>
         <module>rest-spring-generator</module>
+        <module>graphql-spring-generator</module>
     </modules>
 
     <properties>

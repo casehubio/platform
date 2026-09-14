@@ -1,56 +1,43 @@
 package io.casehub.platform.spring.generator;
 
-import org.apache.maven.plugin.AbstractMojo;
+import io.casehub.platform.generator.AbstractGeneratorMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
 import org.jboss.jandex.Index;
-import org.jboss.jandex.IndexReader;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class SpringGeneratorMojo extends AbstractMojo {
-
-    @Parameter(required = true)
-    private File quarkusModule;
+public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Parameter(defaultValue = "${project.build.directory}/generated-sources/spring-generator")
     private File outputDirectory;
 
-    @Parameter(defaultValue = "${project}")
-    private MavenProject project;
+    @Override
+    protected File getOutputDirectory() { return outputDirectory; }
+
+    @Override
+    protected String getGeneratorName() { return "spring-generator"; }
 
     @Override
     public void execute() throws MojoExecutionException {
-        File jandexIdx = new File(quarkusModule, "target/classes/META-INF/jandex.idx");
-        if (!jandexIdx.exists()) {
-            throw new MojoExecutionException(
-                    "Jandex index not found at " + jandexIdx.getAbsolutePath()
-                    + ". Build the Quarkus module first.");
+        Index index = loadJandexIndex();
+
+        var scanner = new JandexProducerScanner();
+        List<ProducerDescriptor> descriptors = scanner.scan(index);
+
+        if (descriptors.isEmpty()) {
+            getLog().info("No @Produces methods found — skipping generation.");
+            return;
         }
 
         try {
-            Index index;
-            try (var fis = new FileInputStream(jandexIdx)) {
-                index = new IndexReader(fis).read();
-            }
-
-            var scanner = new JandexProducerScanner();
-            List<ProducerDescriptor> descriptors = scanner.scan(index);
-
-            if (descriptors.isEmpty()) {
-                getLog().info("No @Produces methods found — skipping generation.");
-                return;
-            }
-
             String sourcePackage = deriveSpringPackage(descriptors.get(0).producerClassName());
             String configClassName = deriveConfigClassName(quarkusModule.getName());
 
@@ -69,10 +56,10 @@ public class SpringGeneratorMojo extends AbstractMojo {
                     metaInf.resolve("org.springframework.boot.autoconfigure.AutoConfiguration.imports"),
                     writer.generateImportsFile(sourcePackage, configClassName));
 
-            project.addCompileSourceRoot(outputDirectory.getAbsolutePath());
+            registerSourceRoot();
 
             getLog().info("Generated " + configClassName + " with " + descriptors.size()
-                    + " @Bean method(s) from " + jandexIdx.getAbsolutePath());
+                    + " @Bean method(s)");
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate Spring auto-configuration", e);

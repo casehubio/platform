@@ -23,6 +23,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-generator-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>io.smallrye</groupId>
             <artifactId>jandex</artifactId>
         </dependency>

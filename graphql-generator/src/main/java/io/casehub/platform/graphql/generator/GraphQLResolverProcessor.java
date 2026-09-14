@@ -40,6 +40,15 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName GRAPHQL_API = DotName.createSimple("org.eclipse.microprofile.graphql.GraphQLApi");
     private static final DotName QUERY = DotName.createSimple("org.eclipse.microprofile.graphql.Query");
     private static final DotName MUTATION = DotName.createSimple("org.eclipse.microprofile.graphql.Mutation");
+    private static final DotName REST_METHOD_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestMethod");
+    private static final DotName PATH_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.PathParam");
+    private static final DotName PATH = DotName.createSimple("jakarta.ws.rs.Path");
+    private static final DotName JAX_GET = DotName.createSimple("jakarta.ws.rs.GET");
+    private static final DotName JAX_POST = DotName.createSimple("jakarta.ws.rs.POST");
+    private static final DotName JAX_PUT = DotName.createSimple("jakarta.ws.rs.PUT");
+    private static final DotName JAX_DELETE = DotName.createSimple("jakarta.ws.rs.DELETE");
+    private static final DotName JAX_PATCH = DotName.createSimple("jakarta.ws.rs.PATCH");
+
 
     private boolean processed = false;
 
@@ -55,7 +64,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             return false;
         }
 
-        Set<String> handWrittenMethods = scanHandWrittenMethods(index);
+        Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index);
+        Set<String> restSkipMethods = scanHandWrittenRestMethods(index);
         Map<String, DomainOperations> domains = scanAnnotatedInterfaces(index);
 
         if (domains.isEmpty()) {
@@ -63,8 +73,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         for (var entry : domains.entrySet()) {
-            generateResolverSource(entry.getKey(), entry.getValue(), handWrittenMethods);
-            generateRestResourceSource(entry.getKey(), entry.getValue(), handWrittenMethods);
+            generateResolverSource(entry.getKey(), entry.getValue(), graphqlSkipMethods);
+            generateRestResourceSource(entry.getKey(), entry.getValue(), restSkipMethods);
         }
 
         return false;
@@ -96,7 +106,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return CompositeIndex.create(indexes);
     }
 
-    private Set<String> scanHandWrittenMethods(IndexView index) {
+    private Set<String> scanHandWrittenGraphQLMethods(IndexView index) {
         Set<String> methods = new HashSet<>();
         for (AnnotationInstance ann : index.getAnnotations(GRAPHQL_API)) {
             if (ann.target().kind() != AnnotationTarget.Kind.CLASS) continue;
@@ -113,6 +123,26 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return methods;
     }
 
+    private Set<String> scanHandWrittenRestMethods(IndexView index) {
+        Set<String> methods = new HashSet<>();
+        for (AnnotationInstance pathAnn : index.getAnnotations(PATH)) {
+            if (pathAnn.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
+            ClassInfo          classInfo = pathAnn.target().asClass();
+            AnnotationInstance mcpDomain = classInfo.annotation(MCP_DOMAIN);
+            if (mcpDomain == null) {continue;}
+            String domain = mcpDomain.value().asString();
+            for (MethodInfo method : classInfo.methods()) {
+                if (method.hasAnnotation(JAX_GET) || method.hasAnnotation(JAX_POST)
+                    || method.hasAnnotation(JAX_PUT) || method.hasAnnotation(JAX_DELETE)
+                    || method.hasAnnotation(JAX_PATCH)) {
+                    methods.add(domain + ":" + method.name());
+                }
+            }
+        }
+        return methods;
+    }
+
+
     private Map<String, DomainOperations> scanAnnotatedInterfaces(IndexView index) {
         Map<String, DomainOperations> domains = new HashMap<>();
 
@@ -128,12 +158,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 AnnotationInstance queryAnn = method.annotation(PLATFORM_QUERY);
                 AnnotationInstance mutAnn = method.annotation(PLATFORM_MUTATION);
 
-                if (queryAnn != null) {
-                    String desc = queryAnn.value() != null ? queryAnn.value().asString() : "";
-                    ops.operations.add(new OperationInfo(method, classInfo, OperationType.QUERY, desc));
-                } else if (mutAnn != null) {
-                    String desc = mutAnn.value() != null ? mutAnn.value().asString() : "";
-                    ops.operations.add(new OperationInfo(method, classInfo, OperationType.MUTATION, desc));
+                if (queryAnn != null || mutAnn != null) {
+                    OperationType opType = queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
+                    String desc = queryAnn != null
+                        ? (queryAnn.value() != null ? queryAnn.value().asString() : "")
+                        : (mutAnn.value() != null ? mutAnn.value().asString() : "");
+                    String restMethodOverride = null;
+                    AnnotationInstance restMethodAnn = method.annotation(REST_METHOD_ANN);
+                    if (restMethodAnn != null && restMethodAnn.value() != null) {
+                        restMethodOverride = restMethodAnn.value().asEnum();
+                    }
+                    ops.operations.add(new OperationInfo(method, classInfo, opType, desc, restMethodOverride));
                 }
             }
         }
@@ -145,7 +180,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void generateResolverSource(String domain, DomainOperations ops,
                                         Set<String> handWrittenMethods) {
-        String className = "Generated" + capitalize(domain) + "Resolver";
+        String className = "Generated" + toPascalCase(domain) + "Resolver";
         String packageName = "io.casehub.platform.graphql.generated";
         String fqcn = packageName + "." + className;
 
@@ -226,7 +261,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void generateRestResourceSource(String domain, DomainOperations ops,
                                             Set<String> handWrittenMethods) {
-        String className   = "Generated" + capitalize(domain) + "Resource";
+        String className   = "Generated" + toPascalCase(domain) + "Resource";
         String packageName = "io.casehub.platform.rest.generated";
         String fqcn        = packageName + "." + className;
 
@@ -236,6 +271,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         for (OperationInfo op : ops.operations) {
             String skipKey = domain + ":" + op.method.name();
             if (handWrittenMethods.contains(skipKey)) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        "REST generator: skipping " + skipKey + " — hand-written REST resource exists");
                 continue;
             }
             toGenerate.add(op);
@@ -253,12 +290,18 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 out.println();
                 out.println("import jakarta.enterprise.context.ApplicationScoped;");
                 out.println("import jakarta.inject.Inject;");
+                out.println("import jakarta.ws.rs.Consumes;");
+                out.println("import jakarta.ws.rs.DELETE;");
                 out.println("import jakarta.ws.rs.GET;");
+                out.println("import jakarta.ws.rs.PATCH;");
                 out.println("import jakarta.ws.rs.POST;");
+                out.println("import jakarta.ws.rs.PUT;");
                 out.println("import jakarta.ws.rs.Path;");
                 out.println("import jakarta.ws.rs.QueryParam;");
                 out.println("import jakarta.ws.rs.Produces;");
                 out.println("import jakarta.ws.rs.core.MediaType;");
+                out.println("import jakarta.ws.rs.core.Response;");
+                out.println("import io.smallrye.common.annotation.RunOnVirtualThread;");
 
                 Set<String> typeImports = collectTypeImports(toGenerate);
                 for (String imp : typeImports) {
@@ -274,6 +317,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 out.println("// GENERATED by GraphQLResolverProcessor — do not edit");
                 out.println("@Path(\"/api/" + domain + "\")");
                 out.println("@Produces(MediaType.APPLICATION_JSON)");
+                out.println("@RunOnVirtualThread");
                 out.println("@ApplicationScoped");
                 out.println("public class " + className + " {");
                 out.println();
@@ -305,36 +349,88 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private void generateRestMethod(PrintWriter out, OperationInfo op) {
-        MethodInfo method     = op.method;
-        String     httpMethod = op.type == OperationType.QUERY ? "@GET" : "@POST";
+        MethodInfo method = op.method;
+        String httpVerb = resolveHttpVerb(op.type, op.restMethodOverride);
+        boolean isBodyVerb = httpVerb.equals("POST") || httpVerb.equals("PUT") || httpVerb.equals("PATCH");
 
-        out.println("    " + httpMethod);
-        out.println("    @Path(\"/" + method.name() + "\")");
+        List<String> pathParams = new ArrayList<>();
+        Set<Integer> pathParamPositions = new HashSet<>();
+        int bodyParamIndex = -1;
+        int complexCount = 0;
 
-        String        returnType = typeToJava(method.returnType());
-        StringBuilder params     = new StringBuilder();
         for (int i = 0; i < method.parameterTypes().size(); i++) {
-            if (i > 0) {params.append(", ");}
+            AnnotationInstance ppAnn = findParameterAnnotation(method, i, PATH_PARAM_ANN);
+            if (ppAnn != null) {
+                String paramName = method.parameterName(i) != null ? method.parameterName(i) : "arg" + i;
+                String pathName = (ppAnn.value() != null && !ppAnn.value().asString().isEmpty())
+                    ? ppAnn.value().asString() : paramName;
+                pathParams.add(pathName);
+                pathParamPositions.add(i);
+            } else if (isBodyVerb
+                       && method.parameterTypes().get(i).kind() != Type.Kind.PRIMITIVE
+                       && !isSimpleType(method.parameterTypes().get(i).name().toString())) {
+                complexCount++;
+                if (bodyParamIndex < 0) {
+                    bodyParamIndex = i;
+                }
+            }
+        }
+
+        if (complexCount > 1) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                "REST generator: method '" + method.name() + "' on domain '"
+                + op.declaringClass.simpleName() + "' has " + complexCount
+                + " complex parameters. Wrap them in a single request DTO"
+                + " or annotate path parameters with @PathParam.");
+            return;
+        }
+
+        boolean hasBody = bodyParamIndex >= 0;
+
+        StringBuilder pathSuffix = new StringBuilder();
+        pathSuffix.append("/").append(toKebabCase(method.name()));
+        for (String pp : pathParams) {
+            pathSuffix.append("/{").append(pp).append("}");
+        }
+
+        out.println("    @" + httpVerb);
+        out.println("    @Path(\"" + pathSuffix + "\")");
+        if (hasBody) {
+            out.println("    @Consumes(MediaType.APPLICATION_JSON)");
+        }
+
+        StringBuilder params = new StringBuilder();
+        for (int i = 0; i < method.parameterTypes().size(); i++) {
+            if (i > 0) params.append(", ");
             String paramName = method.parameterName(i) != null ? method.parameterName(i) : "arg" + i;
-            params.append("@QueryParam(\"").append(paramName).append("\") ");
+
+            if (pathParamPositions.contains(i)) {
+                AnnotationInstance ppAnn = findParameterAnnotation(method, i, PATH_PARAM_ANN);
+                String pathName = (ppAnn != null && ppAnn.value() != null && !ppAnn.value().asString().isEmpty())
+                    ? ppAnn.value().asString() : paramName;
+                params.append("@jakarta.ws.rs.PathParam(\"").append(pathName).append("\") ");
+            } else if (i == bodyParamIndex) {
+                params.append("@jakarta.validation.Valid ");
+            } else {
+                params.append("@QueryParam(\"").append(paramName).append("\") ");
+            }
             params.append(typeToJava(method.parameterTypes().get(i)));
             params.append(" ").append(paramName);
         }
 
-        out.println("    public " + returnType + " " + method.name() + "(" + params + ") {");
+        out.println("    public Response " + method.name() + "(" + params + ") {");
 
-        String        fieldName = decapitalize(op.declaringClass.simpleName());
-        StringBuilder args      = new StringBuilder();
+        String fieldName = decapitalize(op.declaringClass.simpleName());
+        StringBuilder args = new StringBuilder();
         for (int i = 0; i < method.parameterTypes().size(); i++) {
-            if (i > 0) {args.append(", ");}
+            if (i > 0) args.append(", ");
             args.append(method.parameterName(i) != null ? method.parameterName(i) : "arg" + i);
         }
 
-        if (method.returnType().kind() == Type.Kind.VOID) {
-            out.println("        " + fieldName + "." + method.name() + "(" + args + ");");
-        } else {
-            out.println("        return " + fieldName + "." + method.name() + "(" + args + ");");
-        }
+        String returnTypeStr = typeToJava(method.returnType());
+        String delegateCall = fieldName + "." + method.name() + "(" + args + ")";
+        String responseCode = generateResponseCode(returnTypeStr, delegateCall);
+        out.println("        " + responseCode);
 
         out.println("    }");
         out.println();
@@ -438,6 +534,86 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
+
+    private static AnnotationInstance findParameterAnnotation(MethodInfo method, int paramIndex, DotName annotationName) {
+        for (AnnotationInstance ann : method.annotations()) {
+            if (ann.target().kind() == AnnotationTarget.Kind.METHOD_PARAMETER
+                && ann.target().asMethodParameter().position() == paramIndex
+                && ann.name().equals(annotationName)) {
+                return ann;
+            }
+        }
+        return null;
+    }
+
+    static String toKebabCase(String camelCase) {
+        if (camelCase == null || camelCase.isEmpty()) {return camelCase;}
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < camelCase.length(); i++) {
+            char c = camelCase.charAt(i);
+            if (Character.isUpperCase(c)) {
+                if (i > 0) {
+                    char prev = camelCase.charAt(i - 1);
+                    if (Character.isLowerCase(prev) || Character.isDigit(prev)) {
+                        sb.append('-');
+                    } else if (Character.isUpperCase(prev) && i + 1 < camelCase.length()
+                               && Character.isLowerCase(camelCase.charAt(i + 1))) {
+                        sb.append('-');
+                    }
+                }
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    static String toPascalCase(String kebab) {
+        if (kebab == null || kebab.isEmpty()) {return kebab;}
+        StringBuilder sb = new StringBuilder();
+        for (String part : kebab.split("-")) {
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                if (part.length() > 1) {
+                    sb.append(part.substring(1));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    static String resolveHttpVerb(OperationType type, String restMethodOverride) {
+        if (restMethodOverride != null) {
+            return restMethodOverride;
+        }
+        return type == OperationType.QUERY ? "GET" : "POST";
+    }
+
+    private static final Set<String> SIMPLE_TYPES = Set.of(
+            "java.lang.String",
+            "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte",
+            "java.lang.Float", "java.lang.Double", "java.lang.Boolean", "java.lang.Character",
+            "java.util.UUID"
+                                                          );
+
+    static boolean isSimpleType(String fqcn) {
+        if (SIMPLE_TYPES.contains(fqcn)) {return true;}
+        if (fqcn.startsWith("java.time.")) {return true;}
+        return false;
+    }
+
+    static String generateResponseCode(String returnType, String delegateCall) {
+        if ("void".equals(returnType)) {
+            return delegateCall + "; return Response.noContent().build();";
+        }
+        if (returnType.startsWith("Optional<")) {
+            return "return " + delegateCall + ".map(v -> Response.ok(v).build()).orElse(Response.status(404).build());";
+        }
+        return "return Response.ok(" + delegateCall + ").build();";
+    }
+
+
     enum OperationType { QUERY, MUTATION }
 
     static class DomainOperations {
@@ -451,11 +627,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         final ClassInfo declaringClass;
         final OperationType type;
         final String description;
-        OperationInfo(MethodInfo method, ClassInfo declaringClass, OperationType type, String description) {
+        final String restMethodOverride;
+        OperationInfo(MethodInfo method, ClassInfo declaringClass, OperationType type, String description, String restMethodOverride) {
             this.method = method;
             this.declaringClass = declaringClass;
             this.type = type;
             this.description = description;
+            this.restMethodOverride = restMethodOverride;
         }
     }
 }

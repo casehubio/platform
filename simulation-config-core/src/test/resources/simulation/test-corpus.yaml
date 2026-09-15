@@ -1,0 +1,18 @@
+my-spi.query:
+  - key: cardiology
+    tenancy-id: hospital-a
+    input:
+      domain: cardiology
+      question: "latest labs"
+    output: "Lab results for cardiology"
+  - key: neurology
+    tenancy-id: hospital-a
+    input:
+      domain: neurology
+      question: "MRI scan"
+    output: "MRI results"
+
+my-spi.store:
+  - tenancy-id: hospital-b
+    input: "store-input"
+    output: "stored"

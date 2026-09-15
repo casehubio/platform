@@ -1,0 +1,7 @@
+my-spi.query:
+  - key: oncology
+    tenancy-id: hospital-c
+    input:
+      domain: oncology
+      question: "biopsy results"
+    output: "Biopsy report"

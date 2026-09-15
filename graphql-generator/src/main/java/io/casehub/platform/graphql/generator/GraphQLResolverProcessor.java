@@ -58,6 +58,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName JAX_PATCH         = DotName.createSimple("jakarta.ws.rs.PATCH");
     private static final DotName REST_PATH_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
     private static final DotName REST_STATUS_ANN   = DotName.createSimple("io.casehub.platform.api.mcp.RestStatus");
+    private static final DotName REST_NAME_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestName");
+    private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
 
 
     private boolean   processed = false;
@@ -319,17 +321,26 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 pathParamName = ppAnn.value().asString();
             }
 
+            AnnotationInstance rnAnn    = findParameterAnnotation(method, i, REST_NAME_ANN);
+            String             restName = (rnAnn != null && rnAnn.value() != null) ? rnAnn.value().asString() : null;
+
             boolean simple = isSimpleType(typeFqcn, jandexIndex);
-            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple));
+            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName));
         }
 
         imports.add(declaringClass.name().toString());
+
+        List<String> rolesAllowed = List.of();
+        AnnotationInstance raAnn = method.annotation(ROLES_ALLOWED_ANN);
+        if (raAnn != null && raAnn.value() != null) {
+            rolesAllowed = List.of(raAnn.value().asStringArray());
+        }
 
         return new ResolvedOperation(
                 method.name(), returnTypeStr, params, imports,
                 declaringClass.name().toString(), declaringClass.simpleName(),
                 opType, description, restMethodOverride, restPathOverride,
-                restStatusOverride
+                restStatusOverride, rolesAllowed
         );
     }
 
@@ -507,18 +518,36 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     String  pathParamName = isPathParam ? extractAnnotationStringValue(ppAnn) : null;
                     if (pathParamName != null && pathParamName.isEmpty()) {pathParamName = null;}
 
+                    javax.lang.model.element.AnnotationMirror rnAnn = findAnnotationMirror(param,
+                                                                                            "io.casehub.platform.api.mcp.RestName");
+                    String restName = rnAnn != null ? extractAnnotationStringValue(rnAnn) : null;
+                    if (restName != null && restName.isEmpty()) {restName = null;}
+
                     boolean simple = isSimpleTypeMirror(param.asType());
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName));
                 }
 
                 String classFqcn   = typeElement.getQualifiedName().toString();
                 String classSimple = typeElement.getSimpleName().toString();
                 imports.add(classFqcn);
 
+                List<String> rolesAllowed = List.of();
+                javax.lang.model.element.AnnotationMirror raAnn = findAnnotationMirror(method,
+                                                                                        "jakarta.annotation.security.RolesAllowed");
+                if (raAnn != null) {
+                    for (var e : raAnn.getElementValues().entrySet()) {
+                        if (e.getKey().getSimpleName().contentEquals("value")) {
+                            @SuppressWarnings("unchecked")
+                            var values = (java.util.List<? extends javax.lang.model.element.AnnotationValue>) e.getValue().getValue();
+                            rolesAllowed = values.stream().map(v -> v.getValue().toString()).toList();
+                        }
+                    }
+                }
+
                 ops.operations.add(new ResolvedOperation(
                         method.getSimpleName().toString(), returnTypeStr, params, imports,
                         classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride,
-                        restStatusOverride));
+                        restStatusOverride, rolesAllowed));
             }
         }
 
@@ -749,6 +778,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             pathSuffix.append("/{").append(pp).append("}");
         }
 
+        if (!op.rolesAllowed().isEmpty()) {
+            String roles = op.rolesAllowed().stream().map(r -> "\"" + escapeJavaString(r) + "\"").collect(java.util.stream.Collectors.joining(", "));
+            out.println("    @jakarta.annotation.security.RolesAllowed({" + roles + "})");
+        }
         if (!op.description().isEmpty() && isOpenApiAvailable()) {
             out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
         }
@@ -769,7 +802,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             } else if (i == bodyParamIndex) {
                 params.append("@jakarta.validation.Valid ");
             } else {
-                params.append("@QueryParam(\"").append(p.name()).append("\") ");
+                String qpName = p.restName() != null ? p.restName() : p.name();
+                params.append("@QueryParam(\"").append(qpName).append("\") ");
             }
             params.append(p.typeStr()).append(" ").append(p.name());
         }
@@ -1063,7 +1097,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             String description,
             String restMethodOverride,
             String restPathOverride,
-            int restStatusOverride
+            int restStatusOverride,
+            List<String> rolesAllowed
     ) {}
 
     record ResolvedParam(
@@ -1072,7 +1107,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             String typeFqcn,
             boolean isPathParam,
             String pathParamName,
-            boolean isSimpleType
+            boolean isSimpleType,
+            String restName
     ) {}
 
 

@@ -257,6 +257,63 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
+    void restNameOverridesQueryParamName() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.PageApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+
+                @McpDomain("pages")
+                public interface PageApi {
+                    @PlatformQuery("List pages")
+                    java.util.List<String> listPages(@RestName("page_size") Integer pageSize, @RestName("page_num") Integer pageNumber);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=pages", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedPagesResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("@QueryParam(\"page_size\")");
+        assertThat(content).contains("@QueryParam(\"page_num\")");
+    }
+
+    @Test
+    void rolesAllowedPassesThroughToRest() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.AdminApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.annotation.security.RolesAllowed;
+
+                @McpDomain("admin")
+                public interface AdminApi {
+                    @PlatformQuery("Admin view")
+                    @RolesAllowed({"admin", "superuser"})
+                    String getAdminData();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=admin", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedAdminResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("jakarta.annotation.security.RolesAllowed");
+        assertThat(content).contains("\"admin\"");
+        assertThat(content).contains("\"superuser\"");
+    }
+
+    @Test
     void mutationEndpointReturns201() throws Exception {
         var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
                 "test.CreateApi",

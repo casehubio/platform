@@ -38,24 +38,24 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
 
-    private static final DotName MCP_DOMAIN = DotName.createSimple("io.casehub.platform.api.mcp.McpDomain");
-    private static final DotName PLATFORM_QUERY = DotName.createSimple("io.casehub.platform.api.mcp.PlatformQuery");
+    private static final DotName MCP_DOMAIN        = DotName.createSimple("io.casehub.platform.api.mcp.McpDomain");
+    private static final DotName PLATFORM_QUERY    = DotName.createSimple("io.casehub.platform.api.mcp.PlatformQuery");
     private static final DotName PLATFORM_MUTATION = DotName.createSimple("io.casehub.platform.api.mcp.PlatformMutation");
-    private static final DotName GRAPHQL_API = DotName.createSimple("org.eclipse.microprofile.graphql.GraphQLApi");
-    private static final DotName QUERY = DotName.createSimple("org.eclipse.microprofile.graphql.Query");
-    private static final DotName MUTATION = DotName.createSimple("org.eclipse.microprofile.graphql.Mutation");
-    private static final DotName REST_METHOD_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestMethod");
-    private static final DotName PATH_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.PathParam");
-    private static final DotName PATH = DotName.createSimple("jakarta.ws.rs.Path");
-    private static final DotName JAX_GET = DotName.createSimple("jakarta.ws.rs.GET");
-    private static final DotName JAX_POST = DotName.createSimple("jakarta.ws.rs.POST");
-    private static final DotName JAX_PUT = DotName.createSimple("jakarta.ws.rs.PUT");
-    private static final DotName JAX_DELETE = DotName.createSimple("jakarta.ws.rs.DELETE");
-    private static final DotName JAX_PATCH = DotName.createSimple("jakarta.ws.rs.PATCH");
-    private static final DotName REST_PATH_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
+    private static final DotName GRAPHQL_API       = DotName.createSimple("org.eclipse.microprofile.graphql.GraphQLApi");
+    private static final DotName QUERY             = DotName.createSimple("org.eclipse.microprofile.graphql.Query");
+    private static final DotName MUTATION          = DotName.createSimple("org.eclipse.microprofile.graphql.Mutation");
+    private static final DotName REST_METHOD_ANN   = DotName.createSimple("io.casehub.platform.api.mcp.RestMethod");
+    private static final DotName PATH_PARAM_ANN    = DotName.createSimple("io.casehub.platform.api.mcp.PathParam");
+    private static final DotName PATH              = DotName.createSimple("jakarta.ws.rs.Path");
+    private static final DotName JAX_GET           = DotName.createSimple("jakarta.ws.rs.GET");
+    private static final DotName JAX_POST          = DotName.createSimple("jakarta.ws.rs.POST");
+    private static final DotName JAX_PUT           = DotName.createSimple("jakarta.ws.rs.PUT");
+    private static final DotName JAX_DELETE        = DotName.createSimple("jakarta.ws.rs.DELETE");
+    private static final DotName JAX_PATCH         = DotName.createSimple("jakarta.ws.rs.PATCH");
+    private static final DotName REST_PATH_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
 
 
-    private boolean processed = false;
+    private boolean   processed = false;
     private IndexView jandexIndex;
 
     @Override
@@ -64,6 +64,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             return false;
         }
         processed = true;
+
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                 "GraphQL generator: options received: " + processingEnv.getOptions());
 
         IndexView index = loadCombinedIndex();
         this.jandexIndex = index;
@@ -82,6 +85,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             return false;
         }
 
+        for (var entry : allDomains.entrySet()) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                     "GraphQL generator: found domain '" + entry.getKey()
+                                                     + "' (" + entry.getValue().operations.size() + " operations)"
+                                                     + " [source: " + entry.getValue().source + "]");
+        }
+
         boolean generateGraphQL = !"false".equals(processingEnv.getOptions().get("generateGraphQL"));
         boolean generateRest    = !"false".equals(processingEnv.getOptions().get("generateRest"));
         String  domainFilter    = processingEnv.getOptions().get("domainFilter");
@@ -90,8 +100,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                        .collect(java.util.stream.Collectors.toSet())
                                      : null;
 
+        if (!generateGraphQL) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                     "GraphQL generator: GraphQL resolver generation disabled (generateGraphQL=false)");
+        }
+        if (!generateRest) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                     "GraphQL generator: REST resource generation disabled (generateRest=false)");
+        }
+
         for (var entry : allDomains.entrySet()) {
             if (allowedDomains != null && !allowedDomains.contains(entry.getKey())) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                         "GraphQL generator: skipping domain '" + entry.getKey()
+                                                         + "' — not in domainFilter");
                 continue;
             }
             if (generateGraphQL) {
@@ -102,12 +124,27 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
         }
 
-        return false;}
+        if (allowedDomains != null) {
+            long generatedCount = allDomains.keySet().stream()
+                                            .filter(allowedDomains::contains).count();
+            if (generatedCount == 0) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                                                         "GraphQL generator: domainFilter=" + domainFilter
+                                                         + " matched zero domains. Available domains: " + allDomains.keySet());
+            }
+        } else if (allDomains.size() > 1) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                     "GraphQL generator: no domainFilter set — generating for all "
+                                                     + allDomains.size() + " domains. Set -AdomainFilter=... to restrict.");
+        }
+
+        return false;
+    }
 
     private IndexView loadCombinedIndex() {
         List<IndexView> indexes = new ArrayList<>();
         try {
-            ClassLoader cl = getClass().getClassLoader();
+            ClassLoader      cl        = getClass().getClassLoader();
             Enumeration<URL> resources = cl.getResources("META-INF/jandex.idx");
             while (resources.hasMoreElements()) {
                 URL url = resources.nextElement();
@@ -117,7 +154,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-                    "GraphQL generator: failed to read Jandex indexes: " + e.getMessage());
+                                                     "GraphQL generator: failed to read Jandex indexes: " + e.getMessage());
             return null;
         }
 
@@ -126,7 +163,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
-                "GraphQL generator: loaded " + indexes.size() + " Jandex index(es)");
+                                                 "GraphQL generator: loaded " + indexes.size() + " Jandex index(es)");
         return CompositeIndex.create(indexes);
     }
 
@@ -246,7 +283,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
         processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
                                                  "GraphQL generator: scanned " + domains.size() + " domain(s)");
-        return domains;}
+        return domains;
+    }
 
     private ResolvedOperation resolveFromJandex(MethodInfo method, ClassInfo declaringClass,
                                                 OperationType opType, String description,
@@ -375,7 +413,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         try {
             annotated = roundEnv.getElementsAnnotatedWith(
                     io.casehub.platform.api.mcp.McpDomain.class);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | TypeNotPresentException e) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                     "GraphQL generator: RoundEnv scan skipped — McpDomain annotation not loadable: " + e.getMessage());
             return domains;
         }
 
@@ -466,7 +506,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void generateResolverSource(String domain, DomainOperations ops,
                                         Set<String> handWrittenMethods) {
-        String className   = "Generated" + toPascalCase(domain) + "Resolver";
+        String className = "Generated" + toPascalCase(domain) + "Resolver";
+        if (!SourceVersion.isIdentifier(className)) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                                     "GraphQL generator: domain '" + domain
+                                                     + "' produces invalid class name '" + className
+                                                     + "'. Domain names must contain only alphanumerics, hyphens, and slashes.");
+            return;
+        }
         String packageName = "io.casehub.platform.graphql.generated";
         String fqcn        = packageName + "." + className;
 
@@ -542,11 +589,19 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                                      "GraphQL generator: failed to write " + fqcn + ": " + e.getMessage());
-        }}
+        }
+    }
 
     private void generateRestResourceSource(String domain, DomainOperations ops,
                                             Set<String> handWrittenMethods) {
-        String className   = "Generated" + toPascalCase(domain) + "Resource";
+        String className = "Generated" + toPascalCase(domain) + "Resource";
+        if (!SourceVersion.isIdentifier(className)) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                                     "REST generator: domain '" + domain
+                                                     + "' produces invalid class name '" + className
+                                                     + "'. Domain names must contain only alphanumerics, hyphens, and slashes.");
+            return;
+        }
         String packageName = "io.casehub.platform.rest.generated";
         String fqcn        = packageName + "." + className;
 
@@ -630,7 +685,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                                      "REST generator: failed to write " + fqcn + ": " + e.getMessage());
-        }}
+        }
+    }
 
     private void generateRestMethod(PrintWriter out, ResolvedOperation op) {
         String  httpVerb   = resolveHttpVerb(op.type(), op.restMethodOverride());
@@ -775,7 +831,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 sb.append("<");
                 List<Type> args = type.asParameterizedType().arguments();
                 for (int i = 0; i < args.size(); i++) {
-                    if (i > 0) sb.append(", ");
+                    if (i > 0) {sb.append(", ");}
                     sb.append(typeToJava(args.get(i)));
                 }
                 sb.append(">");
@@ -787,7 +843,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private static String decapitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
+        if (s == null || s.isEmpty()) {return s;}
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);
     }
 
@@ -909,7 +965,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
 
-    enum OperationType { QUERY, MUTATION }
+    enum OperationType {QUERY, MUTATION}
 
     enum Source {JANDEX, ROUND_ENV}
 

@@ -252,6 +252,104 @@ class GraphQLResolverProcessorTest {
         assertThat(graphqlSource).isEmpty();
     }
 
+    @Test
+    void domainFilterExcludesNonMatchingDomains() throws Exception {
+        var spi1 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.AlphaApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.McpDomain;
+                import io.casehub.platform.api.mcp.PlatformQuery;
+                
+                @McpDomain("alpha")
+                public interface AlphaApi {
+                    @PlatformQuery("Get alpha") String getAlpha();
+                }
+                """);
+
+        var spi2 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.BetaApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.McpDomain;
+                import io.casehub.platform.api.mcp.PlatformQuery;
+                
+                @McpDomain("beta")
+                public interface BetaApi {
+                    @PlatformQuery("Get beta") String getBeta();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=alpha", "-AgenerateGraphQL=false")
+                                                             .compile(spi1, spi2);
+
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedAlphaResource")).isPresent();
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedBetaResource")).isEmpty();
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.graphql.generated.GeneratedAlphaResolver")).isEmpty();
+    }
+
+    @Test
+    void generateGraphQLFalseSuppressesResolvers() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GammaApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.McpDomain;
+                import io.casehub.platform.api.mcp.PlatformQuery;
+                
+                @McpDomain("gamma")
+                public interface GammaApi {
+                    @PlatformQuery("Get gamma") String getGamma();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=gamma", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.graphql.generated.GeneratedGammaResolver")).isEmpty();
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedGammaResource")).isPresent();
+    }
+
+    @Test
+    void hyphenatedDomainProducesValidClassName() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.DeliveryChannelApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.McpDomain;
+                import io.casehub.platform.api.mcp.PlatformQuery;
+                import java.util.List;
+                
+                @McpDomain("delivery-channels")
+                public interface DeliveryChannelApi {
+                    @PlatformQuery("List channels") List<String> listChannels();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=delivery-channels", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        var restSource = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedDeliveryChannelsResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("class GeneratedDeliveryChannelsResource");
+        assertThat(content).contains("@Path(\"/api/delivery-channels\")");
+    }
+
+
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);

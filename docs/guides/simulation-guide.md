@@ -1,4 +1,4 @@
-# Simulation Framework — User Guide
+# Simulation Framework
 
 > Configurable simulation for any SPI. Real responses when you have a real
 > backend. Simulated responses when you don't. Captured traffic when you
@@ -6,23 +6,86 @@
 
 ---
 
-## When to use this
+## Scenarios — when to reach for simulation
 
-You're building an app that depends on platform SPIs — `CaseMemoryStore`,
-`AgentProvider`, `PreferenceStore`, or any other SPI. In production, a real
-implementation is wired. In dev, tests, or demos, you want controlled
-responses without standing up the full backend.
+The simulation framework handles any SPI where you need controlled
+responses without a live backend. These are the problems it solves,
+grouped by domain.
 
-The simulation framework gives you three modes per SPI method:
+### LLM and agent testing
 
-| Mode | What happens | When to use |
-|------|-------------|-------------|
-| **Simulation** | Strategy resolves responses from a corpus | Dev, demos, load testing |
-| **Capture** | Real impl runs; input/output recorded to corpus | Building a corpus from production traffic |
-| **Passthrough** | No simulation, no capture — transparent delegation | Production, or methods you don't need to simulate |
+**Replace a router LLM** — You have an agent that decides which specialist
+to call. You want to test routing logic without LLM costs. Seed the corpus
+with known prompt→routing pairs, use key-lookup for deterministic dispatch.
 
-All three are configured per method. A multi-method SPI like `CaseMemoryStore`
-can simulate `query`, capture `store`, and pass through `erase` — simultaneously.
+**Replace a judge LLM** — Quality evaluation that needs to approve or reject.
+Sequential with a known approve/reject sequence for scenario testing, or
+key-lookup for input-dependent verdicts.
+
+**Replay captured LLM traffic** — You recorded real Claude or OpenAI sessions
+during development. Replay them in CI with recorded-replay. A normalizing
+extractor strips UUIDs and timestamps so keys match across runs.
+
+### Banking and financial services
+
+**Simulate a payment gateway** — Key-lookup by transaction type and amount
+range. Test approval paths, decline paths, and timeout handling without
+touching a real gateway.
+
+**Simulate a bank feed** — Sequential feed of transactions for reconciliation
+testing. Capture real feed data from staging, replay it later in CI.
+
+**Simulate KYC/AML screening** — Key-lookup by entity name. Known-clean
+entities return clear, known-flagged entities return hits. Test the decision
+logic, not the screening service.
+
+### Healthcare and clinical
+
+**Simulate a lab results service** — Key-lookup by patient ID. Test case
+lifecycle workflows without a FHIR backend.
+
+**Simulate a diagnostic engine** — Recorded-replay from captured real
+diagnoses. Same patient presentation produces the same differential.
+
+### Integration and connectors
+
+**Simulate an external REST API** — Key-lookup by endpoint and request hash.
+Test integration code without the third party being available.
+
+**Error injection** — Seed error responses into the corpus to test error
+handling paths. Sequential with a mix of success and failure responses.
+
+### Testing workflows
+
+**Capture → CI replay** — Capture staging traffic during manual testing,
+replay it in CI. Real-shaped data, no network dependency.
+
+**Tenant isolation testing** — Captured data is tenant-scoped. Verify that
+tenant A's corpus never leaks into tenant B's responses.
+
+**Load testing without backend costs** — Sequential with WRAP exhaustion
+policy. Finite corpus, unlimited calls.
+
+---
+
+## Named patterns
+
+Every usage pattern has a name. The guide uses these names, and the tutorial
+tests carry them as method names. When discussing simulation with your team,
+use the pattern name — it's more precise than describing the mechanism.
+
+| Pattern | Problem it solves | Strategy | Tutorial test |
+|---------|-------------------|----------|---------------|
+| **Deterministic Replay** | Same input → same output, every time | key-lookup | `keyLookupForDeterministicResponses` |
+| **Capture → Replay** | Record real traffic, simulate it later | capture + recorded-replay | `captureWithKeysForDeterministicReplay` |
+| **Infinite Load** | Finite corpus, unlimited calls | sequential (WRAP) | `wrapPolicyRecyclesCorpusIndefinitely` |
+| **Counted Scenario** | Exactly N calls, then fail | sequential (THROW) | `throwPolicyFailsWhenCorpusExhausted` |
+| **Normalizing Extractor** | Strip UUIDs/timestamps for stable keys | key-lookup + normalizer | `normalizingExtractorStripsNoise` |
+| **Composite Key** | Multi-param method → single lookup key | key-lookup + composite extractor | `compositeExtractorForMultipleParams` |
+| **Per-Method Mix** | Different strategies per SPI method | mixed | `differentStrategiesPerMethod` |
+| **Tenant-Isolated Capture** | Captured data scoped to tenant | capture | `capturedDataIsTenantScoped` |
+| **Best-Effort Replay** | Key-first, sequential fallback | recorded-replay | `recordedReplayKeyFirstSequentialFallback` |
+| **Backend Simulation** | Simulate a routed SPI (Path B) | any | `invokeWithStrategyReturnsEventsFromCorpus` |
 
 ---
 
@@ -35,32 +98,28 @@ can simulate `query`, capture `store`, and pass through `erase` — simultaneous
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-simulation-api</artifactId>
-    <version>${casehub.version}</version>
 </dependency>
 
-<!-- Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay) -->
+<!-- Strategy implementations -->
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-simulation-core</artifactId>
-    <version>${casehub.version}</version>
 </dependency>
 
-<!-- In-memory corpus — use for tests and ephemeral dev -->
+<!-- In-memory corpus — tests and ephemeral dev -->
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-simulation-inmem</artifactId>
-    <version>${casehub.version}</version>
     <scope>test</scope>
 </dependency>
 ```
 
-For the annotation processor (generates `@Decorator` per `@SimulationEligible` SPI):
+For generated `@Decorator` per `@SimulationEligible` SPI:
 
 ```xml
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-simulation-generator</artifactId>
-    <version>${casehub.version}</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -71,40 +130,45 @@ For AgentProvider simulation (Path B):
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-agent-simulation-core</artifactId>
-    <version>${casehub.version}</version>
 </dependency>
 ```
 
-### 2. Configure simulation in application.properties
+### 2. Configure simulation
 
 ```properties
-# Simulate query with sequential responses
-casehub.simulation.case-memory-store.query.strategy=sequential
+# Simulate with sequential responses
+casehub.simulation.my-spi.query.strategy=sequential
 
-# Capture real store calls for corpus building
-casehub.simulation.case-memory-store.store.capture=true
+# Capture real calls for corpus building
+casehub.simulation.my-spi.store.capture=true
 
-# erase: no config → passthrough
+# No config → passthrough (transparent delegation)
 ```
 
-### 3. Seed a corpus
+### 3. Seed a corpus and resolve
 
 ```java
-@Inject InMemorySimulationCorpus<String, String> corpus;
+@Inject SimulationCorpus corpus;
+@Inject SimulationRuntime simulation;
 
-void seedTestData() {
-    corpus.seed("case-memory-store.query", List.of(
-        new InvocationRecord<>("tenant-1", "patient-123",
-            "patient-123", "Lab results for patient 123", Instant.now()),
-        new InvocationRecord<>("tenant-1", "patient-456",
-            "patient-456", "X-ray for patient 456", Instant.now())));
+void setup() {
+    corpus.seed("my-spi.query", List.of(
+        new InvocationRecord<>("tenant-1", "key-1",
+            "input-a", "response-a", Instant.now()),
+        new InvocationRecord<>("tenant-1", "key-2",
+            "input-b", "response-b", Instant.now())));
+}
+
+void resolve() {
+    var strategy = simulation.strategyFor("my-spi.query");
+    // strategy.resolve("input-a") → "response-a"
 }
 ```
 
-That's it. The generated `@Decorator` intercepts `CaseMemoryStore.query()`,
-resolves from the corpus via the configured strategy, and returns the seeded
-response. No changes to the SPI, no changes to the NoOp, no changes to
-production code.
+That's it. The generated `@Decorator` intercepts your SPI method,
+resolves from the corpus via the configured strategy, and returns the
+seeded response. No changes to the SPI, no changes to the NoOp, no
+changes to production code.
 
 ---
 
@@ -117,13 +181,25 @@ Every simulated method is identified by a **qualified name**:
 data, strategy configuration, and capture recording across methods.
 
 ```
-case-memory-store.query    → one corpus, one strategy
-case-memory-store.store    → different corpus, different strategy
-agent-provider.invoke      → yet another
+my-spi.query      → one corpus, one strategy
+my-spi.store      → different corpus, different strategy
+agent-provider.invoke  → yet another
 ```
 
-The SPI name comes from `@SimulationEligible(name = "case-memory-store")`.
+The SPI name comes from `@SimulationEligible(name = "my-spi")`.
 If `name` is omitted, it defaults to the kebab-case of the interface name.
+
+### Three modes per method
+
+| Mode | What happens | When to use |
+|------|-------------|-------------|
+| **Simulation** | Strategy resolves responses from a corpus | Dev, demos, load testing |
+| **Capture** | Real impl runs; input/output recorded to corpus | Building a corpus from live traffic |
+| **Passthrough** | No simulation, no capture — transparent delegation | Production, or methods you don't need to simulate |
+
+All three are configured per method. A multi-method SPI can simulate
+`query`, capture `store`, and pass through `erase` — simultaneously.
+This is the **Per-Method Mix** pattern.
 
 ### Corpus
 
@@ -139,40 +215,21 @@ corpus.seed("my-spi.method", List.of(
 corpus.record("my-spi.method", "tenant-1", "key", input, output);
 
 // Look up by key or index
-corpus.lookupByKey("my-spi.method", "patient-123");  // → Optional<O>
-corpus.lookupByIndex("my-spi.method", 0);             // → Optional<O>
+corpus.lookupByKey("my-spi.method", "patient-123");   // → Optional<O>
+corpus.lookupByIndex("my-spi.method", 0);              // → Optional<O>
 ```
 
-Two backends ship:
+Two corpus backends ship:
 
-| Backend | Scope | Behaviour |
-|---------|-------|-----------|
-| `NoOpSimulationCorpus` | Default | Returns empty, discards records — active when no backend module on classpath |
-| `InMemorySimulationCorpus` | `@Alternative @Priority(100)` | ConcurrentHashMap — volatile, thread-safe, lost on restart |
-
-### Strategy
-
-A `SimulationStrategy<I, O>` resolves a response from the corpus. Four
-strategies ship:
-
-| Strategy | Key | How it picks a response |
-|----------|-----|------------------------|
-| **Sequential** | `sequential` | Returns entries in insertion order. Wraps at end (WRAP) or throws (THROW) |
-| **Key-lookup** | `key-lookup` | Extracts a key from the input, exact-matches against corpus keys. Requires a `KeyExtractor` |
-| **Random** | `random` | Samples randomly from corpus. Seeded `Random` for reproducibility |
-| **Recorded-replay** | `recorded-replay` | Key-first (deterministic), sequential fallback when key not found. Requires a `KeyExtractor` |
-
-Every strategy has two methods:
-
-```java
-O resolve(I input);           // return a simulated response
-boolean canResolve(I input);  // check without consuming
-```
+| Backend | CDI tier | Behaviour |
+|---------|----------|-----------|
+| `NoOpSimulationCorpus` | @DefaultBean (Tier 1b) | Returns empty, discards records — active when no backend on classpath |
+| `InMemorySimulationCorpus` | @Alternative @Priority(100) (Tier 4) | ConcurrentHashMap — volatile, thread-safe, lost on restart |
 
 ### SimulationRuntime
 
-The `SimulationRuntime` wires strategies to qualified names at boot time.
-Generated decorators and backend adapters inject it and call:
+The `SimulationRuntime` wires strategies to qualified names. Generated
+decorators and backend adapters inject it and call:
 
 ```java
 Optional<SimulationStrategy<I, O>> strategy = runtime.strategyFor("my-spi.method");
@@ -182,27 +239,37 @@ if (strategy.isPresent() && strategy.get().canResolve(input)) {
 // else: delegate to real impl
 ```
 
+Strategy instances are cached — `strategyFor()` returns the same instance
+on repeated calls.
+
 ---
 
-## Strategies in detail
+## Strategies
+
+The framework ships with four strategies. Each implements the same
+`SimulationStrategy<I, O>` contract:
+
+```java
+public interface SimulationStrategy<I, O> {
+    O resolve(I input);
+    boolean canResolve(I input);
+}
+```
 
 ### Sequential — cycling through a list
 
-Returns responses in insertion order. When the list runs out, behaviour
-depends on the exhaustion policy.
+Returns responses in corpus insertion order. When the list runs out,
+behaviour depends on the exhaustion policy.
 
 ```properties
 casehub.simulation.my-spi.method.strategy=sequential
-# Optional — default is WRAP
-casehub.simulation.my-spi.method.exhaustion-policy=THROW
+casehub.simulation.my-spi.method.exhaustion-policy=THROW  # default: WRAP
 ```
 
-| Policy | Behaviour |
-|--------|-----------|
-| `WRAP` (default) | Cycles back to the beginning — infinite responses from a finite corpus |
-| `THROW` | Throws `SimulationExhaustedException` — use when you expect exactly N calls |
-
-**Use for:** load testing (WRAP), scenario testing with known call count (THROW).
+| Policy | Behaviour | Pattern |
+|--------|-----------|---------|
+| `WRAP` (default) | Cycles back to the beginning — infinite responses from finite corpus | **Infinite Load** |
+| `THROW` | Throws `SimulationExhaustedException` — expects exactly N calls | **Counted Scenario** |
 
 ```java
 // WRAP: always returns something
@@ -225,45 +292,43 @@ casehub.simulation.my-spi.method.strategy=key-lookup
 ```
 
 ```java
-// Register how to derive a key from the input
 runtime.registerExtractor("my-spi.method",
     (String patientId) -> patientId.toLowerCase());
 ```
 
-Throws `SimulationKeyNotFoundException` when no corpus entry matches.
+Throws `SimulationKeyNotFoundException` when no corpus entry matches
+the extracted key.
 
-**Use for:** deterministic test scenarios, demo environments.
+This is the **Deterministic Replay** pattern — the most common starting
+point for simulation.
 
 ### Random — sampling from corpus
 
-Picks a random entry from the corpus each time. Pass a seeded `Random` for
-reproducible tests.
+Picks a random entry from the corpus each time. Pass a seeded `Random`
+for reproducible tests.
 
 ```properties
 casehub.simulation.my-spi.method.strategy=random
 ```
 
-**Use for:** load testing with varied responses, fuzzing.
+Use for load testing with varied responses, or fuzzing.
 
 ### Recorded-replay — key-first with fallback
 
-Tries key-based lookup first. If the key matches a corpus entry, returns
-it (deterministic). If not, falls back to sequential traversal.
+Tries key-based lookup first. If the key matches, returns it
+(deterministic). If not, falls back to sequential traversal.
 
 ```properties
 casehub.simulation.my-spi.method.strategy=recorded-replay
 ```
 
-```java
-runtime.registerExtractor("my-spi.method", (String input) -> input);
-```
-
-**Use for:** replaying captured traffic — known requests replay exactly,
-unexpected requests get best-effort sequential responses.
+This is the **Best-Effort Replay** pattern — ideal for replaying captured
+traffic where known requests replay exactly and unexpected requests get
+sequential responses.
 
 ---
 
-## Writing KeyExtractors
+## KeyExtractors
 
 A `KeyExtractor<I>` is a `@FunctionalInterface` — one method:
 
@@ -281,7 +346,8 @@ The extracted key is matched against corpus entry keys. The key must be
 runtime.registerExtractor("spi.method", (String id) -> id);
 ```
 
-**Normalizing** — strip noise for stable matching:
+**Normalizing** — strip noise for stable matching (**Normalizing Extractor**
+pattern):
 ```java
 runtime.registerExtractor("spi.method", (String prompt) ->
     prompt.replaceAll("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", "<UUID>")
@@ -289,7 +355,7 @@ runtime.registerExtractor("spi.method", (String prompt) ->
           .toLowerCase().trim());
 ```
 
-**Composite** — for multi-parameter methods:
+**Composite** — for multi-parameter methods (**Composite Key** pattern):
 ```java
 runtime.registerExtractor("spi.method", (Object[] args) ->
     "department=" + args[0] + ":severity=" + args[1]);
@@ -321,10 +387,9 @@ public class MySimulationAdapter {
 
 Capture records real SPI invocations to the corpus while the real
 implementation runs. Use it to build a corpus from production or staging
-traffic.
+traffic. This is the first half of the **Capture → Replay** pattern.
 
 ```properties
-# Enable capture (no strategy needed — real impl runs)
 casehub.simulation.my-spi.query.capture=true
 ```
 
@@ -334,18 +399,20 @@ The generated decorator does this automatically:
 // Generated code (simplified):
 Result result = delegate.query(input);
 if (simulation.captureEnabled("my-spi.query")) {
-    simulation.capture("my-spi.query", tenancyId, input, result);
+    String key = extractor.extract(input);  // if registered
+    simulation.capture("my-spi.query", tenancyId, key, input, result);
 }
 return result;
 ```
 
 Captured data is tenant-scoped — each invocation records the tenant context.
+This enables the **Tenant-Isolated Capture** pattern.
 
-### Capture → replay workflow
+### Capture → Replay workflow
 
 1. Deploy with capture enabled against a real backend
 2. Run the scenarios you want to simulate
-3. Export the corpus (or keep it in memory)
+3. Export the corpus (or keep it in memory for the session)
 4. Switch config from capture to simulation:
    ```properties
    # Before: capture
@@ -357,34 +424,30 @@ Captured data is tenant-scoped — each invocation records the tenant context.
 
 ### Capture with keys
 
-For deterministic replay, capture with explicit keys:
-
-```java
-runtime.capture("my-spi.query", tenancyId, key, input, output);
-```
-
-The generated decorator derives keys from the registered `KeyExtractor`.
+For deterministic replay after capture, register a `KeyExtractor` before
+enabling capture. The generated decorator derives keys from the registered
+extractor, making each captured entry addressable by key.
 
 ---
 
 ## Integration paths
 
-### Path A — Generated @Decorator (simple SPIs)
+### Path A — Generated @Decorator (request-response SPIs)
 
-For SPIs with direct CDI injection and simple request-response methods.
-Add `@SimulationEligible` to the SPI interface:
+For SPIs with direct CDI injection and request-response methods. Add
+`@SimulationEligible` to the SPI interface:
 
 ```java
-@SimulationEligible(name = "case-memory-store")
-public interface CaseMemoryStore {
-    List<Memory> query(MemoryQuery query);
-    void store(String tenancyId, MemoryInput input);
+@SimulationEligible(name = "my-spi")
+public interface MySpi {
+    Result query(QueryInput input);
+    void store(String tenancyId, StoreInput input);
     void erase(EraseRequest request);
 }
 ```
 
 The `simulation-generator` annotation processor scans this via Jandex and
-generates a `@Decorator` class (`SimulatedCaseMemoryStore`) that:
+generates a `@Decorator` class that:
 
 - Checks `SimulationRuntime.strategyFor()` for each method
 - Delegates to the real impl when no strategy is configured
@@ -393,28 +456,206 @@ generates a `@Decorator` class (`SimulatedCaseMemoryStore`) that:
 
 No manual decorator code needed. No changes to the SPI or its implementations.
 
+**For SPIs that can't depend on simulation-api** (e.g., zero-dependency modules),
+the generator also reads `META-INF/simulation-eligible.txt` alongside the
+annotation scan. List the fully qualified interface name in this file and the
+generator picks it up without requiring the annotation on the interface itself.
+
 ### Path B — Backend integration (routed SPIs)
 
-For SPIs with existing multi-backend routing (like `AgentProvider` →
-`RoutingAgentProvider` → `AgentBackend`), simulation registers as a backend
-rather than a decorator.
+SPIs with existing multi-backend routing (like `AgentProvider` →
+`RoutingAgentProvider` → `AgentBackend`) integrate simulation as a backend
+rather than a decorator. The simulation backend registers with the existing
+routing infrastructure.
 
-`SimulatedAgentBackend` (key: `"simulated"`) is dispatched by the existing
-router when the model resolves to it:
+`SimulatedAgentBackend` (key: `"simulated"`) is dispatched by the router
+when the model resolves to the simulated backend:
 
 ```properties
-# In ModelRegistry or application.properties:
 casehub.simulation.agent-provider.invoke.strategy=sequential
 ```
 
 ```java
-// Seed with agent responses
 corpus.seed("agent-provider.invoke", List.of(
     new InvocationRecord<>("t1", null,
         new AgentSimulationInput("system-prompt", "hello", null),
         List.of(new AgentEvent.TextDelta("Simulated response")),
         Instant.now())));
 ```
+
+Both paths use the same `SimulationStrategy<I, O>` contract, corpus, and
+configuration model. The difference is where interception happens — CDI
+decorator vs routing-layer backend.
+
+### Choosing a path
+
+| Criteria | Path A (Decorator) | Path B (Backend) |
+|----------|-------------------|-----------------|
+| SPI shape | Request-response methods | Routing layer with multiple backends |
+| Return types | Blocking / data types | Reactive streams, stateful sessions |
+| Integration | Generated @Decorator wrapping SPI | Implements backend interface, registered with router |
+| Strategy contract | `SimulationStrategy<I, O>` | `SimulationStrategy<I, O>` |
+
+---
+
+## Corpus population
+
+How you populate the corpus depends on where you are in the development
+lifecycle and what data you have available.
+
+### Hand-crafted — small, precise corpora
+
+Construct `InvocationRecord` instances directly. Best for small test
+scenarios where you know exactly what inputs and outputs you need.
+
+```java
+corpus.seed("my-spi.query", List.of(
+    new InvocationRecord<>("tenant-1", "patient-123",
+        queryInput, expectedResult, Instant.now())));
+```
+
+### Captured — real-shaped data from live systems
+
+Enable capture mode against a real backend, run your scenarios, then
+replay the captured corpus. Best when you have a working backend and
+want CI-reproducible tests with realistic data.
+
+### Data realism spectrum
+
+The `DataRealism` enum classifies how realistic corpus data is:
+
+| Level | Meaning | Source |
+|-------|---------|--------|
+| `GARBAGE` | Structurally valid but semantically meaningless | Random generation |
+| `STRUCTURALLY_VALID` | Correct types and shapes, plausible values | Schema-driven generation |
+| `DOMAIN_PLAUSIBLE` | Realistic within the domain | Hand-crafted or LLM-generated |
+| `RECORDED_REAL` | Captured from a real system | Capture mode |
+
+Choose the realism level that matches your testing goal. Load testing
+needs volume (`STRUCTURALLY_VALID`). Scenario testing needs accuracy
+(`DOMAIN_PLAUSIBLE` or `RECORDED_REAL`).
+
+---
+
+## Strategy combinations
+
+### Across methods on one SPI
+
+Different strategies for different methods is normal — it's the
+**Per-Method Mix** pattern:
+
+```properties
+# Simulate query with deterministic responses
+casehub.simulation.bank-feed.list-transactions.strategy=key-lookup
+
+# Pass through to real balance API
+# (no config = passthrough)
+
+# Capture real payment calls for corpus building
+casehub.simulation.bank-feed.post-payment.capture=true
+```
+
+### Cross-SPI coordination
+
+Multiple SPIs can be simulated simultaneously, each with its own
+strategy and corpus:
+
+```properties
+# LLM: replay captured traffic
+casehub.simulation.agent-provider.invoke.strategy=recorded-replay
+
+# Memory: deterministic test data
+casehub.simulation.case-memory-store.query.strategy=key-lookup
+
+# Notifications: sequential to verify delivery order
+casehub.simulation.notification-store.store.strategy=sequential
+```
+
+### Strategy lifecycle progression
+
+Simulation typically evolves through stages as a project matures:
+
+1. **No simulation** — real backend available, no need
+2. **Enable capture** — build a corpus from real traffic
+3. **Switch to recorded-replay** — replay captured traffic in CI
+4. **Curate the corpus** — key-lookup for deterministic scenarios
+5. **Expand** — sequential/random for load and fuzz testing
+
+Each stage is a configuration change, not a code change.
+
+---
+
+## Design for simulation
+
+### Flat interfaces are a prerequisite
+
+The framework intercepts at the SPI method level. A capability-based SPI
+like `platform.messaging().send()` is awkward — the decorator intercepts
+`messaging()` (which returns a Messaging object), not `send()` (the actual
+operation).
+
+**Guidance:** if your SPI returns capability objects, flatten the interface
+so each method is a complete operation. Flat interfaces map directly to
+simulation strategies.
+
+### You still need a @DefaultBean no-op
+
+The decorator wraps whatever CDI bean is active. When no real
+implementation is wired, CDI still needs something to inject as the
+`@Delegate`. A `@DefaultBean` no-op fills this role. The decorator
+intercepts before the no-op is reached when simulation is active.
+
+### The framework eliminates simulation boilerplate, not SPI design
+
+What methods go on the interface, what the model records look like,
+pagination contracts, error semantics — these still need the same design
+thought. `@SimulationEligible` eliminates the hand-written simulation
+class, not the SPI design work.
+
+---
+
+## Generated code walkthrough
+
+When the annotation processor runs on an `@SimulationEligible` SPI, it
+generates a `@Decorator` in `target/generated-sources/annotations/`.
+Here's what the generated code does for each method:
+
+```java
+@Decorator
+@Priority(APPLICATION + 200)
+public abstract class SimulatedMySpi implements MySpi {
+
+    @Inject @Delegate MySpi delegate;
+    @Inject SimulationRuntime simulation;
+
+    @Override
+    public Result query(QueryInput input) {
+        String qualifiedName = "my-spi.query";
+
+        // 1. Check for simulation strategy
+        Optional<SimulationStrategy<QueryInput, Result>> strategy =
+            simulation.strategyFor(qualifiedName);
+        if (strategy.isPresent() && strategy.get().canResolve(input)) {
+            return strategy.get().resolve(input);
+        }
+
+        // 2. Delegate to real implementation
+        Result result = delegate.query(input);
+
+        // 3. Capture if enabled
+        if (simulation.captureEnabled(qualifiedName)) {
+            simulation.capture(qualifiedName, tenancyId, input, result);
+        }
+
+        return result;
+    }
+
+    // ... same pattern for each method
+}
+```
+
+Inspect the generated source in `target/generated-sources/annotations/`
+to see the exact output for your SPI.
 
 ---
 
@@ -441,23 +682,45 @@ If omitted, it defaults to the kebab-case of the interface name:
 
 | Interface | Default name |
 |-----------|-------------|
-| `CaseMemoryStore` | `case-memory-store` |
+| `MyPaymentGateway` | `my-payment-gateway` |
 | `PreferenceStore` | `preference-store` |
-| `AgentProvider` | `agent-provider` |
+
+---
+
+## Choosing a strategy
+
+```
+Is the input deterministic? (same input = same expected output)
+├── YES → key-lookup (Deterministic Replay pattern)
+│
+├── PARTIALLY — I have some known inputs, but expect unknown ones too
+│   └── recorded-replay (Best-Effort Replay pattern)
+│
+├── NO — I need a predictable sequence
+│   ├── Finite calls? → sequential + THROW (Counted Scenario)
+│   └── Unlimited calls? → sequential + WRAP (Infinite Load)
+│
+└── NO — I need variety
+    └── random
+```
+
+If you have captured traffic from a real system, start with
+**Capture → Replay**: enable capture, run scenarios, switch to
+recorded-replay.
 
 ---
 
 ## Module dependency map
 
 ```
-simulation-api          zero-dep: contracts, NoOp corpus
-  ├── simulation-core   strategies, SimulationRuntime, SimulationConfig
-  ├── simulation-inmem  InMemorySimulationCorpus @Alternative
+simulation-api            zero-dep: contracts, @SimulationEligible, NoOp corpus
+  ├── simulation-core     strategies, SimulationRuntime, SimulationConfig
+  ├── simulation-inmem    InMemorySimulationCorpus @Alternative
   ├── simulation-generator  APT: generates @Decorator per @SimulationEligible
   └── agent-simulation-core SimulatedAgentBackend (Path B)
 ```
 
-| Module | Your pom.xml scope | When to add |
+| Module | pom.xml scope | When to add |
 |--------|--------------------|-------------|
 | `simulation-api` | compile | Your SPI uses `@SimulationEligible` |
 | `simulation-core` | compile | You need SimulationRuntime (strategy resolution) |
@@ -471,12 +734,29 @@ simulation-api          zero-dep: contracts, NoOp corpus
 
 | Exception | When | What to do |
 |-----------|------|------------|
-| `SimulationExhaustedException` | Sequential strategy with THROW policy, corpus empty | Seed more data, or switch to WRAP |
-| `SimulationKeyNotFoundException` | Key-lookup with no matching corpus entry | Seed the missing key, or use recorded-replay for fallback |
-| `SimulationConfigException` | Unknown strategy name, or key-lookup without extractor | Check config spelling, register your KeyExtractor at startup |
+| `SimulationExhaustedException` | Sequential + THROW, corpus empty | Seed more data, or switch to WRAP |
+| `SimulationKeyNotFoundException` | Key-lookup, no matching entry | Seed the missing key, or use recorded-replay for fallback |
+| `SimulationConfigException` | Unknown strategy name, or key-lookup without extractor | Check config, register your KeyExtractor at startup |
 
 All three extend `RuntimeException` — they propagate through the SPI
-contract without requiring checked exception declarations.
+contract without checked exception declarations.
+
+---
+
+## Tutorial tests
+
+The `simulation-core` module includes tutorial-style tests that demonstrate
+every named pattern. Read them as how-to guides:
+
+| Test class | Patterns demonstrated |
+|------------|----------------------|
+| `SimulationGettingStartedTest` | Deterministic Replay, Infinite Load, passthrough |
+| `PerMethodStrategyTest` | Per-Method Mix |
+| `CaptureAndReplayTest` | Capture → Replay, Tenant-Isolated Capture, Best-Effort Replay |
+| `CustomKeyExtractorTest` | Normalizing Extractor, Composite Key |
+| `ExhaustionAndEdgeCasesTest` | Counted Scenario, Infinite Load, error handling |
+
+Package: `io.casehub.platform.simulation.tutorial` in `simulation-core/src/test/`.
 
 ---
 
@@ -494,17 +774,24 @@ contract without requiring checked exception declarations.
 
 ---
 
-## Tutorial tests
+## What's next
 
-The `simulation-core` module includes tutorial-style tests that demonstrate
-every usage pattern. Read them as how-to guides:
+The simulation framework is actively growing. Planned capabilities that
+will extend the patterns above:
 
-| Test class | What it shows |
-|------------|---------------|
-| `SimulationGettingStartedTest` | Seed, configure, resolve — sequential, key-lookup, random, passthrough |
-| `PerMethodStrategyTest` | Different strategies for different methods on the same SPI |
-| `CaptureAndReplayTest` | Record real invocations, replay with keys, tenant isolation |
-| `CustomKeyExtractorTest` | Identity, normalizing, composite, case-insensitive extractors |
-| `ExhaustionAndEdgeCasesTest` | WRAP/THROW policies, canResolve, error handling, caching |
+- **YAML-driven configuration** — declarative corpus fixtures and
+  KeyExtractors loaded from YAML files at startup
+- **Nearest-match strategy** — weighted similarity scoring for fuzzy
+  input matching, useful when exact keys don't capture the input space
+- **Event simulation** — push-side strategies for event sequences,
+  timed delivery, and DataSource injection
+- **Corpus builders** — fluent, domain-specific builders that eliminate
+  hand-crafted `InvocationRecord` construction
+- **Verification API** — assertion DSL on captured invocations
+  (`wasCalled()`, `wasCalledWith()`, `verifyInOrder()`) replacing
+  ad-hoc corpus inspection
+- **REST client simulation** — `@RegisterRestClient` proxy with
+  strategy dispatch for simulating external HTTP services
 
-Package: `io.casehub.platform.simulation.tutorial` in `simulation-core/src/test/`.
+Each extends the existing strategy/corpus/config model — no breaking
+changes to the patterns documented above.

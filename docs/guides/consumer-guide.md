@@ -9,7 +9,7 @@
 
 ## Purpose
 
-casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, governance, labels, subject views, and agent infrastructure. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
+casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, governance, labels, subject views, agent infrastructure, and simulation. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
 
 This repo is not a parallel framework to Quarkus -- it is a thin domain layer that Quarkus-specific code implements. `CurrentPrincipal` wraps `SecurityIdentity`, `PreferenceProvider` complements `@ConfigMapping`, and `Path` replaces `java.nio.file.Path` with domain semantics. They solve different problems and belong together.
 
@@ -97,6 +97,18 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
 | `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
+
+### Simulation
+
+Configurable simulation for any SPI — real responses when you have a real backend, simulated responses when you don't, captured traffic when you want to build a corpus. See the [Simulation Guide](simulation-guide.md) for full documentation.
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-simulation-api` | Core contracts: `SimulationStrategy`, `SimulationCorpus`, `InvocationRecord`, `KeyExtractor`, `@SimulationEligible`. Zero deps |
+| `casehub-platform-simulation-core` | Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay) + `SimulationRuntime` |
+| `casehub-platform-simulation-inmem` | In-memory `SimulationCorpus` @Alternative @Priority(100) — volatile, thread-safe |
+| `casehub-platform-simulation-generator` (provided scope) | APT: generates `@Decorator` per `@SimulationEligible` SPI |
+| `casehub-platform-agent-simulation-core` | `SimulatedAgentBackend` — Path B integration for `AgentProvider` simulation |
 
 ### Access control
 
@@ -508,6 +520,14 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `%prod.quarkus.kubernetes-config.enabled` | Enable Kubernetes ConfigMap/Secret integration | false |
 | `%prod.quarkus.kubernetes-config.config-maps` | Kubernetes ConfigMaps to read | -- |
 | `%prod.quarkus.kubernetes-config.secrets` | Kubernetes Secrets to read | -- |
+
+### Simulation
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `casehub.simulation.<spi>.<method>.strategy` | Strategy key: `sequential`, `key-lookup`, `random`, `recorded-replay` | none (passthrough) |
+| `casehub.simulation.<spi>.<method>.capture` | Enable capture mode | false |
+| `casehub.simulation.<spi>.<method>.exhaustion-policy` | Sequential exhaustion: `WRAP` or `THROW` | WRAP |
 
 ### Streams
 

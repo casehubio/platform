@@ -1,6 +1,8 @@
 package io.casehub.platform.graphql.spring.generator;
 
 import io.casehub.platform.generator.AbstractVerifyMojo;
+import io.casehub.platform.generator.DomainScanResult;
+import io.casehub.platform.generator.McpDomainJandexScanner;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -34,9 +36,9 @@ public class GraphqlSpringVerifyMojo extends AbstractVerifyMojo {
 
     @Override
     protected Set<String> collectSourceTypes(Index index) {
-        var scanner = new McpDomainScanner();
+        var scanner = new McpDomainJandexScanner();
         return scanner.scan(index).stream()
-                .map(DomainDescriptor::domainName)
+                .map(DomainScanResult::domainName)
                 .collect(Collectors.toSet());
     }
 

@@ -2,6 +2,8 @@ package io.casehub.platform.graphql.spring.generator;
 
 import com.palantir.javapoet.JavaFile;
 import io.casehub.platform.generator.AbstractGeneratorMojo;
+import io.casehub.platform.generator.DomainScanResult;
+import io.casehub.platform.generator.McpDomainJandexScanner;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -28,26 +30,26 @@ public class GraphqlSpringGeneratorMojo extends AbstractGeneratorMojo {
     public void execute() throws MojoExecutionException {
         Index index = loadJandexIndex();
 
-        var scanner = new McpDomainScanner();
-        List<DomainDescriptor> descriptors = scanner.scan(index);
+        var scanner = new McpDomainJandexScanner();
+        List<DomainScanResult> domains = scanner.scan(index);
 
-        if (descriptors.isEmpty()) {
+        if (domains.isEmpty()) {
             getLog().info("No @McpDomain interfaces found — skipping generation.");
             return;
         }
 
         try {
-            var graphqlWriter = new GraphqlControllerWriter();
-            var restWriter = new DomainRestControllerWriter();
+            var graphqlWriter = new SpringGraphqlControllerWriter();
+            var restWriter = new SpringDomainRestControllerWriter();
             int count = 0;
 
-            for (DomainDescriptor desc : descriptors) {
+            for (DomainScanResult domain : domains) {
                 String targetPackage = "io.casehub.platform.graphql.spring.generated";
 
-                JavaFile graphqlFile = graphqlWriter.generate(desc, targetPackage);
+                JavaFile graphqlFile = graphqlWriter.generate(domain, targetPackage);
                 graphqlFile.writeTo(outputDirectory);
 
-                JavaFile restFile = restWriter.generate(desc, targetPackage);
+                JavaFile restFile = restWriter.generate(domain, targetPackage);
                 restFile.writeTo(outputDirectory);
 
                 count += 2;
@@ -55,7 +57,7 @@ public class GraphqlSpringGeneratorMojo extends AbstractGeneratorMojo {
 
             registerSourceRoot();
             getLog().info("Generated " + count + " Spring classes from "
-                    + descriptors.size() + " @McpDomain interface(s)");
+                    + domains.size() + " @McpDomain interface(s)");
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate Spring GraphQL controllers", e);

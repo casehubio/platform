@@ -8,6 +8,7 @@ import org.jboss.jandex.CompositeIndex;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexReader;
 import org.jboss.jandex.IndexView;
+import org.jboss.jandex.Indexer;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
 
@@ -97,12 +98,15 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
             final String className = entry.getKey();
             if (processedClasses.contains(className)) continue;
 
-            final ClassInfo classInfo = index.getClassByName(DotName.createSimple(className));
+            ClassInfo classInfo = index.getClassByName(DotName.createSimple(className));
+            if (classInfo == null) {
+                classInfo = indexClassFromClasspath(className);
+            }
             if (classInfo == null) {
                 if (processingEnv != null) {
                     processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
                             "Simulation generator: class " + className
-                                    + " from listing file not found in Jandex index");
+                                    + " from listing file not found in Jandex index or classpath");
                 }
                 continue;
             }
@@ -332,6 +336,46 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
 
     private Map<String, String> loadListingFile() {
         final Map<String, String> entries = new LinkedHashMap<>();
+
+        if (processingEnv != null) {
+            loadListingFromFiler(entries);
+        }
+
+        loadListingFromClasspath(entries);
+
+        return entries;
+    }
+
+    private ClassInfo indexClassFromClasspath(final String className) {
+        final String resourceName = className.replace('.', '/') + ".class";
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+            if (is == null) return null;
+            final Indexer indexer = new Indexer();
+            indexer.index(is);
+            final IndexView onDemandIndex = indexer.complete();
+            return onDemandIndex.getClassByName(DotName.createSimple(className));
+        } catch (IOException e) {
+            if (processingEnv != null) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                        "Simulation generator: failed to index " + className + ": " + e.getMessage());
+            }
+            return null;
+        }
+    }
+
+    private void loadListingFromFiler(final Map<String, String> entries) {
+        try {
+            final javax.tools.FileObject fo = processingEnv.getFiler().getResource(
+                    javax.tools.StandardLocation.CLASS_OUTPUT, "", LISTING_FILE);
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(fo.openInputStream()))) {
+                parseListingLines(reader, entries);
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void loadListingFromClasspath(final Map<String, String> entries) {
         try {
             final ClassLoader cl = getClass().getClassLoader();
             final Enumeration<URL> resources = cl.getResources(LISTING_FILE);
@@ -339,14 +383,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
                 final URL url = resources.nextElement();
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(url.openStream()))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.strip();
-                        if (line.isEmpty() || line.startsWith("#")) continue;
-                        final int eq = line.indexOf('=');
-                        if (eq < 0) continue;
-                        entries.put(line.substring(0, eq).strip(), line.substring(eq + 1).strip());
-                    }
+                    parseListingLines(reader, entries);
                 }
             }
         } catch (IOException e) {
@@ -355,7 +392,18 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
                         "Simulation generator: failed to read listing file: " + e.getMessage());
             }
         }
-        return entries;
+    }
+
+    private static void parseListingLines(final BufferedReader reader,
+                                           final Map<String, String> entries) throws IOException {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            line = line.strip();
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            final int eq = line.indexOf('=');
+            if (eq < 0) continue;
+            entries.putIfAbsent(line.substring(0, eq).strip(), line.substring(eq + 1).strip());
+        }
     }
 
     private IndexView loadCombinedIndex() {

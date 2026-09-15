@@ -68,6 +68,26 @@ class SpringModelScannerTest {
                 });
     }
 
+    @Test
+    void toolCallbackProviderRegistersAllTools() {
+        runner.withBean("testService", TestServiceImpl.class, TestServiceImpl::new)
+                .run(context -> {
+                    CaseHubToolCallbackProvider provider = context.getBean(CaseHubToolCallbackProvider.class);
+                    var tools = provider.getToolCallbacks();
+
+                    assertThat(tools).hasSizeGreaterThanOrEqualTo(4);
+
+                    List<String> toolNames = java.util.Arrays.stream(tools)
+                            .map(t -> t.getToolDefinition().name())
+                            .toList();
+                    assertThat(toolNames).contains(
+                            "casehub_model",
+                            "casehub_action",
+                            "test_domain_getItems",
+                            "test_domain_createItem");
+                });
+    }
+
     @McpDomain("test-domain")
     interface TestService {
         @PlatformQuery("List all items")

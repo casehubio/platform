@@ -22,7 +22,9 @@ public class McpSpringAutoConfiguration {
     SpringModelScanner springModelScanner(ApplicationContext context,
                                            DomainModelRegistry registry,
                                            ApplicationEventPublisher eventPublisher) {
-        return new SpringModelScanner(context, registry, eventPublisher);
+        var scanner = new SpringModelScanner(context, registry, eventPublisher);
+        scanner.scan();
+        return scanner;
     }
 
     @Bean
@@ -31,5 +33,11 @@ public class McpSpringAutoConfiguration {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         return new SpringOperationDispatcher(registry, context, mapper);
+    }
+
+    @Bean
+    CaseHubToolCallbackProvider caseHubToolCallbackProvider(DomainModelRegistry registry,
+                                                             SpringOperationDispatcher dispatcher) {
+        return new CaseHubToolCallbackProvider(registry, dispatcher);
     }
 }

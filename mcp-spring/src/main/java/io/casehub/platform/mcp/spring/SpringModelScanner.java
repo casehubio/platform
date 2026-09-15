@@ -13,8 +13,8 @@ import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.EventListener;
+
+
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -44,7 +44,6 @@ public class SpringModelScanner {
         this.eventPublisher = eventPublisher;
     }
 
-    @EventListener(ContextRefreshedEvent.class)
     void scan() {
         Map<String, List<OperationDescriptor>> domainOps = new LinkedHashMap<>();
 

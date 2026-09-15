@@ -18,14 +18,18 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @SupportedAnnotationTypes("*")
@@ -40,6 +44,8 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
             DotName.createSimple("io.casehub.platform.simulation.SimulationEligible");
 
     private static final String GENERATED_PACKAGE = "io.casehub.platform.simulation.generated";
+
+    private static final String LISTING_FILE = "META-INF/simulation-eligible.txt";
 
     private boolean processed = false;
 
@@ -65,11 +71,14 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
 
     List<GeneratedSource> generateFromIndex(final IndexView index) {
         final List<GeneratedSource> results = new ArrayList<>();
+        final Set<String> processedClasses = new HashSet<>();
 
         for (final AnnotationInstance ann : index.getAnnotations(SIMULATION_ELIGIBLE)) {
             if (ann.target().kind() != AnnotationTarget.Kind.CLASS) continue;
             final ClassInfo classInfo = ann.target().asClass();
             if (!java.lang.reflect.Modifier.isInterface(classInfo.flags())) continue;
+
+            processedClasses.add(classInfo.name().toString());
 
             final AnnotationValue nameVal = ann.value("name");
             final String spiName = (nameVal != null && !nameVal.asString().isEmpty())
@@ -80,6 +89,29 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
             final String fqcn = GENERATED_PACKAGE + "." + decoratorName;
             final String source = generateDecoratorSource(classInfo, spiName, decoratorName);
 
+            results.add(new GeneratedSource(fqcn, source));
+        }
+
+        final Map<String, String> listingEntries = loadListingFile();
+        for (final Map.Entry<String, String> entry : listingEntries.entrySet()) {
+            final String className = entry.getKey();
+            if (processedClasses.contains(className)) continue;
+
+            final ClassInfo classInfo = index.getClassByName(DotName.createSimple(className));
+            if (classInfo == null) {
+                if (processingEnv != null) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                            "Simulation generator: class " + className
+                                    + " from listing file not found in Jandex index");
+                }
+                continue;
+            }
+            if (!java.lang.reflect.Modifier.isInterface(classInfo.flags())) continue;
+
+            final String spiName = entry.getValue();
+            final String decoratorName = "Simulated" + classInfo.simpleName();
+            final String fqcn = GENERATED_PACKAGE + "." + decoratorName;
+            final String source = generateDecoratorSource(classInfo, spiName, decoratorName);
             results.add(new GeneratedSource(fqcn, source));
         }
 
@@ -296,6 +328,34 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
             case ARRAY -> typeToJava(type.asArrayType().constituent()) + "[]";
             default -> type.name().toString();
         };
+    }
+
+    private Map<String, String> loadListingFile() {
+        final Map<String, String> entries = new LinkedHashMap<>();
+        try {
+            final ClassLoader cl = getClass().getClassLoader();
+            final Enumeration<URL> resources = cl.getResources(LISTING_FILE);
+            while (resources.hasMoreElements()) {
+                final URL url = resources.nextElement();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(url.openStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.strip();
+                        if (line.isEmpty() || line.startsWith("#")) continue;
+                        final int eq = line.indexOf('=');
+                        if (eq < 0) continue;
+                        entries.put(line.substring(0, eq).strip(), line.substring(eq + 1).strip());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            if (processingEnv != null) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                        "Simulation generator: failed to read listing file: " + e.getMessage());
+            }
+        }
+        return entries;
     }
 
     private IndexView loadCombinedIndex() {

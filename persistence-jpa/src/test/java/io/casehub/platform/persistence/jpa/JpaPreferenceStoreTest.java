@@ -22,12 +22,12 @@ class JpaPreferenceStoreTest {
     private static final String TENANT = TenancyConstants.DEFAULT_TENANT_ID;
 
     @Inject PreferenceStore store;
-    @Inject EntityManager entityManager;
+    @Inject EntityManager em;
 
     @BeforeEach
     @Transactional
     void clear() {
-        entityManager.createQuery("delete from PreferenceEntry").executeUpdate();
+        em.createQuery("DELETE FROM PreferenceEntry").executeUpdate();
     }
 
     @Test

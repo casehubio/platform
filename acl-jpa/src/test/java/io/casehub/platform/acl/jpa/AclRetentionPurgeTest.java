@@ -38,8 +38,7 @@ class AclRetentionPurgeTest {
 
         purge.purgeExpiredEntries();
 
-        long remaining = entityManager.createQuery(
-                "select count(e) from AclEntryEntity e", Long.class).getSingleResult();
+        long remaining = entityManager.createQuery("SELECT COUNT(e) FROM AclEntryEntity e", Long.class).getSingleResult();
         assertEquals(2, remaining);
     }
 
@@ -53,8 +52,7 @@ class AclRetentionPurgeTest {
 
         purge.purgeAuditLog();
 
-        long remaining = entityManager.createQuery(
-                "select count(e) from AclAuditLogEntity e", Long.class).getSingleResult();
+        long remaining = entityManager.createQuery("SELECT COUNT(e) FROM AclAuditLogEntity e", Long.class).getSingleResult();
         assertEquals(1, remaining);
     }
 
@@ -65,8 +63,7 @@ class AclRetentionPurgeTest {
 
         purge.purgeExpiredEntries();
 
-        assertEquals(1, entityManager.createQuery(
-                "select count(e) from AclEntryEntity e", Long.class).getSingleResult());
+        assertEquals(1, entityManager.createQuery("SELECT COUNT(e) FROM AclEntryEntity e", Long.class).getSingleResult());
     }
 
     @Test
@@ -76,8 +73,7 @@ class AclRetentionPurgeTest {
 
         purge.purgeAuditLog();
 
-        assertEquals(1, entityManager.createQuery(
-                "select count(e) from AclAuditLogEntity e", Long.class).getSingleResult());
+        assertEquals(1, entityManager.createQuery("SELECT COUNT(e) FROM AclAuditLogEntity e", Long.class).getSingleResult());
     }
 
     private void insertEntry(String actorId, String resourceId, AclAction action, Instant expiresAt) {

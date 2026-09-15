@@ -8,12 +8,12 @@ import jakarta.transaction.Transactional;
 @ApplicationScoped
 public class TestDataCleaner {
 
-    @Inject EntityManager entityManager;
+    @Inject EntityManager em;
 
     @Transactional
     public void deleteAll() {
-        entityManager.createQuery("delete from AclAuditLogEntity").executeUpdate();
-        entityManager.createQuery("delete from AclEntryEntity").executeUpdate();
-        entityManager.createQuery("delete from ResourceParentEntity").executeUpdate();
+        em.createQuery("DELETE FROM AclAuditLogEntity").executeUpdate();
+        em.createQuery("DELETE FROM AclEntryEntity").executeUpdate();
+        em.createQuery("DELETE FROM ResourceParentEntity").executeUpdate();
     }
 }

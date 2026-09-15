@@ -10,6 +10,7 @@ import io.casehub.platform.api.preferences.PreferenceStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
@@ -19,15 +20,19 @@ public class JpaPreferenceStore implements PreferenceStore {
 
     @Inject CurrentPrincipal principal;
     @Inject Event<PreferenceChanged> changedEvent;
+    @Inject EntityManager entityManager;
 
     @Override
     @Transactional
     public void set(String tenancyId, Path scope, String namespace, String name, String subKey, String value) {
         PreferencePermissions.assertTenant(tenancyId, principal);
         String scopeValue = scope.value();
-        PreferenceEntry existing = PreferenceEntry.find(
-                "tenancyId = ?1 and scope = ?2 and namespace = ?3 and name = ?4 and subKey = ?5",
-                tenancyId, scopeValue, namespace, name, subKey).firstResult();
+        PreferenceEntry existing = entityManager.createQuery(
+                "from PreferenceEntry where tenancyId = ?1 and scope = ?2 and namespace = ?3 and name = ?4 and subKey = ?5",
+                PreferenceEntry.class)
+                .setParameter(1, tenancyId).setParameter(2, scopeValue)
+                .setParameter(3, namespace).setParameter(4, name).setParameter(5, subKey)
+                .getResultStream().findFirst().orElse(null);
         if (existing != null) {
             existing.value = value;
         } else {
@@ -38,7 +43,7 @@ public class JpaPreferenceStore implements PreferenceStore {
             entry.name = name;
             entry.subKey = subKey;
             entry.value = value;
-            entry.persist();
+            entityManager.persist(entry);
         }
         changedEvent.fireAsync(new PreferenceChanged(tenancyId, scope, namespace));
     }
@@ -47,9 +52,11 @@ public class JpaPreferenceStore implements PreferenceStore {
     @Transactional
     public void delete(String tenancyId, Path scope, String namespace, String name, String subKey) {
         PreferencePermissions.assertTenant(tenancyId, principal);
-        PreferenceEntry.delete(
-                "tenancyId = ?1 and scope = ?2 and namespace = ?3 and name = ?4 and subKey = ?5",
-                tenancyId, scope.value(), namespace, name, subKey);
+        entityManager.createQuery(
+                "delete from PreferenceEntry where tenancyId = ?1 and scope = ?2 and namespace = ?3 and name = ?4 and subKey = ?5")
+                .setParameter(1, tenancyId).setParameter(2, scope.value())
+                .setParameter(3, namespace).setParameter(4, name).setParameter(5, subKey)
+                .executeUpdate();
         changedEvent.fireAsync(new PreferenceChanged(tenancyId, scope, namespace));
     }
 
@@ -58,16 +65,17 @@ public class JpaPreferenceStore implements PreferenceStore {
         String scopeValue = query.scope() != null ? query.scope().value() : null;
         List<PreferenceEntry> entries;
         if (scopeValue != null && query.namespace() != null) {
-            entries = PreferenceEntry.list("tenancyId = ?1 and scope = ?2 and namespace = ?3",
-                    query.tenancyId(), scopeValue, query.namespace());
+            entries = entityManager.createQuery("from PreferenceEntry where tenancyId = ?1 and scope = ?2 and namespace = ?3", PreferenceEntry.class)
+                    .setParameter(1, query.tenancyId()).setParameter(2, scopeValue).setParameter(3, query.namespace()).getResultList();
         } else if (scopeValue != null) {
-            entries = PreferenceEntry.list("tenancyId = ?1 and scope = ?2",
-                    query.tenancyId(), scopeValue);
+            entries = entityManager.createQuery("from PreferenceEntry where tenancyId = ?1 and scope = ?2", PreferenceEntry.class)
+                    .setParameter(1, query.tenancyId()).setParameter(2, scopeValue).getResultList();
         } else if (query.namespace() != null) {
-            entries = PreferenceEntry.list("tenancyId = ?1 and namespace = ?2",
-                    query.tenancyId(), query.namespace());
+            entries = entityManager.createQuery("from PreferenceEntry where tenancyId = ?1 and namespace = ?2", PreferenceEntry.class)
+                    .setParameter(1, query.tenancyId()).setParameter(2, query.namespace()).getResultList();
         } else {
-            entries = PreferenceEntry.list("tenancyId = ?1", query.tenancyId());
+            entries = entityManager.createQuery("from PreferenceEntry where tenancyId = ?1", PreferenceEntry.class)
+                    .setParameter(1, query.tenancyId()).getResultList();
         }
         return entries.stream()
                 .map(e -> new PreferenceRecord(e.tenancyId, pathFromStored(e.scope), e.namespace, e.name, e.subKey, e.value))
@@ -78,8 +86,9 @@ public class JpaPreferenceStore implements PreferenceStore {
     @Transactional
     public void deleteAll(String tenancyId, Path scope, String namespace) {
         PreferencePermissions.assertTenant(tenancyId, principal);
-        PreferenceEntry.delete("tenancyId = ?1 and scope = ?2 and namespace = ?3",
-                tenancyId, scope.value(), namespace);
+        entityManager.createQuery("delete from PreferenceEntry where tenancyId = ?1 and scope = ?2 and namespace = ?3")
+                .setParameter(1, tenancyId).setParameter(2, scope.value()).setParameter(3, namespace)
+                .executeUpdate();
         changedEvent.fireAsync(new PreferenceChanged(tenancyId, scope, namespace));
     }
 

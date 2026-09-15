@@ -214,6 +214,74 @@ class GraphQLResolverProcessorTest {
         assertThat(GraphQLResolverProcessor.isSimpleType("java.time.Instant", null)).isTrue();
     }
 
+    @Test
+    void responseWrapping_mutation_returns201() {
+        assertThat(GraphQLResolverProcessor.generateResponseCode("String", "spi.create(arg0)", true, -1, false))
+                .isEqualTo("return Response.status(201).entity(spi.create(arg0)).build();");
+    }
+
+    @Test
+    void responseWrapping_query_returns200() {
+        assertThat(GraphQLResolverProcessor.generateResponseCode("String", "spi.get(arg0)", false, -1, false))
+                .isEqualTo("return Response.ok(spi.get(arg0)).build();");
+    }
+
+    @Test
+    void responseWrapping_restStatusOverride_onMutation() {
+        assertThat(GraphQLResolverProcessor.generateResponseCode("String", "spi.create(arg0)", true, 202, false))
+                .isEqualTo("return Response.status(202).entity(spi.create(arg0)).build();");
+    }
+
+    @Test
+    void responseWrapping_pathParam_nonCollection_nullChecks() {
+        String result = GraphQLResolverProcessor.generateResponseCode("String", "spi.get(id)", false, -1, true);
+        assertThat(result).contains("if (result == null) return Response.status(404).build()");
+        assertThat(result).contains("Response.ok(result).build()");
+    }
+
+    @Test
+    void responseWrapping_pathParam_collection_noNullCheck() {
+        String result = GraphQLResolverProcessor.generateResponseCode("List<String>", "spi.list(id)", false, -1, true);
+        assertThat(result).doesNotContain("404");
+        assertThat(result).contains("Response.ok(");
+    }
+
+    @Test
+    void isCollectionType_list() {
+        assertThat(GraphQLResolverProcessor.isCollectionType("List<String>")).isTrue();
+    }
+
+    @Test
+    void isCollectionType_nonCollection() {
+        assertThat(GraphQLResolverProcessor.isCollectionType("String")).isFalse();
+    }
+
+    @Test
+    void mutationEndpointReturns201() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.CreateApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+
+                @McpDomain("items")
+                public interface CreateApi {
+                    @PlatformMutation("Create an item")
+                    String createItem(String name);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=items", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedItemsResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("Response.status(201)");
+    }
+
 
     @Test
     void roundEnvScanDiscoversLocalInterface() throws Exception {

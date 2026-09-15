@@ -57,6 +57,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName JAX_DELETE        = DotName.createSimple("jakarta.ws.rs.DELETE");
     private static final DotName JAX_PATCH         = DotName.createSimple("jakarta.ws.rs.PATCH");
     private static final DotName REST_PATH_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
+    private static final DotName REST_STATUS_ANN   = DotName.createSimple("io.casehub.platform.api.mcp.RestStatus");
 
 
     private boolean   processed = false;
@@ -280,7 +281,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     if (restPathAnn != null && restPathAnn.value() != null) {
                         restPathOverride = restPathAnn.value().asString();
                     }
-                    ops.operations.add(resolveFromJandex(method, classInfo, opType, desc, restMethodOverride, restPathOverride));
+                    int restStatusOverride = -1;
+                    AnnotationInstance restStatusAnn = method.annotation(REST_STATUS_ANN);
+                    if (restStatusAnn != null && restStatusAnn.value() != null) {
+                        restStatusOverride = restStatusAnn.value().asInt();
+                    }
+                    ops.operations.add(resolveFromJandex(method, classInfo, opType, desc, restMethodOverride, restPathOverride, restStatusOverride));
                 }
             }
         }
@@ -292,7 +298,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private ResolvedOperation resolveFromJandex(MethodInfo method, ClassInfo declaringClass,
                                                 OperationType opType, String description,
-                                                String restMethodOverride, String restPathOverride) {
+                                                String restMethodOverride, String restPathOverride,
+                                                int restStatusOverride) {
         String      returnTypeStr = typeToJava(method.returnType());
         Set<String> imports       = new HashSet<>();
         addTypeImport(imports, method.returnType());
@@ -321,7 +328,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return new ResolvedOperation(
                 method.name(), returnTypeStr, params, imports,
                 declaringClass.name().toString(), declaringClass.simpleName(),
-                opType, description, restMethodOverride, restPathOverride
+                opType, description, restMethodOverride, restPathOverride,
+                restStatusOverride
         );
     }
 
@@ -467,6 +475,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     restPathOverride = extractAnnotationStringValue(restPathAnn);
                 }
 
+                int restStatusOverride = -1;
+                javax.lang.model.element.AnnotationMirror restStatusAnn = findAnnotationMirror(method,
+                                                                                                "io.casehub.platform.api.mcp.RestStatus");
+                if (restStatusAnn != null) {
+                    for (var e : restStatusAnn.getElementValues().entrySet()) {
+                        if (e.getKey().getSimpleName().contentEquals("value")) {
+                            restStatusOverride = (int) e.getValue().getValue();
+                        }
+                    }
+                }
+
                 String      returnTypeStr = typeMirrorToJava(method.getReturnType());
                 Set<String> imports       = new HashSet<>();
                 collectTypeMirrorImports(imports, method.getReturnType());
@@ -498,7 +517,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
                 ops.operations.add(new ResolvedOperation(
                         method.getSimpleName().toString(), returnTypeStr, params, imports,
-                        classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride));
+                        classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride,
+                        restStatusOverride));
             }
         }
 
@@ -729,6 +749,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             pathSuffix.append("/{").append(pp).append("}");
         }
 
+        if (!op.description().isEmpty() && isOpenApiAvailable()) {
+            out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
+        }
         out.println("    @" + httpVerb);
         out.println("    @Path(\"" + pathSuffix + "\")");
         if (hasBody) {
@@ -760,8 +783,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             args.append(op.params().get(i).name());
         }
 
+        boolean isMutation = op.type() == OperationType.MUTATION;
+        boolean hasPathParam = !pathParams.isEmpty();
         String delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
-        String responseCode = generateResponseCode(op.returnTypeStr(), delegateCall);
+        String responseCode = generateResponseCode(op.returnTypeStr(), delegateCall, isMutation, op.restStatusOverride(), hasPathParam);
         out.println("        " + responseCode);
 
         out.println("    }");
@@ -959,13 +984,56 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     static String generateResponseCode(String returnType, String delegateCall) {
+        return generateResponseCode(returnType, delegateCall, false, -1, false);
+    }
+
+    static String generateResponseCode(String returnType, String delegateCall,
+                                         boolean isMutation, int restStatusOverride,
+                                         boolean hasPathParam) {
         if ("void".equals(returnType)) {
-            return delegateCall + "; return Response.noContent().build();";
+            int status = restStatusOverride > 0 ? restStatusOverride : 204;
+            if (status == 204) {
+                return delegateCall + "; return Response.noContent().build();";
+            }
+            return delegateCall + "; return Response.status(" + status + ").build();";
         }
         if (returnType.startsWith("Optional<")) {
             return "return " + delegateCall + ".map(v -> Response.ok(v).build()).orElse(Response.status(404).build());";
         }
+        if (hasPathParam && !isCollectionType(returnType)) {
+            String statusExpr = restStatusOverride > 0
+                    ? "Response.status(" + restStatusOverride + ").entity(result).build()"
+                    : "Response.ok(result).build()";
+            return "var result = " + delegateCall + "; if (result == null) return Response.status(404).build(); return " + statusExpr + ";";
+        }
+        if (restStatusOverride > 0) {
+            return "return Response.status(" + restStatusOverride + ").entity(" + delegateCall + ").build();";
+        }
+        if (isMutation) {
+            return "return Response.status(201).entity(" + delegateCall + ").build();";
+        }
         return "return Response.ok(" + delegateCall + ").build();";
+    }
+
+    private boolean openApiAvailable;
+    private boolean openApiChecked;
+
+    private boolean isOpenApiAvailable() {
+        if (!openApiChecked) {
+            openApiChecked = true;
+            try {
+                getClass().getClassLoader().loadClass("org.eclipse.microprofile.openapi.annotations.Operation");
+                openApiAvailable = true;
+            } catch (ClassNotFoundException e) {
+                openApiAvailable = false;
+            }
+        }
+        return openApiAvailable;
+    }
+
+    static boolean isCollectionType(String returnType) {
+        return returnType.startsWith("List<") || returnType.startsWith("Set<")
+               || returnType.startsWith("Collection<") || returnType.startsWith("Map<");
     }
 
 
@@ -994,7 +1062,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             OperationType type,
             String description,
             String restMethodOverride,
-            String restPathOverride
+            String restPathOverride,
+            int restStatusOverride
     ) {}
 
     record ResolvedParam(

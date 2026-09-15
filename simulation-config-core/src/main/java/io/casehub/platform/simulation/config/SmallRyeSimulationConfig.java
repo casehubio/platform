@@ -53,6 +53,19 @@ public class SmallRyeSimulationConfig implements SimulationConfig {
                 .flatMap(MethodSimulationConfig::exhaustionPolicy);
     }
 
+    @Override
+    public Optional<Double> threshold(String qualifiedName) {
+        return Optional.ofNullable(methods.get(qualifiedName))
+                .flatMap(MethodSimulationConfig::threshold);
+    }
+
+    public Map<String, String> scorerSpecs() {
+        return methods.entrySet().stream()
+                .filter(e -> e.getValue().scorer().isPresent())
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> e.getValue().scorer().orElseThrow()));
+    }
+
     public Map<String, String> extractorSpecs() {
         return methods.entrySet().stream()
                 .filter(e -> e.getValue().keyExtractor().isPresent())

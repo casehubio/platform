@@ -5,6 +5,7 @@ import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.platform.simulation.config.DeclarativeExtractorFactory;
+import io.casehub.platform.simulation.config.DeclarativeScorerFactory;
 import io.casehub.platform.simulation.config.SmallRyeSimulationConfig;
 import io.casehub.platform.simulation.config.YamlCorpusLoader;
 import io.quarkus.runtime.StartupEvent;
@@ -57,5 +58,9 @@ public class SimulationConfigBeans {
         var factory = new DeclarativeExtractorFactory();
         extractorConfig.extractorSpecs()
                 .forEach((qn, spec) -> runtime.registerExtractor(qn, factory.create(spec)));
+
+        var scorerFactory = new DeclarativeScorerFactory();
+        extractorConfig.scorerSpecs()
+                .forEach((qn, spec) -> runtime.registerScorer(qn, scorerFactory.create(spec)));
     }
 }

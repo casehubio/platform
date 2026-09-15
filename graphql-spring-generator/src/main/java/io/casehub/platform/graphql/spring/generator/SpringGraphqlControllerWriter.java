@@ -34,11 +34,23 @@ public class SpringGraphqlControllerWriter {
                 .addAnnotation(CONTROLLER);
 
         classBuilder.addField(FieldSpec.builder(spiType, fieldName, Modifier.PRIVATE, Modifier.FINAL).build());
-        classBuilder.addMethod(MethodSpec.constructorBuilder()
+
+        boolean needsCurrentPrincipal = domain.operations().stream()
+                .anyMatch(op -> op.params().stream().anyMatch(ResolvedParam::isContextParam));
+        ClassName currentPrincipalType = ClassName.get("io.casehub.platform.api.identity", "CurrentPrincipal");
+        if (needsCurrentPrincipal) {
+            classBuilder.addField(FieldSpec.builder(currentPrincipalType, "currentPrincipal", Modifier.PRIVATE, Modifier.FINAL).build());
+        }
+
+        MethodSpec.Builder ctorBuilder = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(spiType, fieldName)
-                .addStatement("this.$L = $L", fieldName, fieldName)
-                .build());
+                .addStatement("this.$L = $L", fieldName, fieldName);
+        if (needsCurrentPrincipal) {
+            ctorBuilder.addParameter(currentPrincipalType, "currentPrincipal")
+                    .addStatement("this.currentPrincipal = currentPrincipal");
+        }
+        classBuilder.addMethod(ctorBuilder.build());
 
         for (ResolvedOperation op : domain.operations()) {
             classBuilder.addMethod(buildMethod(op, fieldName));
@@ -60,6 +72,7 @@ public class SpringGraphqlControllerWriter {
                 .addAnnotation(mappingAnnotation);
 
         for (ResolvedParam param : op.params()) {
+            if (param.isContextParam()) { continue; }
             builder.addParameter(ParameterSpec.builder(param.typeName(), param.name())
                     .addAnnotation(AnnotationSpec.builder(ARGUMENT)
                             .addMember("name", "$S", param.name())
@@ -68,7 +81,7 @@ public class SpringGraphqlControllerWriter {
         }
 
         String args = op.params().stream()
-                .map(ResolvedParam::name)
+                .map(p -> p.isContextParam() ? contextParamResolution(p.contextParamKey()) : p.name())
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("");
 
@@ -79,5 +92,13 @@ public class SpringGraphqlControllerWriter {
         }
 
         return builder.build();
+    }
+
+    private static String contextParamResolution(String key) {
+        return switch (key) {
+            case "tenancyId" -> "currentPrincipal.tenancyId()";
+            case "actorId" -> "currentPrincipal.actorId()";
+            default -> throw new IllegalArgumentException("Unknown @ContextParam key: " + key);
+        };
     }
 }

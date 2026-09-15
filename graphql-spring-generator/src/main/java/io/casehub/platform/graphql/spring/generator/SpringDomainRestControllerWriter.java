@@ -55,11 +55,23 @@ public class SpringDomainRestControllerWriter {
                         .build());
 
         classBuilder.addField(FieldSpec.builder(spiType, fieldName, Modifier.PRIVATE, Modifier.FINAL).build());
-        classBuilder.addMethod(MethodSpec.constructorBuilder()
+
+        boolean needsCurrentPrincipal = domain.operations().stream()
+                .anyMatch(op -> op.params().stream().anyMatch(ResolvedParam::isContextParam));
+        ClassName currentPrincipalType = ClassName.get("io.casehub.platform.api.identity", "CurrentPrincipal");
+        if (needsCurrentPrincipal) {
+            classBuilder.addField(FieldSpec.builder(currentPrincipalType, "currentPrincipal", Modifier.PRIVATE, Modifier.FINAL).build());
+        }
+
+        MethodSpec.Builder ctorBuilder = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(spiType, fieldName)
-                .addStatement("this.$L = $L", fieldName, fieldName)
-                .build());
+                .addStatement("this.$L = $L", fieldName, fieldName);
+        if (needsCurrentPrincipal) {
+            ctorBuilder.addParameter(currentPrincipalType, "currentPrincipal")
+                    .addStatement("this.currentPrincipal = currentPrincipal");
+        }
+        classBuilder.addMethod(ctorBuilder.build());
 
         for (ResolvedOperation op : domain.operations()) {
             if (op.type() == OperationType.STREAM) {
@@ -130,6 +142,7 @@ public class SpringDomainRestControllerWriter {
 
         for (int i = 0; i < op.params().size(); i++) {
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
             ParameterSpec.Builder paramBuilder = ParameterSpec.builder(p.typeName(), p.name());
 
             if (pathParamPositions.contains(i)) {
@@ -148,7 +161,8 @@ public class SpringDomainRestControllerWriter {
             builder.addParameter(paramBuilder.build());
         }
 
-        String args = op.params().stream().map(ResolvedParam::name)
+        String args = op.params().stream()
+                .map(p -> p.isContextParam() ? contextParamResolution(p.contextParamKey()) : p.name())
                 .reduce((a, b) -> a + ", " + b).orElse("");
         String delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
         boolean isMutation = op.type() == OperationType.MUTATION;
@@ -192,6 +206,7 @@ public class SpringDomainRestControllerWriter {
 
         for (int i = 0; i < op.params().size(); i++) {
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
             ParameterSpec.Builder paramBuilder = ParameterSpec.builder(p.typeName(), p.name());
             if (pathParamPositions.contains(i)) {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
@@ -205,7 +220,8 @@ public class SpringDomainRestControllerWriter {
             builder.addParameter(paramBuilder.build());
         }
 
-        String args = op.params().stream().map(ResolvedParam::name)
+        String args = op.params().stream()
+                .map(p -> p.isContextParam() ? contextParamResolution(p.contextParamKey()) : p.name())
                 .reduce((a, b) -> a + ", " + b).orElse("");
 
         builder.addStatement("var emitter = new $T()", SSE_EMITTER);
@@ -262,5 +278,13 @@ public class SpringDomainRestControllerWriter {
 
         code.addStatement("return $T.ok($L)", RESPONSE_ENTITY, delegateCall);
         return code.build();
+    }
+
+    private static String contextParamResolution(String key) {
+        return switch (key) {
+            case "tenancyId" -> "currentPrincipal.tenancyId()";
+            case "actorId" -> "currentPrincipal.actorId()";
+            default -> throw new IllegalArgumentException("Unknown @ContextParam key: " + key);
+        };
     }
 }

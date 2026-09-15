@@ -1,6 +1,7 @@
 package io.casehub.platform.persistence.jpa;
 
 
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,6 +11,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+
+import java.util.Collections;
+import java.util.List;
 
 @Entity
 @Table(
@@ -47,4 +51,10 @@ public class PreferenceEntry {
 
     @Column(name = "pref_value", nullable = false, length = 4000)
     public String value;
+
+    static List<PreferenceEntry> findByScopes(EntityManager em, String tenancyId, List<String> scopes) {
+        if (scopes.isEmpty()) { return Collections.emptyList(); }
+        return em.createQuery("from PreferenceEntry where tenancyId = ?1 and scope in ?2", PreferenceEntry.class)
+                .setParameter(1, tenancyId).setParameter(2, scopes).getResultList();
+    }
 }

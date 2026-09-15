@@ -58,7 +58,9 @@ public class JpaPreferenceProvider implements PreferenceProvider {
     @Transactional(TxType.SUPPORTS)
     public Preferences resolve(final SettingsScope scope) {
         final List<String>          ancestors = ancestors(scope.scope());
-        final List<PreferenceEntry> rows      = findByScopes(scope.tenancyId(), ancestors);
+        final List<PreferenceEntry> rows = entityManager.createQuery(
+                "from PreferenceEntry where tenancyId = ?1 and scope in ?2", PreferenceEntry.class)
+                .setParameter(1, scope.tenancyId()).setParameter(2, ancestors).getResultList();
 
         final Map<String, Integer> scopeOrder = new HashMap<>();
         for (int i = 0; i < ancestors.size(); i++) {
@@ -77,14 +79,5 @@ public class JpaPreferenceProvider implements PreferenceProvider {
         }
 
         return new MapPreferences(merged);
-    }
-
-    private List<PreferenceEntry> findByScopes(final String tenancyId, final List<String> scopes) {
-        if (scopes.isEmpty()) { return List.of(); }
-        return entityManager.createQuery(
-                "from PreferenceEntry where tenancyId = ?1 and scope in ?2", PreferenceEntry.class)
-                .setParameter(1, tenancyId)
-                .setParameter(2, scopes)
-                .getResultList();
     }
 }

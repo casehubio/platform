@@ -20,7 +20,7 @@ class JpaPreferenceProviderTest {
     private static final String TENANT = io.casehub.platform.api.identity.TenancyConstants.DEFAULT_TENANT_ID;
 
     @Inject PreferenceProvider preferenceProvider;
-    @Inject EntityManager entityManager;
+    @Inject EntityManager em;
 
     record Count(int value) implements SingleValuePreference {
         static final PreferenceKey<Count> KEY = new PreferenceKey<>(
@@ -33,7 +33,7 @@ class JpaPreferenceProviderTest {
     @BeforeEach
     @Transactional
     void clear() {
-        entityManager.createQuery("delete from PreferenceEntry").executeUpdate();
+        em.createQuery("DELETE FROM PreferenceEntry").executeUpdate();
     }
 
     @Test
@@ -157,6 +157,6 @@ class JpaPreferenceProviderTest {
         e.name      = name;
         e.subKey    = subKey;
         e.value     = value;
-        entityManager.persist(e);
+        em.persist(e);
     }
 }

@@ -60,6 +60,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName REST_PATH_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
     private static final DotName REST_STATUS_ANN   = DotName.createSimple("io.casehub.platform.api.mcp.RestStatus");
     private static final DotName REST_NAME_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestName");
+    private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
     private static final DotName PAGINATED_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
 
@@ -327,8 +328,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             AnnotationInstance rnAnn    = findParameterAnnotation(method, i, REST_NAME_ANN);
             String             restName = (rnAnn != null && rnAnn.value() != null) ? rnAnn.value().asString() : null;
 
+            AnnotationInstance cpAnn = findParameterAnnotation(method, i, CONTEXT_PARAM_ANN);
+            boolean isContextParam = cpAnn != null;
+            String contextParamKey = (cpAnn != null && cpAnn.value() != null) ? cpAnn.value().asString() : null;
+
             boolean simple = isSimpleType(typeFqcn, jandexIndex);
-            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName));
+            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
         }
 
         imports.add(declaringClass.name().toString());
@@ -537,8 +542,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     String restName = rnAnn != null ? extractAnnotationStringValue(rnAnn) : null;
                     if (restName != null && restName.isEmpty()) {restName = null;}
 
+                    javax.lang.model.element.AnnotationMirror cpAnn = findAnnotationMirror(param,
+                                                                                            "io.casehub.platform.api.mcp.ContextParam");
+                    boolean isContextParam = cpAnn != null;
+                    String contextParamKey = isContextParam ? extractAnnotationStringValue(cpAnn) : null;
+
                     boolean simple = isSimpleTypeMirror(param.asType());
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
                 }
 
                 String classFqcn   = typeElement.getQualifiedName().toString();
@@ -654,6 +664,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     }
                 }
 
+                if (hasContextParams(toGenerate)) {
+                    out.println("    @Inject");
+                    out.println("    io.casehub.platform.api.identity.CurrentPrincipal currentPrincipal;");
+                    out.println();
+                }
+
                 for (ResolvedOperation op : toGenerate) {
                     generateMethod(out, op);
                 }
@@ -749,6 +765,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     }
                 }
 
+                if (hasContextParams(toGenerate)) {
+                    out.println("    @Inject");
+                    out.println("    io.casehub.platform.api.identity.CurrentPrincipal currentPrincipal;");
+                    out.println();
+                }
+
                 for (ResolvedOperation op : toGenerate) {
                     generateRestMethod(out, op);
                 }
@@ -821,9 +843,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         StringBuilder params = new StringBuilder();
+        boolean firstParam = true;
         for (int i = 0; i < op.params().size(); i++) {
-            if (i > 0) {params.append(", ");}
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
+
+            if (!firstParam) {params.append(", ");}
+            firstParam = false;
 
             if (pathParamPositions.contains(i)) {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
@@ -843,7 +869,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         StringBuilder args      = new StringBuilder();
         for (int i = 0; i < op.params().size(); i++) {
             if (i > 0) {args.append(", ");}
-            args.append(op.params().get(i).name());
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {
+                args.append(contextParamResolution(p.contextParamKey()));
+            } else {
+                args.append(p.name());
+            }
         }
 
         boolean isMutation = op.type() == OperationType.MUTATION;
@@ -888,9 +919,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         out.println("    @org.jboss.resteasy.reactive.RestStreamElementType(MediaType.APPLICATION_JSON)");
 
         StringBuilder params = new StringBuilder();
+        boolean firstParam = true;
         for (int i = 0; i < op.params().size(); i++) {
-            if (i > 0) {params.append(", ");}
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
+
+            if (!firstParam) {params.append(", ");}
+            firstParam = false;
+
             if (pathParamPositions.contains(i)) {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
                 params.append("@jakarta.ws.rs.PathParam(\"").append(pathName).append("\") ");
@@ -906,7 +942,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         StringBuilder args = new StringBuilder();
         for (int i = 0; i < op.params().size(); i++) {
             if (i > 0) {args.append(", ");}
-            args.append(op.params().get(i).name());
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {
+                args.append(contextParamResolution(p.contextParamKey()));
+            } else {
+                args.append(p.name());
+            }
         }
         out.println("        return " + fieldName + "." + op.methodName() + "(" + args + ");");
         out.println("    }");
@@ -926,9 +967,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         StringBuilder params = new StringBuilder();
+        boolean firstParam = true;
         for (int i = 0; i < op.params().size(); i++) {
-            if (i > 0) {params.append(", ");}
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
+
+            if (!firstParam) {params.append(", ");}
+            firstParam = false;
             params.append(p.typeStr()).append(" ").append(p.name());
         }
 
@@ -938,7 +983,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         StringBuilder args      = new StringBuilder();
         for (int i = 0; i < op.params().size(); i++) {
             if (i > 0) {args.append(", ");}
-            args.append(op.params().get(i).name());
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {
+                args.append(contextParamResolution(p.contextParamKey()));
+            } else {
+                args.append(p.name());
+            }
         }
 
         if ("void".equals(op.returnTypeStr())) {
@@ -958,9 +1008,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         StringBuilder params = new StringBuilder();
+        boolean firstParam = true;
         for (int i = 0; i < op.params().size(); i++) {
-            if (i > 0) {params.append(", ");}
             ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
+
+            if (!firstParam) {params.append(", ");}
+            firstParam = false;
             params.append(p.typeStr()).append(" ").append(p.name());
         }
 
@@ -969,11 +1023,33 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         StringBuilder args = new StringBuilder();
         for (int i = 0; i < op.params().size(); i++) {
             if (i > 0) {args.append(", ");}
-            args.append(op.params().get(i).name());
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {
+                args.append(contextParamResolution(p.contextParamKey()));
+            } else {
+                args.append(p.name());
+            }
         }
         out.println("        return " + fieldName + "." + op.methodName() + "(" + args + ");");
         out.println("    }");
         out.println();
+    }
+
+    private static boolean hasContextParams(List<ResolvedOperation> operations) {
+        for (ResolvedOperation op : operations) {
+            for (ResolvedParam p : op.params()) {
+                if (p.isContextParam()) { return true; }
+            }
+        }
+        return false;
+    }
+
+    private static String contextParamResolution(String key) {
+        return switch (key) {
+            case "tenancyId" -> "currentPrincipal.tenancyId()";
+            case "actorId" -> "currentPrincipal.actorId()";
+            default -> throw new IllegalArgumentException("Unknown @ContextParam key: " + key);
+        };
     }
 
     private Set<String> collectTypeImports(List<ResolvedOperation> operations) {
@@ -1227,7 +1303,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean isPathParam,
             String pathParamName,
             boolean isSimpleType,
-            String restName
+            String restName,
+            boolean isContextParam,
+            String contextParamKey
     ) {}
 
 

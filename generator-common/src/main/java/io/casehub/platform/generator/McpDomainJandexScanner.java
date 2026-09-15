@@ -28,6 +28,7 @@ public class McpDomainJandexScanner {
     private static final DotName REST_PATH_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
     private static final DotName REST_STATUS_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestStatus");
     private static final DotName REST_NAME_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestName");
+    private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
     private static final DotName PAGINATED_ANN = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
 
@@ -105,8 +106,12 @@ public class McpDomainJandexScanner {
                     AnnotationInstance rnAnn = findParameterAnnotation(method, i, REST_NAME_ANN);
                     String restName = (rnAnn != null && rnAnn.value() != null) ? rnAnn.value().asString() : null;
 
+                    AnnotationInstance cpAnn = findParameterAnnotation(method, i, CONTEXT_PARAM_ANN);
+                    boolean isContextParam = cpAnn != null;
+                    String contextParamKey = (cpAnn != null && cpAnn.value() != null) ? cpAnn.value().asString() : null;
+
                     boolean simple = GeneratorUtils.isSimpleType(typeFqcn, index);
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
                 }
 
                 typeImports.add(classInfo.name().toString());

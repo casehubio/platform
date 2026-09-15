@@ -10,5 +10,7 @@ public record ResolvedParam(
         boolean isPathParam,
         String pathParamName,
         boolean isSimpleType,
-        String restName
+        String restName,
+        boolean isContextParam,
+        String contextParamKey
 ) {}

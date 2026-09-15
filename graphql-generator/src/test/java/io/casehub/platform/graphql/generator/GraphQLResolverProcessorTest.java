@@ -475,6 +475,100 @@ class GraphQLResolverProcessorTest {
     }
 
 
+    @Test
+    void streamingRestProducesSseEndpoint() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.EventApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("events")
+                public interface EventApi {
+                    @PlatformStream("Real-time events")
+                    Multi<String> eventStream(@PathParam java.util.UUID scopeId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=events", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        var restSource = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedEventsResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("@Produces(MediaType.SERVER_SENT_EVENTS)");
+        assertThat(content).contains("RestStreamElementType(MediaType.APPLICATION_JSON)");
+        assertThat(content).contains("public Multi<String> eventStream(");
+        assertThat(content).doesNotContain("Response.ok");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+    }
+
+    @Test
+    void streamingGraphqlProducesSubscription() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SubApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("subs")
+                public interface SubApi {
+                    @PlatformStream("Live updates")
+                    Multi<String> updates(java.util.UUID id);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=subs", "-AgenerateRest=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.graphql.generated.GeneratedSubsResolver")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("Subscription");
+        assertThat(content).doesNotContain("@Query\n");
+        assertThat(content).contains("public Multi<String> updates(");
+    }
+
+    @Test
+    void nonStreamingRestHasMethodLevelVirtualThread() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.PlainApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+
+                @McpDomain("plain")
+                public interface PlainApi {
+                    @PlatformQuery("Get item")
+                    String getItem(@PathParam java.util.UUID id);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=plain", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedPlainResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("@RunOnVirtualThread");
+        assertThat(content).contains("public Response getItem(");
+    }
+
+    @Test
+    void httpVerbMapping_defaultStream_isGET() {
+        assertThat(GraphQLResolverProcessor.resolveHttpVerb(GraphQLResolverProcessor.OperationType.STREAM, null)).isEqualTo("GET");
+    }
+
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);

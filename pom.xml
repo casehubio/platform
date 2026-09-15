@@ -102,6 +102,7 @@
         <module>graphql-client</module>
         <module>mcp-core</module>
         <module>mcp</module>
+        <module>mcp-spring</module>
         <module>callback-api</module>
         <module>callback-inmem-core</module>
         <module>callback-inmem</module>
@@ -138,6 +139,7 @@
         <jandex-maven-plugin.version>3.3.1</jandex-maven-plugin.version>
         <langchain4j.version>1.14.1</langchain4j.version>
         <spring-boot.version>3.4.5</spring-boot.version>
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencyManagement>
@@ -160,6 +162,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

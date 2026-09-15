@@ -3,7 +3,7 @@ package io.casehub.platform.spring.generator;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
-import org.jboss.jandex.Index;
+import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.MethodParameterInfo;
 import org.jboss.jandex.Type;
@@ -30,7 +30,7 @@ public class JandexProducerScanner {
             DotName.createSimple("jakarta.enterprise.context.Dependent"),
             DotName.createSimple("jakarta.enterprise.context.RequestScoped"));
 
-    public List<ProducerDescriptor> scan(Index index) {
+    public List<ProducerDescriptor> scan(IndexView index) {
         List<ProducerDescriptor> result = new ArrayList<>();
 
         for (AnnotationInstance produces : index.getAnnotations(PRODUCES)) {

@@ -101,6 +101,7 @@
         <module>graphql-client</module>
         <module>mcp-core</module>
         <module>mcp</module>
+        <module>mcp-spring</module>
         <module>callback-api</module>
         <module>callback-inmem-core</module>
         <module>callback-inmem</module>

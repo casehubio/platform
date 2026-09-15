@@ -1,6 +1,7 @@
 package io.casehub.platform.simulation;
 
 import io.casehub.platform.simulation.strategy.KeyLookupStrategy;
+import io.casehub.platform.simulation.strategy.NearestMatchStrategy;
 import io.casehub.platform.simulation.strategy.RandomStrategy;
 import io.casehub.platform.simulation.strategy.RecordedReplayStrategy;
 import io.casehub.platform.simulation.strategy.SequentialStrategy;
@@ -161,6 +162,44 @@ class SimulationRuntimeTest {
 
         assertThatThrownBy(() -> strategy.get().resolve("any"))
                 .isInstanceOf(SimulationExhaustedException.class);
+    }
+
+    // --- nearest-match ---
+
+    @Test
+    void strategyForReturnsNearestMatchWhenScorerRegistered() {
+        final var config = stubConfig(Optional.of("nearest-match"), false, Optional.empty());
+        final var corpus = new NoOpSimulationCorpus<>();
+        final var runtime = new SimulationRuntime(config, corpus);
+        runtime.registerScorer(QN, (SimilarityScorer<String>) (q, c) -> q.equals(c) ? 1.0 : 0.0);
+
+        final var strategy = runtime.strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get()).isInstanceOf(NearestMatchStrategy.class);
+    }
+
+    @Test
+    void strategyForThrowsWhenNearestMatchWithoutScorer() {
+        final var config = stubConfig(Optional.of("nearest-match"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+
+        assertThatThrownBy(() -> runtime.strategyFor(QN))
+                .isInstanceOf(SimulationConfigException.class)
+                .hasMessageContaining("SimilarityScorer");
+    }
+
+    @Test
+    void nearestMatchStrategyResolvesFromRegisteredScorer() {
+        final var config = stubConfig(Optional.of("nearest-match"), false, Optional.empty());
+        final var corpus = new TestCorpus();
+        corpus.seed(QN, List.of(
+                new InvocationRecord<>("t1", null, "hello", "world", Instant.now())));
+        final var runtime = new SimulationRuntime(config, corpus);
+        runtime.registerScorer(QN, (SimilarityScorer<String>) (q, c) -> q.equals(c) ? 1.0 : 0.0);
+
+        final Optional<SimulationStrategy<String, String>> strategy = runtime.strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("hello")).isEqualTo("world");
     }
 
     // --- helpers ---

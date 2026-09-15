@@ -16,6 +16,13 @@
     <description>REST API for writing preferences to any backend</description>
 
     <dependencies>
+        <!-- Forces reactor to build graphql-generator before this module (annotationProcessorPaths doesn't create reactor deps) -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-graphql-generator</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-preferences-editor-core</artifactId>

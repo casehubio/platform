@@ -10,4 +10,5 @@ import static java.lang.annotation.ElementType.TYPE;
 @Target(TYPE)
 public @interface McpDomain {
     String value();
+    String basePath() default "";
 }

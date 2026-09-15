@@ -1,6 +1,6 @@
 package io.casehub.platform.acl.jpa;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,7 +24,7 @@ import java.time.Instant;
                @Index(name = "idx_acl_tenancy", columnList = "tenancy_id"),
                @Index(name = "idx_acl_entry_type", columnList = "entry_type")
        })
-public class AclEntryEntity extends PanacheEntityBase {
+public class AclEntryEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "acl_entry_seq")

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.util.UUIDv7;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "digest_buffer")
-public class DigestBufferEntity extends PanacheEntityBase {
+public class DigestBufferEntity {
 
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 

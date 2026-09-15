@@ -1,7 +1,7 @@
 package io.casehub.platform.acl.jpa;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,7 +24,7 @@ import java.time.Instant;
                 @Index(name = "idx_audit_performed_at", columnList = "performed_at"),
                 @Index(name = "idx_audit_tenancy", columnList = "tenancy_id")
         })
-public class AclAuditLogEntity extends PanacheEntityBase {
+public class AclAuditLogEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "acl_audit_log_seq")

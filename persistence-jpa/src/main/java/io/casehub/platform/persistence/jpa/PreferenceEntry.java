@@ -1,6 +1,6 @@
 package io.casehub.platform.persistence.jpa;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +22,7 @@ import java.util.List;
                 columnNames = {"tenancy_id", "scope", "namespace", "pref_name", "sub_key"}),
         indexes = @Index(name = "idx_platform_preference_scope", columnList = "scope")
 )
-public class PreferenceEntry extends PanacheEntityBase {
+public class PreferenceEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "platform_preference_seq")

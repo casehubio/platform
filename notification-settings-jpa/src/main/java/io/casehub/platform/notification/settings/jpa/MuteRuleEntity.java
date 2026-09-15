@@ -4,7 +4,7 @@ import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.api.notification.settings.MuteRule;
 import io.casehub.platform.api.notification.settings.MuteRuleInput;
 import io.casehub.platform.api.notification.settings.MuteScope;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,7 +20,7 @@ import java.time.Instant;
         indexes = {
                 @Index(name = "idx_mute_rules_user_tenant", columnList = "user_id, tenancy_id")
         })
-public class MuteRuleEntity extends PanacheEntityBase {
+public class MuteRuleEntity {
 
     @Id
     @Column(length = 36, nullable = false)

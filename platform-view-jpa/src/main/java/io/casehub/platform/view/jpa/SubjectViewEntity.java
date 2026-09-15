@@ -2,7 +2,7 @@ package io.casehub.platform.view.jpa;
 
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.api.view.SubjectViewSpec;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "subject_view")
-public class SubjectViewEntity extends PanacheEntityBase {
+public class SubjectViewEntity {
 
     @Id
     public UUID id;

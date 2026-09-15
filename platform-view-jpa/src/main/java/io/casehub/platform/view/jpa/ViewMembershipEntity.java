@@ -1,6 +1,6 @@
 package io.casehub.platform.view.jpa;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.*;
 
 import java.io.Serializable;
@@ -10,7 +10,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "view_membership")
 @IdClass(ViewMembershipEntity.Key.class)
-public class ViewMembershipEntity extends PanacheEntityBase {
+public class ViewMembershipEntity {
 
     @Id
     @Column(name = "subject_id")

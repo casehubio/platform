@@ -2,7 +2,7 @@ package io.casehub.platform.notification.settings.jpa;
 
 import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -16,7 +16,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "snooze")
 @IdClass(SnoozeEntity.SnoozePK.class)
-public class SnoozeEntity extends PanacheEntityBase {
+public class SnoozeEntity {
 
     @Id
     @Column(name = "user_id", nullable = false)

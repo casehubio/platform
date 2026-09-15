@@ -1,6 +1,6 @@
 package io.casehub.platform.acl.jpa;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -12,7 +12,7 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "resource_parent",
        indexes = @Index(name = "idx_rp_parent", columnList = "parent_resource_id"))
-public class ResourceParentEntity extends PanacheEntityBase {
+public class ResourceParentEntity {
 
     @Id
     @Column(name = "child_resource_id")

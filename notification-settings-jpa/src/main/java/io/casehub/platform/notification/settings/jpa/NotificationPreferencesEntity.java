@@ -7,7 +7,7 @@ import io.casehub.platform.api.notification.settings.ChannelPreference;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceUpdate;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
 import io.casehub.platform.api.notification.settings.QuietHours;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -23,7 +23,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "notification_preferences")
 @IdClass(NotificationPreferencesEntity.PreferencesPK.class)
-public class NotificationPreferencesEntity extends PanacheEntityBase {
+public class NotificationPreferencesEntity {
 
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
     private static final TypeReference<Map<String, ChannelPreference>> CHANNEL_MAP_TYPE =

@@ -1,6 +1,6 @@
 package io.casehub.platform.memory.jpa;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -10,7 +10,7 @@ import java.time.Instant;
 /** JPA entity for a stored memory. domain stored as String (MemoryDomain.name()). */
 @Entity
 @Table(name = "memory_entry")
-public class MemoryEntry extends PanacheEntityBase {
+public class MemoryEntry {
 
     @Id
     @Column(name = "memory_id", length = 36, nullable = false)

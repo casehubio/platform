@@ -107,6 +107,7 @@ Configurable simulation for any SPI — real responses when you have a real back
 | `casehub-platform-simulation-api` | Core contracts: `SimulationStrategy`, `SimulationCorpus`, `InvocationRecord`, `KeyExtractor`, `@SimulationEligible`. Zero deps |
 | `casehub-platform-simulation-core` | Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay) + `SimulationRuntime` |
 | `casehub-platform-simulation-inmem` | In-memory `SimulationCorpus` @Alternative @Priority(100) — volatile, thread-safe |
+| `casehub-platform-simulation-config` | Config binding (`application.properties` → `SimulationConfig`), YAML corpus fixtures, declarative KeyExtractors. Required alongside `simulation-generator` |
 | `casehub-platform-simulation-generator` (provided scope) | APT: generates `@Decorator` per `@SimulationEligible` SPI |
 | `casehub-platform-agent-simulation-core` | `SimulatedAgentBackend` — Path B integration for `AgentProvider` simulation |
 

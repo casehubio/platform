@@ -325,6 +325,42 @@ This is the **Best-Effort Replay** pattern — ideal for replaying captured
 traffic where known requests replay exactly and unexpected requests get
 sequential responses.
 
+### Nearest-match — weighted similarity scoring
+
+Scores all corpus entries against the input using a `SimilarityScorer<I>`
+and returns the best match above a configurable threshold. Use when inputs
+vary between runs (different UUIDs, amounts, entity names) but the response
+shape is stable — and a normalizing KeyExtractor can't make the key exact.
+
+```properties
+casehub.simulation.my-spi.method.strategy=nearest-match
+casehub.simulation.my-spi.method.threshold=0.7
+casehub.simulation.my-spi.method.scorer=fields:domain:exact:1.0,question:substring:0.5
+```
+
+Programmatic registration for complex scoring:
+
+```java
+runtime.registerScorer("my-spi.method",
+    RecordFieldScorer.<MyInput>builder()
+        .field("domain", FieldSimilarity.EXACT, 1.0)
+        .field("question", FieldSimilarity.SUBSTRING, 0.5)
+        .field("limit", FieldSimilarity.IGNORE, 0.0)
+        .build());
+```
+
+Or a custom lambda:
+
+```java
+runtime.registerScorer("my-spi.method",
+    (MyInput q, MyInput c) -> /* custom scoring logic */);
+```
+
+Built-in field scorers: `exact` (1.0/0.0), `substring` (containment),
+`numeric-range` (proportional distance), `ignore` (always 1.0).
+
+O(n) corpus scan — suitable for small corpora (10-50 entries).
+
 ---
 
 ## KeyExtractors
@@ -707,6 +743,9 @@ Is the input deterministic? (same input = same expected output)
 │
 ├── PARTIALLY — I have some known inputs, but expect unknown ones too
 │   └── recorded-replay (Best-Effort Replay pattern)
+│
+├── FUZZY — inputs vary but are structurally similar
+│   └── nearest-match + SimilarityScorer (threshold-based)
 │
 ├── NO — I need a predictable sequence
 │   ├── Finite calls? → sequential + THROW (Counted Scenario)

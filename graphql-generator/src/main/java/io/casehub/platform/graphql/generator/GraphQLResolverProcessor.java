@@ -30,11 +30,15 @@ import java.util.Map;
 import java.util.Set;
 
 @SupportedAnnotationTypes("*")
-@javax.annotation.processing.SupportedOptions({"generateGraphQL", "generateRest", "domainFilter"})
 public class GraphQLResolverProcessor extends AbstractProcessor {
     @Override
     public SourceVersion getSupportedSourceVersion() {
         return SourceVersion.latestSupported();
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        return Set.of("generateGraphQL", "generateRest", "domainFilter");
     }
 
 

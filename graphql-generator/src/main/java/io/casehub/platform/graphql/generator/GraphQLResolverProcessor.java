@@ -835,9 +835,16 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         boolean hasBody = bodyParamIndex >= 0;
 
         StringBuilder pathSuffix = new StringBuilder();
-        pathSuffix.append("/").append(resolveRestPath(op.restPathOverride(), op.methodName()));
+        String resolvedPath = resolveRestPath(op.restPathOverride(), op.methodName());
+        if (resolvedPath.startsWith("/")) {
+            pathSuffix.append(resolvedPath);
+        } else {
+            pathSuffix.append("/").append(resolvedPath);
+        }
         for (String pp : pathParams) {
-            pathSuffix.append("/{").append(pp).append("}");
+            if (!resolvedPath.contains("{" + pp + "}")) {
+                pathSuffix.append("/{").append(pp).append("}");
+            }
         }
 
         if (!op.rolesAllowed().isEmpty()) {
@@ -917,9 +924,16 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         StringBuilder pathSuffix = new StringBuilder();
-        pathSuffix.append("/").append(resolveRestPath(op.restPathOverride(), op.methodName()));
+        String resolvedPath = resolveRestPath(op.restPathOverride(), op.methodName());
+        if (resolvedPath.startsWith("/")) {
+            pathSuffix.append(resolvedPath);
+        } else {
+            pathSuffix.append("/").append(resolvedPath);
+        }
         for (String pp : pathParams) {
-            pathSuffix.append("/{").append(pp).append("}");
+            if (!resolvedPath.contains("{" + pp + "}")) {
+                pathSuffix.append("/{").append(pp).append("}");
+            }
         }
 
         if (!op.description().isEmpty() && isOpenApiAvailable()) {

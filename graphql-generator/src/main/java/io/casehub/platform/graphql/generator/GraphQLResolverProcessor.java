@@ -66,27 +66,31 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         processed = true;
 
         IndexView index = loadCombinedIndex();
-        if (index == null) {
-            return false;
-        }
         this.jandexIndex = index;
 
-        Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index);
-        Set<String> restSkipMethods = scanHandWrittenRestMethods(index);
-        Map<String, DomainOperations> domains = scanAnnotatedInterfaces(index);
+        Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index, roundEnv);
+        Set<String> restSkipMethods    = scanHandWrittenRestMethods(index, roundEnv);
 
-        if (domains.isEmpty()) {
+        Map<String, DomainOperations> jandexDomains =
+                index != null ? scanAnnotatedInterfaces(index) : new HashMap<>();
+        Map<String, DomainOperations> roundEnvDomains = scanRoundEnvironment(roundEnv);
+
+        Map<String, DomainOperations> allDomains = new HashMap<>(roundEnvDomains);
+        allDomains.putAll(jandexDomains);
+
+        if (allDomains.isEmpty()) {
             return false;
         }
 
         boolean generateGraphQL = !"false".equals(processingEnv.getOptions().get("generateGraphQL"));
-        boolean generateRest = !"false".equals(processingEnv.getOptions().get("generateRest"));
-        String domainFilter = processingEnv.getOptions().get("domainFilter");
+        boolean generateRest    = !"false".equals(processingEnv.getOptions().get("generateRest"));
+        String  domainFilter    = processingEnv.getOptions().get("domainFilter");
         Set<String> allowedDomains = domainFilter != null
-            ? java.util.Arrays.stream(domainFilter.split(",")).map(String::trim).collect(java.util.stream.Collectors.toSet())
-            : null;
+                                     ? java.util.Arrays.stream(domainFilter.split(",")).map(String::trim)
+                                                       .collect(java.util.stream.Collectors.toSet())
+                                     : null;
 
-        for (var entry : domains.entrySet()) {
+        for (var entry : allDomains.entrySet()) {
             if (allowedDomains != null && !allowedDomains.contains(entry.getKey())) {
                 continue;
             }
@@ -98,8 +102,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
         }
 
-        return false;
-    }
+        return false;}
 
     private IndexView loadCombinedIndex() {
         List<IndexView> indexes = new ArrayList<>();
@@ -127,36 +130,77 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return CompositeIndex.create(indexes);
     }
 
-    private Set<String> scanHandWrittenGraphQLMethods(IndexView index) {
+    private Set<String> scanHandWrittenGraphQLMethods(IndexView index, RoundEnvironment roundEnv) {
         Set<String> methods = new HashSet<>();
-        for (AnnotationInstance ann : index.getAnnotations(GRAPHQL_API)) {
-            if (ann.target().kind() != AnnotationTarget.Kind.CLASS) continue;
-            ClassInfo classInfo = ann.target().asClass();
-            AnnotationInstance mcpDomain = classInfo.annotation(MCP_DOMAIN);
-            if (mcpDomain == null) continue;
-            String domain = mcpDomain.value().asString();
-            for (MethodInfo method : classInfo.methods()) {
-                if (method.hasAnnotation(QUERY) || method.hasAnnotation(MUTATION)) {
-                    methods.add(domain + ":" + method.name());
+        if (index != null) {
+            for (AnnotationInstance ann : index.getAnnotations(GRAPHQL_API)) {
+                if (ann.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
+                ClassInfo          classInfo = ann.target().asClass();
+                AnnotationInstance mcpDomain = classInfo.annotation(MCP_DOMAIN);
+                if (mcpDomain == null) {continue;}
+                String domain = mcpDomain.value().asString();
+                for (MethodInfo method : classInfo.methods()) {
+                    if (method.hasAnnotation(QUERY) || method.hasAnnotation(MUTATION)) {
+                        methods.add(domain + ":" + method.name());
+                    }
+                }
+            }
+        }
+        for (javax.lang.model.element.Element element : roundEnv.getRootElements()) {
+            if (element.getKind() != javax.lang.model.element.ElementKind.CLASS) {continue;}
+            javax.lang.model.element.AnnotationMirror graphqlApi = findAnnotationMirror(element,
+                                                                                        "org.eclipse.microprofile.graphql.GraphQLApi");
+            if (graphqlApi == null) {continue;}
+            javax.lang.model.element.AnnotationMirror mcpDomain = findAnnotationMirror(element,
+                                                                                       "io.casehub.platform.api.mcp.McpDomain");
+            if (mcpDomain == null) {continue;}
+            String domain = extractAnnotationStringValue(mcpDomain);
+            for (javax.lang.model.element.Element enclosed : element.getEnclosedElements()) {
+                if (enclosed.getKind() != javax.lang.model.element.ElementKind.METHOD) {continue;}
+                if (findAnnotationMirror(enclosed, "org.eclipse.microprofile.graphql.Query") != null
+                    || findAnnotationMirror(enclosed, "org.eclipse.microprofile.graphql.Mutation") != null) {
+                    methods.add(domain + ":" + enclosed.getSimpleName().toString());
                 }
             }
         }
         return methods;
     }
 
-    private Set<String> scanHandWrittenRestMethods(IndexView index) {
+    private Set<String> scanHandWrittenRestMethods(IndexView index, RoundEnvironment roundEnv) {
         Set<String> methods = new HashSet<>();
-        for (AnnotationInstance pathAnn : index.getAnnotations(PATH)) {
-            if (pathAnn.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
-            ClassInfo          classInfo = pathAnn.target().asClass();
-            AnnotationInstance mcpDomain = classInfo.annotation(MCP_DOMAIN);
+        if (index != null) {
+            for (AnnotationInstance pathAnn : index.getAnnotations(PATH)) {
+                if (pathAnn.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
+                ClassInfo          classInfo = pathAnn.target().asClass();
+                AnnotationInstance mcpDomain = classInfo.annotation(MCP_DOMAIN);
+                if (mcpDomain == null) {continue;}
+                String domain = mcpDomain.value().asString();
+                for (MethodInfo method : classInfo.methods()) {
+                    if (method.hasAnnotation(JAX_GET) || method.hasAnnotation(JAX_POST)
+                        || method.hasAnnotation(JAX_PUT) || method.hasAnnotation(JAX_DELETE)
+                        || method.hasAnnotation(JAX_PATCH)) {
+                        methods.add(domain + ":" + method.name());
+                    }
+                }
+            }
+        }
+        for (javax.lang.model.element.Element element : roundEnv.getRootElements()) {
+            if (element.getKind() != javax.lang.model.element.ElementKind.CLASS) {continue;}
+            javax.lang.model.element.AnnotationMirror pathAnn = findAnnotationMirror(element,
+                                                                                     "jakarta.ws.rs.Path");
+            if (pathAnn == null) {continue;}
+            javax.lang.model.element.AnnotationMirror mcpDomain = findAnnotationMirror(element,
+                                                                                       "io.casehub.platform.api.mcp.McpDomain");
             if (mcpDomain == null) {continue;}
-            String domain = mcpDomain.value().asString();
-            for (MethodInfo method : classInfo.methods()) {
-                if (method.hasAnnotation(JAX_GET) || method.hasAnnotation(JAX_POST)
-                    || method.hasAnnotation(JAX_PUT) || method.hasAnnotation(JAX_DELETE)
-                    || method.hasAnnotation(JAX_PATCH)) {
-                    methods.add(domain + ":" + method.name());
+            String domain = extractAnnotationStringValue(mcpDomain);
+            for (javax.lang.model.element.Element enclosed : element.getEnclosedElements()) {
+                if (enclosed.getKind() != javax.lang.model.element.ElementKind.METHOD) {continue;}
+                if (findAnnotationMirror(enclosed, "jakarta.ws.rs.GET") != null
+                    || findAnnotationMirror(enclosed, "jakarta.ws.rs.POST") != null
+                    || findAnnotationMirror(enclosed, "jakarta.ws.rs.PUT") != null
+                    || findAnnotationMirror(enclosed, "jakarta.ws.rs.DELETE") != null
+                    || findAnnotationMirror(enclosed, "jakarta.ws.rs.PATCH") != null) {
+                    methods.add(domain + ":" + enclosed.getSimpleName().toString());
                 }
             }
         }
@@ -237,6 +281,186 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 declaringClass.name().toString(), declaringClass.simpleName(),
                 opType, description, restMethodOverride, restPathOverride
         );
+    }
+
+    private javax.lang.model.element.AnnotationMirror findAnnotationMirror(
+            javax.lang.model.element.Element element, String annotationFqcn) {
+        for (javax.lang.model.element.AnnotationMirror am : element.getAnnotationMirrors()) {
+            if (am.getAnnotationType().toString().equals(annotationFqcn)) {
+                return am;
+            }
+        }
+        return null;
+    }
+
+    private String extractAnnotationStringValue(javax.lang.model.element.AnnotationMirror am) {
+        for (var entry : am.getElementValues().entrySet()) {
+            if (entry.getKey().getSimpleName().contentEquals("value")) {
+                return entry.getValue().getValue().toString();
+            }
+        }
+        return "";
+    }
+
+    private String typeMirrorToJava(javax.lang.model.type.TypeMirror type) {
+        return switch (type.getKind()) {
+            case VOID -> "void";
+            case BOOLEAN -> "boolean";
+            case BYTE -> "byte";
+            case SHORT -> "short";
+            case INT -> "int";
+            case LONG -> "long";
+            case FLOAT -> "float";
+            case DOUBLE -> "double";
+            case CHAR -> "char";
+            case DECLARED -> {
+                javax.lang.model.type.DeclaredType dt     = (javax.lang.model.type.DeclaredType) type;
+                String                             simple = ((javax.lang.model.element.TypeElement) dt.asElement()).getSimpleName().toString();
+                if (dt.getTypeArguments().isEmpty()) {
+                    yield simple;
+                }
+                StringBuilder sb = new StringBuilder(simple).append("<");
+                for (int i = 0; i < dt.getTypeArguments().size(); i++) {
+                    if (i > 0) {sb.append(", ");}
+                    sb.append(typeMirrorToJava(dt.getTypeArguments().get(i)));
+                }
+                sb.append(">");
+                yield sb.toString();
+            }
+            case ARRAY -> typeMirrorToJava(((javax.lang.model.type.ArrayType) type).getComponentType()) + "[]";
+            default -> type.toString();
+        };
+    }
+
+    private void collectTypeMirrorImports(Set<String> imports, javax.lang.model.type.TypeMirror type) {
+        if (type.getKind() == javax.lang.model.type.TypeKind.DECLARED) {
+            javax.lang.model.type.DeclaredType dt   = (javax.lang.model.type.DeclaredType) type;
+            String                             fqcn = ((javax.lang.model.element.TypeElement) dt.asElement()).getQualifiedName().toString();
+            imports.add(fqcn);
+            for (javax.lang.model.type.TypeMirror arg : dt.getTypeArguments()) {
+                collectTypeMirrorImports(imports, arg);
+            }
+        } else if (type.getKind() == javax.lang.model.type.TypeKind.ARRAY) {
+            collectTypeMirrorImports(imports, ((javax.lang.model.type.ArrayType) type).getComponentType());
+        }
+    }
+
+    private boolean isSimpleTypeMirror(javax.lang.model.type.TypeMirror type) {
+        if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {return false;}
+        String fqcn = ((javax.lang.model.element.TypeElement)
+                               ((javax.lang.model.type.DeclaredType) type).asElement()).getQualifiedName().toString();
+        if (isSimpleType(fqcn, jandexIndex)) {return true;}
+        javax.lang.model.element.Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+        if (element.getKind() == javax.lang.model.element.ElementKind.ENUM) {return true;}
+        for (javax.lang.model.element.Element enclosed : element.getEnclosedElements()) {
+            if (enclosed.getKind() == javax.lang.model.element.ElementKind.METHOD) {
+                javax.lang.model.element.ExecutableElement method =
+                        (javax.lang.model.element.ExecutableElement) enclosed;
+                if (method.getModifiers().contains(javax.lang.model.element.Modifier.STATIC)
+                    && method.getParameters().size() == 1
+                    && method.getParameters().get(0).asType().toString().equals("java.lang.String")
+                    && (method.getSimpleName().contentEquals("fromString")
+                        || method.getSimpleName().contentEquals("valueOf"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private Map<String, DomainOperations> scanRoundEnvironment(RoundEnvironment roundEnv) {
+        Map<String, DomainOperations> domains = new HashMap<>();
+
+        Set<? extends javax.lang.model.element.Element> annotated;
+        try {
+            annotated = roundEnv.getElementsAnnotatedWith(
+                    io.casehub.platform.api.mcp.McpDomain.class);
+        } catch (Exception e) {
+            return domains;
+        }
+
+        for (javax.lang.model.element.Element element : annotated) {
+            if (element.getKind() != javax.lang.model.element.ElementKind.INTERFACE) {continue;}
+            javax.lang.model.element.TypeElement typeElement =
+                    (javax.lang.model.element.TypeElement) element;
+
+            javax.lang.model.element.AnnotationMirror mcpAnn = findAnnotationMirror(element,
+                                                                                    "io.casehub.platform.api.mcp.McpDomain");
+            if (mcpAnn == null) {continue;}
+            String domain = extractAnnotationStringValue(mcpAnn);
+            if (domain.isEmpty()) {continue;}
+
+            DomainOperations ops = domains.computeIfAbsent(domain,
+                                                           d -> new DomainOperations(d, Source.ROUND_ENV));
+
+            for (javax.lang.model.element.Element enclosed : typeElement.getEnclosedElements()) {
+                if (enclosed.getKind() != javax.lang.model.element.ElementKind.METHOD) {continue;}
+                javax.lang.model.element.ExecutableElement method =
+                        (javax.lang.model.element.ExecutableElement) enclosed;
+
+                javax.lang.model.element.AnnotationMirror queryAnn = findAnnotationMirror(method,
+                                                                                          "io.casehub.platform.api.mcp.PlatformQuery");
+                javax.lang.model.element.AnnotationMirror mutAnn = findAnnotationMirror(method,
+                                                                                        "io.casehub.platform.api.mcp.PlatformMutation");
+                if (queryAnn == null && mutAnn == null) {continue;}
+
+                OperationType opType = queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
+                String desc = queryAnn != null
+                              ? extractAnnotationStringValue(queryAnn)
+                              : extractAnnotationStringValue(mutAnn);
+
+                String restMethodOverride = null;
+                javax.lang.model.element.AnnotationMirror restMethodAnn = findAnnotationMirror(method,
+                                                                                               "io.casehub.platform.api.mcp.RestMethod");
+                if (restMethodAnn != null) {
+                    restMethodOverride = extractAnnotationStringValue(restMethodAnn);
+                }
+
+                String restPathOverride = null;
+                javax.lang.model.element.AnnotationMirror restPathAnn = findAnnotationMirror(method,
+                                                                                             "io.casehub.platform.api.mcp.RestPath");
+                if (restPathAnn != null) {
+                    restPathOverride = extractAnnotationStringValue(restPathAnn);
+                }
+
+                String      returnTypeStr = typeMirrorToJava(method.getReturnType());
+                Set<String> imports       = new HashSet<>();
+                collectTypeMirrorImports(imports, method.getReturnType());
+
+                List<ResolvedParam> params = new ArrayList<>();
+                for (var param : method.getParameters()) {
+                    String paramName = param.getSimpleName().toString();
+                    String typeStr   = typeMirrorToJava(param.asType());
+                    String typeFqcn = param.asType().getKind() == javax.lang.model.type.TypeKind.DECLARED
+                                      ? ((javax.lang.model.element.TypeElement)
+                                                 ((javax.lang.model.type.DeclaredType) param.asType()).asElement())
+                                        .getQualifiedName().toString()
+                                      : param.asType().toString();
+                    collectTypeMirrorImports(imports, param.asType());
+
+                    javax.lang.model.element.AnnotationMirror ppAnn = findAnnotationMirror(param,
+                                                                                           "io.casehub.platform.api.mcp.PathParam");
+                    boolean isPathParam   = ppAnn != null;
+                    String  pathParamName = isPathParam ? extractAnnotationStringValue(ppAnn) : null;
+                    if (pathParamName != null && pathParamName.isEmpty()) {pathParamName = null;}
+
+                    boolean simple = isSimpleTypeMirror(param.asType());
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple));
+                }
+
+                String classFqcn   = typeElement.getQualifiedName().toString();
+                String classSimple = typeElement.getSimpleName().toString();
+                imports.add(classFqcn);
+
+                ops.operations.add(new ResolvedOperation(
+                        method.getSimpleName().toString(), returnTypeStr, params, imports,
+                        classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride));
+            }
+        }
+
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                                                 "GraphQL generator: RoundEnv scan found " + domains.size() + " domain(s)");
+        return domains;
     }
 
 

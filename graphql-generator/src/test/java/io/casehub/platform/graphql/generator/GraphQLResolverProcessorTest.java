@@ -215,6 +215,43 @@ class GraphQLResolverProcessorTest {
     }
 
 
+    @Test
+    void roundEnvScanDiscoversLocalInterface() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SampleApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.McpDomain;
+                import io.casehub.platform.api.mcp.PlatformQuery;
+                import java.util.List;
+                
+                @McpDomain("sample")
+                public interface SampleApi {
+                    @PlatformQuery("List items")
+                    List<String> listItems();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=sample", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        var restSource = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedSampleResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("class GeneratedSampleResource");
+        assertThat(content).contains("@Path(\"/api/sample\")");
+        assertThat(content).contains("import test.SampleApi;");
+        assertThat(content).contains("public Response listItems(");
+
+        var graphqlSource = compilation.generatedSourceFile(
+                "io.casehub.platform.graphql.generated.GeneratedSampleResolver");
+        assertThat(graphqlSource).isEmpty();
+    }
+
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);

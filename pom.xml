@@ -11,6 +11,7 @@
 
     <modules>
         <module>platform-api</module>
+        <module>simulation-api</module>
         <module>agent-api</module>
         <module>platform-core</module>
         <module>platform</module>

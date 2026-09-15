@@ -1,16 +1,14 @@
 package io.casehub.platform.mcp;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-<<<<<<<< HEAD:mcp/src/main/java/io/casehub/platform/mcp/DomainModelRegistry.java
 @ApplicationScoped
 public class DomainModelRegistry {
-========
-public class ModelRegistry {
->>>>>>>> 813062bd (feat(#276): extract framework-neutral core from platform modules):mcp-core/src/main/java/io/casehub/platform/mcp/ModelRegistry.java
 
     private final Map<String, DomainModel> domains = new ConcurrentHashMap<>();
 

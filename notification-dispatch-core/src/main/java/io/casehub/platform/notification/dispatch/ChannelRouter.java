@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class ChannelRouter {
+    static final String NON_USER_CHANNEL_ID = "cdi-event";
+
 
     private static final Logger LOG = Logger.getLogger(ChannelRouter.class);
 
@@ -100,13 +102,13 @@ public class ChannelRouter {
      * Returns the CdiEventDeliverer channel.
      */
     public Set<ResolvedChannel> routeNonUser() {
-        var deliverer = channelRegistry.resolveDeliverer(CdiEventDeliverer.CHANNEL_ID);
+        var deliverer = channelRegistry.resolveDeliverer(NON_USER_CHANNEL_ID);
         if (deliverer.isEmpty()) {
             LOG.warnf("CdiEventDeliverer not registered — non-user delivery will fail");
             return Set.of();
         }
         return Set.of(new ResolvedChannel(
-                CdiEventDeliverer.CHANNEL_ID, deliverer.get(),
+                NON_USER_CHANNEL_ID, deliverer.get(),
                 false, false, null,
                 io.casehub.platform.api.delivery.DestinationScope.PER_USER));
     }

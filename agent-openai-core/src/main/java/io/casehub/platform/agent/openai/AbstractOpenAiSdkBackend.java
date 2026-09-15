@@ -17,7 +17,7 @@ import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
-import jakarta.annotation.PreDestroy;
+
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -147,8 +147,7 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
         });
     }
 
-    @PreDestroy
-    void shutdown() {
+    public void shutdown() {
         if (timeoutScheduler != null) {
             timeoutScheduler.shutdownNow();
         }

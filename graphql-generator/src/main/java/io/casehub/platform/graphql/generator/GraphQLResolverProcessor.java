@@ -61,6 +61,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName REST_STATUS_ANN   = DotName.createSimple("io.casehub.platform.api.mcp.RestStatus");
     private static final DotName REST_NAME_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestName");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
+    private static final DotName PAGINATED_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
 
 
     private boolean   processed = false;
@@ -338,11 +339,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             rolesAllowed = List.of(raAnn.value().asStringArray());
         }
 
+        boolean paginated = method.hasAnnotation(PAGINATED_ANN);
+        String totalCountMethod = "totalCount";
+        if (paginated) {
+            AnnotationInstance pgAnn = method.annotation(PAGINATED_ANN);
+            if (pgAnn != null && pgAnn.value("totalCountMethod") != null) {
+                totalCountMethod = pgAnn.value("totalCountMethod").asString();
+            }
+        }
+
         return new ResolvedOperation(
                 method.name(), returnTypeStr, params, imports,
                 declaringClass.name().toString(), declaringClass.simpleName(),
                 opType, description, restMethodOverride, restPathOverride,
-                restStatusOverride, rolesAllowed
+                restStatusOverride, rolesAllowed, paginated, totalCountMethod
         );
     }
 
@@ -548,10 +558,21 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     }
                 }
 
+                boolean paginated = findAnnotationMirror(method, "io.casehub.platform.api.mcp.PaginatedResponse") != null;
+                String totalCountMethod = "totalCount";
+                if (paginated) {
+                    javax.lang.model.element.AnnotationMirror pgAnn = findAnnotationMirror(method, "io.casehub.platform.api.mcp.PaginatedResponse");
+                    for (var e : pgAnn.getElementValues().entrySet()) {
+                        if (e.getKey().getSimpleName().contentEquals("totalCountMethod")) {
+                            totalCountMethod = e.getValue().getValue().toString();
+                        }
+                    }
+                }
+
                 ops.operations.add(new ResolvedOperation(
                         method.getSimpleName().toString(), returnTypeStr, params, imports,
                         classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride,
-                        restStatusOverride, rolesAllowed));
+                        restStatusOverride, rolesAllowed, paginated, totalCountMethod));
             }
         }
 
@@ -828,8 +849,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         boolean isMutation = op.type() == OperationType.MUTATION;
         boolean hasPathParam = !pathParams.isEmpty();
         String delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
-        String responseCode = generateResponseCode(op.returnTypeStr(), delegateCall, isMutation, op.restStatusOverride(), hasPathParam);
-        out.println("        " + responseCode);
+        if (op.paginated()) {
+            out.println("        var page = " + delegateCall + ";");
+            out.println("        return Response.ok(page).header(\"X-Total-Count\", String.valueOf(page." + op.totalCountMethod() + "())).build();");
+        } else {
+            String responseCode = generateResponseCode(op.returnTypeStr(), delegateCall, isMutation, op.restStatusOverride(), hasPathParam);
+            out.println("        " + responseCode);
+        }
 
         out.println("    }");
         out.println();
@@ -1189,7 +1215,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             String restMethodOverride,
             String restPathOverride,
             int restStatusOverride,
-            List<String> rolesAllowed
+            List<String> rolesAllowed,
+            boolean paginated,
+            String totalCountMethod
     ) {}
 
     record ResolvedParam(

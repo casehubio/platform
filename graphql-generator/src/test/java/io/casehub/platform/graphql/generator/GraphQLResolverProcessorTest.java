@@ -565,6 +565,41 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
+    void paginatedResponseAddsXTotalCountHeader() throws Exception {
+        var pageType = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.ItemPage",
+                """
+                package test;
+                public record ItemPage(java.util.List<String> items, int totalCount, boolean hasMore) {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.ListApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+
+                @McpDomain("lists")
+                public interface ListApi {
+                    @PlatformQuery("List items")
+                    @PaginatedResponse
+                    test.ItemPage listItems(Integer offset, Integer limit);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=lists", "-AgenerateGraphQL=false")
+                .compile(spi, pageType);
+
+        String content = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedListsResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("X-Total-Count");
+        assertThat(content).contains("page.totalCount()");
+    }
+
+    @Test
     void httpVerbMapping_defaultStream_isGET() {
         assertThat(GraphQLResolverProcessor.resolveHttpVerb(GraphQLResolverProcessor.OperationType.STREAM, null)).isEqualTo("GET");
     }

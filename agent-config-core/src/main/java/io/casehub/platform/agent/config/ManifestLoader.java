@@ -9,7 +9,6 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -31,6 +30,8 @@ public class ManifestLoader {
     private static final Duration FETCH_TIMEOUT = Duration.ofSeconds(10);
 
     private final ObjectMapper mapper;
+    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder().connectTimeout(FETCH_TIMEOUT).build();
+
 
     public ManifestLoader() {
         this.mapper = new ObjectMapper(new YAMLFactory())
@@ -102,14 +103,15 @@ public class ManifestLoader {
 
     private Manifest fetchRemote(String uri) {
         try {
-            var client = HttpClient.newBuilder().connectTimeout(FETCH_TIMEOUT).build();
-            var request = HttpRequest.newBuilder().uri(URI.create(uri)).timeout(FETCH_TIMEOUT).GET().build();
-            var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            var request  = HttpRequest.newBuilder().uri(URI.create(uri)).timeout(FETCH_TIMEOUT).GET().build();
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() >= 400) {
                 LOG.warnf("HTTP %d from %s", response.statusCode(), uri);
                 return null;
             }
-            return mapper.readValue(response.body(), Manifest.class);
+            try (var body = response.body()) {
+                return mapper.readValue(body, Manifest.class);
+            }
         } catch (Exception e) {
             LOG.warnf("Failed to fetch remote source %s: %s", uri, e.getMessage());
             return null;

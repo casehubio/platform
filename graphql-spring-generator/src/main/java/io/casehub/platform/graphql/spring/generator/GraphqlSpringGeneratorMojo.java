@@ -57,7 +57,7 @@ public class GraphqlSpringGeneratorMojo extends AbstractGeneratorMojo {
 
             registerSourceRoot();
             getLog().info("Generated " + count + " Spring classes from "
-                    + domains.size() + " @McpDomain interface(s)");
+                    + domains.size() + " @McpDomain domain(s)");
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate Spring GraphQL controllers", e);

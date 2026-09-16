@@ -26,8 +26,8 @@ public class SpringGraphqlControllerWriter {
 
     public JavaFile generate(DomainScanResult domain, String targetPackage) {
         String className = GeneratorUtils.toPascalCase(domain.domainName()) + "GraphqlController";
-        ClassName spiType = ClassName.bestGuess(domain.spiInterfaceFqcn());
-        String fieldName = GeneratorUtils.decapitalize(domain.spiInterfaceSimple());
+        ClassName spiType = ClassName.bestGuess(domain.sourceFqcn());
+        String fieldName = GeneratorUtils.decapitalize(domain.sourceSimple());
 
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(className)
                 .addModifiers(Modifier.PUBLIC)

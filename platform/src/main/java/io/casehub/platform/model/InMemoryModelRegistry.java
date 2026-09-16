@@ -83,17 +83,19 @@ public class InMemoryModelRegistry implements MutableModelRegistry {
     @Override
     public List<ModelDescriptor> query(ModelQuery query) {
         return resolvedView.values().stream()
-            .filter(d -> query.vendor() == null || d.vendor().equals(query.vendor()))
-            .filter(d -> query.family() == null || d.family().equals(query.family()))
-            .filter(d -> query.tier() == null || d.tier() == query.tier())
-            .filter(d -> query.requiredCapabilities().isEmpty()
-                || d.capabilities().containsAll(query.requiredCapabilities()))
-            .filter(d -> query.locality() == null || d.locality() == query.locality())
-            .filter(d -> query.maxCostTier() == null
-                || (d.costTier() != null && d.costTier().rank() <= query.maxCostTier().rank()))
-            .filter(d -> query.authMethod() == null
-                || (d.authMethod() != null && d.authMethod().equals(query.authMethod())))
-            .toList();
+                           .filter(d -> query.vendor() == null || d.vendor().equals(query.vendor()))
+                           .filter(d -> query.family() == null || d.family().equals(query.family()))
+                           .filter(d -> query.tier() == null || d.tier() == query.tier())
+                           .filter(d -> query.requiredCapabilities().isEmpty()
+                                        || d.capabilities().containsAll(query.requiredCapabilities()))
+                           .filter(d -> query.locality() == null || d.locality() == query.locality())
+                           .filter(d -> query.maxCostTier() == null
+                                        || (d.costTier() != null && d.costTier().rank() <= query.maxCostTier().rank()))
+                           .filter(d -> query.authMethod() == null
+                                        || (d.authMethod() != null && d.authMethod().equals(query.authMethod())))
+                           .filter(d -> query.minContextWindow() == null || d.contextWindow() >= query.minContextWindow())
+                           .filter(d -> query.minMaxOutput() == null || d.maxOutput() >= query.minMaxOutput())
+                           .toList();
     }
 
     @Override

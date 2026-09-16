@@ -6,10 +6,12 @@ import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelTier;
+import org.junit.jupiter.api.Test;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class InMemoryModelRegistryTest {
@@ -19,6 +21,12 @@ class InMemoryModelRegistryTest {
         return new ModelDescriptor(id, id, "backend", null, vendor, family, id, tier,
             caps, 200000, 16384, locality, cost, authMethod, Map.of());
     }
+
+    private ModelDescriptor descWithContext(String id, int contextWindow, int maxOutput) {
+        return new ModelDescriptor(id, id, "backend", null, "vendor", "fam", id, ModelTier.STANDARD,
+                                   Set.of(ModelCapabilities.TEXT), contextWindow, maxOutput, ModelLocality.CLOUD, CostTier.MEDIUM, "api-key", Map.of());
+    }
+
 
     private ModelDescriptor claudeSonnet() {
         return desc("claude-sonnet-5", "anthropic", "claude", ModelTier.STANDARD,
@@ -114,6 +122,39 @@ class InMemoryModelRegistryTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).id()).isEqualTo("llama-4-scout");
     }
+
+    @Test
+    void query_filtersByMinContextWindow() {
+        var registry = new InMemoryModelRegistry();
+        registry.replaceSource("src", 1, List.of(
+                descWithContext("small", 32000, 4096),
+                descWithContext("large", 200000, 32768)
+                                                ));
+        var results = registry.query(ModelQuery.builder().minContextWindow(128000).build());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).id()).isEqualTo("large");
+    }
+
+    @Test
+    void query_filtersByMinMaxOutput() {
+        var registry = new InMemoryModelRegistry();
+        registry.replaceSource("src", 1, List.of(
+                descWithContext("small", 200000, 4096),
+                descWithContext("large", 200000, 32768)
+                                                ));
+        var results = registry.query(ModelQuery.builder().minMaxOutput(16384).build());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).id()).isEqualTo("large");
+    }
+
+    @Test
+    void query_ignoresPreferVendor() {
+        var registry = new InMemoryModelRegistry();
+        registry.replaceSource("src", 1, List.of(claudeSonnet(), gpt4()));
+        var results = registry.query(ModelQuery.builder().preferVendor("anthropic").build());
+        assertThat(results).hasSize(2);
+    }
+
 
     @Test
     void emptyRegistry_returnsEmpty() {

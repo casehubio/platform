@@ -15,6 +15,7 @@ import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
 
+import java.util.Map;
 import java.util.Optional;
 
 public class RoutingAgentProvider implements AgentProvider {
@@ -22,18 +23,28 @@ public class RoutingAgentProvider implements AgentProvider {
     private static final Logger LOG = Logger.getLogger(RoutingAgentProvider.class);
 
     private final BackendInstanceRegistry registry;
-    private final String defaultBackendKey;
-    private final ModelRegistry modelRegistry;
+    private final String                  defaultBackendKey;
+    private final ModelRegistry           modelRegistry;
+    private final Map<String, ModelQuery> aliases;
 
     private record ResolvedRoute(AgentBackend backend, String apiModelId) {}
 
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry) {
+        this(registry, defaultBackendKey, modelRegistry, Map.of());
+    }
+
+    public RoutingAgentProvider(BackendInstanceRegistry registry,
+                                String defaultBackendKey,
+                                ModelRegistry modelRegistry,
+                                Map<String, ModelQuery> aliases) {
         this.registry          = registry;
         this.defaultBackendKey = defaultBackendKey;
         this.modelRegistry     = modelRegistry;
-        LOG.infof("Agent router initialized with registry, default=%s", defaultBackendKey);
+        this.aliases           = aliases != null ? Map.copyOf(aliases) : Map.of();
+        LOG.infof("Agent router initialized with registry, default=%s, aliases=%d",
+                  defaultBackendKey, this.aliases.size());
     }
 
     @Override
@@ -54,24 +65,23 @@ public class RoutingAgentProvider implements AgentProvider {
         return route.backend().openSession(rewritten);
     }
 
-
-    private ResolvedRoute resolveTier(ModelTier tier) {
-        var query      = ModelQuery.builder().tier(tier).build();
+    private ResolvedRoute resolveQuery(ModelQuery query) {
         var candidates = modelRegistry.query(query);
 
         if (candidates.isEmpty()) {
             if (modelRegistry.all().isEmpty()) {
-                throw new IllegalArgumentException(
-                        "No model sources configured — tier resolution requires at least one "
-                        + "ModelSource (e.g., SeedCatalogModelSource). Requested tier: " + tier);
+                throw new IllegalArgumentException("No model sources configured — query resolution requires at least one ModelSource.");
             }
-            var availableTiers = modelRegistry.all().stream()
-                                              .map(ModelDescriptor::tier)
-                                              .distinct().sorted().toList();
-            throw new IllegalArgumentException(
-                    "No model matching tier " + tier
-                    + " (default backend: " + defaultBackendKey
-                    + "). Available tiers: " + availableTiers);
+            if (query.tier() != null) {
+                var availableTiers = modelRegistry.all().stream()
+                                                  .map(ModelDescriptor::tier)
+                                                  .distinct().sorted().toList();
+                throw new IllegalArgumentException(
+                        "No model matching tier " + query.tier()
+                        + " (default backend: " + defaultBackendKey
+                        + "). Available tiers: " + availableTiers);
+            }
+            throw new IllegalArgumentException("No model matching query " + query);
         }
 
         var preferred = candidates.stream()
@@ -81,10 +91,13 @@ public class RoutingAgentProvider implements AgentProvider {
         ModelDescriptor selected;
         if (!preferred.isEmpty()) {
             selected = preferred.get(0);
+        } else if (query.preferVendor() != null) {
+            selected = candidates.stream()
+                                 .filter(d -> d.vendor().equals(query.preferVendor()))
+                                 .findFirst()
+                                 .orElse(candidates.get(0));
         } else {
             selected = candidates.get(0);
-            LOG.infof("Tier %s: no model for default backend '%s', falling back to %s (%s)",
-                      tier, defaultBackendKey, selected.id(), selected.backendKey());
         }
 
         String instanceId = selected.backendInstanceId() != null
@@ -97,9 +110,14 @@ public class RoutingAgentProvider implements AgentProvider {
                     + ", but no backend with that key/instance is registered");
         }
 
-        LOG.debugf("Tier %s resolved to model %s (backend: %s/%s)",
-                   tier, selected.id(), selected.backendKey(), instanceId);
+        LOG.debugf("Query resolved to model %s (backend: %s/%s)",
+                   selected.id(), selected.backendKey(), instanceId);
         return new ResolvedRoute(backend.get(), selected.apiModelId());
+    }
+
+    private ResolvedRoute resolveTier(ModelTier tier) {
+        var query = ModelQuery.builder().tier(tier).build();
+        return resolveQuery(query);
     }
 
     private ResolvedRoute resolve(String model) {
@@ -110,6 +128,12 @@ public class RoutingAgentProvider implements AgentProvider {
                         "No default backend configured: " + defaultBackendKey);
             }
             return new ResolvedRoute(backend.get(), null);
+        }
+
+        // Step 0: Alias?
+        if (aliases.containsKey(model)) {
+            LOG.debugf("Resolving alias: %s", model);
+            return resolveQuery(aliases.get(model));
         }
 
         // Step 1: Tier reference (unambiguous prefix — check first)

@@ -6,6 +6,8 @@ import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.Preferences;
 import io.casehub.platform.api.preferences.SettingsScope;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
@@ -31,6 +33,8 @@ import java.util.Map;
 @ApplicationScoped
 public class JpaPreferenceProvider implements PreferenceProvider {
 
+    @Inject EntityManager entityManager;
+
     /**
      * Returns ancestor scope strings shortest-first (root first), ending with the target scope.
      */
@@ -54,7 +58,7 @@ public class JpaPreferenceProvider implements PreferenceProvider {
     @Transactional(TxType.SUPPORTS)
     public Preferences resolve(final SettingsScope scope) {
         final List<String>          ancestors = ancestors(scope.scope());
-        final List<PreferenceEntry> rows      = PreferenceEntry.findByScopes(scope.tenancyId(), ancestors);
+        final List<PreferenceEntry> rows      = findByScopes(scope.tenancyId(), ancestors);
 
         final Map<String, Integer> scopeOrder = new HashMap<>();
         for (int i = 0; i < ancestors.size(); i++) {
@@ -73,5 +77,14 @@ public class JpaPreferenceProvider implements PreferenceProvider {
         }
 
         return new MapPreferences(merged);
+    }
+
+    private List<PreferenceEntry> findByScopes(final String tenancyId, final List<String> scopes) {
+        if (scopes.isEmpty()) { return List.of(); }
+        return entityManager.createQuery(
+                "from PreferenceEntry where tenancyId = ?1 and scope in ?2", PreferenceEntry.class)
+                .setParameter(1, tenancyId)
+                .setParameter(2, scopes)
+                .getResultList();
     }
 }

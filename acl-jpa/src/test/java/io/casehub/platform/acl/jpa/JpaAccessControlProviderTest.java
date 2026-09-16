@@ -7,6 +7,7 @@ import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.identity.GroupMembershipProvider;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     TestDataCleaner cleaner;
     @Inject
     TestCurrentPrincipal testCurrentPrincipal;
+
+    @Inject
+    EntityManager entityManager;
 
 
     @Override
@@ -64,7 +68,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     void grant_createsAuditLogEntry() {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
-        List<AclAuditLogEntity> logs = AclAuditLogEntity.list("actorId", "actor1");
+        List<AclAuditLogEntity> logs = entityManager.createQuery(
+                "from AclAuditLogEntity where actorId = ?1", AclAuditLogEntity.class)
+                .setParameter(1, "actor1").getResultList();
 
         assertEquals(1, logs.size());
         AclAuditLogEntity log = logs.getFirst();
@@ -82,7 +88,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         Instant expires = Instant.now().plus(1, ChronoUnit.HOURS);
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.WRITE, expires);
 
-        List<AclAuditLogEntity> logs = AclAuditLogEntity.list("actorId", "actor1");
+        List<AclAuditLogEntity> logs = entityManager.createQuery(
+                "from AclAuditLogEntity where actorId = ?1", AclAuditLogEntity.class)
+                .setParameter(1, "actor1").getResultList();
 
         assertEquals(1, logs.size());
         assertNotNull(logs.getFirst().expiresAt);
@@ -93,8 +101,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
         jpaProvider.revoke("actor1", ResourceId.parse("case:abc"), AclAction.READ);
 
-        List<AclAuditLogEntity> logs = AclAuditLogEntity.list(
-                "actorId = ?1 and operation = ?2", "actor1", "REVOKE");
+        List<AclAuditLogEntity> logs = entityManager.createQuery(
+                "from AclAuditLogEntity where actorId = ?1 and operation = ?2", AclAuditLogEntity.class)
+                .setParameter(1, "actor1").setParameter(2, "REVOKE").getResultList();
 
         assertEquals(1, logs.size());
         AclAuditLogEntity log = logs.getFirst();
@@ -109,7 +118,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
         jpaProvider.revoke("actor1", ResourceId.parse("case:abc"), AclAction.READ);
 
-        long total = AclAuditLogEntity.count("actorId", "actor1");
+        long total = entityManager.createQuery(
+                "select count(e) from AclAuditLogEntity e where e.actorId = ?1", Long.class)
+                .setParameter(1, "actor1").getSingleResult();
 
         assertEquals(2, total);
     }
@@ -120,8 +131,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.WRITE, null);
         jpaProvider.revokeAll("actor1", ResourceId.parse("case:abc"));
 
-        List<AclAuditLogEntity> revokeLogs = AclAuditLogEntity.list(
-                "actorId = ?1 and operation = ?2", "actor1", "REVOKE");
+        List<AclAuditLogEntity> revokeLogs = entityManager.createQuery(
+                "from AclAuditLogEntity where actorId = ?1 and operation = ?2", AclAuditLogEntity.class)
+                .setParameter(1, "actor1").setParameter(2, "REVOKE").getResultList();
 
         assertEquals(2, revokeLogs.size());
         List<String> actions = revokeLogs.stream().map(l -> l.action).sorted().toList();
@@ -132,7 +144,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     void revokeAll_noGrants_createsNoAuditLog() {
         jpaProvider.revokeAll("actor1", ResourceId.parse("case:abc"));
 
-        long count = AclAuditLogEntity.count("actorId", "actor1");
+        long count = entityManager.createQuery(
+                "select count(e) from AclAuditLogEntity e where e.actorId = ?1", Long.class)
+                .setParameter(1, "actor1").getSingleResult();
 
         assertEquals(0, count);
     }
@@ -142,8 +156,9 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
-        long grantCount = AclAuditLogEntity.count(
-                "actorId = ?1 and operation = ?2", "actor1", "GRANT");
+        long grantCount = entityManager.createQuery(
+                "select count(e) from AclAuditLogEntity e where e.actorId = ?1 and e.operation = ?2", Long.class)
+                .setParameter(1, "actor1").setParameter(2, "GRANT").getSingleResult();
 
         assertEquals(2, grantCount);
     }
@@ -158,11 +173,12 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
         entry.condition  = "status == 'RUNNING'";
         entry.grantedAt  = Instant.now();
         entry.tenancyId  = "";
-        entry.persist();
+        entityManager.persist(entry);
 
-        AclEntryEntity found = AclEntryEntity.<AclEntryEntity>find(
-                                                     "actorId = ?1 and resourceId = ?2", "actor1", "case:abc")
-                                             .firstResult();
+        AclEntryEntity found = entityManager.createQuery(
+                "from AclEntryEntity where actorId = ?1 and resourceId = ?2", AclEntryEntity.class)
+                .setParameter(1, "actor1").setParameter(2, "case:abc")
+                .getResultList().stream().findFirst().orElse(null);
 
         assertNotNull(found);
         assertEquals("status == 'RUNNING'", found.condition);
@@ -172,9 +188,10 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     void condition_nullByDefault() {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
-        AclEntryEntity found = AclEntryEntity.<AclEntryEntity>find(
-                                                     "actorId = ?1 and resourceId = ?2", "actor1", "case:abc")
-                                             .firstResult();
+        AclEntryEntity found = entityManager.createQuery(
+                "from AclEntryEntity where actorId = ?1 and resourceId = ?2", AclEntryEntity.class)
+                .setParameter(1, "actor1").setParameter(2, "case:abc")
+                .getResultList().stream().findFirst().orElse(null);
 
         assertNotNull(found);
         assertNull(found.condition);
@@ -184,8 +201,10 @@ class JpaAccessControlProviderTest extends AccessControlProviderContractTest {
     void auditLog_tenancyIdFromPrincipal() {
         jpaProvider.grant("actor1", ResourceId.parse("case:abc"), AclAction.READ, null);
 
-        AclAuditLogEntity log = AclAuditLogEntity.<AclAuditLogEntity>find("actorId", "actor1")
-                                                 .firstResult();
+        AclAuditLogEntity log = entityManager.createQuery(
+                "from AclAuditLogEntity where actorId = ?1", AclAuditLogEntity.class)
+                .setParameter(1, "actor1")
+                .getResultList().stream().findFirst().orElse(null);
 
         assertNotNull(log);
         assertNotNull(log.tenancyId);

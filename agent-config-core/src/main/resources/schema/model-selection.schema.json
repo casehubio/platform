@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model-selection",
+  "description": "Model selection — a model ID/alias string or a constraints object",
+  "oneOf": [
+    {
+      "type": "string",
+      "description": "Model ID, backend key, tier reference (tier:FLAGSHIP), or alias name"
+    },
+    {
+      "$ref": "#/$defs/ModelConstraints"
+    }
+  ],
+  "$defs": {
+    "ModelConstraints": {
+      "type": "object",
+      "description": "Constraint-based model selection — filters + tiebreaker",
+      "properties": {
+        "vendor": {
+          "type": "string",
+          "description": "Vendor name filter (exact match)"
+        },
+        "family": {
+          "type": "string",
+          "description": "Model family filter (exact match)"
+        },
+        "tier": {
+          "enum": ["FLAGSHIP", "STANDARD", "FAST", "EMBEDDING"],
+          "description": "Model tier filter"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": ["text", "vision", "tool-use", "code", "reasoning"]
+          },
+          "description": "Required capabilities (all must be present)"
+        },
+        "locality": {
+          "enum": ["CLOUD", "LOCAL"],
+          "description": "Deployment locality filter"
+        },
+        "max-cost": {
+          "enum": ["FREE", "LOW", "MEDIUM", "HIGH", "PREMIUM"],
+          "description": "Maximum cost tier (inclusive upper bound)"
+        },
+        "min-context": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum context window size in tokens"
+        },
+        "min-output": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum max output tokens"
+        },
+        "prefer-vendor": {
+          "type": "string",
+          "description": "Vendor preference for tiebreaking (not a filter)"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

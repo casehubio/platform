@@ -1,0 +1,29 @@
+{
+  "repo": "platform",
+  "base": "main",
+  "groups": [
+    {
+      "label": "feat(#341): @McpDomain on class — eliminate SPI+impl split for single-implementation domains",
+      "commits": [
+        "5bcd7b9f",
+        "b696ef42",
+        "464e9460",
+        "6ed7be22",
+        "276159a7"
+      ]
+    },
+    {
+      "label": "docs(#341): update module descriptions and consumer guide for class-based @McpDomain",
+      "commits": [
+        "dd6162d9",
+        "0bb02e5a"
+      ]
+    },
+    {
+      "label": "docs(work-end): project-promote artifacts from workspace",
+      "commits": [
+        "9119fe53"
+      ]
+    }
+  ]
+}

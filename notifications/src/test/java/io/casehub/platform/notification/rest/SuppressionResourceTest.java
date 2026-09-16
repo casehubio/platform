@@ -65,7 +65,7 @@ class SuppressionResourceTest {
             .body(input)
             .when().post("/api/notification-suppression/mute")
             .then()
-            .statusCode(200)
+            .statusCode(201)
             .body("id", notNullValue())
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
@@ -204,7 +204,7 @@ class SuppressionResourceTest {
             .body(input)
             .when().post("/api/notification-suppression/snooze")
             .then()
-            .statusCode(200)
+            .statusCode(201)
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
             .body("until", notNullValue())
@@ -227,7 +227,7 @@ class SuppressionResourceTest {
             .body(input2)
             .when().post("/api/notification-suppression/snooze")
             .then()
-            .statusCode(200)
+            .statusCode(201)
             .body("until", notNullValue());
 
         // Verify GET returns the second snooze

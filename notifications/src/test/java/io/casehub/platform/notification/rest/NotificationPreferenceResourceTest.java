@@ -75,7 +75,7 @@ class NotificationPreferenceResourceTest {
             .body(update)
             .when().put("/api/notification-preferences/update")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID))
             .body("channelDefaults.email.enabled", is(true))
@@ -107,7 +107,7 @@ class NotificationPreferenceResourceTest {
             .body(setUpdate)
             .when().put("/api/notification-preferences/update")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("quietHours", notNullValue());
 
         // Clear quiet hours
@@ -117,7 +117,7 @@ class NotificationPreferenceResourceTest {
             .body(clearUpdate)
             .when().put("/api/notification-preferences/update")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("quietHours", nullValue());
 
         // Verify GET returns no quiet hours
@@ -141,7 +141,7 @@ class NotificationPreferenceResourceTest {
             .body(update)
             .when().put("/api/notification-preferences/update")
             .then()
-            .statusCode(201);
+            .statusCode(200);
 
         // Switch to user-2 in tenant-2
         principal.setActorId("user-2");
@@ -169,7 +169,7 @@ class NotificationPreferenceResourceTest {
             .body(update)
             .when().put("/api/notification-preferences/update")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("userId", equalTo("user-1"))
             .body("tenancyId", equalTo(TenancyConstants.DEFAULT_TENANT_ID));
     }

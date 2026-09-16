@@ -27,7 +27,7 @@ class CallbackRegistrationResourceTest {
         .when()
             .post("/api/callbacks/register")
         .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("id", notNullValue())
             .body("spiName", equalTo("worker-provisioner"))
             .body("callbackUrl", equalTo("http://app1/casehub/callbacks/worker-provisioner"))
@@ -50,7 +50,7 @@ class CallbackRegistrationResourceTest {
         .when()
             .post("/api/callbacks/register")
         .then()
-            .statusCode(201)
+            .statusCode(200)
             .extract().path("id");
 
         given()
@@ -85,7 +85,7 @@ class CallbackRegistrationResourceTest {
         .when()
             .post("/api/callbacks/register")
         .then()
-            .statusCode(201)
+            .statusCode(200)
             .extract().path("id");
 
         given()

@@ -215,9 +215,9 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void responseWrapping_mutation_returns201() {
+    void responseWrapping_mutation_returns200() {
         assertThat(GraphQLResolverProcessor.generateResponseCode("String", "spi.create(arg0)", true, -1, false))
-                .isEqualTo("return Response.status(201).entity(spi.create(arg0)).build();");
+                .isEqualTo("return Response.ok(spi.create(arg0)).build();");
     }
 
     @Test
@@ -314,7 +314,7 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void mutationEndpointReturns201() throws Exception {
+    void mutationEndpointReturns200() throws Exception {
         var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
                 "test.CreateApi",
                 """
@@ -336,7 +336,7 @@ class GraphQLResolverProcessorTest {
         String content = compilation.generatedSourceFile(
                 "io.casehub.platform.rest.generated.GeneratedItemsResource")
                 .get().getCharContent(true).toString();
-        assertThat(content).contains("Response.status(201)");
+        assertThat(content).contains("Response.ok(");
     }
 
 

@@ -108,7 +108,11 @@ public class GraphQLModelScanner {
                 if (mcpDomain == null) {continue;}
 
                 String domain = mcpDomain.value();
-                if (domainOps.containsKey(domain)) {continue;}
+                if (domainOps.containsKey(domain)) {
+                    LOG.warnf("@McpDomain(\"%s\") on interface %s skipped — domain already registered by class or @GraphQLApi resolver",
+                              domain, iface.getName());
+                    continue;
+                }
 
                 domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : iface.getDeclaredMethods()) {

@@ -38,9 +38,21 @@ public class DeclarativeExtractorFactory {
                         .collect(Collectors.joining(":"));
             };
         }
+        if ("rest-client".equals(spec)) {
+            return input -> {
+                if (input instanceof io.casehub.platform.simulation.RestInvocation ri) {
+                    String path = ri.pathTemplate();
+                    for (var e : ri.params().entrySet()) {
+                        path = path.replace("{" + e.getKey() + "}", String.valueOf(e.getValue()));
+                    }
+                    return ri.httpMethod() + " " + path;
+                }
+                return String.valueOf(input);
+            };
+        }
         throw new SimulationConfigException(
                 "Unknown key-extractor spec: " + spec
-                        + ". Valid: identity, field:<name>, composite:<f1>,<f2>");
+                        + ". Valid: identity, field:<name>, composite:<f1>,<f2>, rest-client");
     }
 
     @SuppressWarnings("unchecked")

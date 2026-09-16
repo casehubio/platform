@@ -25,6 +25,11 @@ public record AgentSessionConfig(
         return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, null);
     }
 
+    public AgentSessionConfig withModel(String model) {
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model);
+    }
+
+
     /**
      * Explicit timeout.
      */

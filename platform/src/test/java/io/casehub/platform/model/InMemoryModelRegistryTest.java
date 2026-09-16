@@ -115,15 +115,6 @@ class InMemoryModelRegistryTest {
     }
 
     @Test
-    void query_filtersByAuthMethod() {
-        var registry = new InMemoryModelRegistry();
-        registry.replaceSource("src", 1, List.of(claudeSonnet(), llama()));
-        var results = registry.query(ModelQuery.builder().authMethod("local").build());
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).id()).isEqualTo("llama-4-scout");
-    }
-
-    @Test
     void query_filtersByMinContextWindow() {
         var registry = new InMemoryModelRegistry();
         registry.replaceSource("src", 1, List.of(

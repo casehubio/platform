@@ -9,7 +9,6 @@ public record ModelQuery(
         Set<String> requiredCapabilities,
         ModelLocality locality,
         CostTier maxCostTier,
-        String authMethod,
         Integer minContextWindow,
         Integer minMaxOutput,
         String preferVendor
@@ -20,7 +19,7 @@ public record ModelQuery(
     }
 
     public static ModelQuery all() {
-        return new ModelQuery(null, null, null, Set.of(), null, null, null, null, null, null);
+        return new ModelQuery(null, null, null, Set.of(), null, null, null, null, null);
     }
 
     public static Builder builder() {return new Builder();}
@@ -32,7 +31,6 @@ public record ModelQuery(
         private Set<String>   requiredCapabilities = Set.of();
         private ModelLocality locality;
         private CostTier      maxCostTier;
-        private String        authMethod;
         private Integer       minContextWindow;
         private Integer       minMaxOutput;
         private String        preferVendor;
@@ -67,11 +65,6 @@ public record ModelQuery(
                                                                       return this;
                                                                   }
 
-        public Builder authMethod(String authMethod)              {
-                                                                      this.authMethod = authMethod;
-                                                                      return this;
-                                                                  }
-
         public Builder minContextWindow(Integer minContextWindow) {
                                                                       this.minContextWindow = minContextWindow;
                                                                       return this;
@@ -89,7 +82,7 @@ public record ModelQuery(
 
         public ModelQuery build() {
             return new ModelQuery(vendor, family, tier, requiredCapabilities,
-                                  locality, maxCostTier, authMethod, minContextWindow, minMaxOutput, preferVendor);
+                                  locality, maxCostTier, minContextWindow, minMaxOutput, preferVendor);
         }
     }
 }

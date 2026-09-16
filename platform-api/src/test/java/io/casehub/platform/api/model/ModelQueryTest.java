@@ -17,7 +17,6 @@ class ModelQueryTest {
         assertThat(query.requiredCapabilities()).isEmpty();
         assertThat(query.locality()).isNull();
         assertThat(query.maxCostTier()).isNull();
-        assertThat(query.authMethod()).isNull();
         assertThat(query.minContextWindow()).isNull();
         assertThat(query.minMaxOutput()).isNull();
         assertThat(query.preferVendor()).isNull();
@@ -32,7 +31,6 @@ class ModelQueryTest {
                               .requiredCapabilities(Set.of(ModelCapabilities.TEXT, ModelCapabilities.VISION))
                               .locality(ModelLocality.CLOUD)
                               .maxCostTier(CostTier.HIGH)
-                              .authMethod("api-key")
                               .minContextWindow(128000)
                               .minMaxOutput(16384)
                               .preferVendor("anthropic")
@@ -44,7 +42,6 @@ class ModelQueryTest {
         assertThat(query.requiredCapabilities()).containsExactlyInAnyOrder("text", "vision");
         assertThat(query.locality()).isEqualTo(ModelLocality.CLOUD);
         assertThat(query.maxCostTier()).isEqualTo(CostTier.HIGH);
-        assertThat(query.authMethod()).isEqualTo("api-key");
         assertThat(query.minContextWindow()).isEqualTo(128000);
         assertThat(query.minMaxOutput()).isEqualTo(16384);
         assertThat(query.preferVendor()).isEqualTo("anthropic");
@@ -52,7 +49,7 @@ class ModelQueryTest {
 
     @Test
     void nullCapabilities_defaultsToEmptySet() {
-        var query = new ModelQuery("anthropic", null, null, null, null, null, null, null, null, null);
+        var query = new ModelQuery("anthropic", null, null, null, null, null, null, null, null);
         assertThat(query.requiredCapabilities()).isEmpty();
     }
 

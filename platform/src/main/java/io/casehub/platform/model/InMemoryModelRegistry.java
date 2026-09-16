@@ -91,8 +91,6 @@ public class InMemoryModelRegistry implements MutableModelRegistry {
                            .filter(d -> query.locality() == null || d.locality() == query.locality())
                            .filter(d -> query.maxCostTier() == null
                                         || (d.costTier() != null && d.costTier().rank() <= query.maxCostTier().rank()))
-                           .filter(d -> query.authMethod() == null
-                                        || (d.authMethod() != null && d.authMethod().equals(query.authMethod())))
                            .filter(d -> query.minContextWindow() == null || d.contextWindow() >= query.minContextWindow())
                            .filter(d -> query.minMaxOutput() == null || d.maxOutput() >= query.minMaxOutput())
                            .toList();

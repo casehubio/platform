@@ -150,6 +150,42 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>io.casehub</groupId>
+                <artifactId>casehub-platform-rest-spring-generator</artifactId>
+                <version>${project.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate</id>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../streams-webhook</quarkusModule>
+                                <quarkusModule>${project.basedir}/../streams-webhook-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../callback-client</quarkusModule>
+                                <quarkusModule>${project.basedir}/../callback-client-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../notification-dispatch</quarkusModule>
+                                <quarkusModule>${project.basedir}/../notification-dispatch-core</quarkusModule>
+                            </quarkusModules>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-rest-drift</id>
+                        <goals><goal>verify</goal></goals>
+                        <phase>verify</phase>
+                        <configuration>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../streams-webhook</quarkusModule>
+                                <quarkusModule>${project.basedir}/../streams-webhook-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../callback-client</quarkusModule>
+                                <quarkusModule>${project.basedir}/../callback-client-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../notification-dispatch</quarkusModule>
+                                <quarkusModule>${project.basedir}/../notification-dispatch-core</quarkusModule>
+                            </quarkusModules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

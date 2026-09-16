@@ -1,0 +1,25 @@
+model-registry.resolveById:
+  - tenancy-id: trading-desk
+    key: trading-agent-model
+    input: "trading-risk-v1"
+    output:
+      id: trading-risk-v1
+      backendKey: claude
+      vendor: Anthropic
+      family: claude-sonnet
+      displayName: "Trading Risk Model"
+      tier: FLAGSHIP
+      contextWindow: 200000
+      maxOutput: 8192
+  - tenancy-id: trading-desk
+    key: compliance-model
+    input: "compliance-checker-v1"
+    output:
+      id: compliance-checker-v1
+      backendKey: openai
+      vendor: OpenAI
+      family: gpt-4o
+      displayName: "Compliance Checker"
+      tier: STANDARD
+      contextWindow: 128000
+      maxOutput: 16384

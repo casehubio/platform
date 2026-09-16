@@ -1,0 +1,17 @@
+agent-provider.invoke:
+  - tenancy-id: trading-desk
+    key: risk-assessment
+    input:
+      systemPrompt: "You are a trading risk assessment agent. Evaluate the proposed trade against risk limits."
+      userPrompt: "Buy 10000 shares AAPL at market. Current position: 5000 shares. Sector limit: 20000 shares."
+    output:
+      - type: TextDelta
+        text: "Trade approved. Post-trade position 15000 shares within sector limit of 20000. Value-at-risk impact: moderate. No concentration breach."
+  - tenancy-id: trading-desk
+    key: compliance-check
+    input:
+      systemPrompt: "Check this transaction against AML and compliance rules."
+      userPrompt: "Wire transfer $45,000 to new beneficiary in jurisdiction with enhanced due diligence requirements."
+    output:
+      - type: TextDelta
+        text: "Enhanced due diligence required. Jurisdiction flagged for heightened AML risk. Recommend: verify beneficiary identity, source of funds documentation, and senior management approval before processing."

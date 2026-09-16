@@ -1,0 +1,17 @@
+agent-provider.invoke:
+  - tenancy-id: hospital-a
+    key: triage-assessment
+    input:
+      systemPrompt: "You are a clinical triage agent. Assess the patient presentation and recommend a priority level."
+      userPrompt: "Patient presents with acute chest pain, elevated troponin, and ST-segment changes on ECG."
+    output:
+      - type: TextDelta
+        text: "Priority 1 — Immediate cardiology consult. Findings suggest acute coronary syndrome: elevated troponin with ST-segment changes. Recommend urgent catheterization assessment."
+  - tenancy-id: hospital-a
+    key: discharge-summary
+    input:
+      systemPrompt: "Generate a discharge summary for the completed case."
+      userPrompt: "Patient admitted for pneumonia, treated with IV antibiotics for 5 days, now afebrile with improving CXR."
+    output:
+      - type: TextDelta
+        text: "Discharge diagnosis: Community-acquired pneumonia, resolved. Treatment: IV ceftriaxone 5 days, transitioned to oral amoxicillin. Follow-up: GP in 7 days, repeat CXR in 6 weeks."

@@ -158,26 +158,16 @@ class SimulationDecoratorProcessorTest {
     // --- default method handling ---
 
     @Test
-    void abstractMethodsGetSimulationLogic() {
+    void allMethodsGetSimulationLogic() {
         final var processor = new SimulationDecoratorProcessor();
         final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
         final String code = findSource(sources, "TestSpiWithDefaults");
 
         assertThat(code).contains("\"spi-with-defaults.query\"");
         assertThat(code).contains("\"spi-with-defaults.store\"");
-        assertThat(occurrences(code, "simulation.strategyFor")).isGreaterThanOrEqualTo(2);
-    }
-
-    @Test
-    void defaultMethodsDelegateWithoutSimulation() {
-        final var processor = new SimulationDecoratorProcessor();
-        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
-        final String code = findSource(sources, "TestSpiWithDefaults");
-
-        assertThat(code).contains("delegate.queryAll(");
-        assertThat(code).contains("delegate.count(");
-        assertThat(code).doesNotContain("\"spi-with-defaults.queryAll\"");
-        assertThat(code).doesNotContain("\"spi-with-defaults.count\"");
+        assertThat(code).contains("\"spi-with-defaults.queryAll\"");
+        assertThat(code).contains("\"spi-with-defaults.count\"");
+        assertThat(occurrences(code, "simulation.strategyFor")).isGreaterThanOrEqualTo(4);
     }
 
     // --- listing file support ---

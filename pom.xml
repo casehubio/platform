@@ -15,6 +15,7 @@
         <module>simulation-core</module>
         <module>simulation-inmem</module>
         <module>simulation-generator</module>
+        <module>rest-client-simulation-generator</module>
         <module>agent-simulation-core</module>
         <module>simulation-config-core</module>
         <module>simulation-config</module>

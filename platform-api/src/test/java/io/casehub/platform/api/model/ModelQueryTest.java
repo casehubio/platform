@@ -1,7 +1,9 @@
 package io.casehub.platform.api.model;
 
-import java.util.Set;
 import org.junit.jupiter.api.Test;
+
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ModelQueryTest {
@@ -16,19 +18,25 @@ class ModelQueryTest {
         assertThat(query.locality()).isNull();
         assertThat(query.maxCostTier()).isNull();
         assertThat(query.authMethod()).isNull();
+        assertThat(query.minContextWindow()).isNull();
+        assertThat(query.minMaxOutput()).isNull();
+        assertThat(query.preferVendor()).isNull();
     }
 
     @Test
     void builder_setsAllFields() {
         var query = ModelQuery.builder()
-            .vendor("anthropic")
-            .family("claude")
-            .tier(ModelTier.STANDARD)
-            .requiredCapabilities(Set.of(ModelCapabilities.TEXT, ModelCapabilities.VISION))
-            .locality(ModelLocality.CLOUD)
-            .maxCostTier(CostTier.HIGH)
-            .authMethod("api-key")
-            .build();
+                              .vendor("anthropic")
+                              .family("claude")
+                              .tier(ModelTier.STANDARD)
+                              .requiredCapabilities(Set.of(ModelCapabilities.TEXT, ModelCapabilities.VISION))
+                              .locality(ModelLocality.CLOUD)
+                              .maxCostTier(CostTier.HIGH)
+                              .authMethod("api-key")
+                              .minContextWindow(128000)
+                              .minMaxOutput(16384)
+                              .preferVendor("anthropic")
+                              .build();
 
         assertThat(query.vendor()).isEqualTo("anthropic");
         assertThat(query.family()).isEqualTo("claude");
@@ -37,11 +45,14 @@ class ModelQueryTest {
         assertThat(query.locality()).isEqualTo(ModelLocality.CLOUD);
         assertThat(query.maxCostTier()).isEqualTo(CostTier.HIGH);
         assertThat(query.authMethod()).isEqualTo("api-key");
+        assertThat(query.minContextWindow()).isEqualTo(128000);
+        assertThat(query.minMaxOutput()).isEqualTo(16384);
+        assertThat(query.preferVendor()).isEqualTo("anthropic");
     }
 
     @Test
     void nullCapabilities_defaultsToEmptySet() {
-        var query = new ModelQuery("anthropic", null, null, null, null, null, null);
+        var query = new ModelQuery("anthropic", null, null, null, null, null, null, null, null, null);
         assertThat(query.requiredCapabilities()).isEmpty();
     }
 

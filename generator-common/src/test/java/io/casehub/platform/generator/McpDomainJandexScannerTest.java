@@ -27,7 +27,8 @@ class McpDomainJandexScannerTest {
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).domainName()).isEqualTo("test-domain");
-        assertThat(results.get(0).spiInterfaceSimple()).isEqualTo("SampleMcpDomain");
+        assertThat(results.get(0).sourceSimple()).isEqualTo("SampleMcpDomain");
+        assertThat(results.get(0).isInterface()).isTrue();
     }
 
     @Test
@@ -118,5 +119,55 @@ class McpDomainJandexScannerTest {
         ResolvedOperation listItems = domain.operations().stream()
                 .filter(o -> o.methodName().equals("listItems")).findFirst().orElseThrow();
         assertThat(listItems.returnTypeName().toString()).isEqualTo("java.util.List<java.lang.String>");
+    }
+
+    // --- Class-based @McpDomain tests ---
+
+    private static Index classIndex;
+
+    static {
+        try {
+            var classIndexer = new Indexer();
+            classIndexer.indexClass(SampleClassDomain.class);
+            classIndex = classIndexer.complete();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void scansClassBasedDomain() {
+        var scanner = new McpDomainJandexScanner();
+        List<DomainScanResult> results = scanner.scan(classIndex);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).domainName()).isEqualTo("test-class-domain");
+        assertThat(results.get(0).sourceSimple()).isEqualTo("SampleClassDomain");
+        assertThat(results.get(0).isInterface()).isFalse();
+    }
+
+    @Test
+    void classBasedDomainScansOperations() {
+        var scanner = new McpDomainJandexScanner();
+        DomainScanResult domain = scanner.scan(classIndex).get(0);
+
+        assertThat(domain.operations()).hasSize(2);
+
+        ResolvedOperation query = domain.operations().stream()
+                .filter(o -> o.methodName().equals("listItems")).findFirst().orElseThrow();
+        assertThat(query.type()).isEqualTo(OperationType.QUERY);
+
+        ResolvedOperation mutation = domain.operations().stream()
+                .filter(o -> o.methodName().equals("createItem")).findFirst().orElseThrow();
+        assertThat(mutation.type()).isEqualTo(OperationType.MUTATION);
+    }
+
+    @Test
+    void classBasedDomainExcludesNonAnnotatedMethods() {
+        var scanner = new McpDomainJandexScanner();
+        DomainScanResult domain = scanner.scan(classIndex).get(0);
+
+        assertThat(domain.operations().stream()
+                .noneMatch(o -> o.methodName().equals("helperNotExposed"))).isTrue();
     }
 }

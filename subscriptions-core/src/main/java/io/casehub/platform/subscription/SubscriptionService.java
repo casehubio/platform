@@ -1,6 +1,13 @@
 package io.casehub.platform.subscription;
 
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
+import io.casehub.platform.api.mcp.HttpMethod;
+import io.casehub.platform.api.mcp.McpDomain;
+import io.casehub.platform.api.mcp.PathParam;
+import io.casehub.platform.api.mcp.PlatformMutation;
+import io.casehub.platform.api.mcp.PlatformQuery;
+import io.casehub.platform.api.mcp.RestMethod;
+import io.casehub.platform.api.mcp.RestPath;
 import io.casehub.platform.api.expression.ExpressionEvaluator;
 import io.casehub.platform.api.expression.JQExpressionEvaluator;
 import io.casehub.platform.api.expression.MvelExpressionEvaluator;
@@ -19,20 +26,22 @@ import io.casehub.platform.api.subscription.TargetType;
 import java.util.List;
 import java.util.Optional;
 
+@McpDomain(value = "subscriptions", basePath = "/subscriptions")
 public class SubscriptionService {
 
-    private final SubscriptionStore store;
-    private final CurrentPrincipal principal;
+    private final SubscriptionStore        store;
+    private final CurrentPrincipal         principal;
     private final ExpressionEngineRegistry expressionRegistry;
 
     public SubscriptionService(SubscriptionStore store,
                                CurrentPrincipal principal,
                                ExpressionEngineRegistry expressionRegistry) {
-        this.store = store;
-        this.principal = principal;
+        this.store              = store;
+        this.principal          = principal;
         this.expressionRegistry = expressionRegistry;
     }
 
+    @PlatformMutation("Create a subscription")
     public Subscription create(SubscriptionInput input) {
         var effectiveScope = input.scope();
 
@@ -79,6 +88,7 @@ public class SubscriptionService {
         return store.store(securedInput);
     }
 
+    @PlatformQuery("List subscriptions")
     public SubscriptionPage list(Boolean enabled, SubscriptionScope scope, String cursor, int limit) {
         return store.find(new SubscriptionQuery(
                 scope == SubscriptionScope.SYSTEM ? null : principal.actorId(),
@@ -90,11 +100,14 @@ public class SubscriptionService {
         ));
     }
 
-    public Optional<Subscription> getById(String id) {
+    @PlatformQuery("Get subscription by ID")
+    public Optional<Subscription> getById(@PathParam String id) {
         return store.findById(id, principal.actorId(), principal.tenancyId());
     }
 
-    public Optional<Subscription> update(String id, SubscriptionUpdate update) {
+    @PlatformMutation("Update a subscription")
+    @RestMethod(HttpMethod.PATCH)
+    public Optional<Subscription> update(@PathParam String id, SubscriptionUpdate update) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {
             return Optional.empty();
@@ -103,7 +116,9 @@ public class SubscriptionService {
         return store.update(id, principal.actorId(), principal.tenancyId(), update);
     }
 
-    public boolean delete(String id) {
+    @PlatformMutation("Delete a subscription")
+    @RestMethod(HttpMethod.DELETE)
+    public boolean delete(@PathParam String id) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {
             return false;
@@ -112,24 +127,30 @@ public class SubscriptionService {
         return store.delete(id, principal.actorId(), principal.tenancyId());
     }
 
-    public Optional<Subscription> enable(String id) {
+    @PlatformMutation("Enable a subscription")
+    @RestMethod(HttpMethod.PATCH)
+    @RestPath("/{id}/enable")
+    public Optional<Subscription> enable(@PathParam String id) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {
             return Optional.empty();
         }
         checkSystemAccess(opt.get().scope());
         return store.update(id, principal.actorId(), principal.tenancyId(),
-                new SubscriptionUpdate(null, null, null, null, null, null, true));
+                            new SubscriptionUpdate(null, null, null, null, null, null, true));
     }
 
-    public Optional<Subscription> disable(String id) {
+    @PlatformMutation("Disable a subscription")
+    @RestMethod(HttpMethod.PATCH)
+    @RestPath("/{id}/disable")
+    public Optional<Subscription> disable(@PathParam String id) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {
             return Optional.empty();
         }
         checkSystemAccess(opt.get().scope());
         return store.update(id, principal.actorId(), principal.tenancyId(),
-                new SubscriptionUpdate(null, null, null, null, null, null, false));
+                            new SubscriptionUpdate(null, null, null, null, null, null, false));
     }
 
     private void checkSystemAccess(SubscriptionScope scope) {
@@ -140,8 +161,8 @@ public class SubscriptionService {
     }
 
     static String extractExpression(ExpressionEvaluator evaluator) {
-        if (evaluator instanceof MvelExpressionEvaluator m) { return m.expression(); }
-        if (evaluator instanceof JQExpressionEvaluator j) { return j.expression(); }
+        if (evaluator instanceof MvelExpressionEvaluator m) {return m.expression();}
+        if (evaluator instanceof JQExpressionEvaluator j) {return j.expression();}
         throw new IllegalArgumentException("Unknown evaluator type: " + evaluator.type());
     }
 }

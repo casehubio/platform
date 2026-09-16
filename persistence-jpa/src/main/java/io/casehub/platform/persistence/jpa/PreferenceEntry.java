@@ -11,9 +11,6 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
-import java.util.Collections;
-import java.util.List;
-
 @Entity
 @Table(
         name = "platform_preference",
@@ -50,9 +47,4 @@ public class PreferenceEntry {
 
     @Column(name = "pref_value", nullable = false, length = 4000)
     public String value;
-
-    static List<PreferenceEntry> findByScopes(final String tenancyId, final List<String> scopes) {
-        if (scopes.isEmpty()) {return Collections.emptyList();}
-        return list("tenancyId = ?1 and scope in ?2", tenancyId, scopes);
-    }
 }

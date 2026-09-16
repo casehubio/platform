@@ -1263,7 +1263,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             return "return Response.status(" + restStatusOverride + ").entity(" + delegateCall + ").build();";
         }
         if (isMutation) {
-            return "return Response.status(201).entity(" + delegateCall + ").build();";
+            return "return Response.ok(" + delegateCall + ").build();";
         }
         return "return Response.ok(" + delegateCall + ").build();";
     }

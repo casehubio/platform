@@ -349,7 +349,7 @@ class NotificationResourceTest {
             .when()
             .post("/api/notifications/mark-all-read")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .contentType(ContentType.JSON)
             .body("count", equalTo(3));
     }
@@ -361,7 +361,7 @@ class NotificationResourceTest {
             .when()
             .post("/api/notifications/mark-all-read")
             .then()
-            .statusCode(201)
+            .statusCode(200)
             .body("count", equalTo(0));
     }
 }

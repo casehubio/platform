@@ -6,11 +6,9 @@ import com.palantir.javapoet.FieldSpec;
 import com.palantir.javapoet.JavaFile;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.ParameterSpec;
-import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
 import io.casehub.platform.generator.DomainScanResult;
 import io.casehub.platform.generator.GeneratorUtils;
-import io.casehub.platform.generator.OperationType;
 import io.casehub.platform.generator.ResolvedOperation;
 import io.casehub.platform.generator.ResolvedParam;
 

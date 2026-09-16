@@ -97,6 +97,7 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 | `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `casehub-platform-agent-gemini` | AgentBackend "gemini" -- native Google GenAI SDK with explicit caching |
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
+| `casehub-platform-agent-ollama` | AgentBackend "ollama" -- local model invocation via Ollama's OpenAI-compatible API (`localhost:11434/v1/`). 120s default timeout |
 | `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
@@ -228,6 +229,15 @@ tasks:
 | `minContextWindow` | Integer | Minimum context window in tokens |
 | `minMaxOutput` | Integer | Minimum max output tokens |
 | `preferVendor` | String | Tiebreaker among matching models (not a filter) |
+
+### LLM configuration
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-llm-config` | `LlmConfigService` — UI-driven LLM provider setup wizard. Vendor discovery, credential validation, model pull |
+| `casehub-platform-llm-config-core` | Framework-neutral LLM config types — `LlmConfigApi` SPI, request/result records. Pure Java, no CDI |
+| `casehub-platform-llm-config-vertex` | Google Vertex AI vendor client — project/region/model discovery, ADC authentication |
+| `casehub-platform-llm-config-bedrock` | AWS Bedrock vendor client — region/model discovery, credential chain authentication |
 
 ### Access control
 
@@ -657,16 +667,6 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `casehub.delivery.retention.attempt-days` | Delivery attempt retention | -- |
 | `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | -- |
 | `casehub.delivery.retention.engagement-days` | Engagement event retention | -- |
-
-### Modular Notification Targets
-
-The notification pipeline supports two target kinds:
-- **USER** (TargetType: `USER`, `GROUP`, `EVENT_FIELD`, `ENTITY_WATCHERS`) — full pipeline with preferences, suppression, digest, inbox persistence
-- **NON_USER** (TargetType: `AGENT`, `SYSTEM`) — skip suppression, fire-and-forget via `CdiEventDeliverer`
-
-To make a domain event subscribable, implement `SubscribableEvent` (`type()`, `tenancyId()`). The subscription engine matches it automatically. Create subscriptions with `AGENT` or `SYSTEM` targets for operational alerts.
-
-Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `CertificateExpiryEvent` (`certificate.expiry`).
 
 ### Subject Views
 

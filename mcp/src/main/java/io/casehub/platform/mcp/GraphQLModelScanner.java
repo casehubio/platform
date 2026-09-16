@@ -58,17 +58,30 @@ public class GraphQLModelScanner {
             McpDomain mcpDomain = beanClass.getAnnotation(McpDomain.class);
             if (mcpDomain == null) {continue;}
 
-            if (!hasGraphQLApi(beanClass)) {
-                if (!ModelEnricher.class.isAssignableFrom(beanClass)) {
-                    LOG.warnf("@McpDomain on %s without @GraphQLApi — skipping",
-                              beanClass.getName());
-                }
-                continue;
-            }
-
             String domain = mcpDomain.value();
             domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
             domainEvents.computeIfAbsent(domain, k -> new ArrayList<>());
+
+            if (!hasGraphQLApi(beanClass)) {
+                if (ModelEnricher.class.isAssignableFrom(beanClass)) {
+                    continue;
+                }
+                for (Method method : beanClass.getDeclaredMethods()) {
+                    if (Modifier.isStatic(method.getModifiers())) { continue; }
+                    if (method.isAnnotationPresent(PlatformQuery.class)) {
+                        String desc = method.getAnnotation(PlatformQuery.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                        OperationDescriptor.OperationType.QUERY, desc));
+                    } else if (method.isAnnotationPresent(PlatformMutation.class)) {
+                        String desc = method.getAnnotation(PlatformMutation.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                        OperationDescriptor.OperationType.MUTATION, desc));
+                    }
+                }
+                continue;
+            }
 
             for (Method method : beanClass.getDeclaredMethods()) {
                 if (Modifier.isStatic(method.getModifiers())) {continue;}

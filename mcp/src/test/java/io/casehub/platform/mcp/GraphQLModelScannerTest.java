@@ -170,6 +170,45 @@ class GraphQLModelScannerTest {
     }
 
 
+    // --- Class-based @McpDomain tests ---
+
+    @Test
+    void discoversClassBasedDomain() {
+        var domain = registry.getDomain("class-based");
+        assertThat(domain).isPresent();
+        assertThat(domain.get().name()).isEqualTo("class-based");
+    }
+
+    @Test
+    void classBasedDomainHasQueryOperations() {
+        var domain = registry.getDomain("class-based").orElseThrow();
+        assertThat(domain.queryCount()).isEqualTo(1);
+    }
+
+    @Test
+    void classBasedDomainHasMutationOperations() {
+        var domain = registry.getDomain("class-based").orElseThrow();
+        assertThat(domain.mutationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void classBasedDomainOperationHasDescription() {
+        var getStatus = registry.getOperation("class-based", "getStatus").orElseThrow();
+        assertThat(getStatus.summary()).isEqualTo("Get status");
+    }
+
+    @Test
+    void classBasedDomainNonAnnotatedMethodNotExposed() {
+        var helper = registry.getOperation("class-based", "internalHelper");
+        assertThat(helper).isEmpty();
+    }
+
+    @Test
+    void classBasedDomainStoresClassAsResolverClass() {
+        var getStatus = registry.getOperation("class-based", "getStatus").orElseThrow();
+        assertThat(getStatus.resolverClass()).isEqualTo(ClassBasedDomainService.class);
+    }
+
     @Test
     void complexTypeFieldExpansion() {
         var create = registry.getOperation("test", "create").orElseThrow();

@@ -49,7 +49,7 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
-        var route = resolve(config.model());
+        var route = config.modelQuery() != null ? resolveQuery(config.modelQuery()) : resolve(config.model());
         var rewritten = new AgentSessionConfig(
                 config.systemPrompt(), config.userPrompt(), config.mcpServers(),
                 config.timeout(), config.correlationId(), route.apiModelId());
@@ -58,7 +58,7 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public AgentSession openSession(AgentSessionInit init) {
-        var route = resolve(init.model());
+        var route = init.modelQuery() != null ? resolveQuery(init.modelQuery()) : resolve(init.model());
         var rewritten = new AgentSessionInit(
                 init.systemPrompt(), init.mcpServers(),
                 init.timeout(), init.correlationId(), route.apiModelId());

@@ -558,5 +558,64 @@ class RoutingAgentProviderTest {
         assertThat(config.model()).isNull();
     }
 
+    @Test
+    void directModelQueryDispatch() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, Map.of());
+
+        var query  = ModelQuery.builder().tier(ModelTier.FLAGSHIP).build();
+        var config = AgentSessionConfig.of("sys", "user").withModel(query);
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void directModelQueryOnSessionInit() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, Map.of());
+
+        var query = ModelQuery.builder().tier(ModelTier.FLAGSHIP).build();
+        var init  = AgentSessionInit.of("sys").withModel(query);
+        router.openSession(init);
+        assertThat(initCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void modelQueryTakesPrecedenceOverString() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"),
+                descriptorWithVendor("claude-haiku", "claude-haiku", "claude", ModelTier.FAST, "anthropic"));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, Map.of());
+
+        var query  = ModelQuery.builder().tier(ModelTier.FAST).build();
+        var config = new AgentSessionConfig("sys", "user", List.of(), null, null, "claude-opus-5", query);
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-haiku");
+    }
+
+    @Test
+    void withModelQuerySetsQueryAndNullsString() {
+        var config    = AgentSessionConfig.of("sys", "user", "claude-opus-5");
+        var query     = ModelQuery.builder().tier(ModelTier.FAST).build();
+        var withQuery = config.withModel(query);
+        assertThat(withQuery.model()).isNull();
+        assertThat(withQuery.modelQuery()).isEqualTo(query);
+        assertThat(config.model()).isEqualTo("claude-opus-5");
+    }
+
 
 }

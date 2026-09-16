@@ -1185,3 +1185,282 @@ steps:
 The `ScenarioOrchestrator` calls `pushOverlay()` on start and
 `popOverlay()` on stop/completion. Each scenario gets an isolated
 corpus — no bleed between scenarios.
+
+---
+
+## Consumer adoption
+
+Every consumer app follows the same adoption path. The checklist below
+is the universal sequence; the per-app sections that follow give
+specific SPI priorities and config for each application.
+
+### Adoption checklist
+
+1. **Add simulation dependencies** to `pom.xml`:
+   ```xml
+   <dependency>
+       <groupId>io.casehub</groupId>
+       <artifactId>casehub-platform-simulation-api</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>io.casehub</groupId>
+       <artifactId>casehub-platform-simulation-core</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>io.casehub</groupId>
+       <artifactId>casehub-platform-simulation-config</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>io.casehub</groupId>
+       <artifactId>casehub-platform-simulation-generator</artifactId>
+       <scope>provided</scope>
+   </dependency>
+   ```
+
+2. **Add the simulation module for your SPIs:**
+
+   | SPI target | Module | Scope |
+   |-----------|--------|-------|
+   | AgentProvider | `casehub-platform-agent-simulation-core` | compile |
+   | CaseMemoryStore | `casehub-platform-memory-simulation-core` | compile |
+   | Platform-api SPIs (ACL, notifications, etc.) | `casehub-platform-platform-simulation-core` | compile |
+   | @RegisterRestClient interfaces | `casehub-platform-rest-client-simulation-generator` | provided |
+
+3. **Create YAML corpus fixtures** — copy from
+   `docs/examples/simulation/<your-app>/` and adapt field values.
+
+4. **Add `%test` profile simulation config** to `application.properties`:
+   ```properties
+   %test.casehub.simulation.<spi>.<method>.strategy=<strategy>
+   ```
+
+5. **Migrate @InjectMock tests** to simulation-based tests — see
+   "Migrating from @InjectMock" below.
+
+**Production overhead:** Generated `@Decorator` classes are active CDI
+beans at all times. Each intercepted call performs a
+`ConcurrentHashMap.get()` returning `Optional.empty()` when no strategy
+is configured — nanosecond overhead. For high-frequency SPIs in
+latency-sensitive production paths, use Maven profile gating to exclude
+simulation modules from production builds.
+
+### clinical
+
+AgentProvider is the highest-value simulation target — 7 mock sites
+across test classes. CbrCaseMemoryStore is second but requires
+consumer-side enablement (see note below).
+
+| SPI | Strategy | Qualified name | Module |
+|-----|----------|----------------|--------|
+| **AgentProvider** | key-lookup or sequential | `agent-provider.invoke` | agent-simulation-core |
+| **CbrCaseMemoryStore** | — | — | **Not covered** (see below) |
+
+**CbrCaseMemoryStore gap:** Clinical uses `CbrCaseMemoryStore`, not
+`CaseMemoryStore`. These are separate interface hierarchies —
+`memory-simulation-core` does not intercept CbrCaseMemoryStore injection
+points. To simulate CbrCaseMemoryStore, add a
+`META-INF/simulation-eligible.txt` in a clinical simulation module:
+
+```
+io.casehub.neocortex.memory.cbr.CbrCaseMemoryStore=cbr-case-memory-store
+```
+
+This is consumer-side work — the listing-file path avoids adding
+`simulation-api` as a dependency to neocortex-memory-api.
+
+**Example config:**
+
+```properties
+%test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
+```
+
+**Example fixtures:** `docs/examples/simulation/clinical/`
+
+### devtown
+
+Five GitHub `@RegisterRestClient` APIs are the highest-value target —
+external API calls dominate integration testing. CaseMemoryStore (via
+engine module) is second.
+
+| SPI | Strategy | Qualified name | Module |
+|-----|----------|----------------|--------|
+| **GitHubChecksApi** | key-lookup | `github-api.createCheckRun` etc. | rest-client-simulation-generator |
+| **GitHubMergeApi** | key-lookup | `github-api.merge` etc. | rest-client-simulation-generator |
+| **GitHubPullRequestApi** | key-lookup | `github-api.getPullRequest` etc. | rest-client-simulation-generator |
+| **GitHubGitApi** | key-lookup | `github-api.getRef` etc. | rest-client-simulation-generator |
+| **GitHubRepoApi** | key-lookup | `github-api.getRepository` etc. | rest-client-simulation-generator |
+| **CaseMemoryStore** | key-lookup | `case-memory-store.query` | memory-simulation-core |
+
+All five GitHub APIs share `configKey="github-api"`, so their qualified
+names use the `github-api` prefix. The `rest-client` key extractor
+produces keys like `GET /repos/owner/repo/pulls/1`.
+
+**Example config:**
+
+```properties
+%test.casehub.simulation.github-api.getPullRequest.strategy=key-lookup
+%test.casehub.simulation.github-api.getPullRequest.key-extractor=rest-client
+%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
+```
+
+**Example fixtures:** `docs/examples/simulation/devtown/`
+
+### aml
+
+AML already uses `InMemoryCbrCaseMemoryStore` in tests — smallest
+adoption gap of the four apps. CbrCaseMemoryStore has the same coverage
+gap as clinical. ModelRegistry is a minor target.
+
+| SPI | Strategy | Qualified name | Module |
+|-----|----------|----------------|--------|
+| **CbrCaseMemoryStore** | — | — | **Not covered** (same gap as clinical) |
+| **ModelRegistry** | key-lookup | `model-registry.resolveById` | platform-simulation-core |
+
+**Example config:**
+
+```properties
+%test.casehub.simulation.model-registry.resolveById.strategy=key-lookup
+```
+
+**Example fixtures:** `docs/examples/simulation/aml/`
+
+### fsitrading
+
+AgentProvider (via blocks modules) is the highest platform-SPI target.
+Domain-specific banking/payment SPIs need consumer-side
+`@SimulationEligible` enablement.
+
+| SPI | Strategy | Qualified name | Module |
+|-----|----------|----------------|--------|
+| **AgentProvider** | key-lookup or sequential | `agent-provider.invoke` | agent-simulation-core |
+| **CaseMemoryStore** | key-lookup | `case-memory-store.query` | memory-simulation-core |
+| **ModelRegistry** | key-lookup | `model-registry.resolveById` | platform-simulation-core |
+| **Banking/payment SPIs** | — | — | **Consumer-side** (see below) |
+
+**Domain SPI enablement:** Fsitrading's banking and payment interfaces
+are domain-specific, not platform SPIs. Two enablement paths:
+
+1. **Annotation path** — add `simulation-api` as a compile dependency,
+   annotate the SPI with `@SimulationEligible(name = "payment-gateway")`.
+2. **Listing-file path** (recommended) — add
+   `META-INF/simulation-eligible.txt` in the module hosting the
+   generated decorator. No annotation dependency on the SPI module.
+
+**Example config:**
+
+```properties
+%test.casehub.simulation.agent-provider.invoke.strategy=sequential
+%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
+%test.casehub.simulation.model-registry.resolveById.strategy=key-lookup
+```
+
+**Example fixtures:** `docs/examples/simulation/fsitrading/`
+
+### Migrating from @InjectMock
+
+Three patterns cover the most common mock-to-simulation migrations:
+
+**Pattern 1: Mock return value → key-lookup**
+
+```java
+// BEFORE: @InjectMock with stubbed return
+@InjectMock AgentProvider agentProvider;
+
+@BeforeEach
+void setup() {
+    when(agentProvider.invoke(any()))
+        .thenReturn(Multi.createFrom().item(
+            new AgentEvent.TextDelta("mocked response")));
+}
+
+// AFTER: simulation config + corpus
+// 1. Remove @InjectMock — let CDI inject the real (or NoOp) bean
+// 2. Add to application.properties:
+//    %test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
+// 3. Seed corpus (YAML or programmatic):
+//    agent-provider.invoke:
+//      - tenancy-id: default
+//        key: any-prompt
+//        input: { systemPrompt: "...", userPrompt: "..." }
+//        output: [{ type: TextDelta, text: "mocked response" }]
+```
+
+**Pattern 2: Mock sequential returns → sequential strategy**
+
+```java
+// BEFORE: thenReturn chaining
+when(store.query(any()))
+    .thenReturn(List.of(memory1))
+    .thenReturn(List.of(memory2))
+    .thenReturn(List.of(memory3));
+
+// AFTER: sequential strategy with seeded corpus
+// %test.casehub.simulation.case-memory-store.query.strategy=sequential
+// Seed 3 entries in corpus order — sequential returns them in order.
+// WRAP policy (default) cycles; THROW policy fails after exhaustion.
+```
+
+**Pattern 3: Mock with verify → capture + journal**
+
+```java
+// BEFORE: verify interactions
+verify(agentProvider, times(2)).invoke(any());
+verify(agentProvider).invoke(argThat(req ->
+    req.userPrompt().contains("triage")));
+
+// AFTER: overlay journal (for scenario-scoped verification)
+var overlay = runtime.pushOverlay(config, corpus);
+try {
+    // ... run test ...
+    var entries = overlay.journal()
+        .entriesFor("agent-provider.invoke");
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).input().toString())
+        .contains("triage");
+} finally {
+    runtime.popOverlay(overlay);
+}
+// The journal records every intercepted call with input, output,
+// timestamp, and whether it was simulated or passthrough.
+// Issue #332 will add a convenience DSL (wasCalled(), wasCalledWith(),
+// verifyInOrder()) over this same journal.
+```
+
+### CI integration with Quarkus profiles
+
+Simulation activates only when `casehub.simulation.*` config is present.
+Use Quarkus profiles to enable simulation in CI and disable it in
+staging/production:
+
+```properties
+# application.properties — %test profile enables simulation
+
+# CI: simulate AgentProvider
+%test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
+
+# CI: simulate CaseMemoryStore
+%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
+
+# Staging/prod: no simulation config → passthrough
+# (no %staging or %prod prefixed simulation keys needed)
+```
+
+No Maven profile changes needed. No CI pipeline changes needed.
+Simulation modules are compile-scope dependencies, but the generated
+decorators are inert without strategy config — a `ConcurrentHashMap.get()`
+returning empty on every call.
+
+**YAML corpus files** for CI are loaded via:
+
+```properties
+%test.casehub.simulation.corpus.files=simulation/agent-corpus.yaml,simulation/memory-corpus.yaml
+```
+
+Place fixture files in `src/test/resources/simulation/` in the consumer
+module.
+
+**Type limitation:** YAML fixtures store input/output as untyped Objects
+(Maps/Lists/Strings). This works for key-lookup and sequential strategies
+where output is consumed as raw data. For SPIs with rich domain return
+types (e.g. `CaseMemoryStore.query()` returns `List<Memory>`), use
+programmatic corpus seeding in a `@Startup` bean or test setup method.

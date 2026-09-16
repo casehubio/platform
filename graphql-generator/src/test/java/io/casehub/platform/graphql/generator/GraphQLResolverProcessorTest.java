@@ -704,6 +704,41 @@ class GraphQLResolverProcessorTest {
                 assertThat(diag.getMessage(null)).contains("without a visible CDI scope annotation"));
     }
 
+    @Test
+    void classBasedDomainWithContextParam() throws Exception {
+        var cls = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.TenantService",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("tenant-items")
+                @ApplicationScoped
+                public class TenantService {
+                    @PlatformQuery("List tenant items")
+                    public List<String> listItems(@ContextParam("tenancyId") String tenancyId) {
+                        return List.of();
+                    }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=tenant-items", "-AgenerateGraphQL=false")
+                .compile(cls);
+
+        var restSource = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedTenantItemsResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("currentPrincipal.tenancyId()");
+        assertThat(content).contains("CurrentPrincipal currentPrincipal;");
+        assertThat(content).doesNotContain("@QueryParam(\"tenancyId\")");
+    }
+
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);

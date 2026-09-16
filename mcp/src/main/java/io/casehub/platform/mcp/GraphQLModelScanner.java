@@ -59,13 +59,13 @@ public class GraphQLModelScanner {
             if (mcpDomain == null) {continue;}
 
             String domain = mcpDomain.value();
-            domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
-            domainEvents.computeIfAbsent(domain, k -> new ArrayList<>());
 
             if (!hasGraphQLApi(beanClass)) {
                 if (ModelEnricher.class.isAssignableFrom(beanClass)) {
                     continue;
                 }
+                domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
+                domainEvents.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : beanClass.getDeclaredMethods()) {
                     if (Modifier.isStatic(method.getModifiers())) { continue; }
                     if (method.isAnnotationPresent(PlatformQuery.class)) {
@@ -82,6 +82,9 @@ public class GraphQLModelScanner {
                 }
                 continue;
             }
+
+            domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
+            domainEvents.computeIfAbsent(domain, k -> new ArrayList<>());
 
             for (Method method : beanClass.getDeclaredMethods()) {
                 if (Modifier.isStatic(method.getModifiers())) {continue;}

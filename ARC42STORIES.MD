@@ -3,8 +3,8 @@
 **Spec:** Arc42Stories v0.1
 **Profile:** CaseHub — Foundation tier
 **Profile ref:** `../parent/docs/arc42stories-casehub-profile.md` · fallback: `https://raw.githubusercontent.com/casehubio/parent/main/docs/arc42stories-casehub-profile.md`
-**Build position:** First in the foundation stack — no casehubio dependencies. Must publish before ledger, connectors, work, qhorus, eidos, engine.
-**Consumed by:** casehub-ledger, casehub-connectors, casehub-work (api), casehub-qhorus, casehub-eidos, casehub-engine, all application-tier harness apps
+**Build position:** First in the foundation stack — no casehubio dependencies. Must publish before ledger, work, qhorus, engine.
+**Consumed by:** casehub-ledger, casehub-work, casehub-qhorus, casehub-engine, claudony, devtown, aml, clinical
 **Depends on:** None — zero casehubio dependencies. Pure Java APIs + Quarkus extension modules with no upstream casehub deps.
 
 ---
@@ -179,7 +179,7 @@ C4Container
     Container(api, "casehub-platform-api", "Java 21", "SPIs, types, records — zero deps")
   }
   Container_Boundary(l2, "L2: Default Implementations") {
-    Container(platform, "casehub-platform", "Quarkus", "@DefaultBean mocks + BlockingToReactiveBridge")
+    Container(platform, "casehub-platform", "Quarkus", "@DefaultBean mocks + configurable defaults")
   }
   Container_Boundary(l3, "L3: Testing") {
     Container(testing, "casehub-platform-testing", "Java 21", "@Alternative @Priority(1) identity fixtures")
@@ -192,7 +192,7 @@ C4Container
   }
   Container_Boundary(l5, "L5: Preference Persistence") {
     Container(jpaPrefs, "casehub-platform-persistence-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaPreferenceProvider")
-    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "Panache MongoDB", "@Alternative @Priority(1) MongoPreferenceProvider")
+    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "MongoDB Java driver", "@Alternative @Priority(1) MongoPreferenceProvider")
   }
   Container_Boundary(l6, "L6: Memory Adapters — mutually exclusive per priority tier") {
     Container(memInmem, "casehub-platform-memory-inmem", "Java", "@Alternative @Priority(10) InMemoryMemoryStore")
@@ -223,7 +223,7 @@ C4Container
   }
   Container_Boundary(l11, "L11: ACL Adapters — mutually exclusive per priority tier") {
     Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
-    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM Panache + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
   }
   Container_Boundary(l12, "L12: Digest Buffer Adapters — mutually exclusive per priority tier") {
     Container(digestInmem, "casehub-platform-digest-inmem", "Java", "@Alternative @Priority(100) InMemoryDigestBuffer — volatile, ConcurrentHashMap")
@@ -530,7 +530,7 @@ flowchart LR
 
 #### C1 — Core SPIs Baseline
 
-**Journey:** J1 | **Sequence:** 1 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 1 of 21 | **Status:** ✅
 **Delivered:** 2026-05-18/19 | **Issues:** #1, #2 | **Blog:** `blog/2026-05-19-mdp01-laying-platform-foundation.md`
 
 **What this delivers**
@@ -552,7 +552,7 @@ Consumers can declare a `@ConfigProperty`-backed `PreferenceKey<T>`, resolve it 
 
 #### C2 — YAML Preferences Provider
 
-**Journey:** J1 | **Sequence:** 2 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 2 of 21 | **Status:** ✅
 **Delivered:** 2026-05-20 | **Issues:** #2 | **Blog:** `blog/2026-05-20-mdp01-preferences-drools-cascade.md`
 
 **What this delivers**
@@ -572,7 +572,7 @@ Harness apps can ship a YAML preferences file, and `ConfigFilePreferenceProvider
 
 #### C3 — OIDC CurrentPrincipal + Tenancy
 
-**Journey:** J1 | **Sequence:** 3 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 3 of 21 | **Status:** ✅
 **Delivered:** 2026-05-21 | **Issues:** #3, #16, #17 | **Blog:** `blog/2026-05-21-mdp02-oidc-optional-module.md`, `blog/2026-05-21-mdp01-tenancy-id-before-the-fields.md`
 
 **What this delivers**
@@ -593,7 +593,7 @@ Consumers that add `casehub-platform-oidc` get JWT-backed identity context with 
 
 #### C4 — ActorType Migration
 
-**Journey:** J1 | **Sequence:** 4 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 4 of 21 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** #22 | **Blog:** `blog/2026-05-22-mdp01-moving-actortype-upstream.md`
 
 **What this delivers**
@@ -612,7 +612,7 @@ Consumers that add `casehub-platform-oidc` get JWT-backed identity context with 
 
 #### C5 — JQ Expression Evaluator
 
-**Journey:** J1 | **Sequence:** 5 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 5 of 21 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** engine#319 | **Blog:** `blog/2026-05-22-mdp02-jq-moves-to-platform.md`
 
 **What this delivers**
@@ -630,7 +630,7 @@ Foundation-tier repos (`casehub-work`, `casehub-qhorus`) can evaluate JQ express
 
 #### C6 — JPA Preferences Backend
 
-**Journey:** J1 | **Sequence:** 6 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 6 of 21 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** #6 | **Blog:** `blog/2026-05-22-mdp03-preferences-meet-database.md`
 
 **What this delivers**
@@ -648,7 +648,7 @@ Preference values survive restarts and can be updated without a redeployment. Sc
 
 #### C7 — MongoDB Preferences Backend
 
-**Journey:** J1 | **Sequence:** 7 of 15 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 7 of 21 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** — | **Blog:** `blog/2026-05-22-mdp06-mongodb-preferences-missing-rung.md`
 
 **What this delivers**
@@ -666,15 +666,14 @@ Consumers co-deploying Postgres JPA and MongoDB can use MongoDB as the preferenc
 
 #### C8 — Memory SPI + InMem + JPA Adapters
 
-**Journey:** J2 | **Sequence:** 8 of 15 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 8 of 21 | **Status:** ✅
 **Delivered:** 2026-05-28 to 2026-06-01 | **Issues:** #27, #32, #36, #48 | **Blog:** `blog/2026-05-28-mdp01-teaching-platform-to-remember.md`
 
 **What this delivers**
-Applications can store and query agent memories that persist across case boundaries. `CaseMemoryStore.store()` is append-only; `query()` supports multi-entity fan-out, `CHRONOLOGICAL` and `RELEVANCE` ordering, and `since` filtering. `assertTenant()` enforces per-store tenant isolation before any entity reaches the persistence layer. The `BlockingToReactiveBridge` wraps any blocking adapter as `ReactiveCaseMemoryStore @DefaultBean`, so reactive callers need no adapter-specific code.
+Applications can store and query agent memories that persist across case boundaries. `CaseMemoryStore.store()` is append-only; `query()` supports multi-entity fan-out, `CHRONOLOGICAL` and `RELEVANCE` ordering, and `since` filtering. `assertTenant()` enforces per-store tenant isolation before any entity reaches the persistence layer.
 
 **Accountability gaps closed**
 - Cross-case agent memory — before: every case starts cold, no shared knowledge → L6 (`CaseMemoryStore` SPI + `InMemoryMemoryStore`, `JpaMemoryStore`)
-- Reactive memory access without adapter-specific code → L2 (`BlockingToReactiveBridge`)
 - Tenant assertion before persistence — GDPR-adjacent correctness → L1 (`MemoryPermissions.assertTenant`)
 
 **Layer Impact**
@@ -689,7 +688,7 @@ Applications can store and query agent memories that persist across case boundar
 
 #### C9 — SQLite Durable Memory
 
-**Journey:** J2 | **Sequence:** 9 of 15 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 9 of 21 | **Status:** ✅
 **Delivered:** 2026-05-31 | **Issues:** #37 | **Blog:** `blog/2026-05-31-mdp01-durable-memory-no-server.md`
 
 **What this delivers**
@@ -708,7 +707,7 @@ Single-process deployments and local installs get durable agent memory without a
 
 #### C10 — Mem0 Vector Memory
 
-**Journey:** J2 | **Sequence:** 10 of 15 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 10 of 21 | **Status:** ✅
 **Delivered:** 2026-06-04 | **Issues:** #33 | **Blog:** `blog/2026-06-04-mdp01-mem0-adapter.md`
 
 **What this delivers**
@@ -726,7 +725,7 @@ Agent memories are stored with vector embeddings in Mem0 OSS, enabling semantic 
 
 #### C11 — Memory Contract Hardening
 
-**Journey:** J2 | **Sequence:** 11 of 15 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 11 of 21 | **Status:** ✅
 **Delivered:** 2026-06-05 | **Issues:** #39, #49 | **Blog:** `blog/2026-06-05-mdp01-storeall-contract.md`
 
 **What this delivers**
@@ -746,7 +745,7 @@ Agent memories are stored with vector embeddings in Mem0 OSS, enabling semantic 
 
 #### C12 — SCIM GroupMembershipProvider
 
-**Journey:** J3 | **Sequence:** 12 of 15 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 12 of 21 | **Status:** ✅
 **Delivered:** 2026-05-30 to 2026-06-01 | **Issues:** #45, #47 | **Blog:** `blog/2026-05-30-mdp01-asking-directories-whos-in-the-group.md`
 
 **What this delivers**
@@ -768,7 +767,7 @@ The `GroupMembershipProvider` answers the inverse membership query ("who is in g
 
 #### C13 — Agent Identity (DID/VC)
 
-**Journey:** J3 | **Sequence:** 13 of 15 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 13 of 21 | **Status:** ✅
 **Delivered:** 2026-06-02 | **Issues:** #52, #53, #54 | **Blog:** `blog/2026-06-01-mdp03-the-permission-layer.md`
 
 **What this delivers**
@@ -787,7 +786,7 @@ Agent actors can prove their identity via DID (did:key, did:web) and verifiable 
 
 #### C14 — Agent SPI (Claude)
 
-**Journey:** J3 | **Sequence:** 14 of 15 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 14 of 21 | **Status:** ✅
 **Delivered:** 2026-06-03 | **Issues:** #55 | **Blog:** `blog/2026-06-03-mdp01-shipping-platform-agent.md`
 
 **What this delivers**
@@ -807,7 +806,7 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C15 — ActorState SPI
 
-**Journey:** J3 | **Sequence:** 15 of 16 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 15 of 21 | **Status:** ✅
 **Delivered:** 2026-06-03 | **Issues:** casehubio/parent#56 | **Blog:** —
 
 **What this delivers**
@@ -1031,7 +1030,7 @@ Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
 
 **Why `ActorType` is in `platform-api`, not `casehub-ledger-api`:** Actor classification is an identity concern. `CurrentPrincipal.actorType()` must be expressible without a ledger dependency — `platform-api` is zero-dependency and adding `casehub-ledger-api` would break the tier model. ADR-0005.
 
-**Why `MemoryPermissions.assertTenant` is static:** Reactive-only `CaseMemoryStore` adapters (those implementing `ReactiveCaseMemoryStore` directly, without going through `BlockingToReactiveBridge`) have no reference to the blocking SPI instance. A `default` method on `CaseMemoryStore` is unreachable from those adapters. A static utility is callable from both paths.
+**Why `MemoryPermissions.assertTenant` is static:** A `default` method on `CaseMemoryStore` would couple tenant validation to a specific SPI instance. A static utility is callable from any adapter without requiring the interface reference — simpler and decoupled.
 
 #### Pattern introduced
 
@@ -1056,7 +1055,7 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 #### Layer — L2: Default Implementations
 
 **Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14, C16, C17
-**Architectural patterns:** `@DefaultBean` CDI displacement, Blocking-to-reactive bridge
+**Architectural patterns:** `@DefaultBean` CDI displacement
 **Key protocols:** `docs/protocols/casehub/alternative-extension-patterns.md`
 **Issues:** #1, #27
 **Navigation:** `git log --grep="#1\|#27" --oneline`
@@ -1070,7 +1069,6 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 
 What this layer adds:
 - **`@DefaultBean` mocks** — all mocks read values from `@ConfigProperty`; no hardcoded values; `Optional<T>` for fields where the config key may be absent
-- **`BlockingToReactiveBridge @DefaultBean`** — wraps whichever blocking `CaseMemoryStore` is active; reactive callers need not reference adapters directly
 - **`PathParserConfigurator @Startup`** — wires the config-driven `PathParser` at application start before any `Path.parse()` call reaches it
 - **`NoOpAgentProvider @DefaultBean`** — emits a WARN per invocation; dev misconfiguration is loud, not silent
 
@@ -1081,7 +1079,6 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 | Gap | What breaks without it | Closed by |
 |---|---|---|
 | CDI context at startup | Every injection point for a platform SPI fails at boot | `@DefaultBean` mocks |
-| Reactive CaseMemoryStore without adapter coupling | Reactive callers must reference each adapter directly | `BlockingToReactiveBridge` |
 
 #### Key files
 
@@ -1090,8 +1087,6 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 - `platform/src/main/java/io/casehub/platform/mock/MockGroupMembershipProvider.java` — returns configurable group members
 - `platform/src/main/java/io/casehub/platform/mock/PathParserConfigurator.java` — `@Startup @ApplicationScoped`; wires `PathParser` before first `Path.parse()` call
 - `platform/src/main/java/io/casehub/platform/memory/NoOpCaseMemoryStore.java` — `@DefaultBean`; `store()` returns a dummy `Memory`; `query()` returns empty; no persistence
-- `platform/src/main/java/io/casehub/platform/memory/ReactiveCaseMemoryStore.java` — reactive SPI (Mutiny); `@DefaultBean` bridge is `BlockingToReactiveBridge`
-- `platform/src/main/java/io/casehub/platform/memory/BlockingToReactiveBridge.java` — `@DefaultBean`; injects active blocking `CaseMemoryStore`; delegates on Quarkus worker thread
 - `platform/src/main/java/io/casehub/platform/agent/NoOpAgentProvider.java` — `@DefaultBean`; logs WARN per invocation; returns empty stream
 - `platform/src/main/java/io/casehub/platform/converter/PathParamConverter.java` — JAX-RS `@Provider`; `fromString()` → `Path.parse()`; `toString()` → `path.value()`
 
@@ -1099,7 +1094,6 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 
 **`@DefaultBean` yields to any non-default `@ApplicationScoped` on the classpath.** No exclusion config required. Add an optional module, the mock steps aside. Remove it, the mock returns. This is the activation contract for all optional modules in this repo.
 
-**`BlockingToReactiveBridge` thread dispatch is the entrypoint's responsibility.** Do not annotate bridge methods `@Blocking` — Quarkus's `ExecutionModelAnnotationsProcessor` only recognises that annotation on JAX-RS resources, reactive messaging consumers, and GraphQL resolvers, not plain CDI bean methods. If a JAX-RS resource method is `@Blocking`, the entire call chain (including the bridge) runs on a worker thread already. GE-20260528-xxxx captures this.
 
 **Mock `@ConfigProperty Optional<T>` fields for absent config keys.** SmallRye Config throws `NoSuchElementException` for non-Optional fields with no configured value. Use `Optional<List<String>>` for groups, `Optional<Map<String,String>>` for preference overrides.
 
@@ -1247,7 +1241,7 @@ Not closed here: preference write path (`preferences-editor`, issue #8 — not y
 
 - `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceProvider.java` — scope ancestor list → single `IN` query → map merge; `effectiveAt` ignored (ADR-0006)
 - `persistence-jpa/src/main/resources/db/platform/migration/V1__create_platform_preference.sql` — `platform_preference` table; `pref_name`, `pref_value` (not `name`, `value` — H2 reserved words)
-- `persistence-mongodb/src/main/java/io/casehub/platform/persistence/mongodb/MongoPreferenceProvider.java` — compound `_id`; `Filters.in("scope", scopes)` (not Panache JPQL syntax)
+- `persistence-mongodb/src/main/java/io/casehub/platform/persistence/mongodb/MongoPreferenceProvider.java` — compound `_id`; `Filters.in("scope", scopes)` (MongoDB Java driver Bson filter API)
 
 #### Key wiring
 
@@ -1259,7 +1253,7 @@ Not closed here: preference write path (`preferences-editor`, issue #8 — not y
 
 **Comparator fallback for unknown scopes must be `-1`, not `0`.** When sorting query results by ancestor list index, `getOrDefault(scope, 0)` gives unknown scopes the same priority as root scope (index 0). Safe by construction (only ancestor-list rows are returned), but semantically wrong. Use `-1` as the fallback so any data anomaly sorts below root rather than equal to it.
 
-**`MongoPreferenceProvider` uses `Filters.in("scope", scopes)` not Panache JPQL string syntax.** Panache MongoDB and Panache ORM share the same surface API but different query parsers. The JPQL `IN` form is not guaranteed to parse correctly in the MongoDB adapter. Use the `Bson` filter overload.
+**`MongoPreferenceProvider` uses `Filters.in("scope", scopes)` — the MongoDB Java driver's Bson filter API.** Direct use of the driver API avoids query parser abstraction layers and ensures correct `IN` semantics.
 
 **MongoDB scope index created at startup by `@Startup @ApplicationScoped` bean.** No Flyway for MongoDB — `createIndex()` is idempotent; MongoDB ignores it if the index already exists.
 
@@ -1286,7 +1280,7 @@ CDI priority ladder — `@DefaultBean` (lowest) → `@ApplicationScoped` (middle
 #### Layer — L6: Memory Adapters
 
 **Participates in chapters:** C8, C9, C10, C11, C16
-**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
+**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
 **ADRs:** ADR-0008
 **Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #65, #66, #67, #69, #70, #87, #90, #99
 **Navigation:** `git log --grep="#32\|#33\|#36\|#37\|#39\|#48\|#49" --oneline`
@@ -1505,7 +1499,6 @@ C19 delivered #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/
 
 #### Architectural decisions
 
-**Why `@Blocking` was removed from `BlockingToReactiveBridge` methods:** Quarkus's `ExecutionModelAnnotationsProcessor` only processes `@Blocking` on framework entrypoints — JAX-RS resources, reactive messaging consumers, GraphQL resolvers. On a plain `@ApplicationScoped` CDI bean returning `Uni<T>`, the annotation is illegal and the build fails. Thread dispatch on the bridge is the entrypoint's responsibility.
 
 #### Pattern introduced
 
@@ -1745,10 +1738,9 @@ Cross-cutting decisions not captured in layer entries:
 | `ActorId` | A principal performing an action in a specific context. Use for execution attribution, audit, and delegation. Wraps a `PrincipalId`. See §8 Identity Hierarchy. |
 | `ParticipantId` | An actor involved in a multi-party interaction (conversation, session, collaboration). Wraps an `ActorId`. See §8 Identity Hierarchy. |
 | `GroupMember` | Record: `actorId` (SCIM `value` = OIDC `sub` = stable identity key) + `displayName` (human label — never use as a routing key). |
-| `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking; wrapped by `BlockingToReactiveBridge` for reactive callers. `store()` is append-only. |
+| `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking. `store()` is append-only. |
 | `MemoryQuery` | Query builder for `CaseMemoryStore.query()` — multi-entity fan-out, `MemoryOrder` (CHRONOLOGICAL / RELEVANCE), `since` filter, domain filter. |
 | `MemoryPermissions` | Static utility — `assertTenant(tenantId, CurrentPrincipal)` throws `SecurityException` if the current principal's tenancy does not match. Static so callable from both blocking and reactive adapters; `assertCrossTenantAdmin(principal)` — requires `isCrossTenantAdmin()=true`, no async bypass form. |
-| `BlockingToReactiveBridge` | `@DefaultBean` `ReactiveCaseMemoryStore` implementation that wraps whichever blocking `CaseMemoryStore` is active. Thread dispatch is the entrypoint's responsibility. |
 | `AgentProvider` | SPI for agent execution — `execute(prompt, AgentSessionConfig)` returns `Multi<AgentEvent>`. `NoOpAgentProvider @DefaultBean` active when no implementation is on the classpath. |
 | `ActorStateContributor` | SPI: `contribute(actorId, ActorStateAccumulator)` — each contributor adds its slice of actor workload data (active cases, open WorkItems, open obligations). |
 | `SettingsScope` | Wraps a `Path` and an `effectiveAt Instant` for preference resolution. `SettingsScope.of(path)` defaults `effectiveAt` to `Instant.now()`. |
@@ -1776,7 +1768,6 @@ Cross-cutting decisions not captured in layer entries:
 | `CbrCaseEntry` | Standard schema for the CBR Retain step: `problem` → `MemoryInput.text`, `solution` → `SOLUTION` attribute, `outcome` → `OUTCOME` attribute, `origin` → `CONFIDENCE` attribute. `toMemoryInput()` converts to store input; `CbrCaseEntry.from(Memory)` reconstructs from a recalled memory. |
 | `StoreAllResult` | Return type of `CaseMemoryStore.storeAll()` — carries `stored()` (IDs of successfully persisted inputs) and `failures()` (list of `StoreFailure`). Backend `RuntimeException`s are collected per input; `SecurityException` always propagates immediately and terminates the batch. |
 | `StoreFailure` | Record inside `StoreAllResult` — `inputIndex`, `input`, `cause`. Allows callers to correlate partial-write failures back to the original `MemoryInput` list for retry. |
-| `ReactiveCaseMemoryStore` | Mutiny SPI mirror of `CaseMemoryStore` — `Uni`/`Multi` return types. Lives in `platform-api` (L1). `BlockingToReactiveBridge @DefaultBean` in `platform/` wraps the active blocking adapter so reactive callers need no adapter-specific code. |
 | `GraphCaseMemoryStore` | Extension of `CaseMemoryStore` adding `graphQuery(GraphMemoryQuery)` for temporal knowledge graph adapters. `NoOpCaseMemoryStore` implements this interface so injection of the graph type does not fail when no graph adapter is deployed. |
 | `GraphMemoryQuery` | Query record for graph-native adapters — `tenantId`, `entityIds`, `domain`, `question`, `limit`, `since`, `validAt`, `entityTypes`, `resultType`. |
 | `MemoryCapability` | Enum declaring what a `CaseMemoryStore` adapter supports (e.g. `GRAPH_QUERY`, `CROSS_TENANT_ERASE`). `capabilities()` default on `CaseMemoryStore` returns `EnumSet.noneOf(MemoryCapability.class)`; adapters override. `requireCapability()` throws `MemoryCapabilityException` if not supported. |

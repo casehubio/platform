@@ -604,6 +604,106 @@ class GraphQLResolverProcessorTest {
         assertThat(GraphQLResolverProcessor.resolveHttpVerb(GraphQLResolverProcessor.OperationType.STREAM, null)).isEqualTo("GET");
     }
 
+    // --- Class-based @McpDomain tests ---
+
+    @Test
+    void classBasedDomainGeneratesRestResource() throws Exception {
+        var cls = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StatusService",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+
+                @McpDomain("status")
+                @ApplicationScoped
+                public class StatusService {
+                    @PlatformQuery("Get system status")
+                    public String getStatus() { return "ok"; }
+
+                    @PlatformMutation("Reset status")
+                    public void resetStatus(String reason) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=status")
+                .compile(cls);
+
+        var restSource = compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedStatusResource");
+        assertThat(restSource).isPresent();
+
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).contains("@Path(\"/api/status\")");
+        assertThat(restContent).contains("import test.StatusService;");
+        assertThat(restContent).contains("StatusService statusService;");
+        assertThat(restContent).contains("statusService.getStatus()");
+
+        var graphqlSource = compilation.generatedSourceFile(
+                "io.casehub.platform.graphql.generated.GeneratedStatusResolver");
+        assertThat(graphqlSource).isPresent();
+
+        String gqlContent = graphqlSource.get().getCharContent(true).toString();
+        assertThat(gqlContent).contains("@GraphQLApi");
+        assertThat(gqlContent).contains("import test.StatusService;");
+        assertThat(gqlContent).contains("StatusService statusService;");
+    }
+
+    @Test
+    void classWithoutScopeEmitsWarning() throws Exception {
+        var cls = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.UnscopedService",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+
+                @McpDomain("unscoped")
+                public class UnscopedService {
+                    @PlatformQuery("Get data")
+                    public String getData() { return "data"; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=unscoped", "-AgenerateGraphQL=false")
+                .compile(cls);
+
+        assertThat(compilation.warnings()).anySatisfy(diag ->
+                assertThat(diag.getMessage(null)).contains("without a visible CDI scope annotation"));
+
+        assertThat(compilation.generatedSourceFile(
+                "io.casehub.platform.rest.generated.GeneratedUnscopedResource")).isPresent();
+    }
+
+    @Test
+    void classWithScopeNoWarning() throws Exception {
+        var cls = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.ScopedService",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+
+                @McpDomain("scoped")
+                @ApplicationScoped
+                public class ScopedService {
+                    @PlatformQuery("Get data")
+                    public String getData() { return "data"; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=scoped", "-AgenerateGraphQL=false")
+                .compile(cls);
+
+        assertThat(compilation.warnings()).noneSatisfy(diag ->
+                assertThat(diag.getMessage(null)).contains("without a visible CDI scope annotation"));
+    }
+
     private static String decapitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);

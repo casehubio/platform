@@ -85,7 +85,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         Set<String> restSkipMethods    = scanHandWrittenRestMethods(index, roundEnv);
 
         Map<String, DomainOperations> jandexDomains =
-                index != null ? scanAnnotatedInterfaces(index) : new HashMap<>();
+                index != null ? scanAnnotatedDomains(index) : new HashMap<>();
         Map<String, DomainOperations> roundEnvDomains = scanRoundEnvironment(roundEnv);
 
         Map<String, DomainOperations> allDomains = new HashMap<>(roundEnvDomains);
@@ -255,13 +255,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
 
-    private Map<String, DomainOperations> scanAnnotatedInterfaces(IndexView index) {
+    private Map<String, DomainOperations> scanAnnotatedDomains(IndexView index) {
         Map<String, DomainOperations> domains = new HashMap<>();
 
         for (AnnotationInstance ann : index.getAnnotations(MCP_DOMAIN)) {
             if (ann.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
             ClassInfo classInfo = ann.target().asClass();
-            if (!java.lang.reflect.Modifier.isInterface(classInfo.flags())) {continue;}
 
             String domain = ann.value().asString();
             DomainOperations ops = domains.computeIfAbsent(domain,
@@ -430,6 +429,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
     }
 
+    private boolean hasVisibleCdiScope(javax.lang.model.element.Element element) {
+        for (String scopeAnnotation : List.of(
+                "jakarta.enterprise.context.ApplicationScoped",
+                "jakarta.enterprise.context.RequestScoped",
+                "jakarta.enterprise.context.SessionScoped",
+                "jakarta.enterprise.context.Dependent",
+                "jakarta.inject.Singleton")) {
+            if (findAnnotationMirror(element, scopeAnnotation) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isSimpleTypeMirror(javax.lang.model.type.TypeMirror type) {
         if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {return false;}
         String fqcn = ((javax.lang.model.element.TypeElement)
@@ -467,9 +480,22 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         for (javax.lang.model.element.Element element : annotated) {
-            if (element.getKind() != javax.lang.model.element.ElementKind.INTERFACE) {continue;}
+            if (element.getKind() != javax.lang.model.element.ElementKind.INTERFACE
+                && element.getKind() != javax.lang.model.element.ElementKind.CLASS) {continue;}
             javax.lang.model.element.TypeElement typeElement =
                     (javax.lang.model.element.TypeElement) element;
+
+            if (element.getKind() == javax.lang.model.element.ElementKind.CLASS) {
+                if (!hasVisibleCdiScope(element)) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                            "@McpDomain on class " + typeElement.getQualifiedName()
+                            + " without a visible CDI scope annotation. "
+                            + "The class must be a CDI bean at runtime. "
+                            + "Note: this check cannot see inherited scopes, stereotypes, "
+                            + "or scopes added by CDI extensions.",
+                            element);
+                }
+            }
 
             javax.lang.model.element.AnnotationMirror mcpAnn = findAnnotationMirror(element,
                                                                                     "io.casehub.platform.api.mcp.McpDomain");

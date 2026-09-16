@@ -50,7 +50,9 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `agent-gemini/` | `casehub-platform-agent-gemini` | `@ApplicationScoped` | AgentBackend "gemini" -- native Google GenAI SDK (v1.65.0), explicit caching |
 | `agent-gemini-cli/` | `casehub-platform-agent-gemini-cli` | `@ApplicationScoped` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
 | `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@ApplicationScoped` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
-| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- three-step model resolution (ModelRegistry → key → fail-fast) with config rewriting; `NoOpModelRegistry @DefaultBean` fallback |
+| `agent-config-core/` | `casehub-platform-agent-config-core` | (none) | Manifest types, `ManifestLoader`, `ManifestProcessor`, `ManifestCredentialResolver`, `CredentialRef` sealed interface, `ManifestResult`, `LocalModelReconciler`. Pure Java + Jackson |
+| `agent-config/` | `casehub-platform-agent-config` | `@Startup @Priority(50)` | `AgentConfigBeans` -- discovers `agent-config.yaml`, runs loader+processor, produces `ManifestResult @Singleton` |
+| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking; consumes `ManifestResult`; `NoOpModelRegistry @DefaultBean` fallback |
 | `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps RoutingAgentProvider |
 | `endpoints-memory/` | `casehub-platform-endpoints-memory` | `@Alternative @Priority(100)` | In-memory `EndpointRegistry` -- volatile, Tier 4 CDI |
 | `endpoints-config/` | `casehub-platform-endpoints-config` | `@Startup @ApplicationScoped` | YAML endpoint populator -- `${VAR}` interpolation, multi-file |
@@ -190,11 +192,47 @@ Same composite pattern for `ActorDIDProvider` -- `ConfiguredActorDIDProvider` (@
 
 **SecretManager** (`@DefaultBean` in expression module): Reads secrets from config properties with prefix `casehub.platform.secrets.{secretName}.{property}`. Same Kubernetes Secret integration pattern.
 
+### Agent Configuration Manifest
+
+The manifest system drives `AgentProvider` configuration declaratively. The pipeline:
+
+```
+agent-config.yaml files → ManifestLoader → ManifestProcessor → existing SPIs
+                                                                  ├─ LlmCredentialStore
+                                                                  ├─ MutableModelRegistry
+                                                                  ├─ RoutingAgentProvider (aliases + defaults)
+                                                                  └─ LocalModelReconciler (Ollama pull)
+```
+
+**Startup ordering:**
+
+| Priority | Bean | Responsibility |
+|----------|------|----------------|
+| 50 | `AgentConfigBeans` | Load manifest, store credentials, prepare aliases + defaults |
+| 75 | `BackendInstanceCoordinator` | Discover credentials in store → create backend instances |
+| default | `ModelRegistryRefresher` | Refresh all model sources (seed, cloud, configured) |
+
+**ManifestProcessor pipeline (in agent-config-core):**
+
+1. **Providers → Credentials:** Resolve `env:`/`file:`/`ref:` references via `ManifestCredentialResolver`, validate against `VendorInfo.requiredFields()` (injected as `Map<String, List<String>>` by Quarkus layer), store in `LlmCredentialStore` as `"cloud-{vendorKey}"` (matches `BackendInstanceFactory` pattern)
+2. **Models → Registry:** Register via `MutableModelRegistry.replaceSource("manifest", 8, models)`. Priority 8 sits above cloud sources (5) but below per-tenant runtime config (10)
+3. **Local models → Reconciliation:** Delegate to `LocalModelReconciler` functional interface (Quarkus layer provides implementation via `OllamaModelSource` + `LlmConfigService.pullModel()`)
+4. **Aliases + Defaults → ManifestResult:** Convert `AliasDeclaration` → `ModelQuery`, produce `ManifestResult` record consumed by `RouterBeans`
+
+**Credential reference resolution chain:**
+- `env:VAR` → `System.getenv()` (dev, CI)
+- `file:/path` → file contents (k8s mounted secrets)
+- `ref:credential-ref` → `CredentialResolver` SPI → `credentials-quarkus` bridge → Quarkus `CredentialsProvider` → Vault/AWS/GCP
+
+**Adding a new vendor:** Implement `VendorClient` in `llm-config/`. The interface requires `vendorKey()`, `backendKey()`, `displayName()`, `authMethod()`, `requiredFields()`, and `listModels(credentials)`. The manifest processor picks up required fields automatically via CDI discovery in `AgentConfigBeans`.
+
+**model-selection.schema.json:** Published as a Maven artifact resource in `agent-config-core`. Defines a union type (string | ModelConstraints object). Eidos and org descriptors `$ref` this schema for task-level model requirements. The schema uses open `type: string` for capabilities (not a closed enum) to allow new capabilities without schema updates.
+
 ### Agent Infrastructure
 
 `AgentProvider` SPI with two execution paths:
-- `invoke(AgentSessionConfig)` -- single-shot, per-invocation semaphore. Returns cold `Multi<AgentEvent>`.
-- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine), semaphore held for session lifetime
+- `invoke(AgentSessionConfig)` -- single-shot, per-invocation semaphore. Returns cold `Multi<AgentEvent>`. `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, nullable `model` (String), and nullable `modelQuery` (ModelQuery for direct constraint dispatch). Use `withModel(String)` or `withModel(ModelQuery)`.
+- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine), semaphore held for session lifetime. Same `withModel` overloads.
 
 CDI tier for `AgentProvider`:
 - Tier 0: `NoOpAgentProvider @DefaultBean` (platform/) -- fallback

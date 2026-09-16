@@ -1,0 +1,10 @@
+providers:
+  - vendor: anthropic
+    credential: env:ANTHROPIC_API_KEY
+aliases:
+  reasoning-heavy:
+    tier: FLAGSHIP
+    capabilities: [reasoning, code]
+    min-context: 128000
+defaults:
+  backend: claude

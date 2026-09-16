@@ -1,0 +1,8 @@
+providers:
+  - vendor: ollama
+aliases:
+  reasoning-heavy:
+    tier: STANDARD
+    capabilities: [text]
+defaults:
+  backend: ollama

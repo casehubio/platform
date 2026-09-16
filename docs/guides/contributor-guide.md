@@ -38,7 +38,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `datasource-jpa/` | `casehub-platform-datasource-jpa` | `@ApplicationScoped` | JPA `DataSourceRegistry` -- startup reconciliation, `@Transactional` |
 | `identity/` | `casehub-platform-identity` | `@ApplicationScoped` | DID resolution (did:key, did:web, SCIM), actor-to-DID mapping, VC validation |
 | `acl-inmem/` | `casehub-platform-acl-inmem` | `@Alternative @Priority(10)` | In-memory ACL -- ConcurrentHashMap, group-based grants, parent-child hierarchy, deny entries, wildcard grants |
-| `acl-jpa/` | `casehub-platform-acl-jpa` | `@ApplicationScoped` | JPA ACL -- Hibernate ORM Panache, audit logging, deny entries, recursive CTE hierarchy, tenant-filtered queries, retention purge |
+| `acl-jpa/` | `casehub-platform-acl-jpa` | `@ApplicationScoped` | JPA ACL -- Hibernate ORM, audit logging, deny entries, recursive CTE hierarchy, tenant-filtered queries, retention purge |
 | `acl-admin/` | `casehub-platform-acl-admin` | `@ApplicationScoped` | ACL admin -- `AclService implements AclApi`, generated REST via `@McpDomain("acl")`, `@RolesAllowed("admin")` |
 | `governance/` | `casehub-platform-governance` | `@ApplicationScoped` | `DefaultPolicyEnforcer` -- retry/timeout/backoff on virtual thread executor |
 | `credentials-quarkus/` | `casehub-platform-credentials-quarkus` | `@Alternative @Priority(1)` | Bridge `CredentialResolver` to Quarkus `CredentialsProvider` |
@@ -58,7 +58,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `endpoints-config/` | `casehub-platform-endpoints-config` | `@Startup @ApplicationScoped` | YAML endpoint populator -- `${VAR}` interpolation, multi-file |
 | `notifications/` | `casehub-platform-notifications` | `@ApplicationScoped` | REST + SSE -- list, mark-read, dismiss, unread-count, preferences, suppression |
 | `notifications-inmem/` | `casehub-platform-notifications-inmem` | `@Alternative @Priority(100)` | In-memory `NotificationStore` -- bounded eviction, cursor pagination |
-| `notifications-jpa/` | `casehub-platform-notifications-jpa` | `@ApplicationScoped` | JPA `NotificationStore` -- Hibernate ORM Panache, keyset pagination, retention scheduler |
+| `notifications-jpa/` | `casehub-platform-notifications-jpa` | `@ApplicationScoped` | JPA `NotificationStore` -- Hibernate ORM, keyset pagination, retention scheduler |
 | `notification-dispatch/` | `casehub-platform-notification-dispatch` | `@ApplicationScoped` | Three-path delivery: digest/suppress/immediate; `DigestFlushScheduler`; `DeliveryRetryProcessor`; `DestinationScope` per-tenant dedup |
 | `notification-settings-inmem/` | `casehub-platform-notification-settings-inmem` | `@Alternative @Priority(100)` | In-memory preference/suppression store |
 | `notification-settings-jpa/` | `casehub-platform-notification-settings-jpa` | `@ApplicationScoped` | JPA preference/suppression store -- JSON TEXT columns, retention scheduler |
@@ -82,6 +82,66 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `yaml-core/` | `casehub-platform-yaml-core` | (none) | Pure Java YAML primitives -- `VariableResolver`, `ForEachExpander`, `Truthiness`, `CsvParser`, `ModuleBridge<T>`, `TypedExpandedModule<T>`. Zero deps |
 | `yaml-jackson/` | `casehub-platform-yaml-jackson` | (none) | Jackson mixins for yaml-core types -- `YamlCoreJacksonModule`, dynamic section capture, case-insensitive enums. Depends on yaml-core + jackson-databind |
 | `ts-core/` | `casehub-platform-ts-core` | (none) | TypeScript execution SPI -- `TsExecutor` interface, `NodeTsExecutor` (Node.js subprocess). Zero deps |
+| `platform-core/` | `casehub-platform-core` | (none) | Framework-neutral POJOs with constructor injection -- no CDI, no Spring imports |
+| `platform-spring/` | `casehub-platform-spring` | Spring `@AutoConfiguration` | Spring Boot auto-configuration -- `@Bean @ConditionalOnMissingBean` equivalents of Quarkus `@DefaultBean` |
+| `spring-testing/` | `casehub-platform-spring-testing` | (none) | Spring test support -- test fixtures for Spring-based consumers |
+| `platform-view-core/` | `casehub-platform-view-core` | (none) | Framework-neutral view evaluation POJOs |
+| `platform-view-spring/` | `casehub-platform-view-spring` | Spring `@AutoConfiguration` | Spring auto-config for subject views |
+| `expression-core/` | `casehub-platform-expression-core` | (none) | Framework-neutral expression engine POJOs |
+| `governance-core/` | `casehub-platform-governance-core` | (none) | Framework-neutral policy enforcer POJOs |
+| `identity-core/` | `casehub-platform-identity-core` | (none) | Framework-neutral identity resolution POJOs |
+| `mcp/` | `casehub-platform-mcp` | `@ApplicationScoped` | MCP hierarchical model -- `GraphQLModelScanner` (auto-discovers domains from `@GraphQLApi`, class-based `@McpDomain`, or interface `@McpDomain`), `DynamicToolRegistrar`, `McpResourceRegistryBridge`, `DomainResourceRegistrar` |
+| `mcp-core/` | `casehub-platform-mcp-core` | (none) | Framework-neutral MCP POJOs |
+| `graphql/` | `casehub-platform-graphql` | (none) | GraphQL foundation -- `@CustomScalar("JSON")`, `PageInput`/`PageInfo`/`PageResult<T>` pagination, `GraphQLError` (RFC 7807) |
+| `graphql-client/` | `casehub-graphql-client` | (none) | Typed CaseHub GraphQL client -- `@GraphQLClientApi` per domain (`CaseClient`, `WorkItemClient`, `LedgerClient`, `QhorusClient`) |
+| `generator-common/` | `casehub-platform-generator-common` | (none) | Shared generator infrastructure -- `McpDomainJandexScanner` (scans `@McpDomain` on interfaces and classes), `DomainScanResult`, `AbstractGeneratorMojo`, `AbstractVerifyMojo`, `JandexTypeConverter` |
+| `graphql-generator/` | `casehub-platform-graphql-generator` | (APT) | Annotation processor -- scans `@McpDomain` + `@PlatformQuery`/`@PlatformMutation` on interfaces or classes, generates `@GraphQLApi` resolvers + `@Path` JAX-RS REST resources. APT scope warning for classes without CDI scope |
+| `graphql-spring-generator/` | `casehub-platform-graphql-spring-generator` | (Maven plugin) | Spring generator -- scans `@McpDomain` via Jandex, generates Spring `@Controller` + `@RestController` per domain |
+| `rest-spring-generator/` | `casehub-platform-rest-spring-generator` | (Maven plugin) | Spring REST generator -- scans `@Path` resources via Jandex, generates Spring MVC `@RestController` classes |
+| `mcp-spring-generator/` | `casehub-platform-mcp-spring-generator` | (Maven plugin) | Spring MCP generator -- scans Quarkus `@Tool` methods, generates Spring AI `@Tool` equivalents |
+| `callback-generator/` | `casehub-platform-callback-generator` | (APT) | Annotation processor -- scans `@CallbackEligible` interfaces, generates `@Decorator` classes routing to `CallbackInvoker` |
+| `callback-api/` | `casehub-platform-callback-api` | (none) | Callback registration SPI -- `CallbackRegistry`, `CallbackRegistration`, CDI events. Pure Java |
+| `callback/` | `casehub-platform-callback` | `@ApplicationScoped` | `CallbackInvoker` -- HTTP POST with retry via `PolicyEnforcer`, `LeaseReaper @Scheduled`, REST/MCP via `@McpDomain("callbacks")` |
+| `callback-inmem/` | `casehub-platform-callback-inmem` | `@Alternative @Priority(100)` | In-memory `CallbackRegistry` -- ConcurrentHashMap, upsert, lease expiry |
+| `callback-client/` | `casehub-platform-callback-client` | `@Startup` | Client-side callback auto-registration -- discovers local `@CallbackEligible` SPIs, registers with server, heartbeat renewal |
+| `callback-client-core/` | `casehub-platform-callback-client-core` | (none) | Framework-neutral `CallbackDispatcher` -- routes invocations to local SPI beans |
+| `callback-core/` | `casehub-platform-callback-core` | (none) | Framework-neutral callback invoker POJOs |
+| `callback-spring/` | `casehub-platform-callback-spring` | Spring `@AutoConfiguration` | Spring callback infrastructure -- `CallbackDecoratorBeanPostProcessor` wraps `@CallbackEligible` beans |
+| `agent-ollama/` | `casehub-platform-agent-ollama` | `@ApplicationScoped` | AgentBackend "ollama" -- local model invocation via Ollama's OpenAI-compatible API |
+| `agent-runtime-core/` | `casehub-platform-agent-runtime-core` | (none) | Framework-neutral agent runtime POJOs |
+| `agent-claude-core/` | `casehub-platform-agent-claude-core` | (none) | Framework-neutral Claude agent POJOs |
+| `agent-openai-core/` | `casehub-platform-agent-openai-core` | (none) | Framework-neutral OpenAI agent POJOs |
+| `agent-codex-core/` | `casehub-platform-agent-codex-core` | (none) | Framework-neutral Codex agent POJOs |
+| `agent-gemini-core/` | `casehub-platform-agent-gemini-core` | (none) | Framework-neutral Gemini agent POJOs |
+| `agent-gemini-cli-core/` | `casehub-platform-agent-gemini-cli-core` | (none) | Framework-neutral Gemini CLI agent POJOs |
+| `agent-router-core/` | `casehub-platform-agent-router-core` | (none) | Framework-neutral agent router POJOs |
+| `agent-gate-core/` | `casehub-platform-agent-gate-core` | (none) | Framework-neutral agent gate POJOs |
+| `agent-langchain4j-core/` | `casehub-platform-agent-langchain4j-core` | (none) | Framework-neutral LangChain4j agent POJOs |
+| `acl-worker/` | `casehub-platform-acl-worker` | `@Provider` | Worker credential filter -- token lookup, tenancy validation, `FailClosedWorkerScopeExtractor @DefaultBean` |
+| `schema-generator/` | `casehub-platform-schema-generator` | (none) | JSON Schema generation -- victools/jsonschema-generator (Draft 2020-12), `SealedHierarchyModule`, `ShorthandModule` |
+| `drift-detection/` | `casehub-platform-drift-detection` | (Maven Enforcer) | Drift detection custom rule -- detects hand-written types in codegen-managed packages |
+| `platform-pdf/` | `casehub-platform-pdf` | `@ApplicationScoped` | HTML-to-PDF with PDF/A-2b conformance -- OpenHTMLtoPDF + PDFBox 3.0.3. Displaces `NoOpPdfGenerator @DefaultBean` |
+| `platform-signing/` | `casehub-platform-signing` | `@ApplicationScoped` | EU DSS 6.2 document signing -- PAdES PDF + CAdES detached. Displaces `NoOpDocumentSigningService @DefaultBean` |
+| `yaml-codegen/` | `casehub-platform-yaml-codegen` | (Maven plugin) | YAML codegen -- generates Java records/POJOs from JSON Schema via jsonschema2pojo-core |
+| `llm-config/` | `casehub-platform-llm-config` | `@ApplicationScoped` | LLM config wizard -- vendor discovery, credential validation, model listing |
+| `llm-config-core/` | `casehub-platform-llm-config-core` | (none) | Framework-neutral LLM config types -- `LlmConfigApi` SPI, request/result records |
+| `notifications-core/` | `casehub-platform-notifications-core` | (none) | Framework-neutral notification POJOs |
+| `notifications-inmem-core/` | `casehub-platform-notifications-inmem-core` | (none) | Framework-neutral in-memory notification store POJOs |
+| `notification-settings-inmem-core/` | `casehub-platform-notification-settings-inmem-core` | (none) | Framework-neutral notification settings POJOs |
+| `notification-dispatch-core/` | `casehub-platform-notification-dispatch-core` | (none) | Framework-neutral notification dispatch POJOs |
+| `delivery-tracking-inmem-core/` | `casehub-platform-delivery-tracking-inmem-core` | (none) | Framework-neutral delivery tracking POJOs |
+| `digest-inmem-core/` | `casehub-platform-digest-inmem-core` | (none) | Framework-neutral digest buffer POJOs |
+| `delivery-channel-inmem-core/` | `casehub-platform-delivery-channel-inmem-core` | (none) | Framework-neutral delivery channel POJOs |
+| `datasource-inmem-core/` | `casehub-platform-datasource-inmem-core` | (none) | Framework-neutral datasource registry POJOs |
+| `endpoints-memory-core/` | `casehub-platform-endpoints-memory-core` | (none) | Framework-neutral endpoint registry POJOs |
+| `endpoints-config-core/` | `casehub-platform-endpoints-config-core` | (none) | Framework-neutral endpoint config POJOs |
+| `acl-inmem-core/` | `casehub-platform-acl-inmem-core` | (none) | Framework-neutral in-memory ACL POJOs |
+| `callback-inmem-core/` | `casehub-platform-callback-inmem-core` | (none) | Framework-neutral callback in-memory POJOs |
+| `config-core/` | `casehub-platform-config-core` | (none) | Framework-neutral config POJOs |
+| `preferences-editor-core/` | `casehub-platform-preferences-editor-core` | (none) | Framework-neutral preferences editor POJOs |
+| `subscriptions-inmem-core/` | `casehub-platform-subscriptions-inmem-core` | (none) | Framework-neutral subscriptions POJOs |
+| `subscriptions-core/` | `casehub-platform-subscriptions-core` | (none) | Framework-neutral subscriptions POJOs |
+| `streams-webhook-core/` | `casehub-platform-streams-webhook-core` | (none) | Framework-neutral webhook receiver POJOs |
 
 **Removed from build:** `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` -- memory backends migrated to casehub-neocortex (neocortex#56). Directories remain on disk.
 
@@ -98,7 +158,7 @@ Two patterns exist:
 | Pattern | Used by | Behaviour |
 |---------|---------|-----------|
 | **Configurable mock** | `PreferenceProvider`, `CurrentPrincipal`, `GroupMembershipProvider` | Returns `@ConfigProperty` values -- tests set specific returns |
-| **Silent no-op** | `CaseMemoryStore`, `AgentProvider`, `AccessControlProvider`, `ExpressionEngineRegistry`, `PreferenceStore`, `PreferenceSchemaRegistry`, `CredentialResolver`, `DataSourceRegistry`, `EndpointRegistry`, `MarshallerRegistry`, `NotificationStore`, `SubscriptionStore`, `SuppressionStore`, `NotificationPreferenceStore`, `DeliveryAttemptStore`, `DigestBuffer`, `DeliveryChannelRegistry`, `SubjectViewStore`, `ViewMembershipTracker`, `CrossTenantSubjectViewStore`, `DIDResolver`, `ActorDIDProvider`, `EventTypeRegistry`, `EntityWatcherProvider`, `StrategyResolver` | Returns empty/void -- system works without the capability |
+| **Silent no-op** | `CaseMemoryStore`, `AgentProvider`, `AccessControlProvider`, `ExpressionEngineRegistry`, `PreferenceStore`, `PreferenceSchemaRegistry`, `CredentialResolver`, `DataSourceRegistry`, `EndpointRegistry`, `MarshallerRegistry`, `NotificationStore`, `SubscriptionStore`, `SuppressionStore`, `NotificationPreferenceStore`, `DeliveryAttemptStore`, `DigestBuffer`, `DeliveryChannelRegistry`, `SubjectViewStore`, `ViewMembershipTracker`, `CrossTenantSubjectViewStore`, `DIDResolver`, `ActorDIDProvider`, `EventTypeRegistry`, `EntityWatcherProvider`, `StrategyResolver`, `DisplayTermResolver`, `PdfGenerator`, `DocumentSigningService`, `DocumentVerificationService`, `McpResourceRegistry`, `ModelRegistry` (`NoOpModelRegistry`), `CallbackRegistry`, `LlmCredentialStore`, `SessionIsolator`, `WorkerCredentialStore`, `AgentCredentialValidator`, `WorkerAuthorizationPolicy` (`AutoApproveWorkerAuthorizationPolicy`) | Returns empty/void -- system works without the capability |
 
 ### CDI Priority Ladder
 
@@ -255,7 +315,7 @@ CDI tier for `AgentProvider`:
 
 **InMemoryAccessControlProvider** (`@Alternative @Priority(10)`): Three `ConcurrentHashMap`s -- grants, denies, parents. `GrantKey = (actorId, ResourceId, action, tenancyId)`. All SPI methods use `ResourceId` (structured `type:id` value type) instead of raw strings.
 
-**JpaAccessControlProvider** (`@ApplicationScoped`): Hibernate ORM Panache entities. All mutations are `@Transactional` with audit logging to `AclAuditLogEntity`. Upsert semantics on grants/denies.
+**JpaAccessControlProvider** (`@ApplicationScoped`): Hibernate ORM entities. All mutations are `@Transactional` with audit logging to `AclAuditLogEntity`. Upsert semantics on grants/denies.
 
 Both implementations share the same resolution algorithm:
 

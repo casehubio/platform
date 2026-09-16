@@ -93,6 +93,7 @@
         <module>platform-view-spring</module>
         <module>preferences-editor-core</module>
         <module>preferences-editor</module>
+        <module>agent-config-core</module>
         <module>agent-router-core</module>
         <module>agent-router</module>
         <module>agent-gate-core</module>

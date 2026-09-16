@@ -15,9 +15,9 @@
 
 `casehub-platform` is the zero-dependency foundational SPI layer for the CaseHub ecosystem. It defines shared interfaces and default implementations that all foundation modules and application-tier repos depend on without creating circular dependencies.
 
-Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
+Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `deny`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI), `NotificationStore` / `SubscriptionEngine` (notification pipeline), `DataSourceRegistry` (alpha network event routing), `CallbackRegistry` (lease-based callback SPI), `@McpDomain` annotation processing (REST + GraphQL + MCP generation from interfaces or classes), `ModelRegistry` (model catalog + resolution), `SubjectViewStore` (label-pattern filtered views).
 
-Module structure: `platform-api` (SPIs, zero heavy deps — includes CompiledExpression/ExpressionEngine/ExpressionEngineRegistry expression SPI), `platform` (@DefaultBean mocks + NoOpExpressionEngineRegistry), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3 transpiler) + JQExpressionEngine + JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider + AgentBackend SPIs + AgentSession multi-turn + AgentRuntime/AgentProcess), `agent-runtime/` (SubprocessRuntime), `agent-claude/` (AgentBackend "claude" — Claude CLI subprocess), `agent-openai/` (AgentBackend "openai" — native OpenAI SDK), `agent-codex/` (AgentBackend "codex" — Codex CLI via AgentRuntime), `agent-gemini/` (AgentBackend "gemini" — native Google GenAI SDK), `agent-gemini-cli/` (AgentBackend "gemini-cli" — Gemini CLI via AgentRuntime), `agent-langchain4j/` (AgentBackend "langchain4j" — bidirectional LangChain4j interop), `agent-router/` (RoutingAgentProvider — three-step model resolution: ModelRegistry → key → fail-fast, config rewriting; NoOpModelRegistry @DefaultBean), `agent-gate/` (CDI @Decorator rate limiter — token bucket + concurrency gate), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
+Module structure (70+ modules across 22 layers): `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (MVEL3 + JQ expression engines), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal graph), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider + AgentBackend SPIs), `agent-runtime/` (SubprocessRuntime), `agent-claude/`, `agent-openai/`, `agent-ollama/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/` (backend providers), `agent-router/` (four-step model resolution), `agent-gate/` (CDI @Decorator rate limiter), `agent-config-core/` + `agent-config/` (YAML manifest loading), `endpoints-memory/`, `endpoints-config/` (endpoint registry), `acl-inmem/`, `acl-jpa/`, `acl-admin/`, `acl-worker/` (access control), `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` (stream ingestion), `governance/` (PolicyEnforcer), `notifications/`, `notifications-inmem/`, `notifications-jpa/`, `notification-dispatch/`, `notification-settings-inmem/`, `notification-settings-jpa/`, `delivery-channel-inmem/`, `delivery-tracking-inmem/`, `delivery-tracking-jpa/`, `digest-inmem/`, `digest-jpa/` (notification pipeline), `subscriptions/`, `subscriptions-inmem/`, `subscriptions-jpa/` (subscription engine), `datasource-alpha/`, `datasource-inmem/`, `datasource-jpa/` (alpha network), `callback-api/`, `callback/`, `callback-inmem/`, `callback-client/`, `callback-generator/`, `callback-spring/` (callback infrastructure), `mcp/`, `graphql/`, `graphql-client/`, `graphql-generator/`, `graphql-spring-generator/`, `rest-spring-generator/`, `mcp-spring-generator/`, `generator-common/`, `drift-detection/` (MCP & API generation), `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` (subject views), `platform-pdf/` (PDF generation), `platform-signing/` (document signing), `schema-generator/` (JSON Schema), `yaml-core/`, `yaml-jackson/`, `yaml-codegen/` (YAML primitives), `credentials-quarkus/` (credential bridge), `preferences-editor/` (preference CRUD), `llm-config-core/`, `llm-config/`, `llm-config-vertex/`, `llm-config-bedrock/` (LLM configuration). Framework-neutral `-core` and Spring `-spring` companion modules for dual-framework deployment.
 
 ### Artifact Schema
 
@@ -139,18 +139,25 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L1: API Tier | `platform-api` | Zero-dep Java SPIs, records, enums, types |
 | L2: Default Implementations | `platform` | `@DefaultBean` CDI mocks |
 | L3: Testing Infrastructure | `testing` | `@Alternative @Priority(1)` test fixtures |
-| L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/` | Opt-in non-mock implementations — expression/ provides MvelExpressionEngine (MVEL3 transpiler), JQExpressionEngine, DefaultExpressionEngineRegistry |
+| L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/`, `credentials-quarkus/`, `preferences-editor/`, `governance/` | Opt-in non-mock implementations — expression/ provides MvelExpressionEngine (MVEL3 transpiler), JQExpressionEngine, DefaultExpressionEngineRegistry; credentials-quarkus/ bridges to Quarkus CredentialsProvider (Vault/AWS/GCP); preferences-editor/ REST/MCP CRUD for preferences; governance/ provides PolicyEnforcer (retry/timeout/backoff/circuit-breaker) |
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
-| L8: Agent Infrastructure | `agent-api/`, `agent-runtime/`, `agent-claude/`, `agent-openai/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/`, `agent-router/`, `agent-gate/` | AgentProvider (caller SPI) + AgentBackend (implementor SPI) + RoutingAgentProvider (three-step model resolution: ModelRegistry → key → fail-fast) + ModelRegistry SPI (ModelDescriptor, ModelSource, ModelQuery) + InMemoryModelRegistry + SeedCatalogModelSource (17 models, 5 vendors) + native providers (Claude CLI, OpenAI API, Gemini API, Codex CLI, Gemini CLI) + LangChain4j interop + SubprocessRuntime (AgentRuntime SPI) + CDI @Decorator rate limiter |
+| L8: Agent Infrastructure | `agent-api/`, `agent-runtime/`, `agent-claude/`, `agent-openai/`, `agent-ollama/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/`, `agent-router/`, `agent-gate/`, `agent-config-core/`, `agent-config/` | AgentProvider (caller SPI) + AgentBackend (implementor SPI) + RoutingAgentProvider (four-step model resolution: alias → tier → registry → key → fail-fast) + ModelRegistry SPI (ModelDescriptor, ModelSource, ModelQuery) + InMemoryModelRegistry + SeedCatalogModelSource (17 models, 5 vendors) + native providers (Claude CLI, OpenAI API, Ollama, Gemini API, Codex CLI, Gemini CLI) + LangChain4j interop + SubprocessRuntime (AgentRuntime SPI) + CDI @Decorator rate limiter + agent-config manifest loading (YAML hierarchy, credential resolution, profile support) |
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
-| L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
-| L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
+| L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-webhook-core/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
+| L11: Access Control | `acl-inmem/`, `acl-jpa/`, `acl-admin/`, `acl-worker/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped, deny entries; `AclService` REST/MCP admin; `WorkerCredentialFilter` @Provider. Flyway V3 for JPA adapter |
 | L12: Digest Buffer Adapters | `digest-inmem/`, `digest-jpa/` | `DigestBuffer` SPI implementations — volatile in-memory or persistent JPA; mutually exclusive per CDI priority tier |
-| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
+| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/`, `platform-view-core/`, `platform-view-spring/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
 | L14: PDF Generation | `platform-pdf/` | HTML-to-PDF conversion with PDF/A-2b conformance (ISO 19005-2). `PdfGenerator` SPI in `platform-api/api/pdf/` with `@DefaultBean NoOpPdfGenerator` in `platform/` (returns `Optional.empty()`). Implementation: OpenHTMLtoPDF 1.1.37 with bundled Liberation Sans + Mono fonts (~1.4MB). Optional module — classpath activation. First consumer: qhorus compliance-report (#417) |
 | L15: Document Signing | `platform-signing/` | EU DSS 6.2-backed PAdES PDF signatures + CAdES detached (.p7s). `DocumentSigningService` + `DocumentVerificationService` SPIs in `platform-api/.../signing/document/` with `@DefaultBean NoOp*` in `platform/`. Implementation: `DssDocumentSigningService` (PAdES via `PAdESService`, CAdES via `CAdESService`), `DssDocumentVerificationService` (format auto-detection via `SignedDocumentValidator`, optional EU Trusted List validation via `TrustedListManager`), `KeyStoreManager @ApplicationScoped` (PKCS#12, `@Inject` from config). Certificate lifecycle: `CertificateExpiryMonitor` (`@Scheduled` 6h, fires `CertificateExpiryEvent`), `KeyStoreRotationService` (atomic swap via `AtomicReference`). Multi-tenant: `TenantKeyStoreResolver` (per-tenant PKCS#12, cached, fallback to default). EU Trusted List: `TrustedListManager` loads LOTL via `dss-tsl-validation` (file-cached 24h, disabled by default). Profile enforcement: B_T+ without TSA fails (no silent downgrade). PDFBox 3.0.4 via DSS (compatible with L14's 3.0.3). `DssSigningConfig @ConfigMapping(prefix = "casehub.signing")`. Optional module — classpath activation. First consumer: qhorus compliance-report (#418) |
+| L16: Notification & Delivery | `notifications/`, `notifications-inmem/`, `notifications-jpa/`, `notification-dispatch/`, `notification-settings-inmem/`, `notification-settings-jpa/`, `delivery-channel-inmem/`, `delivery-tracking-inmem/`, `delivery-tracking-jpa/`, `notifications-core/`, `notification-dispatch-core/`, `notification-settings-inmem-core/`, `delivery-tracking-inmem-core/`, `delivery-channel-inmem-core/` | Full notification pipeline: `NotificationStore` SPI (store/query/status), `NotificationDispatcher` (target resolution → suppression → template → channel routing → delivery or digest buffer), `DeliveryAttemptStore` (tracking + retry), `DigestFlushScheduler` (polymorphic schedule), `EngagementRecorder`. REST/MCP endpoints generated from @McpDomain SPIs. CDI event push via `EventBroadcaster`. Mutually exclusive adapters per CDI priority |
+| L17: Subscription Engine | `subscriptions/`, `subscriptions-inmem/`, `subscriptions-jpa/`, `subscriptions-core/`, `subscriptions-inmem-core/` | `SubscriptionEngine` wires subscriptions into the alpha network via `EventTypeObjectType`. Expression-compiled filters (MVEL, JQ). `SubscriptionMatched` CDI event (async) fires `NotificationDispatcher`. REST CRUD + event-type discovery. Glob-pattern event matching (`io.casehub.work.workitem.*`) |
+| L18: Datasource & Alpha Network | `datasource-alpha/`, `datasource-inmem/`, `datasource-jpa/`, `datasource-inmem-core/` | Rete alpha network runtime — `AlphaDataSource`, `TypeNode`, `FilterNode`, `FanOutProcessor`. `DataSourceRegistry` SPI (register/resolve/discover/deregister). `datasource-alpha/` is pure runtime (no CDI, no persistence). Adapters: volatile in-memory or JPA-backed with startup reconciliation |
+| L19: Callback Infrastructure | `callback-api/`, `callback/`, `callback-inmem/`, `callback-client/`, `callback-client-core/`, `callback-generator/`, `callback-spring/`, `callback-core/` | Lease-based callback registration SPI. `CallbackInvoker` (HTTP POST + retry via PolicyEnforcer). `CallbackAutoRegistrar` (client-side @Startup discovery + heartbeat). `CallbackDecoratorProcessor` APT (generates @Decorator proxies from @CallbackEligible SPIs). Spring `BeanPostProcessor` equivalent |
+| L20: MCP & API Generation | `mcp/`, `mcp-core/`, `graphql/`, `graphql-client/`, `graphql-generator/`, `graphql-spring-generator/`, `rest-spring-generator/`, `mcp-spring-generator/`, `generator-common/`, `drift-detection/`, `schema-generator/` | MCP runtime: `GraphQLModelScanner` auto-discovers `@McpDomain` domains (classes and interfaces) at startup, `DynamicToolRegistrar`, `McpSchemaBuilder`, `McpResourceRegistryBridge`. `graphql-generator` APT: `@McpDomain` + `@PlatformQuery`/`@PlatformMutation` → `@GraphQLApi` resolver + `@Path` JAX-RS REST resource. Spring generators mirror for Spring Boot. `GraphQL` module: JSON scalar, pagination types. `schema-generator`: JSON Schema from Java types (victools). `drift-detection`: Maven Enforcer rule for codegen drift |
+| L21: Dual-Framework Core & Spring | `platform-core/`, `platform-spring/`, `spring-testing/`, `spring-generator/`, `expression-core/`, `governance-core/`, `identity-core/`, `agent-runtime-core/`, `agent-claude-core/`, `agent-openai-core/`, `agent-codex-core/`, `agent-gemini-core/`, `agent-gemini-cli-core/`, `agent-config-core/`, `agent-router-core/`, `agent-gate-core/`, `agent-langchain4j-core/`, `llm-config-core/`, `config-core/`, `endpoints-config-core/`, `endpoints-memory-core/`, `acl-inmem-core/`, `preferences-editor-core/`, `mcp-core/` | Framework-neutral constructor-injected POJOs extracted from CDI-coupled modules. Each `-core` module has zero CDI imports. Quarkus modules retain existing artifact names and depend on their `-core`. Spring auto-configuration modules (`-spring`) are generated from Quarkus `@Produces` via `spring-generator` (extends `generator-common` base classes) |
+| L22: LLM Configuration | `llm-config-core/`, `llm-config/`, `llm-config-vertex/`, `llm-config-bedrock/` | UI-driven LLM provider setup wizard. `LlmConfigApi` SPI (configure/validate/pull). Vendor discovery clients: Vertex AI (ADC auth, project/region/model), Bedrock (credential chain, region/model). Framework-neutral core types + Quarkus wiring |
 
 ### Journey and Chapter sequencing rationale
 
@@ -188,7 +195,10 @@ C4Container
     Container(config, "casehub-platform-config", "Quarkus", "YAML ConfigFilePreferenceProvider")
     Container(oidc, "casehub-platform-oidc", "Quarkus OIDC", "@RequestScoped OidcCurrentPrincipal")
     Container(expr, "casehub-platform-expression", "Quarkus", "DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3) + JQExpressionEngine + JQEvaluator + SecretManager/ConfigManager mocks")
-    Container(endpointsConfig, "casehub-platform-endpoints-config", "Quarkus", "@Startup @ApplicationScoped YAML-backed EndpointDescriptor populator")
+    Container(endpointsConfig, "casehub-platform-endpoints-config", "Quarkus", "@Startup YAML-backed EndpointDescriptor populator")
+    Container(credsQuarkus, "casehub-platform-credentials-quarkus", "Quarkus", "@Alternative @Priority(1) CredentialResolver — Vault/AWS/GCP bridge")
+    Container(prefsEditor, "casehub-platform-preferences-editor", "Quarkus", "PreferenceService REST/MCP — @McpDomain CRUD + schema discovery")
+    Container(governance, "casehub-platform-governance", "Java", "PolicyEnforcer — retry/timeout/backoff/circuit-breaker via virtual threads")
   }
   Container_Boundary(l5, "L5: Preference Persistence") {
     Container(jpaPrefs, "casehub-platform-persistence-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaPreferenceProvider")
@@ -207,9 +217,18 @@ C4Container
   }
   Container_Boundary(l8, "L8: Agent Infrastructure") {
     Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentSession multi-turn + AgentEvent types")
+    Container(agentRuntime, "casehub-platform-agent-runtime", "Quarkus", "SubprocessRuntime — local process execution for CLI agents")
     Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + ClaudeAgentSession (IDLE/ACTIVE/CLOSED)")
-    Container(agentLangchain4j, "casehub-platform-agent-langchain4j", "LangChain4j", "Bidirectional: ChatModelAgentProvider (@Alternative @Priority(1)) + AgentProviderChatModel (@DefaultBean @Priority(10))")
-    Container(agentGate, "casehub-platform-agent-gate", "CDI @Decorator", "GatedAgentProvider @Decorator @Priority(APPLICATION) — token bucket + concurrency gate, deferred admission, per-query session rate limiting")
+    Container(agentOpenai, "casehub-platform-agent-openai", "OpenAI SDK", "OpenAiAgentBackend — native SDK with prompt_cache_key")
+    Container(agentOllama, "casehub-platform-agent-ollama", "OpenAI SDK", "OllamaAgentBackend — local models via OpenAI-compat API")
+    Container(agentCodex, "casehub-platform-agent-codex", "Quarkus", "CodexAgentBackend — Codex CLI via AgentRuntime")
+    Container(agentGemini, "casehub-platform-agent-gemini", "Google GenAI SDK", "GeminiAgentBackend — native SDK with cached content")
+    Container(agentGeminiCli, "casehub-platform-agent-gemini-cli", "Quarkus", "GeminiCliAgentBackend — Gemini CLI via AgentRuntime")
+    Container(agentLangchain4j, "casehub-platform-agent-langchain4j", "LangChain4j", "Bidirectional: ChatModelAgentProvider + AgentProviderChatModel")
+    Container(agentRouter, "casehub-platform-agent-router", "Quarkus", "RoutingAgentProvider — four-step model resolution")
+    Container(agentGate, "casehub-platform-agent-gate", "CDI @Decorator", "GatedAgentProvider — token bucket + concurrency gate")
+    Container(agentConfigCore, "casehub-platform-agent-config-core", "Java", "ManifestLoader + ManifestProcessor — YAML hierarchy, credential resolution")
+    Container(agentConfig, "casehub-platform-agent-config", "Quarkus", "@Startup manifest loading + ManifestResult producer")
   }
   Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
     Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
@@ -221,9 +240,11 @@ C4Container
     Container(streamsPoll, "casehub-platform-streams-poll", "Quarkus Scheduler", "@Startup @Scheduled HTTP GET — java.net.http.HttpClient field, explicit status check")
     Container(streamsCamel, "casehub-platform-streams-camel", "Apache Camel Quarkus", "@ApplicationScoped dynamic route builder via @ObservesAsync EndpointRegistered")
   }
-  Container_Boundary(l11, "L11: ACL Adapters — mutually exclusive per priority tier") {
-    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
-    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
+  Container_Boundary(l11, "L11: Access Control") {
+    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, deny entries, parent hierarchy")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging + deny + recursive CTE")
+    Container(aclAdmin, "casehub-platform-acl-admin", "Quarkus", "AclService REST/MCP — @McpDomain, @RolesAllowed(ADMIN)")
+    Container(aclWorker, "casehub-platform-acl-worker", "Quarkus", "WorkerCredentialFilter @Provider — fail-closed by default")
   }
   Container_Boundary(l12, "L12: Digest Buffer Adapters — mutually exclusive per priority tier") {
     Container(digestInmem, "casehub-platform-digest-inmem", "Java", "@Alternative @Priority(100) InMemoryDigestBuffer — volatile, ConcurrentHashMap")
@@ -232,7 +253,50 @@ C4Container
 
   Container_Boundary(l_decl, "Declaration Primitives") {
     Container(yamlCore, "casehub-platform-yaml-core", "Java 21", "VariableResolver, ForEachExpander, Truthiness, CsvParser — zero deps")
+    Container(yamlJackson, "casehub-platform-yaml-jackson", "Jackson", "Jackson mixins for yaml-core types — @JsonAnySetter builder, case-insensitive enums")
+    Container(yamlCodegen, "casehub-platform-yaml-codegen", "Maven plugin", "Java records + POJOs from JSON Schema via jsonschema2pojo")
     Container(tsCore, "casehub-platform-ts-core", "Java 21", "TsExecutor SPI, NodeTsExecutor (Node.js subprocess) — zero deps")
+  }
+  Container_Boundary(l16, "L16: Notification & Delivery") {
+    Container(notifications, "casehub-platform-notifications", "Quarkus", "REST/MCP endpoints from @McpDomain SPIs + WebSocket push via EventBroadcaster")
+    Container(notifsInmem, "casehub-platform-notifications-inmem", "Java", "@Alternative @Priority(100) InMemoryNotificationStore")
+    Container(notifsJpa, "casehub-platform-notifications-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA NotificationStore + retention purge")
+    Container(notifDispatch, "casehub-platform-notification-dispatch", "Quarkus", "NotificationDispatcher — target → suppression → template → channel → delivery/digest")
+    Container(notifSettingsInmem, "casehub-platform-notification-settings-inmem", "Java", "@Alternative InMemoryNotificationPreferenceStore + SuppressionStore")
+    Container(notifSettingsJpa, "casehub-platform-notification-settings-jpa", "Hibernate ORM + Flyway", "JPA NotificationPreferenceStore + SuppressionStore")
+    Container(deliveryChan, "casehub-platform-delivery-channel-inmem", "Java", "InMemoryDeliveryChannelRegistry — startup-populated, production impl")
+    Container(deliveryTrackInmem, "casehub-platform-delivery-tracking-inmem", "Java", "@Alternative InMemoryDeliveryAttemptStore — size-based eviction")
+    Container(deliveryTrackJpa, "casehub-platform-delivery-tracking-jpa", "Hibernate ORM + Flyway", "JPA DeliveryAttemptStore — SELECT FOR UPDATE SKIP LOCKED retry")
+  }
+  Container_Boundary(l17, "L17: Subscription Engine") {
+    Container(subscriptions, "casehub-platform-subscriptions", "Quarkus", "SubscriptionEngine — alpha network wiring, glob patterns, ExpressionEngine filters")
+    Container(subsInmem, "casehub-platform-subscriptions-inmem", "Java", "@Alternative @Priority(100) InMemorySubscriptionStore")
+    Container(subsJpa, "casehub-platform-subscriptions-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA SubscriptionStore")
+  }
+  Container_Boundary(l18, "L18: Datasource & Alpha Network") {
+    Container(dsAlpha, "casehub-platform-datasource-alpha", "Java", "Rete alpha network runtime — AlphaDataSource, TypeNode, FilterNode, FanOutProcessor")
+    Container(dsInmem, "casehub-platform-datasource-inmem", "Java", "@Alternative @Priority(100) InMemoryDataSourceRegistry — reference-counted pruning")
+    Container(dsJpa, "casehub-platform-datasource-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA DataSourceRegistry — startup reconciliation")
+  }
+  Container_Boundary(l19, "L19: Callback Infrastructure") {
+    Container(callbackApi, "casehub-platform-callback-api", "Java", "Pure Java callback registration SPI — lease + deregister model")
+    Container(callback, "casehub-platform-callback", "Quarkus", "CallbackInvoker (HTTP POST + retry) + LeaseReaper + CallbackService REST/MCP")
+    Container(callbackInmem, "casehub-platform-callback-inmem", "Java", "@Alternative @Priority(100) InMemoryCallbackRegistry")
+    Container(callbackClient, "casehub-platform-callback-client", "Quarkus", "Client-side CallbackAutoRegistrar + CallbackDispatchResource")
+    Container(callbackGen, "casehub-platform-callback-generator", "APT", "@CallbackEligible → @Decorator proxy generation")
+    Container(callbackSpring, "casehub-platform-callback-spring", "Spring Boot", "CallbackDecoratorBeanPostProcessor — JDK Proxy equivalent")
+  }
+  Container_Boundary(l20, "L20: MCP & API Generation") {
+    Container(mcp, "casehub-platform-mcp", "Quarkus", "GraphQLModelScanner + DynamicToolRegistrar + McpResourceRegistryBridge")
+    Container(graphql, "casehub-platform-graphql", "SmallRye GraphQL", "JSON scalar, PageInput/PageInfo pagination, GraphQLError")
+    Container(graphqlClient, "casehub-graphql-client", "SmallRye GraphQL Client", "Typed per-domain CaseHub GraphQL client")
+    Container(graphqlGen, "casehub-platform-graphql-generator", "APT", "@McpDomain → @GraphQLApi + @Path REST — interfaces and classes")
+    Container(graphqlSpringGen, "casehub-platform-graphql-spring-generator", "Maven plugin", "@McpDomain → Spring @Controller + @RestController")
+    Container(restSpringGen, "casehub-platform-rest-spring-generator", "Maven plugin", "@Path → Spring @RestController")
+    Container(mcpSpringGen, "casehub-platform-mcp-spring-generator", "Maven plugin", "Quarkus @Tool → Spring @Tool")
+    Container(genCommon, "casehub-platform-generator-common", "Java", "McpDomainJandexScanner + DomainScanResult + AbstractGeneratorMojo")
+    Container(schemaGen, "casehub-platform-schema-generator", "victools", "JSON Schema generation from Java types — Draft 2020-12")
+    Container(driftDetect, "casehub-platform-drift-detection", "Maven Enforcer", "Codegen drift detection — hand-written types in generated packages")
   }
 
   Rel(platform, api, "implements SPIs from")
@@ -261,6 +325,23 @@ C4Container
   Rel(streamsWebhook, api, "fires Event<CloudEvent> via")
   Rel(streamsPoll, api, "fires Event<CloudEvent> via")
   Rel(streamsCamel, api, "observes EndpointRegistered, fires Event<CloudEvent> via")
+  Rel(agentRouter, agentApi, "routes AgentProvider calls via ModelRegistry")
+  Rel(agentGate, agentRouter, "decorates RoutingAgentProvider with rate limits")
+  Rel(agentOpenai, agentApi, "implements AgentBackend from")
+  Rel(agentOllama, agentApi, "implements AgentBackend from")
+  Rel(agentCodex, agentApi, "implements AgentBackend via AgentRuntime")
+  Rel(agentGemini, agentApi, "implements AgentBackend from")
+  Rel(agentGeminiCli, agentApi, "implements AgentBackend via AgentRuntime")
+  Rel(aclAdmin, api, "implements AclApi from")
+  Rel(notifications, api, "implements NotificationApi from")
+  Rel(notifDispatch, api, "observes SubscriptionMatched, delivers via channels")
+  Rel(subscriptions, api, "implements SubscriptionStore/SubscribableEvent from")
+  Rel(dsAlpha, api, "implements DataSource from")
+  Rel(callbackApi, api, "defines CallbackRegistry SPI")
+  Rel(callback, callbackApi, "implements CallbackInvoker + CallbackService")
+  Rel(mcp, api, "discovers @McpDomain domains via CDI BeanManager")
+  Rel(graphqlGen, api, "generates code from @McpDomain annotations")
+  Rel(graphqlSpringGen, genCommon, "consumes DomainScanResult from")
 ```
 
 ---
@@ -342,6 +423,53 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-digest-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile digest buffer. Do NOT combine with `digest-jpa` in same scope |
 | `casehub-platform-digest-jpa` | `compile` + Flyway location | `classpath:db/digest/migration` required; Flyway `V2000` schema. Configurable `casehub.notification.digest.max-buffer-size` (default 0 = no eviction) |
 | `casehub-platform-streams-camel` | `compile` | Requires `quarkus-camel` extension; routes built from CAMEL-protocol `EndpointDescriptor` records |
+| `casehub-platform-streams-webhook-core` | `compile` | Framework-neutral WebhookReceiver POJO — CloudEvents HTTP binding |
+| `casehub-platform-notifications` | `compile` | REST/MCP endpoints + WebSocket push — generated from @McpDomain SPIs |
+| `casehub-platform-notifications-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile NotificationStore |
+| `casehub-platform-notifications-jpa` | `compile` + Flyway location | `classpath:db/notification/migration` required |
+| `casehub-platform-notification-dispatch` | `compile` | Full delivery pipeline — target resolution → suppression → channel routing |
+| `casehub-platform-notification-settings-inmem` | `test` or `compile` (ephemeral) | InMemory preference + suppression stores |
+| `casehub-platform-notification-settings-jpa` | `compile` + Flyway location | `classpath:db/notification-settings/migration` required |
+| `casehub-platform-delivery-channel-inmem` | `compile` | InMemoryDeliveryChannelRegistry — startup-populated, production impl |
+| `casehub-platform-delivery-tracking-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile delivery attempt store |
+| `casehub-platform-delivery-tracking-jpa` | `compile` + Flyway location | `classpath:db/delivery-tracking/migration` required |
+| `casehub-platform-subscriptions` | `compile` | SubscriptionEngine + REST CRUD + event-type discovery |
+| `casehub-platform-subscriptions-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile SubscriptionStore |
+| `casehub-platform-subscriptions-jpa` | `compile` + Flyway location | `classpath:db/subscription/migration` required |
+| `casehub-platform-datasource-alpha` | `compile` | Rete alpha network runtime — pure runtime, no CDI, no persistence |
+| `casehub-platform-datasource-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile DataSourceRegistry |
+| `casehub-platform-datasource-jpa` | `compile` + Flyway location | `classpath:db/datasource/migration` required |
+| `casehub-platform-callback-api` | `compile` | Pure Java callback registration SPI — zero deps |
+| `casehub-platform-callback` | `compile` | CallbackInvoker + LeaseReaper + CallbackService REST/MCP |
+| `casehub-platform-callback-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile CallbackRegistry |
+| `casehub-platform-callback-client` | `compile` | Client-side auto-registration + heartbeat + dispatch |
+| `casehub-platform-callback-generator` | `compile` (build-time APT) | @CallbackEligible → @Decorator proxy generation |
+| `casehub-platform-callback-spring` | `compile` | Spring Boot BeanPostProcessor for @CallbackEligible |
+| `casehub-platform-mcp` | `compile` | MCP hierarchical model — GraphQLModelScanner, DynamicToolRegistrar, McpResourceRegistryBridge |
+| `casehub-platform-graphql` | `compile` | JSON scalar, PageInput/PageInfo pagination, GraphQLError |
+| `casehub-graphql-client` | `compile` | Typed per-domain CaseHub GraphQL client — configure `quarkus.smallrye-graphql-client.casehub.url` |
+| `casehub-platform-graphql-generator` | `compile` (build-time APT) | @McpDomain → @GraphQLApi + @Path REST. Options: -AdomainFilter, -AgenerateGraphQL, -AgenerateRest |
+| `casehub-platform-graphql-spring-generator` | `compile` (build-time Maven plugin) | @McpDomain → Spring @Controller + @RestController |
+| `casehub-platform-rest-spring-generator` | `compile` (build-time Maven plugin) | @Path → Spring @RestController |
+| `casehub-platform-mcp-spring-generator` | `compile` (build-time Maven plugin) | Quarkus @Tool → Spring @Tool |
+| `casehub-platform-generator-common` | `compile` (build-time) | Shared McpDomainJandexScanner + AbstractGeneratorMojo |
+| `casehub-platform-schema-generator` | `compile` | JSON Schema from Java types — victools/jsonschema-generator Draft 2020-12 |
+| `casehub-platform-drift-detection` | `compile` (build-time Maven Enforcer rule) | Detects hand-written types in codegen-managed packages |
+| `casehub-platform-agent-ollama` | `compile` | AgentBackend "ollama" — local models via OpenAI-compat API, 120s timeout |
+| `casehub-platform-agent-config-core` | `compile` | Framework-neutral manifest types — ManifestLoader, ManifestProcessor |
+| `casehub-platform-agent-config` | `compile` | Quarkus @Startup manifest loading + ManifestResult producer |
+| `casehub-platform-acl-admin` | `compile` | REST/MCP admin for ACL — @RolesAllowed("admin") on mutations |
+| `casehub-platform-acl-worker` | `compile` | WorkerCredentialFilter @Provider — fail-closed by default |
+| `casehub-platform-credentials-quarkus` | `compile` | @Alternative @Priority(1) CredentialResolver → Quarkus CredentialsProvider (Vault/AWS/GCP) |
+| `casehub-platform-preferences-editor` | `compile` | PreferenceService REST/MCP — @McpDomain CRUD + PreferenceSchemaService |
+| `casehub-platform-governance` | `compile` | PolicyEnforcer — retry/timeout/backoff/circuit-breaker, shared virtual-thread executor |
+| `casehub-platform-llm-config-core` | `compile` | Framework-neutral LLM config types — LlmConfigApi SPI |
+| `casehub-platform-llm-config` | `compile` | LlmConfigService — UI-driven LLM provider setup |
+| `casehub-platform-llm-config-vertex` | `compile` | Vertex AI vendor client — ADC auth, project/region/model discovery |
+| `casehub-platform-llm-config-bedrock` | `compile` | Bedrock vendor client — credential chain, region/model discovery |
+| `casehub-platform-yaml-jackson` | `compile` | Jackson mixins for yaml-core — @JsonAnySetter dynamic section capture |
+| `casehub-platform-yaml-codegen` | `compile` (build-time Maven plugin) | Java records + POJOs from JSON Schema |
+| `casehub-platform-platform-pdf` | `compile` (optional) | HTML-to-PDF via OpenHTMLtoPDF — classpath activation |
 
 ---
 

@@ -450,5 +450,113 @@ class RoutingAgentProviderTest {
         assertThat(configCapture.get().model()).isEqualTo("claude-sonnet-5");
     }
 
+    static ModelDescriptor descriptorWithVendor(String id, String apiModelId, String backendKey, ModelTier tier, String vendor) {
+        return new ModelDescriptor(id, apiModelId, backendKey, null, vendor, "test-family",
+                                   "Test " + id, tier, Set.of("text", "reasoning"), 200000, 32768,
+                                   ModelLocality.CLOUD, null, null, Map.of());
+    }
+
+    // --- Alias resolution ---
+
+    @Test
+    void aliasResolvesToMatchingModel() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"));
+        var aliases = Map.of("reasoning-heavy",
+                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).requiredCapabilities(Set.of("reasoning")).build());
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, aliases);
+
+        var config = AgentSessionConfig.of("sys", "user", "reasoning-heavy");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void aliasResolvesBeforeTierRef() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"),
+                descriptorWithVendor("claude-haiku", "claude-haiku", "claude", ModelTier.FAST, "anthropic"));
+        var aliases = Map.of("tier:FLAGSHIP",
+                             ModelQuery.builder().tier(ModelTier.FAST).build());
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, aliases);
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FLAGSHIP");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-haiku");
+    }
+
+    @Test
+    void unknownAliasFallsToTierRef() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-haiku", "claude-haiku", "claude", ModelTier.FAST, "anthropic"));
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", registry, Map.of());
+
+        var config = AgentSessionConfig.of("sys", "user", "tier:FAST");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("claude-haiku");
+    }
+
+    @Test
+    void preferVendorTiebreaksAmongMatches() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"),
+                descriptorWithVendor("o3", "o3", "openai", ModelTier.FLAGSHIP, "openai"));
+        var aliases = Map.of("prefer-openai",
+                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("openai").build());
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture), stubBackend("openai")),
+                "claude", registry, aliases);
+
+        var config = AgentSessionConfig.of("sys", "user", "prefer-openai");
+        router.invoke(config).collect().asList().await().indefinitely();
+        // default backend is claude, but preferVendor=openai overrides for tiebreaking
+        // However, default backend takes priority over preferVendor
+        // Both are FLAGSHIP, claude is default backend → claude wins
+        assertThat(configCapture.get().model()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void preferVendorWinsWhenNoDefaultBackendMatch() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var registry = tierAwareRegistry(
+                descriptorWithVendor("o3", "o3", "openai", ModelTier.FLAGSHIP, "openai"),
+                descriptorWithVendor("gemini-ultra", "gemini-ultra", "gemini", ModelTier.FLAGSHIP, "google"));
+        var aliases = Map.of("prefer-google",
+                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("google").build());
+        var router = new RoutingAgentProvider(
+                backendRegistry(stubBackend("openai"),
+                                capturingBackend("gemini", configCapture, initCapture)),
+                "claude", registry, aliases);
+
+        var config = AgentSessionConfig.of("sys", "user", "prefer-google");
+        router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(configCapture.get().model()).isEqualTo("gemini-ultra");
+    }
+
+    @Test
+    void withModelCreatesNewConfig() {
+        var config    = AgentSessionConfig.of("sys", "user");
+        var withModel = config.withModel("tier:FAST");
+        assertThat(withModel.model()).isEqualTo("tier:FAST");
+        assertThat(withModel.systemPrompt()).isEqualTo("sys");
+        assertThat(withModel.userPrompt()).isEqualTo("user");
+        assertThat(config.model()).isNull();
+    }
+
 
 }

@@ -828,17 +828,73 @@ Package: `io.casehub.platform.simulation.tutorial` in `simulation-core/src/test/
 
 ---
 
+## Event simulation
+
+Event simulation generates synthetic CloudEvents and injects them
+into the CDI event bus — the same path real stream processors use.
+Events traverse DataSourceRouter's tenancy check and
+acceptedEventTypes filter before reaching wired DataSources.
+
+### Core components
+
+| Type | Purpose |
+|------|---------|
+| `EventTrigger` | Input record — eventType, tenancyId, context |
+| `EventSourceConfig` | Per-source config — qualifiedName, eventType, tenancyId |
+| `SimulatedEventEmitter` | Core emitter with `tick()` method |
+| `CloudEventFixtureBuilder` | Map ↔ CloudEvent conversion for YAML corpus |
+| `EmissionResult` | Synchronous result from `tick()` |
+
+### Usage
+
+```java
+// 1. Build a corpus with CloudEvent entries
+var corpus = new InMemorySimulationCorpus<EventTrigger, CloudEvent>();
+CloudEvent template = CloudEventFixtureBuilder.fromMap(Map.of(
+        "type", "io.casehub.work.workitem.completed",
+        "source", "/simulation/event-emitter",
+        "tenancyid", "default",
+        "datacontenttype", "application/json",
+        "data", Map.of("workItemId", "WI-001")));
+corpus.seed("event-emitter.wic", List.of(new InvocationRecord<>(
+        "default", "wic",
+        new EventTrigger("io.casehub.work.workitem.completed", "default", Map.of()),
+        template, Instant.now())));
+
+// 2. Configure and create the emitter
+var config = ...; // strategy = "sequential" for "event-emitter.wic"
+var runtime = new SimulationRuntime(config, corpus);
+List<CloudEvent> sink = new ArrayList<>();
+var emitter = new SimulatedEventEmitter(runtime, sink::add,
+        List.of(new EventSourceConfig("event-emitter.wic",
+                "io.casehub.work.workitem.completed", "default")));
+
+// 3. Emit
+EmissionResult result = emitter.tick();
+assertThat(result.emittedCount()).isEqualTo(1);
+assertThat(sink.get(0).getType())
+        .isEqualTo("io.casehub.work.workitem.completed");
+```
+
+The emitter stamps a fresh UUID `id` and `time` on each emission.
+Corpus entries store CloudEvent templates without these fields.
+
+### Tenant context
+
+The emitter does not use `CurrentPrincipal`. Tenant context comes
+from `EventSourceConfig.tenancyId()` and the `tenancyid` CloudEvent
+extension in the corpus. For multi-tenant testing, configure multiple
+EventSourceConfig entries with different tenant IDs.
+
+---
+
 ## What's next
 
 The simulation framework is actively growing. Planned capabilities that
 will extend the patterns above:
 
-- **YAML-driven configuration** — declarative corpus fixtures and
-  KeyExtractors loaded from YAML files at startup
-- **Nearest-match strategy** — weighted similarity scoring for fuzzy
-  input matching, useful when exact keys don't capture the input space
-- **Event simulation** — push-side strategies for event sequences,
-  timed delivery, and DataSource injection
+- **Timed event simulation** — @Scheduled wrapper for continuous
+  background event emission with configurable timing patterns
 - **Corpus builders** — fluent, domain-specific builders that eliminate
   hand-crafted `InvocationRecord` construction
 - **Verification API** — assertion DSL on captured invocations

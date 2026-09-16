@@ -212,19 +212,24 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("        if (strategy.isPresent() && strategy.get().canResolve(").append(inputExpr).append(")) {\n");
         if (isVoid) {
             sb.append("            strategy.get().resolve(").append(inputExpr).append(");\n");
+            sb.append("            simulation.recordJournal(qualifiedName, ").append(inputExpr).append(", null, true);\n");
             sb.append("            return;\n");
         } else {
-            sb.append("            return (").append(returnType).append(") strategy.get().resolve(").append(inputExpr).append(");\n");
+            sb.append("            Object simResult = strategy.get().resolve(").append(inputExpr).append(");\n");
+            sb.append("            simulation.recordJournal(qualifiedName, ").append(inputExpr).append(", simResult, true);\n");
+            sb.append("            return (").append(returnType).append(") simResult;\n");
         }
         sb.append("        }\n");
 
         if (isVoid) {
             sb.append("        delegate.").append(method.name()).append("(").append(args).append(");\n");
+            sb.append("        simulation.recordJournal(qualifiedName, ").append(inputExpr).append(", null, false);\n");
             sb.append("        if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append("            simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", null);\n");
             sb.append("        }\n");
         } else {
             sb.append("        ").append(returnType).append(" result = delegate.").append(method.name()).append("(").append(args).append(");\n");
+            sb.append("        simulation.recordJournal(qualifiedName, ").append(inputExpr).append(", result, false);\n");
             sb.append("        if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append("            simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", result);\n");
             sb.append("        }\n");

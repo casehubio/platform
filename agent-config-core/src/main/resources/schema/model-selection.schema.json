@@ -31,9 +31,10 @@
         "capabilities": {
           "type": "array",
           "items": {
-            "enum": ["text", "vision", "tool-use", "code", "reasoning"]
+            "type": "string"
           },
-          "description": "Required capabilities (all must be present)"
+          "examples": [["text", "vision", "tool-use", "code", "reasoning"]],
+          "description": "Required capabilities (all must be present). Well-known values: text, vision, tool-use, code, reasoning"
         },
         "locality": {
           "enum": ["CLOUD", "LOCAL"],

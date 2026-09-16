@@ -26,7 +26,6 @@
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-simulation-inmem</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

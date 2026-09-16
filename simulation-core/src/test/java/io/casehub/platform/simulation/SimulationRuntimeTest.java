@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -200,6 +201,127 @@ class SimulationRuntimeTest {
         final Optional<SimulationStrategy<String, String>> strategy = runtime.strategyFor(QN);
         assertThat(strategy).isPresent();
         assertThat(strategy.get().resolve("hello")).isEqualTo("world");
+    }
+
+    // --- overlay stack ---
+
+    @Test
+    void pushOverlayMakesStrategyResolveFromOverlay() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+        assertThat(runtime.<String, String>strategyFor(QN)).isEmpty();
+
+        final var overlayCorpus = new TestCorpus();
+        overlayCorpus.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "out", Instant.now())));
+        final var overlay = runtime.pushOverlay(
+                MapSimulationConfig.of(Map.of(QN, "sequential")), overlayCorpus);
+
+        assertThat(runtime.<String, String>strategyFor(QN)).isPresent();
+        assertThat(runtime.hasActiveOverlay()).isTrue();
+    }
+
+    @Test
+    void overlayStrategyUsesOverlayCorpus() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var baseCorpus = new TestCorpus();
+        baseCorpus.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "base-value", Instant.now())));
+        final var runtime = new SimulationRuntime(baseConfig, baseCorpus);
+
+        final var overlayCorpus = new TestCorpus();
+        overlayCorpus.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "overlay-value", Instant.now())));
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of(QN, "sequential")), overlayCorpus);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("in")).isEqualTo("overlay-value");
+    }
+
+    @Test
+    void popOverlayRestoresBaseResolution() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        final var overlay = runtime.pushOverlay(MapSimulationConfig.of(Map.of(QN, "sequential")));
+
+        runtime.popOverlay(overlay);
+        assertThat(runtime.<String, String>strategyFor(QN)).isEmpty();
+        assertThat(runtime.hasActiveOverlay()).isFalse();
+    }
+
+    @Test
+    void multipleOverlaysResolveTopDown() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        final var corpus1 = new TestCorpus();
+        corpus1.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "first", Instant.now())));
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of(QN, "sequential")), corpus1);
+
+        final var corpus2 = new TestCorpus();
+        corpus2.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "second", Instant.now())));
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of(QN, "sequential")), corpus2);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("in")).isEqualTo("second");
+    }
+
+    @Test
+    void popAllClearsEntireStack() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of(QN, "sequential")));
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of("other.method", "random")));
+
+        runtime.popAll();
+        assertThat(runtime.hasActiveOverlay()).isFalse();
+        assertThat(runtime.<String, String>strategyFor(QN)).isEmpty();
+    }
+
+    @Test
+    void journalReturnsOverlayJournal() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+        final var overlay = runtime.pushOverlay(MapSimulationConfig.of(Map.of()));
+
+        runtime.recordJournal(QN, "input", "output", true);
+
+        final var journal = runtime.journal(overlay);
+        assertThat(journal).hasSize(1);
+        assertThat(journal.get(0).simulated()).isTrue();
+    }
+
+    @Test
+    void recordJournalNoOpWhenNoOverlay() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        runtime.recordJournal(QN, "input", "output", false);
+    }
+
+    @Test
+    void popOverlayThrowsForUnknownOverlay() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+        final var overlay = new SimulationOverlay(MapSimulationConfig.of(Map.of()), new NoOpSimulationCorpus<>());
+
+        assertThatThrownBy(() -> runtime.popOverlay(overlay))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void overlayDoesNotAffectUnrelatedQualifiedNames() {
+        final var baseConfig = stubConfig(Optional.of("sequential"), false, Optional.empty());
+        final var baseCorpus = new TestCorpus();
+        baseCorpus.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "base", Instant.now())));
+        final var runtime = new SimulationRuntime(baseConfig, baseCorpus);
+
+        runtime.pushOverlay(MapSimulationConfig.of(Map.of("other.method", "sequential")));
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("in")).isEqualTo("base");
     }
 
     // --- helpers ---

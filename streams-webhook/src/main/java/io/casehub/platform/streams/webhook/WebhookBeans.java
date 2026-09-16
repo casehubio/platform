@@ -3,12 +3,14 @@ package io.casehub.platform.streams.webhook;
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.cloudevents.CloudEvent;
+import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.inject.Produces;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+@Startup
 @ApplicationScoped
 public class WebhookBeans {
 

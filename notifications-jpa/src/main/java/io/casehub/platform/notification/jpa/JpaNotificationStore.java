@@ -197,7 +197,7 @@ public class JpaNotificationStore implements NotificationStore {
     }
 
     private static String encodeCursor(Instant createdAt, String id) {
-        String raw = createdAt.toEpochMilli() + "|" + id;
+        String raw = createdAt.getEpochSecond() + ":" + createdAt.getNano() + "|" + id;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes());
     }
 
@@ -206,9 +206,16 @@ public class JpaNotificationStore implements NotificationStore {
             String raw = new String(Base64.getUrlDecoder().decode(cursor));
             int    sep = raw.indexOf('|');
             if (sep == -1) {return null;}
-            long   epochMillis = Long.parseLong(raw.substring(0, sep));
-            String id          = raw.substring(sep + 1);
-            return new CursorValue(Instant.ofEpochMilli(epochMillis), id);
+            String timePart = raw.substring(0, sep);
+            String id       = raw.substring(sep + 1);
+            int    colon    = timePart.indexOf(':');
+            if (colon == -1) {
+                long epochMillis = Long.parseLong(timePart);
+                return new CursorValue(Instant.ofEpochMilli(epochMillis), id);
+            }
+            long epochSecond = Long.parseLong(timePart.substring(0, colon));
+            int  nano        = Integer.parseInt(timePart.substring(colon + 1));
+            return new CursorValue(Instant.ofEpochSecond(epochSecond, nano), id);
         } catch (IllegalArgumentException e) {
             return null;
         }

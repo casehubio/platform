@@ -178,7 +178,7 @@ public class RestControllerWriter {
         if (method.returnType().equals(TypeName.VOID) || isResponseReturn) {
             return CodeBlock.builder()
                             .addStatement("$L.$L($L)", delegateFieldName, method.methodName(), args)
-                            .addStatement("return $T.ok().build()", RESPONSE_ENTITY)
+                            .addStatement("return $T.noContent().build()", RESPONSE_ENTITY)
                             .build();
         }
 

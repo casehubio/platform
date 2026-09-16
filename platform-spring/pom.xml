@@ -62,6 +62,26 @@
             <artifactId>casehub-platform-streams-webhook-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Quarkus modules referenced by rest-spring-generator plugin (filesystem Jandex paths).
+             Provided-scope creates reactor ordering edge without polluting runtime classpath. -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-streams-webhook</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-callback-client</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-notification-dispatch</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>

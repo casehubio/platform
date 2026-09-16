@@ -83,13 +83,15 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 
 ### Agent infrastructure
 
-Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `model` field via three-step resolution: (1) `ModelRegistry` lookup by model ID (routes to backend via descriptor's `backendKey`), (2) direct backend key match, (3) fail-fast. Add one or more backend modules to the classpath; the router discovers them automatically.
+Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `model` field via four-step resolution: (0) alias lookup (named constraint sets from manifest), (1) tier reference (`tier:FLAGSHIP`), (2) `ModelRegistry` lookup by model ID, (3) direct backend key match, (4) fail-fast. Add one or more backend modules to the classpath; the router discovers them automatically.
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
+| `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); `AgentSessionConfig.withModel(String)` and `withModel(ModelQuery)` for model selection. Depends on platform-api |
+| `casehub-platform-agent-config-core` | Framework-neutral manifest loader and processor. `ManifestLoader` discovers `agent-config.yaml` from directory hierarchy (project → user → system → seed catalog), parses YAML, merges by model ID. `ManifestProcessor` drives existing SPIs from merged manifest. `ManifestCredentialResolver` handles `env:`/`file:`/`ref:` credential references. `model-selection.schema.json` published as Maven artifact resource for cross-repo `$ref`. Pure Java + Jackson -- no CDI |
+| `casehub-platform-agent-config` | Quarkus `@Startup @Priority(50)` wiring -- runs ManifestLoader + ManifestProcessor at boot, produces `ManifestResult` for router consumption. Profile support via `CASEHUB_AGENT_PROFILE` env var |
 | `casehub-platform-agent-runtime` | `SubprocessRuntime` -- local process execution for CLI agent providers |
-| `casehub-platform-agent-router` | `RoutingAgentProvider` -- three-step model resolution (registry → key → fail-fast) with config rewriting. Config: `casehub.platform.agent.default-backend` |
+| `casehub-platform-agent-router` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking. Consumes `ManifestResult` for aliases and default backend. Config: `casehub.platform.agent.default-backend` |
 | `casehub-platform-agent-claude` | AgentBackend "claude" -- Claude CLI subprocess via `claude-code-sdk` |
 | `casehub-platform-agent-openai` | AgentBackend "openai" -- native OpenAI Java SDK with `prompt_cache_key` support |
 | `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
@@ -97,6 +99,135 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
 | `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
+
+### Agent configuration manifest
+
+Drop an `agent-config.yaml` in your project root and `AgentProvider` works at startup -- no custom wiring code needed. The manifest declares what vendors are available, how to authenticate, and how to select models.
+
+**Directory hierarchy:** The loader discovers manifest files from a fixed priority chain. Higher priority wins for the same model ID or vendor.
+
+| Level | Path | Priority |
+|-------|------|----------|
+| Platform | `classpath:models/seed-catalog.yaml` | 0 |
+| System | `/etc/casehub/agent-config.yaml` | 10 |
+| User | `~/.casehub/agent-config.yaml` | 20 |
+| User profile | `~/.casehub/agent-config-{profile}.yaml` | 25 |
+| Project | `./agent-config.yaml` | 30 |
+| Project profile | `./agent-config-{profile}.yaml` | 35 |
+
+Set `CASEHUB_AGENT_PROFILE` env var to activate profile-specific files (e.g. `ci`). In Quarkus, falls back to `QUARKUS_PROFILE` if unset.
+
+**Credential references:** Manifests never contain raw secrets. Three reference types:
+
+| Prefix | Resolves via | Use case |
+|--------|-------------|----------|
+| `env:VAR_NAME` | `System.getenv()` | Dev machines, CI (secrets in environment) |
+| `file:/path` | File contents | Kubernetes mounted secrets |
+| `ref:credential-ref` | `CredentialResolver` SPI → Quarkus `CredentialsProvider` → Vault/AWS/GCP | Production |
+
+**Example -- developer machine:**
+
+```yaml
+# ~/.casehub/agent-config.yaml
+providers:
+  - vendor: anthropic
+    credential: env:ANTHROPIC_API_KEY
+  - vendor: ollama
+aliases:
+  reasoning-heavy:
+    tier: FLAGSHIP
+    capabilities: [reasoning]
+    min-context: 128000
+  cheap-fast:
+    tier: FAST
+    max-cost: LOW
+defaults:
+  backend: claude
+```
+
+**Example -- CI with Ollama:**
+
+```yaml
+# ./agent-config-ci.yaml
+providers:
+  - vendor: ollama
+local-models:
+  - id: llama-4-scout
+    ensure: present
+defaults:
+  backend: ollama
+```
+
+**Example -- production with Vault:**
+
+```yaml
+# /etc/casehub/agent-config.yaml
+providers:
+  - vendor: anthropic
+    credential: ref:vault/casehub/anthropic-api-key
+  - vendor: vertex
+    credential:
+      project-id: ref:vault/casehub/gcp-project
+      location: ref:vault/casehub/gcp-location
+      service-account-json: ref:vault/casehub/gcp-service-account
+defaults:
+  backend: claude
+```
+
+**Using AgentProvider in code:**
+
+```java
+@Inject AgentProvider agentProvider;
+
+// By alias (resolves differently per environment)
+agentProvider.invoke(config.withModel("reasoning-heavy"));
+
+// By tier
+agentProvider.invoke(config.withModel("tier:FAST"));
+
+// By model ID
+agentProvider.invoke(config.withModel("claude-opus-5"));
+
+// By inline constraints (ModelQuery)
+var query = ModelQuery.builder()
+    .tier(ModelTier.FLAGSHIP)
+    .requiredCapabilities(Set.of("vision", "reasoning"))
+    .minContextWindow(128000)
+    .build();
+agentProvider.invoke(config.withModel(query));
+
+// No model -- uses default backend from manifest
+agentProvider.invoke(config);
+```
+
+**In YAML definitions (eidos):**
+
+```yaml
+tasks:
+  analyze:
+    agent:
+      model: reasoning-heavy
+  triage:
+    agent:
+      model:
+        tier: FAST
+        max-cost: LOW
+        locality: LOCAL
+```
+
+**ModelQuery fields** (all nullable -- null means "don't care"):
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `vendor` | String | Exact vendor match |
+| `family` | String | Exact model family match |
+| `tier` | ModelTier | FLAGSHIP / STANDARD / FAST / EMBEDDING |
+| `requiredCapabilities` | Set\<String\> | All listed capabilities must be present |
+| `locality` | ModelLocality | CLOUD / LOCAL |
+| `maxCostTier` | CostTier | Maximum cost (ranked: FREE < LOW < MEDIUM < HIGH < PREMIUM) |
+| `minContextWindow` | Integer | Minimum context window in tokens |
+| `minMaxOutput` | Integer | Minimum max output tokens |
+| `preferVendor` | String | Tiebreaker among matching models (not a filter) |
 
 ### Access control
 
@@ -426,11 +557,11 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 
 ### Agent Infrastructure
 
-**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and resolves the `model` field via three-step resolution: (1) `ModelRegistry.resolveById` — routes to backend from `descriptor.backendKey()`, rewrites config with the API model ID, (2) direct `backends.get(model)` — model nulled so backend uses its default, (3) fail-fast `IllegalArgumentException`. Callers always inject `AgentProvider`, never `AgentBackend`.
+**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and resolves the `model` field via four-step resolution: (0) alias lookup (named constraint sets from the agent config manifest), (1) tier reference (`tier:FLAGSHIP`), (2) `ModelRegistry.resolveById` — routes to backend from `descriptor.backendKey()`, rewrites config with the API model ID, (3) direct backend key match — model nulled so backend uses its default, (4) fail-fast `IllegalArgumentException`. When `ManifestResult` is available (from `agent-config` module), aliases and default backend override config properties. Callers always inject `AgentProvider`, never `AgentBackend`.
 
 `AgentProvider` has two execution paths:
-- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model` (provider key).
-- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). `AgentSessionInit` carries `systemPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model`.
+- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, nullable `model` (string), and nullable `modelQuery` (`ModelQuery` for direct constraint dispatch). Use `config.withModel(String)` for aliases/IDs or `config.withModel(ModelQuery)` for inline constraints.
+- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). Same `withModel` overloads.
 
 `AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no backend key and no `ModelRegistry` entry, resolution fails fast with `IllegalArgumentException`.
 

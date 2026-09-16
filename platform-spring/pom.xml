@@ -130,6 +130,7 @@
                                 <quarkusModule>${project.basedir}/../preferences-editor-core</quarkusModule>
                                 <quarkusModule>${project.basedir}/../callback-api</quarkusModule>
                                 <quarkusModule>${project.basedir}/../llm-config-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../subscriptions-core</quarkusModule>
                             </quarkusModules>
                         </configuration>
                     </execution>
@@ -143,6 +144,7 @@
                                 <quarkusModule>${project.basedir}/../preferences-editor-core</quarkusModule>
                                 <quarkusModule>${project.basedir}/../callback-api</quarkusModule>
                                 <quarkusModule>${project.basedir}/../llm-config-core</quarkusModule>
+                                <quarkusModule>${project.basedir}/../subscriptions-core</quarkusModule>
                             </quarkusModules>
                         </configuration>
                     </execution>

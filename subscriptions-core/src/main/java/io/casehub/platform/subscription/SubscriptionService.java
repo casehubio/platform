@@ -42,6 +42,7 @@ public class SubscriptionService {
     }
 
     @PlatformMutation("Create a subscription")
+    @RestPath("/")
     public Subscription create(SubscriptionInput input) {
         var effectiveScope = input.scope();
 
@@ -89,6 +90,7 @@ public class SubscriptionService {
     }
 
     @PlatformQuery("List subscriptions")
+    @RestPath("/")
     public SubscriptionPage list(Boolean enabled, SubscriptionScope scope, String cursor, int limit) {
         return store.find(new SubscriptionQuery(
                 scope == SubscriptionScope.SYSTEM ? null : principal.actorId(),
@@ -101,12 +103,14 @@ public class SubscriptionService {
     }
 
     @PlatformQuery("Get subscription by ID")
+    @RestPath("/{id}")
     public Optional<Subscription> getById(@PathParam String id) {
         return store.findById(id, principal.actorId(), principal.tenancyId());
     }
 
     @PlatformMutation("Update a subscription")
     @RestMethod(HttpMethod.PATCH)
+    @RestPath("/{id}")
     public Optional<Subscription> update(@PathParam String id, SubscriptionUpdate update) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {
@@ -118,6 +122,7 @@ public class SubscriptionService {
 
     @PlatformMutation("Delete a subscription")
     @RestMethod(HttpMethod.DELETE)
+    @RestPath("/{id}")
     public boolean delete(@PathParam String id) {
         var opt = store.findById(id, principal.actorId(), principal.tenancyId());
         if (opt.isEmpty()) {

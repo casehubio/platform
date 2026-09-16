@@ -121,6 +121,7 @@
         <module>llm-config</module>
         <module>llm-config-vertex</module>
         <module>llm-config-bedrock</module>
+        <module>agent-config</module>
         <module>spring-testing</module>
         <module>generator-common</module>
         <module>spring-generator</module>

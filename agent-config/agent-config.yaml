@@ -1,0 +1,6 @@
+aliases:
+  fast:
+    tier: FAST
+    max-cost: LOW
+defaults:
+  backend: claude

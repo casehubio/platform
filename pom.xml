@@ -59,6 +59,7 @@
         <module>acl-inmem</module>
         <module>acl-jpa-common</module>
         <module>acl-jpa</module>
+        <module>acl-spring-jpa</module>
         <module>acl-admin</module>
         <module>acl-worker</module>
         <module>notifications-inmem-core</module>

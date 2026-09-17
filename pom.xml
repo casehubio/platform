@@ -25,6 +25,7 @@
         <module>expression</module>
         <module>persistence-jpa-common</module>
         <module>persistence-jpa</module>
+        <module>persistence-spring-jpa</module>
         <module>persistence-mongodb</module>
         <module>endpoints-memory-core</module>
         <module>endpoints-memory</module>

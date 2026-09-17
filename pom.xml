@@ -165,6 +165,7 @@
         <module>graphql-spring-generator</module>
         <module>mcp-spring-generator</module>
         <module>spring-boot-starter</module>
+        <module>spring-integration-test</module>
     </modules>
 
     <properties>
@@ -174,7 +175,7 @@
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <jandex-maven-plugin.version>3.3.1</jandex-maven-plugin.version>
         <langchain4j.version>1.14.1</langchain4j.version>
-        <spring-boot.version>3.4.5</spring-boot.version>
+        <spring-boot.version>4.1.1</spring-boot.version>
         <spring-ai.version>2.0.0</spring-ai.version>
         <bouncycastle.version>1.85</bouncycastle.version>
     </properties>

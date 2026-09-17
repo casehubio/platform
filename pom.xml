@@ -93,6 +93,7 @@
         <module>digest-inmem</module>
         <module>digest-jpa-common</module>
         <module>digest-jpa</module>
+        <module>digest-spring-jpa</module>
         <module>delivery-tracking-inmem-core</module>
         <module>delivery-tracking-inmem</module>
         <module>delivery-tracking-jpa-common</module>

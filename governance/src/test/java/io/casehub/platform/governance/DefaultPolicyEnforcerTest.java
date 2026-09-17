@@ -138,7 +138,9 @@ class DefaultPolicyEnforcerTest {
 
         Thread.currentThread().interrupt();
 
-        assertThatThrownBy(() -> enforcer.execute(policy, () -> "result"))
+        assertThatThrownBy(() -> enforcer.execute(policy, () -> {
+            throw new RuntimeException("fail while interrupted");
+        }))
             .isInstanceOf(InterruptedPolicyException.class)
             .hasMessageContaining("Interrupted");
 

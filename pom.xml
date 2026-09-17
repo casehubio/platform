@@ -36,6 +36,7 @@
         <module>datasource-inmem</module>
         <module>datasource-jpa-common</module>
         <module>datasource-jpa</module>
+        <module>datasource-spring-jpa</module>
         <module>scim</module>
         <module>identity-core</module>
         <module>identity</module>
@@ -77,6 +78,7 @@
         <module>subscriptions-inmem</module>
         <module>subscriptions-jpa-common</module>
         <module>subscriptions-jpa</module>
+        <module>subscriptions-spring-jpa</module>
         <module>streams-kafka</module>
         <module>streams-amqp</module>
         <module>streams-webhook-core</module>

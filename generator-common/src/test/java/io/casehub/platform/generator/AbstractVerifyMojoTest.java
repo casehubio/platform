@@ -47,7 +47,7 @@ class AbstractVerifyMojoTest {
         @Override protected Set<String> collectTargetTypes() { return targetTypes; }
         @Override protected File getOutputDirectory() { return new File("target"); }
         @Override protected String getGeneratorName() { return "test"; }
-        @Override protected Index loadJandexIndex() {
+        @Override protected IndexView loadCompositeIndex() {
             try { return Index.of(new Class<?>[0]); } catch (java.io.IOException e) { throw new RuntimeException(e); }
         }
     }

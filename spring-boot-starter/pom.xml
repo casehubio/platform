@@ -92,5 +92,13 @@
             <artifactId>casehub-platform-callback-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- Jackson 2 bridge — Spring Boot 4 defaults to Jackson 3.
+             Keeps both frameworks on Jackson 2 ObjectMapper until
+             Quarkus 4 aligns on Jackson 3 (~Nov 2026). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
     </dependencies>
 </project>

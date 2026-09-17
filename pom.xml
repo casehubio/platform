@@ -152,6 +152,7 @@
         <module>rest-spring-generator</module>
         <module>graphql-spring-generator</module>
         <module>mcp-spring-generator</module>
+        <module>spring-boot-starter</module>
     </modules>
 
     <properties>

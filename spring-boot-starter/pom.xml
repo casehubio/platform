@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-parent</artifactId>
+        <version>0.2-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>casehub-spring-boot-starter</artifactId>
+    <packaging>pom</packaging>
+    <name>CaseHub Spring Boot Starter</name>
+    <description>Single dependency for all CaseHub platform Spring Boot modules.
+        Add this starter to get auto-configured persistence, MCP, callbacks,
+        and mock fallbacks out of the box.</description>
+
+    <dependencies>
+        <!-- Core auto-configuration + mock fallbacks -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Spring Data JPA persistence -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-persistence-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-acl-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-notifications-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-notification-settings-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-subscriptions-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-datasource-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-digest-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-delivery-tracking-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-view-spring-jpa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- View orchestration -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-view-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- MCP / tool support -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-mcp-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Callback decorator -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-callback-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+</project>

@@ -40,9 +40,15 @@ public class SpringVerifyMojo extends AbstractVerifyMojo {
     protected String getGeneratorName() { return "spring-generator"; }
 
     @Override
-    protected Set<String> collectSourceTypes(IndexView index) {
+    protected Set<String> collectSourceTypes(IndexView compositeIndex) {
+        IndexView scanIndex;
+        try {
+            scanIndex = loadJandexIndex();
+        } catch (org.apache.maven.plugin.MojoExecutionException e) {
+            throw new RuntimeException(e);
+        }
         var scanner = new JandexProducerScanner();
-        List<ProducerDescriptor> quarkusProducers = scanner.scan(index);
+        List<ProducerDescriptor> quarkusProducers = scanner.scan(scanIndex, compositeIndex);
         Set<String> types = new HashSet<>();
         for (ProducerDescriptor d : quarkusProducers) {
             if (!d.requiresManualConfig()) {

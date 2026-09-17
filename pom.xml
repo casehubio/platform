@@ -108,6 +108,7 @@
         <module>platform-view-inmem</module>
         <module>platform-view-jpa-common</module>
         <module>platform-view-jpa</module>
+        <module>platform-view-spring-jpa</module>
         <module>platform-view-spring</module>
         <module>preferences-editor-core</module>
         <module>preferences-editor</module>

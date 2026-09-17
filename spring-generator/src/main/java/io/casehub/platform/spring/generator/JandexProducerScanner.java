@@ -31,9 +31,13 @@ public class JandexProducerScanner {
             DotName.createSimple("jakarta.enterprise.context.RequestScoped"));
 
     public List<ProducerDescriptor> scan(IndexView index) {
+        return scan(index, index);
+    }
+
+    public List<ProducerDescriptor> scan(IndexView scanIndex, IndexView resolveIndex) {
         List<ProducerDescriptor> result = new ArrayList<>();
 
-        for (AnnotationInstance produces : index.getAnnotations(PRODUCES)) {
+        for (AnnotationInstance produces : scanIndex.getAnnotations(PRODUCES)) {
             if (produces.target().kind() != org.jboss.jandex.AnnotationTarget.Kind.METHOD) {
                 continue;
             }
@@ -57,9 +61,9 @@ public class JandexProducerScanner {
                 hasCdiDeps = true;
             }
 
-            ClassInfo returnTypeInfo = index.getClassByName(returnTypeName);
+            ClassInfo returnTypeInfo = resolveIndex.getClassByName(returnTypeName);
             if (returnTypeInfo != null && isAbstractOrInterface(returnTypeInfo)) {
-                concreteReturnType = resolveConcreteType(index, method.name(), returnTypeInfo);
+                concreteReturnType = resolveConcreteType(resolveIndex, method.name(), returnTypeInfo);
                 if (concreteReturnType == null) {
                     hasCdiDeps = true;
                 }
@@ -86,7 +90,7 @@ public class JandexProducerScanner {
                     hasCdiDeps = true;
                 }
 
-                ClassInfo paramTypeInfo = index.getClassByName(typeName);
+                ClassInfo paramTypeInfo = resolveIndex.getClassByName(typeName);
                 if (paramTypeInfo != null && paramTypeInfo.hasAnnotation(CONFIG_MAPPING)) {
                     hasCdiDeps = true;
                 }

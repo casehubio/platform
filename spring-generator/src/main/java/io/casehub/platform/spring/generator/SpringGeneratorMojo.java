@@ -29,10 +29,11 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        IndexView index = loadCompositeIndex();
+        IndexView scanIndex = loadJandexIndex();
+        IndexView resolveIndex = loadCompositeIndex();
 
         var scanner = new JandexProducerScanner();
-        List<ProducerDescriptor> descriptors = scanner.scan(index);
+        List<ProducerDescriptor> descriptors = scanner.scan(scanIndex, resolveIndex);
 
         if (descriptors.isEmpty()) {
             getLog().info("No @Produces methods found — skipping generation.");

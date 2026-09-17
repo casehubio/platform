@@ -48,7 +48,12 @@ public class AutoConfigurationWriter {
             sb.append("\n");
             sb.append("    @Bean\n");
             if (d.defaultBean()) {
-                sb.append("    @ConditionalOnMissingBean\n");
+                if (d.hasConcreteOverride()) {
+                    sb.append("    @ConditionalOnMissingBean(").append(d.returnTypeSimpleName())
+                      .append(".class)\n");
+                } else {
+                    sb.append("    @ConditionalOnMissingBean\n");
+                }
             }
             if (d.alternative()) {
                 sb.append("    @Primary\n");
@@ -70,7 +75,7 @@ public class AutoConfigurationWriter {
             }
 
             sb.append(") {\n");
-            sb.append("        return new ").append(d.returnTypeSimpleName()).append("(");
+            sb.append("        return new ").append(d.effectiveReturnTypeSimpleName()).append("(");
 
             for (int i = 0; i < params.size(); i++) {
                 if (i > 0) sb.append(", ");
@@ -93,6 +98,9 @@ public class AutoConfigurationWriter {
         for (ProducerDescriptor d : descriptors) {
             if (d.requiresManualConfig()) {continue;}
             imports.add(d.returnType());
+            if (d.hasConcreteOverride()) {
+                imports.add(d.effectiveReturnType());
+            }
             for (ProducerDescriptor.ParameterDescriptor p : d.parameters()) {
                 if (!p.isConfigProperty()) {
                     imports.add(p.type());
@@ -100,5 +108,6 @@ public class AutoConfigurationWriter {
             }
         }
         imports.removeIf(t -> t.startsWith("java.lang."));
-        return imports;}
+        return imports;
+    }
 }

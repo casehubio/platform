@@ -6,6 +6,7 @@ public record ProducerDescriptor(
         String producerClassName,
         String methodName,
         String returnType,
+        String concreteReturnType,
         List<ParameterDescriptor> parameters,
         boolean defaultBean,
         boolean alternative,
@@ -31,8 +32,22 @@ public record ProducerDescriptor(
         return hasConfigProperties() || hasCdiDependencies();
     }
 
+    public boolean hasConcreteOverride() {
+        return concreteReturnType != null && !concreteReturnType.equals(returnType);
+    }
+
+    public String effectiveReturnType() {
+        return concreteReturnType != null ? concreteReturnType : returnType;
+    }
+
     public String returnTypeSimpleName() {
         int dot = returnType.lastIndexOf('.');
         return dot >= 0 ? returnType.substring(dot + 1) : returnType;
+    }
+
+    public String effectiveReturnTypeSimpleName() {
+        String t = effectiveReturnType();
+        int dot = t.lastIndexOf('.');
+        return dot >= 0 ? t.substring(dot + 1) : t;
     }
 }

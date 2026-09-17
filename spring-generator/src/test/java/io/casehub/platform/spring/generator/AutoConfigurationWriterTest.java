@@ -17,12 +17,14 @@ class AutoConfigurationWriterTest {
                         "io.casehub.platform.view.quarkus.ViewBeans",
                         "subjectViewEvaluator",
                         "io.casehub.platform.view.SubjectViewEvaluator",
+                        null,
                         List.of(),
                         false, false, 0, false),
                 new ProducerDescriptor(
                         "io.casehub.platform.view.quarkus.ViewBeans",
                         "subjectViewOrchestrator",
                         "io.casehub.platform.view.SubjectViewOrchestrator",
+                        null,
                         List.of(
                                 new ProducerDescriptor.ParameterDescriptor(
                                         "io.casehub.platform.view.SubjectViewEvaluator",
@@ -52,6 +54,7 @@ class AutoConfigurationWriterTest {
                         "io.casehub.platform.quarkus.DefaultBeans",
                         "noOpStore",
                         "io.casehub.platform.mock.NoOpStore",
+                        null,
                         List.of(),
                         true, false, 0, false)
         );
@@ -70,6 +73,7 @@ class AutoConfigurationWriterTest {
                         "io.casehub.platform.quarkus.OverrideBeans",
                         "overrideService",
                         "io.casehub.platform.SomeService",
+                        null,
                         List.of(),
                         false, true, 100, false)
         );
@@ -88,12 +92,14 @@ class AutoConfigurationWriterTest {
                         "io.casehub.engine.common.quarkus.CommonBeans",
                         "simpleBean",
                         "io.casehub.engine.common.SimpleBean",
+                        null,
                         List.of(),
                         false, false, 0, false),
                 new ProducerDescriptor(
                         "io.casehub.engine.common.quarkus.CommonBeans",
                         "cdiBean",
                         "io.casehub.engine.common.CdiBean",
+                        null,
                         List.of(
                                 new ProducerDescriptor.ParameterDescriptor(
                                         "jakarta.enterprise.inject.Instance",

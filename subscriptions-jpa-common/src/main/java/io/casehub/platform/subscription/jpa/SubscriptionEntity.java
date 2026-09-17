@@ -75,7 +75,7 @@ public class SubscriptionEntity {
     @Column(name = "updated_at", nullable = false)
     public Instant updatedAt;
 
-    static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
+    public static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
         SubscriptionEntity entity = new SubscriptionEntity();
         entity.id           = UUIDv7.generate();
         entity.ownerId      = input.ownerId();
@@ -94,7 +94,7 @@ public class SubscriptionEntity {
         return entity;
     }
 
-    static String serializeFilters(List<ExpressionEvaluator> filters, ObjectMapper mapper) {
+    public static String serializeFilters(List<ExpressionEvaluator> filters, ObjectMapper mapper) {
         if (filters == null || filters.isEmpty()) {
             return null;
         }
@@ -108,7 +108,7 @@ public class SubscriptionEntity {
         }
     }
 
-    static List<ExpressionEvaluator> deserializeFilters(String json, ObjectMapper mapper) {
+    public static List<ExpressionEvaluator> deserializeFilters(String json, ObjectMapper mapper) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
@@ -133,7 +133,7 @@ public class SubscriptionEntity {
         throw new IllegalArgumentException("Unknown evaluator type: " + evaluator.type());
     }
 
-    static String serializeTemplate(NotificationTemplate template, ObjectMapper mapper) {
+    public static String serializeTemplate(NotificationTemplate template, ObjectMapper mapper) {
         try {
             return mapper.writeValueAsString(template);
         } catch (JsonProcessingException e) {
@@ -141,7 +141,7 @@ public class SubscriptionEntity {
         }
     }
 
-    static NotificationTemplate deserializeTemplate(String json, ObjectMapper mapper) {
+    public static NotificationTemplate deserializeTemplate(String json, ObjectMapper mapper) {
         try {
             return mapper.readValue(json, NotificationTemplate.class);
         } catch (JsonProcessingException e) {
@@ -149,7 +149,7 @@ public class SubscriptionEntity {
         }
     }
 
-    static String serializeTargets(List<NotificationTarget> targets, ObjectMapper mapper) {
+    public static String serializeTargets(List<NotificationTarget> targets, ObjectMapper mapper) {
         try {
             return mapper.writeValueAsString(targets);
         } catch (JsonProcessingException e) {
@@ -157,7 +157,7 @@ public class SubscriptionEntity {
         }
     }
 
-    static List<NotificationTarget> deserializeTargets(String json, ObjectMapper mapper) {
+    public static List<NotificationTarget> deserializeTargets(String json, ObjectMapper mapper) {
         try {
             return List.copyOf(mapper.readValue(json, TARGET_LIST_TYPE));
         } catch (JsonProcessingException e) {
@@ -165,7 +165,7 @@ public class SubscriptionEntity {
         }
     }
 
-    Subscription toSubscription(ObjectMapper mapper) {
+    public Subscription toSubscription(ObjectMapper mapper) {
         return new Subscription(
                 id,
                 ownerId,

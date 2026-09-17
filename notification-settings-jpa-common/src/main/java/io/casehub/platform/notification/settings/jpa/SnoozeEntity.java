@@ -35,7 +35,7 @@ public class SnoozeEntity {
     /**
      * Build entity from input. Captures createdAt.
      */
-    static SnoozeEntity fromInput(SnoozeInput input) {
+    public static SnoozeEntity fromInput(SnoozeInput input) {
         SnoozeEntity entity = new SnoozeEntity();
         entity.userId = input.userId();
         entity.tenancyId = input.tenancyId();
@@ -47,7 +47,7 @@ public class SnoozeEntity {
     /**
      * Convert entity to domain record.
      */
-    Snooze toSnooze() {
+    public Snooze toSnooze() {
         return new Snooze(
                 userId,
                 tenancyId,

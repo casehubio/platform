@@ -125,10 +125,10 @@
 
 **Files:**
 - Create: `notifications-jpa/pom.xml`
-- Create: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/NotificationEntity.java`
+- Create: `../../notifications-jpa-common/src/main/java/io/casehub/platform/notification/jpa/NotificationEntity.java`
 - Create: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/JpaReactiveNotificationStore.java`
 - Create: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/JpaNotificationStore.java`
-- Create: `notifications-jpa/src/main/resources/db/notification/migration/V1__notification.sql`
+- Create: `../../notifications-jpa-common/src/main/resources/db/notification/migration/V1__notification.sql`
 - Create: `notifications-jpa/src/test/java/io/casehub/platform/notification/jpa/JpaNotificationStoreTest.java`
 - Create: `notifications-jpa/src/test/resources/application.properties`
 - Modify: `pom.xml` (parent — add `<module>notifications-jpa</module>`)

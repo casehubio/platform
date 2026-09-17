@@ -1786,8 +1786,8 @@ ACL Phase 2 (identity propagation) closed by platform#220 + engine#768. ACL Phas
 - `platform/src/main/java/io/casehub/platform/acl/NoOpAccessControlProvider.java` — `@DefaultBean @ApplicationScoped`
 - `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java` — `@Alternative @Priority(10) @ApplicationScoped`
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` — `@ApplicationScoped`; Flyway V2000
-- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
-- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)
+- `acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
+- `acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)
 
 #### Key wiring
 

@@ -78,7 +78,7 @@ public class NotificationEntity {
     @Column(name = "dismissed_at")
     public Instant dismissedAt;
 
-    static NotificationEntity fromInput(NotificationInput input) {
+    public static NotificationEntity fromInput(NotificationInput input) {
         NotificationEntity entity = new NotificationEntity();
         entity.id               = UUIDv7.generate();
         entity.userId           = input.userId();
@@ -97,7 +97,7 @@ public class NotificationEntity {
         return entity;
     }
 
-    Notification toNotification() {
+    public Notification toNotification() {
         return new Notification(
                 id,
                 userId,

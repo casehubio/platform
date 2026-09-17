@@ -748,7 +748,7 @@ feat(platform#142): subscription REST API — CRUD + enable/disable
 
 **Files:**
 - Create: `subscriptions-jpa/pom.xml`
-- Create: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
+- Create: `../../subscriptions-jpa-common/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
 - Create: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaReactiveSubscriptionStore.java`
 - Create: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaSubscriptionStore.java`
 - Create: `subscriptions-jpa/src/main/resources/db/subscription/migration/V1__subscription.sql`

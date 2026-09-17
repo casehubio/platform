@@ -51,7 +51,7 @@ public class MuteRuleEntity {
     /**
      * Build entity from input. Generates UUIDv7 id, captures createdAt.
      */
-    static MuteRuleEntity fromInput(MuteRuleInput input) {
+    public static MuteRuleEntity fromInput(MuteRuleInput input) {
         if (input.scope() == MuteScope.ENTITY && input.entityType() == null) {
             throw new IllegalArgumentException("entityType is required for ENTITY scope");
         }
@@ -71,7 +71,7 @@ public class MuteRuleEntity {
     /**
      * Convert entity to domain record.
      */
-    MuteRule toMuteRule() {
+    public MuteRule toMuteRule() {
         return new MuteRule(
                 id,
                 userId,

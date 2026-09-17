@@ -75,7 +75,7 @@ public class SubscriptionEntity {
     @Column(name = "updated_at", nullable = false)
     public Instant updatedAt;
 
-    static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
+    public static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
         SubscriptionEntity entity = new SubscriptionEntity();
         entity.id           = UUIDv7.generate();
         entity.ownerId      = input.ownerId();
@@ -165,7 +165,7 @@ public class SubscriptionEntity {
         }
     }
 
-    Subscription toSubscription(ObjectMapper mapper) {
+    public Subscription toSubscription(ObjectMapper mapper) {
         return new Subscription(
                 id,
                 ownerId,

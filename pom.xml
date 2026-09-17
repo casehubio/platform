@@ -64,6 +64,7 @@
         <module>notifications-inmem</module>
         <module>notifications-jpa-common</module>
         <module>notifications-jpa</module>
+        <module>notifications-spring-jpa</module>
         <module>notifications-core</module>
         <module>notifications</module>
         <module>notification-settings-inmem-core</module>

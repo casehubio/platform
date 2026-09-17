@@ -50,7 +50,7 @@ public class NotificationPreferencesEntity {
     /**
      * Build entity from update input. Upsert semantics — creates new or updates existing.
      */
-    static NotificationPreferencesEntity fromUpdate(String userId, String tenancyId,
+    public static NotificationPreferencesEntity fromUpdate(String userId, String tenancyId,
                                                      NotificationPreferenceUpdate update,
                                                      NotificationPreferencesEntity existing) {
         NotificationPreferencesEntity entity = new NotificationPreferencesEntity();
@@ -88,7 +88,7 @@ public class NotificationPreferencesEntity {
     /**
      * Convert entity to domain record.
      */
-    NotificationPreferences toPreferences() {
+    public NotificationPreferences toPreferences() {
         Map<String, ChannelPreference> channelDefaults = deserializeChannelDefaults();
         QuietHours quietHours = deserializeQuietHours();
 

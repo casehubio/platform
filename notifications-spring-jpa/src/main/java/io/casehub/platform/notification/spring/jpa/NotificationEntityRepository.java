@@ -30,6 +30,15 @@ public interface NotificationEntityRepository extends JpaRepository<Notification
     @Query("SELECT e FROM NotificationEntity e WHERE e.userId = ?1 AND e.tenancyId = ?2 AND (e.createdAt < ?3 OR (e.createdAt = ?3 AND e.id < ?4)) ORDER BY e.createdAt DESC, e.id DESC")
     List<NotificationEntity> findByUserAndTenantAfterCursor(String userId, String tenancyId, Instant cursorCreatedAt, String cursorId, Pageable pageable);
 
+    @Query("SELECT e FROM NotificationEntity e WHERE e.userId = ?1 AND e.tenancyId = ?2 AND e.status = ?3 AND (e.createdAt < ?4 OR (e.createdAt = ?4 AND e.id < ?5)) ORDER BY e.createdAt DESC, e.id DESC")
+    List<NotificationEntity> findByUserAndTenantAndStatusAfterCursor(String userId, String tenancyId, NotificationStatus status, Instant cursorCreatedAt, String cursorId, Pageable pageable);
+
+    @Query("SELECT e FROM NotificationEntity e WHERE e.userId = ?1 AND e.tenancyId = ?2 AND e.category = ?3 AND (e.createdAt < ?4 OR (e.createdAt = ?4 AND e.id < ?5)) ORDER BY e.createdAt DESC, e.id DESC")
+    List<NotificationEntity> findByUserAndTenantAndCategoryAfterCursor(String userId, String tenancyId, String category, Instant cursorCreatedAt, String cursorId, Pageable pageable);
+
+    @Query("SELECT e FROM NotificationEntity e WHERE e.userId = ?1 AND e.tenancyId = ?2 AND e.status = ?3 AND e.category = ?4 AND (e.createdAt < ?5 OR (e.createdAt = ?5 AND e.id < ?6)) ORDER BY e.createdAt DESC, e.id DESC")
+    List<NotificationEntity> findByUserAndTenantAndStatusAndCategoryAfterCursor(String userId, String tenancyId, NotificationStatus status, String category, Instant cursorCreatedAt, String cursorId, Pageable pageable);
+
     Optional<NotificationEntity> findByIdAndUserIdAndTenancyIdAndStatusNot(String id, String userId, String tenancyId, NotificationStatus status);
 
     @Modifying

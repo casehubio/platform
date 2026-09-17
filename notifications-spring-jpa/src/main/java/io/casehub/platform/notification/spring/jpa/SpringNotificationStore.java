@@ -62,15 +62,9 @@ public class SpringNotificationStore implements NotificationStore {
         var pageable = PageRequest.of(0, fetchLimit);
 
         List<NotificationEntity> entities;
-        if (query.cursor() != null) {
-            CursorValue cursor = decodeCursor(query.cursor());
-            if (cursor != null) {
-                entities = repo.findByUserAndTenantAfterCursor(
-                        query.userId(), query.tenancyId(),
-                        cursor.createdAt, cursor.id, pageable);
-            } else {
-                entities = findWithoutCursor(query, pageable);
-            }
+        CursorValue cursor = query.cursor() != null ? decodeCursor(query.cursor()) : null;
+        if (cursor != null) {
+            entities = findWithCursor(query, cursor, pageable);
         } else {
             entities = findWithoutCursor(query, pageable);
         }
@@ -104,6 +98,26 @@ public class SpringNotificationStore implements NotificationStore {
                     query.userId(), query.tenancyId(), query.category(), pageable);
         } else {
             return repo.findByUserAndTenant(query.userId(), query.tenancyId(), pageable);
+        }
+    }
+
+    private List<NotificationEntity> findWithCursor(NotificationQuery query, CursorValue cursor, PageRequest pageable) {
+        if (query.status() != null && query.category() != null) {
+            return repo.findByUserAndTenantAndStatusAndCategoryAfterCursor(
+                    query.userId(), query.tenancyId(), query.status(), query.category(),
+                    cursor.createdAt, cursor.id, pageable);
+        } else if (query.status() != null) {
+            return repo.findByUserAndTenantAndStatusAfterCursor(
+                    query.userId(), query.tenancyId(), query.status(),
+                    cursor.createdAt, cursor.id, pageable);
+        } else if (query.category() != null) {
+            return repo.findByUserAndTenantAndCategoryAfterCursor(
+                    query.userId(), query.tenancyId(), query.category(),
+                    cursor.createdAt, cursor.id, pageable);
+        } else {
+            return repo.findByUserAndTenantAfterCursor(
+                    query.userId(), query.tenancyId(),
+                    cursor.createdAt, cursor.id, pageable);
         }
     }
 

@@ -506,8 +506,8 @@ git commit -m "refactor(#192): update InMemoryDeliveryAttemptStore for sourceId/
 ### Task 3: JPA Store + Migration
 
 **Files:**
-- Modify: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/DeliveryAttemptEntity.java`
-- Modify: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`
+- Modify: `../../delivery-tracking-jpa-common/src/main/java/io/casehub/platform/delivery/tracking/jpa/DeliveryAttemptEntity.java`
+- Modify: `../../delivery-tracking-jpa-common/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`
 - Modify: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStore.java`
 - Create: `delivery-tracking-jpa/src/main/resources/db/delivery-tracking/migration/V3002__source_type_decoupling.sql`
 - Test: `delivery-tracking-jpa/src/test/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStoreTest.java`

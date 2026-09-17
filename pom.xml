@@ -23,6 +23,7 @@
         <module>oidc</module>
         <module>expression-core</module>
         <module>expression</module>
+        <module>persistence-jpa-common</module>
         <module>persistence-jpa</module>
         <module>persistence-mongodb</module>
         <module>endpoints-memory-core</module>
@@ -32,6 +33,7 @@
         <module>datasource-alpha</module>
         <module>datasource-inmem-core</module>
         <module>datasource-inmem</module>
+        <module>datasource-jpa-common</module>
         <module>datasource-jpa</module>
         <module>scim</module>
         <module>identity-core</module>
@@ -49,24 +51,29 @@
         <module>agent-gemini-cli</module>
         <module>agent-langchain4j-core</module>
         <module>agent-langchain4j</module>
+        <module>memory-jpa-common</module>
         <module>memory-inmem</module>
         <module>acl-inmem-core</module>
         <module>acl-inmem</module>
+        <module>acl-jpa-common</module>
         <module>acl-jpa</module>
         <module>acl-admin</module>
         <module>acl-worker</module>
         <module>notifications-inmem-core</module>
         <module>notifications-inmem</module>
+        <module>notifications-jpa-common</module>
         <module>notifications-jpa</module>
         <module>notifications-core</module>
         <module>notifications</module>
         <module>notification-settings-inmem-core</module>
         <module>notification-settings-inmem</module>
+        <module>notification-settings-jpa-common</module>
         <module>notification-settings-jpa</module>
         <module>subscriptions-core</module>
         <module>subscriptions</module>
         <module>subscriptions-inmem-core</module>
         <module>subscriptions-inmem</module>
+        <module>subscriptions-jpa-common</module>
         <module>subscriptions-jpa</module>
         <module>streams-kafka</module>
         <module>streams-amqp</module>
@@ -83,13 +90,16 @@
         <module>notification-dispatch</module>
         <module>digest-inmem-core</module>
         <module>digest-inmem</module>
+        <module>digest-jpa-common</module>
         <module>digest-jpa</module>
         <module>delivery-tracking-inmem-core</module>
         <module>delivery-tracking-inmem</module>
+        <module>delivery-tracking-jpa-common</module>
         <module>delivery-tracking-jpa</module>
         <module>platform-view-core</module>
         <module>platform-view</module>
         <module>platform-view-inmem</module>
+        <module>platform-view-jpa-common</module>
         <module>platform-view-jpa</module>
         <module>platform-view-spring</module>
         <module>preferences-editor-core</module>

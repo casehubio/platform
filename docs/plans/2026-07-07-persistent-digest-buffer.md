@@ -379,9 +379,9 @@ Prerequisite for adding JPA-backed DigestBuffer without CDI ambiguity."
 
 **Files:**
 - Create: `digest-jpa/pom.xml`
-- Create: `digest-jpa/src/main/java/io/casehub/platform/delivery/digest/jpa/DigestBufferEntity.java`
+- Create: `../../digest-jpa-common/src/main/java/io/casehub/platform/delivery/digest/jpa/DigestBufferEntity.java`
 - Create: `digest-jpa/src/main/java/io/casehub/platform/delivery/digest/jpa/JpaDigestBuffer.java`
-- Create: `digest-jpa/src/main/resources/db/digest/migration/V2000__digest_buffer.sql`
+- Create: `../../digest-jpa-common/src/main/resources/db/digest/migration/V2000__digest_buffer.sql`
 - Create: `digest-jpa/src/test/java/io/casehub/platform/delivery/digest/jpa/JpaDigestBufferTest.java`
 - Create: `digest-jpa/src/test/resources/application.properties`
 - Modify: `pom.xml` (parent) — add `<module>digest-jpa</module>`
@@ -476,7 +476,7 @@ Prerequisite for adding JPA-backed DigestBuffer without CDI ambiguity."
 
 - [ ] **Step 2: Create Flyway migration**
 
-File: `digest-jpa/src/main/resources/db/digest/migration/V2000__digest_buffer.sql`
+File: `../../digest-jpa-common/src/main/resources/db/digest/migration/V2000__digest_buffer.sql`
 
 ```sql
 -- Digest buffer store (platform#158)

@@ -5,6 +5,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.jboss.jandex.IndexView;
 
 import java.io.File;
@@ -13,7 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-@Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
+@Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES,
+      requiresDependencyResolution = ResolutionScope.COMPILE)
 public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Parameter(defaultValue = "${project.build.directory}/generated-sources/spring-generator")
@@ -27,7 +29,7 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        IndexView index = loadJandexIndex();
+        IndexView index = loadCompositeIndex();
 
         var scanner = new JandexProducerScanner();
         List<ProducerDescriptor> descriptors = scanner.scan(index);

@@ -14,7 +14,7 @@ public abstract class AbstractVerifyMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        IndexView index = loadJandexIndex();
+        IndexView index = loadCompositeIndex();
 
         Set<String> sourceTypes = collectSourceTypes(index);
         Set<String> targetTypes = collectTargetTypes();

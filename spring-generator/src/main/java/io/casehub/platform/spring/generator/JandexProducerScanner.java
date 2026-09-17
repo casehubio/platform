@@ -50,11 +50,19 @@ public class JandexProducerScanner {
             }
 
             boolean hasCdiDeps = false;
+            String concreteReturnType = null;
 
-            // Skip factory-produced JDK types — abstract/interface, can't be new'd
             DotName returnTypeName = method.returnType().name();
             if (returnTypeName.toString().startsWith("java.")) {
                 hasCdiDeps = true;
+            }
+
+            ClassInfo returnTypeInfo = index.getClassByName(returnTypeName);
+            if (returnTypeInfo != null && isAbstractOrInterface(returnTypeInfo)) {
+                concreteReturnType = resolveConcreteType(index, method.name(), returnTypeInfo);
+                if (concreteReturnType == null) {
+                    hasCdiDeps = true;
+                }
             }
 
             // Skip methods from classes with @Inject fields (field-injected CDI beans)
@@ -106,6 +114,7 @@ public class JandexProducerScanner {
                     declaringClass.name().toString(),
                     method.name(),
                     method.returnType().name().toString(),
+                    concreteReturnType,
                     params,
                     isDefaultBean,
                     isAlternative,
@@ -134,6 +143,26 @@ public class JandexProducerScanner {
             }
         }
         return false;
+    }
+
+    private boolean isAbstractOrInterface(ClassInfo classInfo) {
+        return java.lang.reflect.Modifier.isInterface(classInfo.flags())
+                || java.lang.reflect.Modifier.isAbstract(classInfo.flags());
+    }
+
+    private String resolveConcreteType(IndexView index, String methodName, ClassInfo abstractType) {
+        String pascalName = Character.toUpperCase(methodName.charAt(0)) + methodName.substring(1);
+        for (ClassInfo impl : index.getAllKnownImplementors(abstractType.name())) {
+            if (impl.simpleName().equals(pascalName)) {
+                return impl.name().toString();
+            }
+        }
+        for (ClassInfo sub : index.getAllKnownSubclasses(abstractType.name())) {
+            if (sub.simpleName().equals(pascalName)) {
+                return sub.name().toString();
+            }
+        }
+        return null;
     }
 
 }

@@ -4,6 +4,7 @@ import io.casehub.platform.generator.AbstractVerifyMojo;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.jboss.jandex.IndexView;
 
 import java.io.File;
@@ -19,7 +20,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Mojo(name = "verify", defaultPhase = LifecyclePhase.VERIFY)
+@Mojo(name = "verify", defaultPhase = LifecyclePhase.VERIFY,
+      requiresDependencyResolution = ResolutionScope.COMPILE)
 public class SpringVerifyMojo extends AbstractVerifyMojo {
 
     private static final Pattern BEAN_RETURN_TYPE = Pattern.compile(

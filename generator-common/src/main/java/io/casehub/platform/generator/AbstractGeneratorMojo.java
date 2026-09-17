@@ -1,5 +1,6 @@
 package io.casehub.platform.generator;
 
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -14,6 +15,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.jar.JarFile;
 
 public abstract class AbstractGeneratorMojo extends AbstractMojo {
 
@@ -65,6 +67,27 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to read Jandex index", e);
         }
+    }
+
+    protected IndexView loadCompositeIndex() throws MojoExecutionException {
+        List<IndexView> indexes = new ArrayList<>();
+        indexes.add(loadJandexIndex());
+        for (Object obj : project.getArtifacts()) {
+            Artifact artifact = (Artifact) obj;
+            File file = artifact.getFile();
+            if (file != null && file.getName().endsWith(".jar")) {
+                try (JarFile jar = new JarFile(file)) {
+                    var entry = jar.getEntry("META-INF/jandex.idx");
+                    if (entry != null) {
+                        try (var is = jar.getInputStream(entry)) {
+                            indexes.add(new IndexReader(is).read());
+                        }
+                    }
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        return CompositeIndex.create(indexes);
     }
 
     protected void registerSourceRoot() {

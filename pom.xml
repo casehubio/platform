@@ -72,6 +72,7 @@
         <module>notification-settings-inmem</module>
         <module>notification-settings-jpa-common</module>
         <module>notification-settings-jpa</module>
+        <module>notification-settings-spring-jpa</module>
         <module>subscriptions-core</module>
         <module>subscriptions</module>
         <module>subscriptions-inmem-core</module>
@@ -101,6 +102,7 @@
         <module>delivery-tracking-inmem</module>
         <module>delivery-tracking-jpa-common</module>
         <module>delivery-tracking-jpa</module>
+        <module>delivery-tracking-spring-jpa</module>
         <module>platform-view-core</module>
         <module>platform-view</module>
         <module>platform-view-inmem</module>

@@ -169,6 +169,67 @@ resolves from the corpus via the configured strategy, and returns the
 seeded response. No changes to the SPI, no changes to the NoOp, no
 changes to production code.
 
+### 4. Use corpus builders (recommended)
+
+The raw `corpus.seed()` API above is verbose. `CorpusSeed` and per-SPI
+descriptor classes provide a cleaner alternative:
+
+```java
+import static io.casehub.platform.simulation.testing.AclCorpus.*;
+
+var seed = canAccess("hospital-a");
+seed.add(check("admin", resource("case", "c-1"), AclAction.WRITE), true);
+seed.add(check("nurse", resource("case", "c-1"), AclAction.READ), true);
+seed.add(check("nurse", resource("case", "c-1"), AclAction.WRITE), false);
+
+seed.seedInto(corpus);
+runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
+```
+
+Add `casehub-platform-simulation-testing` as a test dependency:
+
+```xml
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-simulation-testing</artifactId>
+    <version>${casehub.version}</version>
+    <scope>test</scope>
+</dependency>
+```
+
+Available descriptors:
+
+| Descriptor | SPI | Factory method |
+|-----------|-----|----------------|
+| `AclCorpus` | AccessControlProvider | `canAccess(tenancyId)` |
+| `ModelCorpus` | ModelRegistry | `resolveById(tenancyId)` |
+| `NotificationCorpus` | NotificationStore | `store(tenancyId)` |
+| `PreferenceCorpus` | PreferenceProvider | `resolve(tenancyId)` |
+| `CredentialCorpus` | CredentialResolver | `resolve(tenancyId)` |
+| `AgentCorpus` | AgentProvider | `invoke(tenancyId)` (in agent-simulation-core) |
+
+Each descriptor provides typed domain factories (`check()`, `resource()`,
+`model()`, `input()`, etc.) and a default `KeyExtractor`. For SPIs not
+listed above, use `CorpusSeed` directly with qualified name constants
+from the generated `*QN` classes.
+
+#### LLM corpus generation
+
+Seed a few examples by hand, then let an LLM generate more:
+
+```java
+var populator = new LlmCorpusPopulator(AgentCorpus.llmFunction(agentProvider), objectMapper);
+
+var seed = ModelCorpus.resolveById("tenant-1");
+seed.add("claude-opus-5", ModelCorpus.found(ModelCorpus.model("claude-opus-5", "claude", "Anthropic", "Opus", ModelTier.FLAGSHIP, ModelLocality.CLOUD)));
+
+populator.populate(seed, String.class, ModelDescriptor.class, Optional::of, 10,
+    "Generate realistic AI model descriptors for a healthcare platform");
+
+seed.seedInto(corpus);
+runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
+```
+
 ---
 
 ## Core concepts

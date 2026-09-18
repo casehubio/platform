@@ -1,113 +1,266 @@
 package io.casehub.platform.spring.generator;
 
-import java.util.LinkedHashSet;
+import com.palantir.javapoet.AnnotationSpec;
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.JavaFile;
+import com.palantir.javapoet.MethodSpec;
+import com.palantir.javapoet.ParameterSpec;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.TypeSpec;
+
+import javax.lang.model.element.Modifier;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class AutoConfigurationWriter {
 
-    public String generate(String packageName, String className, List<ProducerDescriptor> descriptors) {
-        var sb = new StringBuilder();
+    private static final ClassName AUTO_CONFIGURATION = ClassName.get(
+            "org.springframework.boot.autoconfigure", "AutoConfiguration");
+    private static final ClassName BEAN = ClassName.get(
+            "org.springframework.context.annotation", "Bean");
+    private static final ClassName CONDITIONAL_ON_MISSING_BEAN = ClassName.get(
+            "org.springframework.boot.autoconfigure.condition", "ConditionalOnMissingBean");
+    private static final ClassName CONDITIONAL_ON_CLASS = ClassName.get(
+            "org.springframework.boot.autoconfigure.condition", "ConditionalOnClass");
+    private static final ClassName PRIMARY = ClassName.get(
+            "org.springframework.context.annotation", "Primary");
+    private static final ClassName ORDER = ClassName.get(
+            "org.springframework.core.annotation", "Order");
+    private static final ClassName ENABLE_CONFIG_PROPERTIES = ClassName.get(
+            "org.springframework.boot.context.properties", "EnableConfigurationProperties");
+    private static final ClassName CONFIG_PROPERTIES = ClassName.get(
+            "org.springframework.boot.context.properties", "ConfigurationProperties");
+    private static final ClassName DEFAULT_VALUE = ClassName.get(
+            "org.springframework.boot.context.properties.bind", "DefaultValue");
+    private static final ClassName VALUE = ClassName.get(
+            "org.springframework.beans.factory.annotation", "Value");
+    private static final ClassName OBJECT_PROVIDER = ClassName.get(
+            "org.springframework.beans.factory", "ObjectProvider");
 
-        sb.append("package ").append(packageName).append(";\n\n");
+    public List<JavaFile> generate(String packageName, String className,
+                                   List<ProducerDescriptor> descriptors) {
+        var files = new ArrayList<JavaFile>();
 
-        String anchorType = descriptors.stream()
-                .filter(d -> !d.requiresManualConfig())
-                .findFirst()
-                .map(ProducerDescriptor::returnTypeSimpleName)
-                .orElse(null);
+        ClassName anchorType = selectAnchorType(descriptors);
+        ClassName propsRecordType = null;
 
-        Set<String> imports = collectImports(descriptors);
-        imports.add("org.springframework.boot.autoconfigure.AutoConfiguration");
-        imports.add("org.springframework.context.annotation.Bean");
-        for (ProducerDescriptor d : descriptors) {
-            if (d.defaultBean()) {
-                imports.add("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean");
-            }
-            if (d.alternative()) {
-                imports.add("org.springframework.context.annotation.Primary");
-            }
+        // Check if any descriptor needs a ConfigProperties record
+        ProducerDescriptor configDescriptor = descriptors.stream()
+                .filter(d -> !d.requiresManualConfig()
+                        && d.configPropertiesInterface() != null
+                        && !d.configMethods().isEmpty())
+                .findFirst().orElse(null);
+
+        if (configDescriptor != null) {
+            propsRecordType = ClassName.get(packageName,
+                    simpleClassName(configDescriptor.configPropertiesInterface()) + "Spring");
+            files.add(generateConfigPropertiesRecord(
+                    packageName, configDescriptor, propsRecordType));
         }
+
+        TypeSpec.Builder classBuilder = TypeSpec.classBuilder(className)
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(AUTO_CONFIGURATION);
+
         if (anchorType != null) {
-            imports.add("org.springframework.boot.autoconfigure.condition.ConditionalOnClass");
+            classBuilder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_CLASS)
+                    .addMember("value", "$T.class", anchorType)
+                    .build());
         }
-        for (String imp : imports.stream().sorted().collect(Collectors.toList())) {
-            sb.append("import ").append(imp).append(";\n");
-        }
-        sb.append("\n");
 
-        sb.append("@AutoConfiguration\n");
-        if (anchorType != null) {
-            sb.append("@ConditionalOnClass(").append(anchorType).append(".class)\n");
+        if (propsRecordType != null) {
+            classBuilder.addAnnotation(AnnotationSpec.builder(ENABLE_CONFIG_PROPERTIES)
+                    .addMember("value", "$T.class", propsRecordType)
+                    .build());
         }
-        sb.append("public class ").append(className).append(" {\n");
 
         for (ProducerDescriptor d : descriptors) {
             if (d.requiresManualConfig()) continue;
-            sb.append("\n");
-            sb.append("    @Bean\n");
-            if (d.defaultBean()) {
-                if (d.hasConcreteOverride()) {
-                    sb.append("    @ConditionalOnMissingBean(").append(d.returnTypeSimpleName())
-                      .append(".class)\n");
-                } else {
-                    sb.append("    @ConditionalOnMissingBean\n");
-                }
-            }
-            if (d.alternative()) {
-                sb.append("    @Primary\n");
-            }
 
-            sb.append("    public ").append(d.returnTypeSimpleName()).append(" ");
-            sb.append(d.methodName()).append("(");
-
-            List<ProducerDescriptor.ParameterDescriptor> params = d.parameters();
-            for (int i = 0; i < params.size(); i++) {
-                var p = params.get(i);
-                if (i > 0) sb.append(", ");
-                if (p.isConfigProperty()) {
-                    sb.append("@org.springframework.beans.factory.annotation.Value(\"${")
-                      .append(p.configProperty()).append("}\") ");
-                }
-                sb.append(p.type().substring(p.type().lastIndexOf('.') + 1))
-                  .append(" ").append(p.name());
+            if (d.constructorResolved()) {
+                classBuilder.addMethod(buildEnhancedBeanMethod(d, propsRecordType));
+            } else {
+                classBuilder.addMethod(buildLegacyBeanMethod(d));
             }
-
-            sb.append(") {\n");
-            sb.append("        return new ").append(d.effectiveReturnTypeSimpleName()).append("(");
-
-            for (int i = 0; i < params.size(); i++) {
-                if (i > 0) sb.append(", ");
-                sb.append(params.get(i).name());
-            }
-            sb.append(");\n");
-            sb.append("    }\n");
         }
 
-        sb.append("}\n");
-        return sb.toString();
+        files.add(0, JavaFile.builder(packageName, classBuilder.build()).build());
+        return files;
     }
 
     public String generateImportsFile(String packageName, String className) {
         return packageName + "." + className + "\n";
     }
 
-    private Set<String> collectImports(List<ProducerDescriptor> descriptors) {
-        Set<String> imports = new LinkedHashSet<>();
-        for (ProducerDescriptor d : descriptors) {
-            if (d.requiresManualConfig()) {continue;}
-            imports.add(d.returnType());
+    private MethodSpec buildEnhancedBeanMethod(ProducerDescriptor d, ClassName propsRecordType) {
+        ClassName returnType = toClassName(d.effectiveReturnType());
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(d.methodName())
+                .addModifiers(Modifier.PUBLIC)
+                .returns(returnType);
+
+        addBeanAnnotation(builder, d);
+
+        if (d.defaultBean()) {
             if (d.hasConcreteOverride()) {
-                imports.add(d.effectiveReturnType());
+                builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
+                        .addMember("value", "$T.class", toClassName(d.returnType()))
+                        .build());
+            } else {
+                builder.addAnnotation(CONDITIONAL_ON_MISSING_BEAN);
             }
-            for (ProducerDescriptor.ParameterDescriptor p : d.parameters()) {
-                if (!p.isConfigProperty()) {
-                    imports.add(p.type());
+        }
+        if (d.isEffectivePrimary()) {
+            builder.addAnnotation(PRIMARY);
+        }
+        if (d.orderValue() > 0) {
+            builder.addAnnotation(AnnotationSpec.builder(ORDER)
+                    .addMember("value", "$L", d.orderValue())
+                    .build());
+        }
+        for (String qualifier : d.qualifiers()) {
+            builder.addAnnotation(toClassName(qualifier));
+        }
+
+        var paramNames = new ArrayList<String>();
+        for (ProducerDescriptor.ConstructorParam cp : d.constructorParams()) {
+            switch (cp.kind()) {
+                case LIST -> {
+                    ParameterizedTypeName listType = ParameterizedTypeName.get(
+                            ClassName.get(java.util.List.class), toClassName(cp.type()));
+                    builder.addParameter(listType, cp.name());
+                    paramNames.add(cp.name());
+                }
+                case OPTIONAL -> {
+                    ParameterizedTypeName providerType = ParameterizedTypeName.get(
+                            OBJECT_PROVIDER, toClassName(cp.type()));
+                    builder.addParameter(providerType, cp.name());
+                    paramNames.add(cp.name() + ".getIfAvailable()");
+                }
+                case CONFIG_PROPERTIES -> {
+                    TypeName paramType = propsRecordType != null ? propsRecordType : toClassName(cp.type());
+                    builder.addParameter(paramType, cp.name());
+                    paramNames.add(cp.name());
+                }
+                case PLAIN -> {
+                    builder.addParameter(toClassName(cp.type()), cp.name());
+                    paramNames.add(cp.name());
                 }
             }
         }
-        imports.removeIf(t -> t.startsWith("java.lang."));
-        return imports;
+
+        String args = String.join(", ", paramNames);
+        if (d.hasFactoryMethod()) {
+            builder.addStatement("return $T.$L($L)", returnType, d.factoryMethodName(), args);
+        } else {
+            builder.addStatement("return new $T($L)", returnType, args);
+        }
+
+        return builder.build();
+    }
+
+    private MethodSpec buildLegacyBeanMethod(ProducerDescriptor d) {
+        ClassName returnType = toClassName(d.returnType());
+        ClassName effectiveReturn = toClassName(d.effectiveReturnType());
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(d.methodName())
+                .addModifiers(Modifier.PUBLIC)
+                .returns(returnType)
+                .addAnnotation(BEAN);
+
+        if (d.defaultBean()) {
+            if (d.hasConcreteOverride()) {
+                builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
+                        .addMember("value", "$T.class", returnType)
+                        .build());
+            } else {
+                builder.addAnnotation(CONDITIONAL_ON_MISSING_BEAN);
+            }
+        }
+        if (d.alternative()) {
+            builder.addAnnotation(PRIMARY);
+        }
+
+        var paramNames = new ArrayList<String>();
+        for (ProducerDescriptor.ParameterDescriptor p : d.parameters()) {
+            ClassName paramType = toClassName(p.type());
+            if (p.isConfigProperty()) {
+                builder.addParameter(ParameterSpec.builder(paramType, p.name())
+                        .addAnnotation(AnnotationSpec.builder(VALUE)
+                                .addMember("value", "$S", "${" + p.configProperty() + "}")
+                                .build())
+                        .build());
+            } else {
+                builder.addParameter(paramType, p.name());
+            }
+            paramNames.add(p.name());
+        }
+
+        String args = String.join(", ", paramNames);
+        builder.addStatement("return new $T($L)", effectiveReturn, args);
+        return builder.build();
+    }
+
+    private void addBeanAnnotation(MethodSpec.Builder builder, ProducerDescriptor d) {
+        if (d.initMethod() != null && !d.initMethod().isEmpty()) {
+            builder.addAnnotation(AnnotationSpec.builder(BEAN)
+                    .addMember("initMethod", "$S", d.initMethod())
+                    .build());
+        } else {
+            builder.addAnnotation(BEAN);
+        }
+    }
+
+    private JavaFile generateConfigPropertiesRecord(String packageName,
+                                                     ProducerDescriptor d,
+                                                     ClassName recordType) {
+        ClassName propsInterface = toClassName(d.configPropertiesInterface());
+
+        MethodSpec.Builder ctorBuilder = MethodSpec.constructorBuilder();
+        for (ProducerDescriptor.ConfigPropertyMethod m : d.configMethods()) {
+            ParameterSpec.Builder paramBuilder = ParameterSpec.builder(
+                    toClassName(m.type()), m.name());
+            if (m.defaultValue() != null) {
+                paramBuilder.addAnnotation(AnnotationSpec.builder(DEFAULT_VALUE)
+                        .addMember("value", "$S", m.defaultValue())
+                        .build());
+            }
+            ctorBuilder.addParameter(paramBuilder.build());
+        }
+
+        TypeSpec record = TypeSpec.recordBuilder(recordType.simpleName())
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(AnnotationSpec.builder(CONFIG_PROPERTIES)
+                        .addMember("prefix", "$S", d.configPropertiesPrefix())
+                        .build())
+                .addSuperinterface(propsInterface)
+                .recordConstructor(ctorBuilder.build())
+                .build();
+
+        return JavaFile.builder(packageName, record).build();
+    }
+
+    private ClassName selectAnchorType(List<ProducerDescriptor> descriptors) {
+        return descriptors.stream()
+                .filter(d -> !d.requiresManualConfig())
+                .map(d -> d.effectiveReturnType())
+                .sorted()
+                .findFirst()
+                .map(this::toClassName)
+                .orElse(null);
+    }
+
+    private ClassName toClassName(String fqn) {
+        int lastDot = fqn.lastIndexOf('.');
+        if (lastDot < 0) {
+            return ClassName.get("", fqn);
+        }
+        return ClassName.get(fqn.substring(0, lastDot), fqn.substring(lastDot + 1));
+    }
+
+    private String simpleClassName(String fqn) {
+        int dot = fqn.lastIndexOf('.');
+        return dot >= 0 ? fqn.substring(dot + 1) : fqn;
     }
 }

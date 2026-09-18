@@ -1,76 +1,60 @@
 package io.casehub.platform.identity.config;
 
+import io.casehub.platform.identity.CredentialValidationProperties;
+import io.casehub.platform.identity.IdentityDIDProperties;
+import io.casehub.platform.identity.ScimAgentLookupProperties;
+import io.casehub.platform.identity.WebDIDResolverProperties;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Platform identity configuration.
- * Config prefix: {@code casehub.identity}
- */
 @ConfigMapping(prefix = "casehub.identity")
-public interface IdentityConfig {
+public interface IdentityConfig extends IdentityDIDProperties, CredentialValidationProperties {
 
-    /**
-     * Maps actorId → DID URI for {@code ConfiguredActorDIDProvider}.
-     * Quote keys with colons in application.properties:
-     * {@code casehub.identity.dids."claude:reviewer@v1"=did:web:example.com:agents/reviewer}
-     */
+    @Override
     Map<String, String> dids();
 
-    /** HTTP timeout for {@code WebDIDResolver} in milliseconds (default 5000). */
-    @WithDefault("5000")
-    int webResolverTimeoutMs();
-
-    /** Maximum DID document response size in bytes — SSRF/DoS protection (default 1 MiB). */
-    @WithDefault("1048576")
-    int webResolverMaxResponseBytes();
-
-    /**
-     * Maps actorId → file path of a W3C VC JWT credential.
-     * Quote keys with colons in application.properties:
-     * {@code casehub.identity.credentials."claude:reviewer@v1"=/etc/casehub/creds/reviewer.jwt}
-     */
+    @Override
     Map<String, String> credentials();
 
-    /** Cache TTL for credential validation results in minutes (default 1440 = 24h). */
+    @Override
     @WithDefault("1440")
     int credentialCacheTtlMinutes();
 
-    /** SCIM2-based agent DID resolution configuration. */
+    WebConfig web();
+
     ScimConfig scim();
 
-    interface ScimConfig {
+    interface WebConfig extends WebDIDResolverProperties {
 
-        /**
-         * Base URL of the SCIM2 server (e.g. {@code https://idp.example.com}).
-         * Must use HTTPS — validated at first use via {@code @PostConstruct}.
-         * Optional so that Quarkus config validation does not fail at startup when the
-         * SCIM provider is not activated.
-         */
-        Optional<String> endpoint();
-
-        /**
-         * Bearer token for the {@code Authorization} header.
-         * Static deploy-time credential. Optional so that Quarkus config validation
-         * does not fail at startup when the SCIM provider is not activated.
-         */
-        Optional<String> authToken();
-
-        /** HTTP connect + read timeout in milliseconds (default 5000). */
+        @Override
         @WithDefault("5000")
         int timeoutMs();
 
-        /** TTL for cached SCIM lookups in minutes (default 5). */
+        @Override
+        @WithDefault("1048576")
+        int maxResponseBytes();
+    }
+
+    interface ScimConfig extends ScimAgentLookupProperties {
+
+        @Override
+        Optional<String> endpoint();
+
+        @Override
+        Optional<String> authToken();
+
+        @Override
+        @WithDefault("5000")
+        int timeoutMs();
+
+        @Override
         @WithDefault("5")
         int cacheTtlMinutes();
 
-        /**
-         * Whether to enforce HTTPS for the SCIM endpoint.
-         * Set to {@code false} only in test environments using plain HTTP (e.g. WireMock).
-         */
+        @Override
         @WithDefault("true")
         boolean requireHttps();
     }

@@ -49,6 +49,19 @@ public class ChatModelAgentProvider implements AgentBackend {
         }
     }
 
+    @io.casehub.platform.api.FactoryMethod
+    public static ChatModelAgentProvider create(java.util.List<ChatModel> allChatModels,
+                                                AgentLangchain4jProperties config) {
+        java.util.List<ChatModel> candidates = allChatModels.stream()
+                                                            .filter(m -> !(m instanceof AgentProviderChatModel))
+                                                            .toList();
+        ChatModel chatModel = candidates.isEmpty() ? null : candidates.get(0);
+        StreamingChatModel streamingChatModel =
+                (chatModel instanceof StreamingChatModel s) ? s : null;
+        return new ChatModelAgentProvider(chatModel, streamingChatModel, config);
+    }
+
+
     @Override
     public String key() {return "langchain4j";}
 

@@ -35,12 +35,12 @@ public class WebDIDResolver implements DIDResolver {
     private final int maxResponseBytes;
     private final HttpClient httpClient;
 
-    public WebDIDResolver(final int timeoutMs, final int maxResponseBytes) {
-        this.timeoutMs = timeoutMs;
-        this.maxResponseBytes = maxResponseBytes;
+    public WebDIDResolver(final WebDIDResolverProperties config) {
+        this.timeoutMs = config.timeoutMs();
+        this.maxResponseBytes = config.maxResponseBytes();
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofMillis(timeoutMs))
+                .connectTimeout(Duration.ofMillis(config.timeoutMs()))
                 .build();
     }
 

@@ -25,12 +25,9 @@ public class RouterBeans {
     @Produces
     @ApplicationScoped
     public RoutingAgentProvider routingAgentProvider(RoutingAgentConfig config) {
-        if (manifestResult.isResolvable()) {
-            var result = manifestResult.get();
-            var defaultBackend = result.defaultBackendKey() != null
-                                 ? result.defaultBackendKey() : config.defaultBackend();
-            return new RoutingAgentProvider(registry, defaultBackend, modelRegistry, result.aliases());
-        }
-        return new RoutingAgentProvider(registry, config.defaultBackend(), modelRegistry);
+        var manifest = manifestResult.isResolvable()
+                ? java.util.Optional.of(manifestResult.get())
+                : java.util.Optional.<io.casehub.platform.agent.config.ManifestResult>empty();
+        return RoutingAgentProvider.create(registry, config.defaultBackend(), modelRegistry, manifest);
     }
 }

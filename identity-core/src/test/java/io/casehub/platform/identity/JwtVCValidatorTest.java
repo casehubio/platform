@@ -82,7 +82,10 @@ class JwtVCValidatorTest {
 
     private JwtVCValidator createValidator(final Map<String, String> credentials,
                                            final DIDResolver resolver) {
-        return new JwtVCValidator(credentials, resolver, Duration.ofHours(24));
+        return new JwtVCValidator(new CredentialValidationProperties() {
+            @Override public Map<String, String> credentials() { return credentials; }
+            @Override public int credentialCacheTtlMinutes() { return 1440; }
+        }, resolver);
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────────

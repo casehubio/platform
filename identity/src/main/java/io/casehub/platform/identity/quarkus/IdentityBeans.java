@@ -21,7 +21,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 
-import java.time.Duration;
 import java.util.List;
 
 @ApplicationScoped
@@ -42,18 +41,13 @@ public class IdentityBeans {
     @DIDMethod
     @Priority(100)
     public WebDIDResolver webDIDResolver(IdentityConfig config) {
-        return new WebDIDResolver(config.webResolverTimeoutMs(), config.webResolverMaxResponseBytes());
+        return new WebDIDResolver(config.web());
     }
 
     @Produces
     @ApplicationScoped
     public ScimAgentLookup scimAgentLookup(IdentityConfig config) {
-        return new ScimAgentLookup(
-                config.scim().endpoint().orElse(""),
-                config.scim().authToken().orElse(""),
-                config.scim().timeoutMs(),
-                Duration.ofMinutes(config.scim().cacheTtlMinutes()),
-                config.scim().requireHttps());
+        return new ScimAgentLookup(config.scim());
     }
 
     @Produces
@@ -77,7 +71,7 @@ public class IdentityBeans {
     @ActorDIDSource
     @Priority(100)
     public ConfiguredActorDIDProvider configuredActorDIDProvider(IdentityConfig config) {
-        return new ConfiguredActorDIDProvider(config.dids());
+        return new ConfiguredActorDIDProvider(config);
     }
 
     @Produces
@@ -105,7 +99,6 @@ public class IdentityBeans {
     @Produces
     @ApplicationScoped
     public JwtVCValidator jwtVCValidator(IdentityConfig config, DIDResolver resolver) {
-        return new JwtVCValidator(config.credentials(), resolver,
-                Duration.ofMinutes(config.credentialCacheTtlMinutes()));
+        return new JwtVCValidator(config, resolver);
     }
 }

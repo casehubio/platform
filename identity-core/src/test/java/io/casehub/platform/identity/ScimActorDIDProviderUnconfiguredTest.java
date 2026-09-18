@@ -2,8 +2,6 @@ package io.casehub.platform.identity;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class ScimActorDIDProviderUnconfiguredTest {
@@ -18,7 +16,7 @@ class ScimActorDIDProviderUnconfiguredTest {
     @Test
     void didFor_returns_empty_when_endpoint_is_blank() {
         var lookup = new ScimAgentLookup(
-                "", "valid-token", 1000, Duration.ofMinutes(1), true);
+                TestScimProperties.of("", "valid-token", 1000, 1, true));
         var provider = new ScimActorDIDProvider(lookup);
         assertTrue(provider.didFor("claude:reviewer@v1").isEmpty());
     }

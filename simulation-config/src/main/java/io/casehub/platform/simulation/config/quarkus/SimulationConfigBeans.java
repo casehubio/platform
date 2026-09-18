@@ -3,11 +3,11 @@ package io.casehub.platform.simulation.config.quarkus;
 import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
-import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.platform.simulation.config.DeclarativeExtractorFactory;
 import io.casehub.platform.simulation.config.DeclarativeScorerFactory;
 import io.casehub.platform.simulation.config.SmallRyeSimulationConfig;
 import io.casehub.platform.simulation.config.YamlCorpusLoader;
+import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -23,7 +23,7 @@ public class SimulationConfigBeans {
 
     @Produces
     @ApplicationScoped
-    public SimulationConfig simulationConfig() {
+    public SmallRyeSimulationConfig simulationConfig() {
         return new SmallRyeSimulationConfig(ConfigProvider.getConfig());
     }
 
@@ -44,6 +44,7 @@ public class SimulationConfigBeans {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     void onStartup(@Observes StartupEvent event,
+                   SmallRyeSimulationConfig config,
                    SimulationCorpus corpus,
                    SimulationRuntime runtime,
                    @ConfigProperty(name = "casehub.simulation.corpus.files")
@@ -54,13 +55,19 @@ public class SimulationConfigBeans {
             loaded.forEach(corpus::seed);
         }
 
-        var extractorConfig = new SmallRyeSimulationConfig(ConfigProvider.getConfig());
         var factory = new DeclarativeExtractorFactory();
-        extractorConfig.extractorSpecs()
+        config.extractorSpecs()
                 .forEach((qn, spec) -> runtime.registerExtractor(qn, factory.create(spec)));
 
         var scorerFactory = new DeclarativeScorerFactory();
-        extractorConfig.scorerSpecs()
+        config.scorerSpecs()
                 .forEach((qn, spec) -> runtime.registerScorer(qn, scorerFactory.create(spec)));
+
+        runtime.setProfileSource(config);
+
+        config.activeProfileCorpusFiles().ifPresent(files -> {
+            var loader = new YamlCorpusLoader();
+            loader.loadFromPaths(files).forEach(corpus::seed);
+        });
     }
 }

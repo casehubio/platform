@@ -21,19 +21,19 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class GatedAgentProviderTest {
+class GatedAgentProviderWrapperTest {
 
     @Test
-    void passthroughWhenBothLimitsZero() {
+    void passthroughWhenAllLimitsZero() {
         var delegate = stubProvider("hello");
-        var gated = createGated(delegate, 0, 0.0, 0);
+        var wrapper = createWrapper(delegate, 0, 0.0, 0);
 
-        String result = collectText(gated.invoke(config()));
+        String result = collectText(wrapper.invoke(config()));
         assertThat(result).isEqualTo("hello");
     }
 
     @Test
-    void concurrencyOnlyBlocksExcessCalls() throws Exception {
+    void concurrencyBlocksExcessCalls() throws Exception {
         var holdFirst = new CountDownLatch(1);
         var firstStarted = new CountDownLatch(1);
         AgentProvider delayed = new StubProvider() {
@@ -44,9 +44,7 @@ class GatedAgentProviderTest {
                 if (callOrder.incrementAndGet() == 1) {
                     return Multi.createFrom().emitter(em -> {
                         firstStarted.countDown();
-                        try {
-                            holdFirst.await();
-                        } catch (InterruptedException e) {
+                        try { holdFirst.await(); } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                         em.emit(new AgentEvent.TextDelta("first"));
@@ -56,18 +54,18 @@ class GatedAgentProviderTest {
                 return Multi.createFrom().item(new AgentEvent.TextDelta("second"));
             }
         };
-        var gated = createGated(delayed, 1, 0.0, 0);
+        var wrapper = createWrapper(delayed, 1, 0.0, 0);
         var allDone = new CountDownLatch(2);
         var results = new ConcurrentLinkedQueue<String>();
 
         Thread.ofVirtual().start(() -> {
-            results.add(collectText(gated.invoke(config())));
+            results.add(collectText(wrapper.invoke(config())));
             allDone.countDown();
         });
         assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
         Thread.ofVirtual().start(() -> {
-            results.add(collectText(gated.invoke(config())));
+            results.add(collectText(wrapper.invoke(config())));
             allDone.countDown();
         });
 
@@ -77,15 +75,13 @@ class GatedAgentProviderTest {
     }
 
     @Test
-    void concurrencyTimeoutReturnsSessionLimitFailure() throws Exception {
+    void concurrencyTimeoutThrowsSessionLimitException() throws Exception {
         var holdForever = new CountDownLatch(1);
         AgentProvider slow = new StubProvider() {
             @Override
             public Multi<AgentEvent> invoke(AgentSessionConfig config) {
                 return Multi.createFrom().emitter(em -> {
-                    try {
-                        holdForever.await();
-                    } catch (InterruptedException e) {
+                    try { holdForever.await(); } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
                     em.emit(new AgentEvent.TextDelta("done"));
@@ -93,44 +89,44 @@ class GatedAgentProviderTest {
                 });
             }
         };
-        var gated = createGated(slow, 1, 0.0, 0,
+        var wrapper = createWrapper(slow, 1, 0.0, 0,
                 Duration.ofMillis(200), Duration.ofSeconds(5));
 
-        Thread.ofVirtual().start(() -> collectText(gated.invoke(config())));
+        Thread.ofVirtual().start(() -> collectText(wrapper.invoke(config())));
         Thread.sleep(100);
 
-        assertThatThrownBy(() -> collectText(gated.invoke(config())))
+        assertThatThrownBy(() -> collectText(wrapper.invoke(config())))
                 .isInstanceOf(AgentSessionLimitException.class);
         holdForever.countDown();
     }
 
     @Test
-    void rateLimitOnlyControlsThroughput() {
+    void rateLimitControlsThroughput() {
         var delegate = stubProvider("ok");
-        var gated = createGated(delegate, 0, 2.0, 2);
+        var wrapper = createWrapper(delegate, 0, 2.0, 2);
 
-        assertThat(collectText(gated.invoke(config()))).isEqualTo("ok");
-        assertThat(collectText(gated.invoke(config()))).isEqualTo("ok");
+        assertThat(collectText(wrapper.invoke(config()))).isEqualTo("ok");
+        assertThat(collectText(wrapper.invoke(config()))).isEqualTo("ok");
     }
 
     @Test
-    void rateLimitTimeoutReturnsRateLimitFailure() {
+    void rateLimitTimeoutThrowsRateLimitException() {
         var delegate = stubProvider("ok");
-        var gated = createGated(delegate, 0, 0.5, 1,
+        var wrapper = createWrapper(delegate, 0, 0.5, 1,
                 Duration.ofMillis(100), Duration.ofSeconds(5));
 
-        collectText(gated.invoke(config()));
-        assertThatThrownBy(() -> collectText(gated.invoke(config())))
+        collectText(wrapper.invoke(config()));
+        assertThatThrownBy(() -> collectText(wrapper.invoke(config())))
                 .isInstanceOf(AgentRateLimitException.class);
     }
 
     @Test
     void permitReleasedOnStreamCompletion() {
         var delegate = stubProvider("ok");
-        var gated = createGated(delegate, 1, 0.0, 0);
+        var wrapper = createWrapper(delegate, 1, 0.0, 0);
 
-        collectText(gated.invoke(config()));
-        collectText(gated.invoke(config()));
+        collectText(wrapper.invoke(config()));
+        collectText(wrapper.invoke(config()));
     }
 
     @Test
@@ -141,12 +137,10 @@ class GatedAgentProviderTest {
                 return Multi.createFrom().failure(new RuntimeException("boom"));
             }
         };
-        var gated = createGated(failing, 1, 0.0, 0);
+        var wrapper = createWrapper(failing, 1, 0.0, 0);
 
-        assertThatThrownBy(() -> collectText(gated.invoke(config())))
+        assertThatThrownBy(() -> collectText(wrapper.invoke(config())))
                 .hasMessageContaining("boom");
-        var gated2 = createGated(stubProvider("ok"), 1, 0.0, 0);
-        assertThat(collectText(gated2.invoke(config()))).isEqualTo("ok");
     }
 
     @Test
@@ -157,9 +151,9 @@ class GatedAgentProviderTest {
                 throw new IllegalStateException("sync explosion");
             }
         };
-        var gated = createGated(exploding, 1, 0.0, 0);
+        var wrapper = createWrapper(exploding, 1, 0.0, 0);
 
-        assertThatThrownBy(() -> collectText(gated.invoke(config())))
+        assertThatThrownBy(() -> collectText(wrapper.invoke(config())))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("sync explosion");
     }
@@ -172,8 +166,8 @@ class GatedAgentProviderTest {
                 return new StubAgentSession();
             }
         };
-        var gated = createGated(delegate, 1, 0.0, 0);
-        var session = gated.openSession(AgentSessionInit.of("sys"));
+        var wrapper = createWrapper(delegate, 1, 0.0, 0);
+        var session = wrapper.openSession(AgentSessionInit.of("sys"));
         session.close();
     }
 
@@ -185,42 +179,46 @@ class GatedAgentProviderTest {
                 return new StubAgentSession();
             }
         };
-        var gated = createGated(delegate, 1, 0.0, 0,
+        var wrapper = createWrapper(delegate, 1, 0.0, 0,
                 Duration.ofMillis(200), Duration.ofSeconds(5));
-        var session = gated.openSession(AgentSessionInit.of("sys"));
+        var session = wrapper.openSession(AgentSessionInit.of("sys"));
 
         assertThatThrownBy(() ->
-                gated.openSession(AgentSessionInit.of("sys")))
+                wrapper.openSession(AgentSessionInit.of("sys")))
                 .isInstanceOf(AgentSessionLimitException.class);
         session.close();
     }
 
     // --- factory helpers ---
 
-    private GatedAgentProviderWrapper createGated(AgentProvider delegate,
-                                                   int maxConcurrent,
-                                                   double permitsPerSecond,
-                                                   int burstCapacity) {
-        return createGated(delegate, maxConcurrent, permitsPerSecond,
+    private GatedAgentProviderWrapper createWrapper(AgentProvider delegate,
+                                                     int maxConcurrent,
+                                                     double permitsPerSecond,
+                                                     int burstCapacity) {
+        return createWrapper(delegate, maxConcurrent, permitsPerSecond,
                 burstCapacity, Duration.ofSeconds(30), Duration.ofSeconds(5));
     }
 
-    private GatedAgentProviderWrapper createGated(AgentProvider delegate,
-                                                   int maxConcurrent,
-                                                   double permitsPerSecond,
-                                                   int burstCapacity,
-                                                   Duration acquireTimeout,
-                                                   Duration queryAcquireTimeout) {
-        var props = new TestAgentGateProperties(acquireTimeout, queryAcquireTimeout,
+    private GatedAgentProviderWrapper createWrapper(AgentProvider delegate,
+                                                     int maxConcurrent,
+                                                     double permitsPerSecond,
+                                                     int burstCapacity,
+                                                     Duration acquireTimeout,
+                                                     Duration queryAcquireTimeout) {
+        var props = new StubAgentGateProperties(acquireTimeout, queryAcquireTimeout,
                 maxConcurrent, permitsPerSecond, burstCapacity);
         return new GatedAgentProviderWrapper(delegate, props, new SessionRegistry());
     }
 
-    private record TestAgentGateProperties(
+    // --- stubs ---
+
+    private record StubAgentGateProperties(
             Duration acquireTimeout, Duration queryAcquireTimeout,
             int maxConcurrent, double permitsPerSec, int burst
     ) implements AgentGateProperties {
-        @Override public Concurrency concurrency() { return () -> maxConcurrent; }
+        @Override public Concurrency concurrency() {
+            return () -> maxConcurrent;
+        }
         @Override public TokenBucketConfig tokenBucket() {
             return new TokenBucketConfig() {
                 @Override public double permitsPerSecond() { return permitsPerSec; }
@@ -270,7 +268,6 @@ class GatedAgentProviderTest {
         public Multi<AgentEvent> invoke(AgentSessionConfig config) {
             return Multi.createFrom().empty();
         }
-
         @Override
         public AgentSession openSession(AgentSessionInit init) {
             throw new UnsupportedOperationException();
@@ -278,23 +275,13 @@ class GatedAgentProviderTest {
     }
 
     private static class StubAgentSession implements AgentSession {
-        @Override
-        public Multi<AgentEvent> query(String prompt) {
+        @Override public Multi<AgentEvent> query(String prompt) {
             return Multi.createFrom().empty();
         }
-
-        @Override
-        public Uni<Void> interrupt() {
+        @Override public Uni<Void> interrupt() {
             return Uni.createFrom().voidItem();
         }
-
-        @Override
-        public void close(Duration maxWait) {
-        }
-
-        @Override
-        public void close() {
-            close(Duration.ofSeconds(30));
-        }
+        @Override public void close(Duration maxWait) {}
+        @Override public void close() { close(Duration.ofSeconds(30)); }
     }
 }

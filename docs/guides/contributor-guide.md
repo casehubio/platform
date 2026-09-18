@@ -340,6 +340,108 @@ Every casehub module depends on `platform-api`. Known consumers:
 
 ---
 
+## Simulation Framework
+
+The simulation framework provides SPI-level testing infrastructure — a complete replacement for Mockito when testing SPI interactions. It intercepts SPI method calls via CDI `@Decorator`, resolves responses from a corpus via configurable strategies, and records all interactions in an `InvocationJournal` for verification.
+
+### Two Simulation Paths
+
+**Path A — Generated decorator (most SPIs):** `@SimulationEligible` annotation on an SPI interface triggers `SimulationDecoratorProcessor` (Jandex-based APT) to generate a `@Decorator @Priority(APPLICATION + 200)` class. The decorator checks `SimulationRuntime.strategyFor(qualifiedName)` — if a strategy is configured and can resolve the input, it returns the strategy's result; otherwise it passes through to the delegate. The decorator also records every call to `InvocationJournal` (with `tenancyId` from `CurrentPrincipal`) and optionally captures input/output to the corpus for replay.
+
+**Path B — Backend routing (AgentProvider):** Simulation is a registered backend key (`"simulated"`) that `RoutingAgentProvider` dispatches to via model resolution. `SimulatedAgentBackend` resolves from `SimulationStrategy` directly. Used because AgentProvider routing is key-based, not decorator-based.
+
+### Key Internal Types (simulation-core)
+
+| Type | Role |
+|------|------|
+| `SimulationRuntime` | Central coordinator — strategy factory (`createStrategy`), strategy cache (`ConcurrentHashMap`), `KeyExtractor`/`SimilarityScorer` registration, overlay stack management, capture dispatch, profile activation via `ProfileSource`. Constructor-injected POJO, no CDI. |
+| `SimulationOverlay` | Opaque per-scenario handle. Contains: `SimulationConfig`, `SimulationCorpus`, `InvocationJournal`, strategy cache. Created by `pushOverlay()`/`pushProfile()`, discarded on `popOverlay()`. |
+| `InvocationJournal` | Synchronized `ArrayList` of `JournalEntry` records. Thread-safe. Per-overlay. Methods: `entries()`, `entriesFor(qn)`, `countFor(qn)`. |
+| `JournalEntry` | Immutable record: `qualifiedName`, `tenancyId`, `input`, `output`, `timestamp`, `simulated`. |
+| `SimulationVerifier` | Stateful verification on `InvocationJournal`. Tracks verified methods for `noUnverifiedCalls()`. `method(qn)` returns `MethodVerification`. `inOrder(qn...)` asserts call sequence. |
+| `MethodVerification` | Fluent filter-then-assert: `forTenant(id)`, `matching(Predicate<JournalEntry>)`, `wasCalled()`/`wasCalled(n)`/`wasNeverCalled()`/`wasCalledAtLeast(n)`/`wasCalledAtMost(n)`, `allSimulated()`/`noneSimulated()`. Mockito-quality error messages with actual call listings. |
+
+### Strategy Implementations (simulation-core)
+
+| Strategy | Resolution | Key requirement |
+|----------|-----------|-----------------|
+| `SequentialStrategy` | Round-robin through corpus entries | None |
+| `KeyLookupStrategy` | Exact key match | `KeyExtractor` registered |
+| `RandomStrategy` | Random selection from corpus | None |
+| `RecordedReplayStrategy` | Replay in recorded order, key-matched | `KeyExtractor` registered |
+| `NearestMatchStrategy` | O(n) corpus scan, best score above threshold | `SimilarityScorer` registered |
+
+### Code Generator (simulation-generator)
+
+`SimulationDecoratorProcessor` is a Jandex-based annotation processor. It scans `@SimulationEligible` interfaces (via annotation or `META-INF/simulation-eligible.txt` listing file) and generates two files per SPI:
+
+1. **Decorator class** (e.g., `SimulatedAccessControlProvider`) — `@Decorator @Priority(APPLICATION + 200)`. Injects `delegate` + `SimulationRuntime` + `CurrentPrincipal`. Intercepts ALL interface methods (abstract and default). For each method: check strategy → resolve or delegate → record to journal (with tenancyId, null fallback for missing tenancy) → optionally capture.
+
+2. **QN constants class** (e.g., `AccessControlProviderQN`) — one `public static final String` per method (e.g., `CANACCESS = "access-control-provider.canAccess"`). Compile-time safety for qualified names — typos cause compilation errors, not silent runtime mismatches.
+
+A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/` handles `@RegisterRestClient` interfaces with `@RestClient`-qualified delegates and `RestInvocation` input types.
+
+### Configuration (simulation-config-core)
+
+| Type | Role |
+|------|------|
+| `SmallRyeSimulationConfig` | Manual prefix scanning of `casehub.simulation.*` properties. Parses flat config AND named profiles (`casehub.simulation.profiles.<name>.*`). Implements `ProfileSource` for profile resolution. Active profile via `casehub.simulation.active-profile`. |
+| `YamlCorpusLoader` | YAML fixture parsing into `InvocationRecord<Object, Object>` |
+| `DeclarativeExtractorFactory` | Config string → `KeyExtractor` (`identity`, `field:name`, `composite:x,y`) via Jackson `ObjectMapper.convertValue` |
+| `DeclarativeScorerFactory` | Config string → `RecordFieldScorer` (`fields:name:EXACT:1.0,age:NUMERIC_RANGE:0.5`) |
+
+### Event Simulation (event-simulation-core)
+
+| Type | Role |
+|------|------|
+| `SimulatedEventEmitter` | `tick()`-based emitter, fires via `Consumer<CloudEvent>` callback. CDI wiring provides `Event<CloudEvent>.fireAsync()` for full pipeline fidelity. |
+| `TimedSequence<E>` | Generic timed sequences with relative delays. `withMultiplier(10.0)` compresses a 30-min case to 3 min. `fromRecorded(List<InvocationRecord>)` derives timing from captured data. |
+| `EventSequenceRunner` | Virtual-thread executor for timed sequences. Per-source error isolation. |
+
+### Schema-Driven Data Generation (schema-generator)
+
+`SchemaDataGenerator` produces random instances from JSON Schema (Draft 2020-12). Supports: string/integer/number/boolean/object/array types, enum selection, const values, Jakarta Validation constraints (min/max, minLength/maxLength, pattern), format (uuid, date-time), `$ref`/`$defs` resolution with depth guard (20). Seeded `Random` for reproducible output. Typed overload: `generate(schema, count, Class<T>, ObjectMapper)` → `List<T>`.
+
+### Testing Utilities (simulation-testing)
+
+Per-SPI corpus descriptor classes provide typed `CorpusSeed` factory methods, domain fixture factories, and default key extractors:
+
+| Descriptor | SPI | Module |
+|-----------|-----|--------|
+| `AclCorpus` | `AccessControlProvider` | simulation-testing |
+| `ModelCorpus` | `ModelRegistry` | simulation-testing |
+| `NotificationCorpus` | `NotificationStore` | simulation-testing |
+| `PreferenceCorpus` | `PreferenceProvider` | simulation-testing |
+| `CredentialCorpus` | `CredentialResolver` | simulation-testing |
+| `AgentCorpus` | `AgentProvider` | agent-simulation-core |
+
+Additional utilities:
+- `LlmCorpusPopulator` — takes `Function<String, String>` (framework-agnostic), uses `PlatformSchemaGenerator` for JSON Schema prompts, hybrid few-shot from existing seed entries
+- `RandomCorpusPopulator` — thin `CorpusSeed` integration over `SchemaDataGenerator` for schema-driven random corpus population
+
+### Module Dependency Graph
+
+```
+simulation-api ──→ simulation-core ──→ simulation-inmem
+       │                  │
+       │                  ├──→ simulation-testing (test utilities)
+       │                  │
+       ├──→ simulation-config-core ──→ simulation-config (Quarkus beans)
+       │
+       ├──→ simulation-generator (APT)
+       │         ├──→ platform-simulation-core (11 platform-api SPIs)
+       │         ├──→ memory-simulation-core (CaseMemoryStore)
+       │         └──→ rest-client-simulation-generator (@RegisterRestClient)
+       │
+       └──→ event-simulation-core ──→ event-simulation (Quarkus @Scheduled)
+
+agent-api ──→ agent-simulation-core (SimulatedAgentBackend + AgentCorpus)
+
+schema-generator (SchemaDataGenerator) ──→ simulation-testing (RandomCorpusPopulator)
+```
+
+---
+
 ## Current State
 
 All modules listed above are shipped and active in the build.

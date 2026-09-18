@@ -21,7 +21,7 @@ public abstract class AbstractCachingIdentityProvider<C> {
         this.ttl = ttl;
     }
 
-    public final Optional<C> get(String key) {
+    public Optional<C> get(String key) {
         Instant now = now();
         CacheEntry<C> existing = cache.get(key);
         if (existing != null && existing.isExpired(now)) {
@@ -37,7 +37,7 @@ public abstract class AbstractCachingIdentityProvider<C> {
         return existing.value();
     }
 
-    public final void put(String key, Optional<C> value) {
+    public void put(String key, Optional<C> value) {
         cache.put(key, new CacheEntry<>(value, now().plus(ttl)));
     }
 

@@ -15,7 +15,7 @@ import java.util.Optional;
 
 public class SimulatedAgentBackend implements AgentBackend {
 
-    private static final String QN_INVOKE = "agent-provider.invoke";
+
 
     private final SimulationRuntime simulation;
 
@@ -32,7 +32,7 @@ public class SimulatedAgentBackend implements AgentBackend {
     @SuppressWarnings("unchecked")
     public Multi<AgentEvent> invoke(final AgentSessionConfig config) {
         final Optional<SimulationStrategy<AgentSimulationInput, List<AgentEvent>>> strategy =
-                simulation.strategyFor(QN_INVOKE);
+                simulation.strategyFor(AgentProviderQN.INVOKE);
         if (strategy.isEmpty()) {
             return Multi.createFrom().empty();
         }

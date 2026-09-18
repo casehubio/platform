@@ -61,7 +61,7 @@ class SimulationDecoratorProcessorTest {
                 .map(SimulationDecoratorProcessor.GeneratedSource::className)
                 .toList();
 
-        assertThat(classNames).hasSize(4);
+        assertThat(classNames).hasSize(8);
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestSimpleService"));
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestDefaultNameSpi"));
     }
@@ -233,10 +233,61 @@ class SimulationDecoratorProcessorTest {
         final long testSimpleServiceCount = sources.stream()
                 .filter(s -> s.className().contains("TestSimpleService"))
                 .count();
-        assertThat(testSimpleServiceCount).isEqualTo(1);
+        assertThat(testSimpleServiceCount).isEqualTo(2);
     }
 
     // --- helpers ---
+
+
+// --- QN constants generation ---
+
+    @Test
+    void generatesQNConstantsClassForAnnotatedInterface() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+
+        final List<String> classNames = sources.stream()
+                                               .map(SimulationDecoratorProcessor.GeneratedSource::className)
+                                               .toList();
+
+        assertThat(classNames).anyMatch(n -> n.contains("TestSimpleServiceQN"));
+    }
+
+    @Test
+    void qnConstantsClassContainsMethodConstants() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+
+        final String code = findSource(sources, "TestSimpleServiceQN");
+
+        assertThat(code).contains("public static final String LOOKUP = \"test-service.lookup\"");
+        assertThat(code).contains("public static final String SAVE = \"test-service.save\"");
+        assertThat(code).contains("public static final String COUNT = \"test-service.count\"");
+        assertThat(code).contains("private TestSimpleServiceQN()");
+    }
+
+    @Test
+    void qnConstantsClassGeneratedForListingFileEntries() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+
+        final List<String> classNames = sources.stream()
+                                               .map(SimulationDecoratorProcessor.GeneratedSource::className)
+                                               .toList();
+
+        assertThat(classNames).anyMatch(n -> n.contains("TestUnannotatedSpiQN"));
+    }
+
+    @Test
+    void qnListingFileClassHasCorrectConstants() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+
+        final String code = findSource(sources, "TestUnannotatedSpiQN");
+
+        assertThat(code).contains("public static final String RESOLVE = \"test-unannotated.resolve\"");
+        assertThat(code).contains("public static final String DELETE = \"test-unannotated.delete\"");
+    }
 
     private static int occurrences(final String text, final String sub) {
         int count = 0;

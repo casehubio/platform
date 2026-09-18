@@ -173,6 +173,7 @@
         <module>agent-langchain4j-spring</module>
         <module>agent-config-spring</module>
         <module>agent-router-spring</module>
+        <module>agent-gate-spring</module>
         <module>governance-spring</module>
         <module>expression-spring</module>
         <module>identity-spring</module>

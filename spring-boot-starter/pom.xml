@@ -139,6 +139,11 @@
             <artifactId>casehub-platform-agent-config-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-gate-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Identity -->
         <dependency>

@@ -28,6 +28,7 @@ public class JandexProducerScanner {
     private static final DotName POST_CONSTRUCT = DotName.createSimple("jakarta.annotation.PostConstruct");
     private static final DotName JAVA_LIST = DotName.createSimple("java.util.List");
     private static final DotName JAVA_OPTIONAL = DotName.createSimple("java.util.Optional");
+    private static final DotName WITH_DEFAULT = DotName.createSimple("io.smallrye.config.WithDefault");
 
     private static final Set<DotName> KNOWN_METHOD_ANNOTATIONS = Set.of(
             PRODUCES, DEFAULT_BEAN, ALTERNATIVE, PRIORITY,
@@ -130,6 +131,7 @@ public class JandexProducerScanner {
             String configInterface = null;
             boolean hasFactory = false;
             String factoryName = null;
+            List<ProducerDescriptor.ConfigPropertyMethod> configMethods = List.of();
 
             ClassInfo effectiveType = concreteReturnType != null
                     ? resolveIndex.getClassByName(DotName.createSimple(concreteReturnType))
@@ -160,6 +162,9 @@ public class JandexProducerScanner {
                         if (result2.kind == ProducerDescriptor.ParamKind.CONFIG_PROPERTIES) {
                             configPrefix = result2.configPrefix;
                             configInterface = result2.configInterface;
+                            configMethods = collectConfigMethods(
+                                    DotName.createSimple(result2.configInterface),
+                                    scanIndex, resolveIndex);
                         }
                     }
                     constructorParams = List.copyOf(ctorParams);
@@ -202,7 +207,8 @@ public class JandexProducerScanner {
                     primaryBean,
                     orderValue,
                     hasFactory,
-                    factoryName));
+                    factoryName,
+                    configMethods));
         }
 
         return result;
@@ -281,6 +287,49 @@ public class JandexProducerScanner {
         }
 
         return null;
+    }
+
+    private List<ProducerDescriptor.ConfigPropertyMethod> collectConfigMethods(
+            DotName propertiesInterface, IndexView scanIndex, IndexView resolveIndex) {
+        var methods = new ArrayList<ProducerDescriptor.ConfigPropertyMethod>();
+        ClassInfo propsClass = resolveIndex.getClassByName(propertiesInterface);
+        if (propsClass == null) {
+            propsClass = scanIndex.getClassByName(propertiesInterface);
+        }
+        if (propsClass == null) {
+            return methods;
+        }
+
+        // Find the @ConfigMapping extension to read @WithDefault values
+        ClassInfo configMappingClass = null;
+        for (AnnotationInstance cmAnn : scanIndex.getAnnotations(CONFIG_MAPPING)) {
+            if (cmAnn.target().kind() == org.jboss.jandex.AnnotationTarget.Kind.CLASS) {
+                ClassInfo cmClass = cmAnn.target().asClass();
+                if (cmClass.interfaceNames().contains(propertiesInterface)
+                        || propertiesInterface.equals(cmClass.name())) {
+                    configMappingClass = cmClass;
+                    break;
+                }
+            }
+        }
+
+        for (MethodInfo m : propsClass.methods()) {
+            if (m.parametersCount() == 0
+                    && !m.name().equals("<init>")
+                    && !m.name().equals("<clinit>")
+                    && java.lang.reflect.Modifier.isAbstract(m.flags())) {
+                String defaultValue = null;
+                if (configMappingClass != null) {
+                    MethodInfo configMethod = configMappingClass.method(m.name());
+                    if (configMethod != null && configMethod.hasAnnotation(WITH_DEFAULT)) {
+                        defaultValue = configMethod.annotation(WITH_DEFAULT).value().asString();
+                    }
+                }
+                methods.add(new ProducerDescriptor.ConfigPropertyMethod(
+                        m.name(), m.returnType().name().toString(), defaultValue));
+            }
+        }
+        return methods;
     }
 
     private MethodInfo findFactoryMethod(ClassInfo classInfo) {

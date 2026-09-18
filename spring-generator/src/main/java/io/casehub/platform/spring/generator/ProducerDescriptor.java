@@ -20,7 +20,10 @@ public record ProducerDescriptor(
         boolean primaryBean,
         int orderValue,
         boolean hasFactoryMethod,
-        String factoryMethodName) {
+        String factoryMethodName,
+        List<ConfigPropertyMethod> configMethods) {
+
+    public record ConfigPropertyMethod(String name, String type, String defaultValue) {}
 
     public enum ParamKind {
         PLAIN, LIST, OPTIONAL, CONFIG_PROPERTIES
@@ -53,7 +56,7 @@ public record ProducerDescriptor(
             boolean cdiDeps) {
         this(producerClassName, methodName, returnType, concreteReturnType,
                 parameters, defaultBean, alternative, priority, cdiDeps,
-                null, null, null, List.of(), null, false, 0, false, null);
+                null, null, null, List.of(), null, false, 0, false, null, List.of());
     }
 
     public boolean constructorResolved() {

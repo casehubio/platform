@@ -1,5 +1,6 @@
 package io.casehub.platform.spring.generator;
 
+import com.palantir.javapoet.JavaFile;
 import io.casehub.platform.generator.AbstractGeneratorMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -45,12 +46,11 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
             String configClassName = deriveConfigClassName(quarkusModule.getName());
 
             var writer = new AutoConfigurationWriter();
-            String source = writer.generate(sourcePackage, configClassName, descriptors);
+            List<JavaFile> javaFiles = writer.generate(sourcePackage, configClassName, descriptors);
 
-            Path sourceDir = outputDirectory.toPath()
-                    .resolve(sourcePackage.replace('.', '/'));
-            Files.createDirectories(sourceDir);
-            Files.writeString(sourceDir.resolve(configClassName + ".java"), source);
+            for (JavaFile javaFile : javaFiles) {
+                javaFile.writeTo(outputDirectory.toPath());
+            }
 
             Path metaInf = outputDirectory.toPath()
                     .resolve("META-INF/spring");
@@ -61,8 +61,8 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
             registerSourceRoot();
 
-            getLog().info("Generated " + configClassName + " with " + descriptors.size()
-                    + " @Bean method(s)");
+            getLog().info("Generated " + configClassName + " with " + javaFiles.size()
+                    + " file(s) from " + descriptors.size() + " @Produces method(s)");
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate Spring auto-configuration", e);

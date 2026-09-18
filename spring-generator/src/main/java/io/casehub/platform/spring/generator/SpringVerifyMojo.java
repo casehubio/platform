@@ -51,9 +51,7 @@ public class SpringVerifyMojo extends AbstractVerifyMojo {
         List<ProducerDescriptor> quarkusProducers = scanner.scan(scanIndex, compositeIndex);
         Set<String> types = new HashSet<>();
         for (ProducerDescriptor d : quarkusProducers) {
-            if (!d.requiresManualConfig()) {
-                types.add(d.returnTypeSimpleName());
-            }
+            types.add(d.returnTypeSimpleName());
         }
         return types;
     }

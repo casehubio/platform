@@ -53,8 +53,6 @@
         <module>agent-gemini-cli</module>
         <module>agent-langchain4j-core</module>
         <module>agent-langchain4j</module>
-        <module>memory-jpa-common</module>
-        <module>memory-inmem</module>
         <module>acl-inmem-core</module>
         <module>acl-inmem</module>
         <module>acl-jpa-common</module>

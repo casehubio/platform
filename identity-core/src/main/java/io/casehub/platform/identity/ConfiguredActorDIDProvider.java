@@ -9,8 +9,8 @@ public class ConfiguredActorDIDProvider implements ActorDIDProvider {
 
     private final Map<String, String> dids;
 
-    public ConfiguredActorDIDProvider(final Map<String, String> dids) {
-        this.dids = dids;
+    public ConfiguredActorDIDProvider(final IdentityDIDProperties config) {
+        this.dids = config.dids();
     }
 
     @Override

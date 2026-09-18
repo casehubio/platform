@@ -32,20 +32,26 @@ public class ScimAgentLookup extends AbstractCachingIdentityProvider<ScimAgentRe
 
     ScimAgentLookup() {}
 
-    public ScimAgentLookup(final String endpoint, final String authToken,
-                            final int timeoutMs, final Duration cacheTtl,
-                            final boolean requireHttps) {
-        super(cacheTtl);
-        this.scimEndpoint = endpoint;
-        this.authToken = authToken;
-        this.timeoutMs = timeoutMs;
-        this.requireHttps = requireHttps;
+    public ScimAgentLookup(final ScimAgentLookupProperties config) {
+        super(Duration.ofMinutes(config.cacheTtlMinutes()));
+        this.scimEndpoint = config.endpoint().orElse("");
+        this.authToken = config.authToken().orElse("");
+        this.timeoutMs = config.timeoutMs();
+        this.requireHttps = config.requireHttps();
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(timeoutMs)).build();
+                .connectTimeout(Duration.ofMillis(config.timeoutMs())).build();
     }
 
     public static ScimAgentLookup unconfigured() {
-        return new ScimAgentLookup("", "", 5000, Duration.ofMinutes(5), true);
+        return new ScimAgentLookup(new DefaultScimProperties());
+    }
+
+    private static final class DefaultScimProperties implements ScimAgentLookupProperties {
+        @Override public java.util.Optional<String> endpoint() { return java.util.Optional.empty(); }
+        @Override public java.util.Optional<String> authToken() { return java.util.Optional.empty(); }
+        @Override public int timeoutMs() { return 5000; }
+        @Override public int cacheTtlMinutes() { return 5; }
+        @Override public boolean requireHttps() { return true; }
     }
 
     public boolean isConfigured() {

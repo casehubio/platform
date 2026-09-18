@@ -4,7 +4,6 @@ import io.casehub.platform.api.identity.DIDDocument;
 import io.casehub.platform.api.identity.VerificationMethod;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -119,8 +118,8 @@ class ScimDIDResolverTest {
     // ── helpers ──
 
     private ScimAgentLookup lookupReturning(ScimAgentResource resource) {
-        return new ScimAgentLookup("https://scim.example.com", "token",
-                5000, Duration.ofMinutes(5), true) {
+        return new ScimAgentLookup(
+                TestScimProperties.of("https://scim.example.com", "token", 5000, 5, true)) {
             @Override
             protected Optional<ScimAgentResource> loadContext(String key) {
                 return Optional.ofNullable(resource);
@@ -129,8 +128,8 @@ class ScimDIDResolverTest {
     }
 
     private ScimAgentLookup throwingLookup() {
-        return new ScimAgentLookup("https://scim.example.com", "token",
-                5000, Duration.ofMinutes(5), true) {
+        return new ScimAgentLookup(
+                TestScimProperties.of("https://scim.example.com", "token", 5000, 5, true)) {
             @Override
             protected Optional<ScimAgentResource> loadContext(String key) {
                 throw new IllegalStateException("SCIM down");

@@ -33,11 +33,10 @@ public class JwtVCValidator extends AbstractCachingIdentityProvider<CredentialVa
 
     JwtVCValidator() {}
 
-    public JwtVCValidator(final Map<String, String> credentials,
-                   final DIDResolver resolver,
-                   final Duration cacheTtl) {
-        super(cacheTtl);
-        this.credentials = credentials;
+    public JwtVCValidator(final CredentialValidationProperties config,
+                   final DIDResolver resolver) {
+        super(Duration.ofMinutes(config.credentialCacheTtlMinutes()));
+        this.credentials = config.credentials();
         this.resolver = resolver;
     }
 

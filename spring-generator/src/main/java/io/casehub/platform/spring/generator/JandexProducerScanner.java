@@ -126,7 +126,7 @@ public class JandexProducerScanner {
             }
 
             // --- Constructor following: resolve core POJO constructor ---
-            List<ProducerDescriptor.ConstructorParam> constructorParams = List.of();
+            List<ProducerDescriptor.ConstructorParam> constructorParams = null;
             String configPrefix = null;
             String configInterface = null;
             boolean hasFactory = false;

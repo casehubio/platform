@@ -45,20 +45,18 @@ public class AutoConfigurationWriter {
         var files = new ArrayList<JavaFile>();
 
         ClassName anchorType = selectAnchorType(descriptors);
-        ClassName propsRecordType = null;
 
-        // Check if any descriptor needs a ConfigProperties record
-        ProducerDescriptor configDescriptor = descriptors.stream()
-                .filter(d -> !d.requiresManualConfig()
-                        && d.configPropertiesInterface() != null
-                        && !d.configMethods().isEmpty())
-                .findFirst().orElse(null);
-
-        if (configDescriptor != null) {
-            propsRecordType = ClassName.get(packageName,
-                    simpleClassName(configDescriptor.configPropertiesInterface()) + "Spring");
-            files.add(generateConfigPropertiesRecord(
-                    packageName, configDescriptor, propsRecordType));
+        // Collect ALL unique config properties interfaces across descriptors
+        var configRecordMap = new java.util.LinkedHashMap<String, ClassName>();
+        for (ProducerDescriptor d : descriptors) {
+            if (d.requiresManualConfig()) continue;
+            if (d.configPropertiesInterface() != null && !d.configMethods().isEmpty()
+                    && !configRecordMap.containsKey(d.configPropertiesInterface())) {
+                ClassName recordType = ClassName.get(packageName,
+                        simpleClassName(d.configPropertiesInterface()) + "Spring");
+                configRecordMap.put(d.configPropertiesInterface(), recordType);
+                files.add(generateConfigPropertiesRecord(packageName, d, recordType));
+            }
         }
 
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(className)
@@ -71,17 +69,21 @@ public class AutoConfigurationWriter {
                     .build());
         }
 
-        if (propsRecordType != null) {
-            classBuilder.addAnnotation(AnnotationSpec.builder(ENABLE_CONFIG_PROPERTIES)
-                    .addMember("value", "$T.class", propsRecordType)
-                    .build());
+        if (!configRecordMap.isEmpty()) {
+            var enableBuilder = AnnotationSpec.builder(ENABLE_CONFIG_PROPERTIES);
+            for (ClassName recordType : configRecordMap.values()) {
+                enableBuilder.addMember("value", "$T.class", recordType);
+            }
+            classBuilder.addAnnotation(enableBuilder.build());
         }
 
         for (ProducerDescriptor d : descriptors) {
             if (d.requiresManualConfig()) continue;
 
             if (d.constructorResolved()) {
-                classBuilder.addMethod(buildEnhancedBeanMethod(d, propsRecordType));
+                ClassName propsType = d.configPropertiesInterface() != null
+                        ? configRecordMap.get(d.configPropertiesInterface()) : null;
+                classBuilder.addMethod(buildEnhancedBeanMethod(d, propsType));
             } else {
                 classBuilder.addMethod(buildLegacyBeanMethod(d));
             }
@@ -137,7 +139,11 @@ public class AutoConfigurationWriter {
                     ParameterizedTypeName providerType = ParameterizedTypeName.get(
                             OBJECT_PROVIDER, toClassName(cp.type()));
                     builder.addParameter(providerType, cp.name());
-                    paramNames.add(cp.name() + ".getIfAvailable()");
+                    if (d.hasFactoryMethod()) {
+                        paramNames.add("java.util.Optional.ofNullable(" + cp.name() + ".getIfAvailable())");
+                    } else {
+                        paramNames.add(cp.name() + ".getIfAvailable()");
+                    }
                 }
                 case CONFIG_PROPERTIES -> {
                     TypeName paramType = propsRecordType != null ? propsRecordType : toClassName(cp.type());

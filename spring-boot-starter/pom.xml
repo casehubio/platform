@@ -93,6 +93,74 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Agent infrastructure -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-runtime-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-claude-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-openai-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-codex-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-gemini-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-gemini-cli-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-langchain4j-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-router-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-config-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Identity -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-identity-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Governance -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-governance-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Expression engines -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-expression-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Jackson 2 bridge — Spring Boot 4 defaults to Jackson 3.
              Keeps both frameworks on Jackson 2 ObjectMapper until
              Quarkus 4 aligns on Jackson 3 (~Nov 2026). -->

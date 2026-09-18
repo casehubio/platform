@@ -151,6 +151,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
 | L14: PDF Generation | `platform-pdf/` | HTML-to-PDF conversion with PDF/A-2b conformance (ISO 19005-2). `PdfGenerator` SPI in `platform-api/api/pdf/` with `@DefaultBean NoOpPdfGenerator` in `platform/` (returns `Optional.empty()`). Implementation: OpenHTMLtoPDF 1.1.37 with bundled Liberation Sans + Mono fonts (~1.4MB). Optional module — classpath activation. First consumer: qhorus compliance-report (#417) |
 | L15: Document Signing | `platform-signing/` | EU DSS 6.2-backed PAdES PDF signatures + CAdES detached (.p7s). `DocumentSigningService` + `DocumentVerificationService` SPIs in `platform-api/.../signing/document/` with `@DefaultBean NoOp*` in `platform/`. Implementation: `DssDocumentSigningService` (PAdES via `PAdESService`, CAdES via `CAdESService`), `DssDocumentVerificationService` (format auto-detection via `SignedDocumentValidator`, optional EU Trusted List validation via `TrustedListManager`), `KeyStoreManager @ApplicationScoped` (PKCS#12, `@Inject` from config). Certificate lifecycle: `CertificateExpiryMonitor` (`@Scheduled` 6h, fires `CertificateExpiryEvent`), `KeyStoreRotationService` (atomic swap via `AtomicReference`). Multi-tenant: `TenantKeyStoreResolver` (per-tenant PKCS#12, cached, fallback to default). EU Trusted List: `TrustedListManager` loads LOTL via `dss-tsl-validation` (file-cached 24h, disabled by default). Profile enforcement: B_T+ without TSA fails (no silent downgrade). PDFBox 3.0.4 via DSS (compatible with L14's 3.0.3). `DssSigningConfig @ConfigMapping(prefix = "casehub.signing")`. Optional module — classpath activation. First consumer: qhorus compliance-report (#418) |
+| L16: Simulation Framework | `simulation-api/`, `simulation-core/`, `simulation-inmem/`, `simulation-config-core/`, `simulation-config/`, `simulation-generator/`, `simulation-testing/`, `platform-simulation-core/`, `memory-simulation-core/`, `agent-simulation-core/`, `event-simulation-core/`, `event-simulation/`, `rest-client-simulation-generator/`, `schema-generator/` (SchemaDataGenerator) | SPI-level simulation without Mockito. 4 tiers: API (`SimulationStrategy<I,O>`, `SimulationCorpus<I,O>`, `InvocationRecord<I,O>`, `KeyExtractor<I>`, `SimilarityScorer<I>`, `CorpusSeed<I,O>`, `DataRealism`, `ExhaustionPolicy`, `@SimulationEligible`), Core (5 strategies: Sequential, KeyLookup, Random, RecordedReplay, NearestMatch + `SimulationRuntime` + `SimulationOverlay` + `InvocationJournal`/`JournalEntry` + `SimulationVerifier`/`MethodVerification` + `SimulationConfig`/`MapSimulationConfig` + `ProfileSource`/`SimulationProfile`), Generator (`SimulationDecoratorProcessor` APT — `@Decorator` + `*QN` constants per SPI; `RestClientSimulationProcessor` for `@RegisterRestClient`), Integration (`SmallRyeSimulationConfig` prefix scanning, `YamlCorpusLoader`, `DeclarativeExtractorFactory`/`DeclarativeScorerFactory`, `SimulatedEventEmitter`/`TimedSequence`/`EventSequenceRunner`, corpus descriptors: `AclCorpus`/`ModelCorpus`/`NotificationCorpus`/`PreferenceCorpus`/`CredentialCorpus`/`AgentCorpus`, `LlmCorpusPopulator`, `RandomCorpusPopulator`, `SchemaDataGenerator`). Config: `casehub.simulation.<spi>.<method>.{strategy,capture,exhaustion-policy,threshold}`, named profiles via `casehub.simulation.profiles.<name>.*` |
 
 ### Journey and Chapter sequencing rationale
 
@@ -166,6 +167,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 - C19 after C14: `AgentSession` extends `AgentProvider` — the SPI and `ClaudeAgentClient` must exist first; LangChain4j bridge depends on `AgentSession`
 - C20 after C17/C18: `streams-camel` observes `EndpointRegistered` (fired by `InMemoryEndpointRegistry` from C17); all stream modules require `cloudevents-core` declared in parent BOM
 - C21 after C12: `AccessControlProvider` SPI is independent of memory; `groupsOf()` inverse lookup added to `GroupMembershipProvider` in C12 is a prerequisite for role-based ACL resolution
+- C23 after C14: simulation decorators inject `CurrentPrincipal` (from C3) and wrap `AgentProvider` (from C14); simulation-api is a new module independent of platform-api
 
 ---
 
@@ -426,6 +428,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | J5: Stream Ingestion | CloudEvent-envelope transports — five classpath-activated stream adapters firing CDI events | C20 | ✅ Complete |
 | J6: Access Control | Flat-grant ACL SPI — resource-level `canAccess` / `grant` / `revoke`, parent-resource hierarchy, JPA and in-memory adapters | C21 | ✅ Complete |
 | J7: Subject Views | Filtered views of any labeled subject — label-pattern matching, membership tracking, ADDED/REMOVED lifecycle events. Generalizes work-queues' QueueView pattern. | C22 | ✅ Complete (#175) |
+| J8: Simulation Framework | SPI-level simulation without Mockito — generated CDI decorators intercept SPI calls, corpus-backed strategies resolve responses, overlay stack isolates scenarios, verification API asserts interactions. 5 data population paths, event simulation, named profiles. | C23 | ✅ Complete (#294) |
 
 ### §9.2 Chapter Index
 
@@ -451,6 +454,7 @@ flowchart LR
   C14 --> C19["C19: AgentSession\n+LangChain4j\nL8"]
   C18 --> C20["C20: Stream Ingestion\nL10"]
   C12 --> C21["C21: ACL Phase 1\nL1+L2+L11"]
+  C14 --> C23["C23: Simulation Framework\nL1+L16"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -473,6 +477,7 @@ flowchart LR
   style C19 fill:#90EE90,color:#000
   style C20 fill:#90EE90,color:#000
   style C21 fill:#90EE90,color:#000
+  style C23 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -499,6 +504,7 @@ flowchart LR
 | 20 | Stream Ingestion | J5 | L10 | ✅ |
 | 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
 | 22 | Subject View Toolkit | J7 | L1, L2, L13 | ✅ |
+| 23 | Simulation Framework | J8 | L1, L16 | ✅ |
 
 **Layer × Chapter matrix**
 
@@ -949,6 +955,34 @@ Five classpath-activated transports that each receive external events and fire `
 | L1: API Tier | High — new `io.casehub.platform.api.acl` package: `AccessControlProvider`, `AclAction`, `AclResourceType`, `AclEntry`, `AccessDeniedException`; `GroupMembershipProvider.groupsOf()` added |
 | L2: Default Implementations | Low — `NoOpAccessControlProvider @DefaultBean @ApplicationScoped` |
 | L11: Access Control | High — `acl-inmem/` and `acl-jpa/` new modules |
+
+---
+
+#### C23 — Simulation Framework
+
+**Journey:** J8 | **Sequence:** 23 of 23 | **Status:** ✅
+**Delivered:** 2026-09-18 | **Issues:** platform#294 (epic), platform#312–#332
+**Blog:** —
+
+**What this delivers**
+SPI-level simulation without Mockito — a complete replacement for `when/thenReturn` (corpus + strategy) and `verify()` (journal + SimulationVerifier). Generated CDI `@Decorator` classes intercept every `@SimulationEligible` SPI method, resolve responses from a corpus of `InvocationRecord`s via configurable strategies, record all interactions in an `InvocationJournal` with tenant context, and capture real backend traffic for corpus building. The framework supports 5 data population paths (YAML fixtures, programmatic `CorpusSeed`, LLM-driven generation via `LlmCorpusPopulator`, schema-driven random generation via `SchemaDataGenerator`/`RandomCorpusPopulator`, and capture mode), runtime overlays for per-scenario isolation (no ThreadLocal), named profiles for strategy bundles, event simulation via `TimedSequence` + CloudEvent CDI bus injection, and REST client simulation via a separate `@RegisterRestClient` annotation processor.
+
+18 modules across 4 tiers: simulation-api (pure Java SPIs), simulation-core (5 strategies + runtime + overlay + journal + verifier), simulation-generator + rest-client-simulation-generator (APT code generators), and 10 integration modules (config, event, testing, per-domain generated decorators). The simulation-api module is deliberately not in platform-api — simulation is opt-in, not universal. Generated decorators wrap `@DefaultBean` NoOps without modifying them — NoOps remain zero-dependency.
+
+**Accountability gaps closed**
+- Mockito-free SPI testing with real CDI wiring → L16 (corpus + strategy replaces when/thenReturn; SimulationVerifier replaces verify())
+- SPI call recording with tenant context → L16 (InvocationJournal + JournalEntry with tenancyId)
+- Schema-driven random data generation → L16 (SchemaDataGenerator: JSON Schema → constraint-respecting random instances)
+- Per-scenario test isolation without ThreadLocal → L16 (SimulationOverlay stack with isolated corpus + journal)
+- Declarative simulation configuration → L16 (SmallRyeSimulationConfig prefix scanning, named profiles)
+- Event simulation with timing preservation → L16 (TimedSequence + SimulatedEventEmitter + @Scheduled continuous tick)
+- REST client simulation → L16 (RestClientSimulationProcessor generates decorators for @RegisterRestClient interfaces)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | Low — `@SimulationEligible` annotation, `DataRealism` enum added to platform-api |
+| L16: Simulation Framework | High — 18 new modules: complete simulation infrastructure from SPI to verification |
 
 ---
 
@@ -1685,6 +1719,124 @@ Flat-grant ACL with parent-resource hierarchy — grant propagates from parent t
 **Symptom:** `canAccess()` returns `true` despite no grant having been issued.
 **Cause:** `NoOpAccessControlProvider @DefaultBean` is active — no `acl-inmem` or `acl-jpa` on the classpath.
 **Fix:** Add `acl-inmem` (test) or `acl-jpa` (production) to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+---
+
+#### Layer — L16: Simulation Framework
+
+**Participates in chapters:** C23
+**Architectural patterns:** Generated CDI `@Decorator` (APT), overlay stack (per-scenario isolation), config-driven strategy selection (boot-time), corpus-backed response resolution, tenant-aware invocation recording
+**Issues:** platform#294 (epic), platform#312–#332
+**Blog:** —
+**Completed:** 2026-09-18
+
+#### What it adds
+
+**Before:** SPI testing required Mockito: `@InjectMock` for stub responses, `verify()` for interaction assertions. Mocks bypass CDI wiring — interceptors, decorators, and @PostConstruct lifecycle are invisible to tests. No capture path for building test fixtures from real traffic.
+**After:** Generated `@Decorator` classes intercept SPI calls through real CDI. Corpus + strategy replaces `when/thenReturn`. `InvocationJournal` + `SimulationVerifier` replaces `verify()`. Five data population paths from zero-effort random generation to captured real traffic.
+
+What this layer adds:
+
+**API tier (simulation-api):**
+- **`SimulationStrategy<I, O>`** — generic strategy contract: `canResolve(I)`, `resolve(I) → O`
+- **`SimulationCorpus<I, O>`** — SPI for corpus storage: `seed()`, `entriesFor()`, `allEntries()`
+- **`InvocationRecord<I, O>`** — record: tenancyId, key, input, output, recordedAt; `of()` factories
+- **`KeyExtractor<I>`** — functional interface for key derivation from inputs
+- **`SimilarityScorer<I>`** — functional interface for nearest-match scoring
+- **`CorpusSeed<I, O>`** — typed accumulator with `withKeyExtractor()`, `withOutputMapper()`, `add()`, `seedInto(corpus)`
+- **`DataRealism`** — enum: GARBAGE, PLACEHOLDER, STRUCTURALLY_VALID, DOMAIN_PLAUSIBLE, RECORDED_REAL
+- **`ExhaustionPolicy`** — enum: WRAP, THROW
+- **`@SimulationEligible`** — marks SPI interfaces for decorator generation
+
+**Core tier (simulation-core):**
+- **5 strategies:** `SequentialStrategy` (round-robin), `KeyLookupStrategy` (exact key match), `RandomStrategy` (random corpus selection), `RecordedReplayStrategy` (key-matched replay), `NearestMatchStrategy` (similarity scoring with threshold)
+- **`SimulationRuntime`** — strategy factory + cache, overlay stack, capture dispatch, `recordJournal()` with tenancyId, `pushProfile()/pushOverlay()/popOverlay()/popAll()`
+- **`SimulationOverlay`** — opaque handle: config + corpus + journal per scenario
+- **`InvocationJournal`** + **`JournalEntry`** — tenant-aware invocation recording: qualifiedName, tenancyId, input, output, timestamp, simulated
+- **`SimulationVerifier`** — stateful verification: `method(qn)` → `MethodVerification`, `inOrder(qn...)`, `noUnverifiedCalls()`
+- **`MethodVerification`** — fluent assertion builder: `forTenant(id)`, `matching(Predicate<JournalEntry>)`, `wasCalled()/wasNeverCalled()/wasCalledAtLeast()/wasCalledAtMost()`, `allSimulated()/noneSimulated()`
+- **`ProfileSource`** / **`SimulationProfile`** — named profile resolution for strategy bundles
+- **`RestInvocation`** — REST client invocation context: spiName, methodName, httpMethod, pathTemplate, params, body
+- **`MapSimulationConfig`** — programmatic SimulationConfig from `Map<String, String>`
+
+**Config tier (simulation-config-core + simulation-config):**
+- **`SmallRyeSimulationConfig`** — manual prefix scanning of `casehub.simulation.*` properties; profile parsing, `ProfileSource` implementation
+- **`YamlCorpusLoader`** — YAML fixture parsing into `InvocationRecord<Object, Object>`
+- **`DeclarativeExtractorFactory`** — config string → `KeyExtractor` (identity/field/composite)
+- **`DeclarativeScorerFactory`** — config string → `RecordFieldScorer` (weighted per-field scoring)
+
+**Generator tier (simulation-generator + rest-client-simulation-generator):**
+- **`SimulationDecoratorProcessor`** — APT: scans `@SimulationEligible` interfaces + `META-INF/simulation-eligible.txt` listings via Jandex, generates `@Decorator @Priority(APPLICATION + 200)` classes + `*QN` constants classes per SPI. Generated decorators inject `SimulationRuntime` + `CurrentPrincipal`, handle strategy resolution, journal recording with tenancyId, and capture dispatch.
+- **`RestClientSimulationProcessor`** — APT: scans `@RegisterRestClient` interfaces, generates `@Decorator` with `@RestClient`-qualified delegate and `RestInvocation` inputs
+
+**Event tier (event-simulation-core + event-simulation):**
+- **`SimulatedEventEmitter`** — `tick()` method emits CloudEvents via `Consumer<CloudEvent>` callback
+- **`TimedSequence<E>`** / **`TimedEntry<E>`** — relative-delay event sequences with `withMultiplier()` for time compression, `fromRecorded()` for timing preservation
+- **`EventSequenceRunner`** — virtual-thread sequence executor
+
+**Testing tier (simulation-testing):**
+- **5 corpus descriptors:** `AclCorpus`, `ModelCorpus`, `NotificationCorpus`, `PreferenceCorpus`, `CredentialCorpus` — typed `CorpusSeed` factories, domain fixture factories, default `KeyExtractor`
+- **`AgentCorpus`** in agent-simulation-core — descriptor for AgentProvider simulation + `llmFunction()` adapter
+- **`LlmCorpusPopulator`** — takes `Function<String, String>` (framework-agnostic), uses `PlatformSchemaGenerator` for JSON Schema prompts, hybrid few-shot from existing seed entries
+- **`RandomCorpusPopulator`** — schema-driven random generation via `SchemaDataGenerator` + `PlatformSchemaGenerator`
+- **`SchemaDataGenerator`** — JSON Schema → random instances: all types, constraints (min/max, minLength/maxLength, pattern, enum, const), format (uuid, date-time), `$ref`/`$defs` with depth guard (20), typed `List<T>` API
+
+**Generated decorator modules:**
+- **`platform-simulation-core`** — 11 platform-api SPIs (AccessControlProvider, DataSourceRegistry, SubscriptionStore, NotificationStore, EndpointRegistry, ExpressionEngineRegistry, DocumentSigningService, CredentialResolver, ModelRegistry, PreferenceProvider, CurrentPrincipal)
+- **`memory-simulation-core`** — CaseMemoryStore (cross-repo SPI in neocortex-memory-api)
+
+#### Accountability gaps closed
+
+| Gap | What breaks without it | Closed by |
+|---|---|---|
+| SPI tests bypass CDI wiring | Mockito mocks miss decorator interceptors, @PostConstruct lifecycle, CDI event observers | Generated `@Decorator` — real CDI, no mocks |
+| No standard verification for SPI interactions | Each test re-implements journal filtering and assertion logic | `SimulationVerifier` + `MethodVerification` fluent API |
+| Corpus population requires manual authoring | Every test writes InvocationRecords by hand | 5 data population paths: YAML, CorpusSeed, LLM, SchemaDataGenerator, capture |
+| Test scenarios share mutable state | Mockito mocks are per-test but don't isolate corpus/strategy combinations | `SimulationOverlay` stack — push/pop per scenario, isolated corpus + journal |
+| No tenant context in interaction recording | Tenant-scoped assertions require parsing SPI method parameters | `JournalEntry.tenancyId` + `MethodVerification.forTenant()` |
+
+#### Key files
+
+- `simulation-api/src/main/java/io/casehub/platform/simulation/SimulationStrategy.java` — generic strategy contract
+- `simulation-api/src/main/java/io/casehub/platform/simulation/CorpusSeed.java` — typed corpus accumulator
+- `simulation-core/src/main/java/io/casehub/platform/simulation/SimulationRuntime.java` — strategy factory, overlay stack, recording
+- `simulation-core/src/main/java/io/casehub/platform/simulation/SimulationVerifier.java` — stateful verification entry point
+- `simulation-core/src/main/java/io/casehub/platform/simulation/MethodVerification.java` — fluent assertion builder
+- `simulation-core/src/main/java/io/casehub/platform/simulation/JournalEntry.java` — tenant-aware invocation record
+- `simulation-generator/src/main/java/io/casehub/platform/simulation/generator/SimulationDecoratorProcessor.java` — APT code generator
+- `simulation-config-core/src/main/java/io/casehub/platform/simulation/config/SmallRyeSimulationConfig.java` — prefix scanning + profiles
+- `schema-generator/src/main/java/io/casehub/schema/generator/SchemaDataGenerator.java` — JSON Schema → random instances
+- `simulation-testing/src/main/java/io/casehub/platform/simulation/testing/RandomCorpusPopulator.java` — CorpusSeed integration
+
+#### Key wiring
+
+**Generated decorators are inert without config.** The `@Decorator @Priority(APPLICATION + 200)` wraps whatever SPI bean is active. Without `casehub.simulation.<spi>.<method>.strategy=...`, the decorator passes through to the delegate — zero overhead beyond a `ConcurrentHashMap.get()` returning `Optional.empty()`.
+
+**`@SimulationEligible` on the SPI interface + `simulation-generator` APT dependency triggers generation.** For SPIs in other repos that can't depend on `simulation-api`, a `META-INF/simulation-eligible.txt` listing file triggers generation without the annotation.
+
+**Two simulation paths exist:** Path A (listing-file) for SPIs that can't depend on simulation-api (CaseMemoryStore in neocortex), Path B (direct annotation) for SPIs in this repo. Both produce identical `@Decorator` classes.
+
+**Overlay stack replaces ThreadLocal for scenario isolation.** `pushOverlay(config, corpus)` adds a layer; the strategy cache is invalidated. `popOverlay()` discards the layer's corpus and journal. Sequential scenario execution means no concurrency concerns on the stack.
+
+**SimulationVerifier tracks verified methods for exhaustive checking.** Each `method(qn)` call registers the qualified name. `noUnverifiedCalls()` asserts every distinct qualified name in the journal has been checked — catching unexpected SPI interactions.
+
+#### Pattern introduced
+
+Generated CDI @Decorator for SPI simulation — annotation processor generates one decorator per SPI interface, handling strategy resolution, journal recording, and capture dispatch. The decorator wraps the active CDI bean (real implementation or NoOp) without displacing it. Config-driven activation means the decorator is present but dormant unless explicitly configured.
+
+#### Gotchas
+
+**Symptom:** Simulation strategy is configured but the SPI returns NoOp responses.
+**Cause:** `simulation-generator` (or `platform-simulation-core` / `memory-simulation-core`) is not on the classpath — no decorator was generated for this SPI.
+**Fix:** Add the appropriate generated-decorator module to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+**Symptom:** `variable tenancyId is already defined` compilation error in generated decorator.
+**Cause:** The SPI method has a parameter named `tenancyId`, conflicting with the generator's local variable.
+**Fix:** The generator uses `__simTenancyId` to avoid collisions. If this persists, check for a generator version mismatch — clean and rebuild.
+
+**Symptom:** `SimulationConfigException: Strategy for X requires a KeyExtractor, but none registered`.
+**Cause:** `key-lookup` or `recorded-replay` strategy configured without a corresponding `registerExtractor()` call. The extractor must be registered before the first SPI call that triggers strategy creation.
+**Fix:** Register the extractor at startup or in test setup: `runtime.registerExtractor(qn, extractor)`.
 
 ---
 

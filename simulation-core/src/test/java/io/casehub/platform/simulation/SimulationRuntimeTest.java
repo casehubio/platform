@@ -326,6 +326,51 @@ class SimulationRuntimeTest {
 
     // --- helpers ---
 
+
+// --- pushProfile ---
+
+    @Test
+    void pushProfileActivatesNamedProfile() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime    = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        final var profileCorpus = new TestCorpus();
+        profileCorpus.seed(QN, List.of(new InvocationRecord<>("t1", null, "in", "profile-value", Instant.now())));
+        final var profileConfig = MapSimulationConfig.of(Map.of(QN, "sequential"));
+        final var profile       = new SimulationProfile(profileConfig, profileCorpus);
+
+        runtime.setProfileSource(name -> "test-profile".equals(name) ? Optional.of(profile) : Optional.empty());
+
+        final var overlay  = runtime.pushProfile("test-profile");
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("in")).isEqualTo("profile-value");
+
+        runtime.popOverlay(overlay);
+        assertThat(runtime.<String, String>strategyFor(QN)).isEmpty();
+    }
+
+    @Test
+    void pushProfileThrowsForUnknownProfile() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime    = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+        runtime.setProfileSource(name -> Optional.empty());
+
+        assertThatThrownBy(() -> runtime.pushProfile("nonexistent"))
+                .isInstanceOf(SimulationConfigException.class)
+                .hasMessageContaining("nonexistent");
+    }
+
+    @Test
+    void pushProfileThrowsWhenNoProfileSource() {
+        final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
+        final var runtime    = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
+
+        assertThatThrownBy(() -> runtime.pushProfile("any"))
+                .isInstanceOf(SimulationConfigException.class)
+                .hasMessageContaining("ProfileSource");
+    }
+
     private static SimulationConfig stubConfig(final Optional<String> strategy,
                                                final boolean capture,
                                                final Optional<ExhaustionPolicy> exhaustion) {

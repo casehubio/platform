@@ -59,4 +59,23 @@ class SimulationConfigIT {
         Object result = strategy.get().resolve(Map.of("name", "alice", "age", 30));
         assertThat(result).isEqualTo("found-alice");
     }
+
+    @Test
+    void pushProfileActivatesNamedProfile() {
+        var overlay = runtime.pushProfile("test-profile");
+        try {
+            var strategy = runtime.strategyFor("profile-spi.invoke");
+            assertThat(strategy).isPresent();
+        } finally {
+            runtime.popOverlay(overlay);
+        }
+        assertThat(runtime.<Object, Object>strategyFor("profile-spi.invoke")).isEmpty();
+    }
+
+    @Test
+    void pushProfileThrowsForUnknownProfile() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> runtime.pushProfile("nonexistent"))
+                                       .isInstanceOf(io.casehub.platform.simulation.SimulationConfigException.class);
+    }
+
 }

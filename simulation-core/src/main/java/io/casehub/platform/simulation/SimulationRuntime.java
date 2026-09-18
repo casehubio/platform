@@ -23,6 +23,8 @@ public class SimulationRuntime {
     private final ConcurrentHashMap<String, SimilarityScorer<?>> scorers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<SimulationOverlay> overlayStack = new CopyOnWriteArrayList<>();
+    private       ProfileSource                           profileSource;
+
 
     public SimulationRuntime(final SimulationConfig config, final SimulationCorpus corpus) {
         this.config = config;
@@ -98,6 +100,23 @@ public class SimulationRuntime {
     public boolean hasActiveOverlay() {
         return !overlayStack.isEmpty();
     }
+
+    public void setProfileSource(final ProfileSource profileSource) {
+        this.profileSource = profileSource;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public SimulationOverlay pushProfile(final String name) {
+        if (profileSource == null) {
+            throw new SimulationConfigException(
+                    "No ProfileSource registered — cannot resolve profile '" + name + "'");
+        }
+        final SimulationProfile profile = profileSource.resolve(name)
+                                                       .orElseThrow(() -> new SimulationConfigException(
+                                                               "Unknown simulation profile: '" + name + "'"));
+        return pushOverlay(profile.config(), (SimulationCorpus) profile.corpus());
+    }
+
 
     public void recordJournal(final String qualifiedName, final Object input,
                                final Object output, final boolean simulated) {

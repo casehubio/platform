@@ -690,7 +690,165 @@ Simulation typically evolves through stages as a project matures:
 4. **Curate the corpus** — key-lookup for deterministic scenarios
 5. **Expand** — sequential/random for load and fuzz testing
 
-Each stage is a configuration change, not a code change.
+Each stage is a configuration change, not a code change. See
+**Simulation profiles** below for named profile bundles at each stage.
+
+---
+
+## Simulation profiles
+
+A profile is a named bundle of per-method strategy configs with
+optional corpus files. Profiles let you declare "this scenario uses
+these strategies with this data" as a reusable unit.
+
+### Declaring a profile
+
+```properties
+# Named profile — bundles strategy + corpus config
+casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
+casehub.simulation.profiles.ci-replay.case-memory-store.query.strategy=key-lookup
+casehub.simulation.profiles.ci-replay.notification-store.store.strategy=sequential
+casehub.simulation.profiles.ci-replay.corpus.files=fixtures/captured-traffic.yaml
+```
+
+### Activating a profile at boot time
+
+```properties
+casehub.simulation.active-profile=ci-replay
+```
+
+Resolution order when an active profile is set:
+1. Active profile entries (for matching qualified names)
+2. Flat config entries (fallback)
+3. Empty (no strategy configured — passthrough)
+
+Existing flat config works unchanged. Profiles are purely additive.
+
+### Profile corpus files
+
+Each profile can bundle its own corpus data:
+
+```properties
+casehub.simulation.profiles.ci-replay.corpus.files=fixtures/captured-traffic.yaml
+casehub.simulation.profiles.dev-demo.corpus.files=fixtures/demo-data.yaml
+```
+
+At boot time, the active profile's corpus files are loaded into the
+base corpus alongside base corpus files. At runtime (via `pushProfile`),
+corpus files are loaded into an overlay-isolated corpus that is
+discarded when the overlay is popped.
+
+### Runtime activation with pushProfile
+
+```java
+var overlay = runtime.pushProfile("ci-replay");
+try {
+    // All SPI calls resolve against ci-replay profile
+    runScenario();
+} finally {
+    runtime.popOverlay(overlay);
+}
+```
+
+`pushProfile()` resolves the named profile, loads its corpus files into
+a fresh isolated corpus, and pushes an overlay. The overlay stack
+mechanics are unchanged — profiles are a naming layer.
+
+### Quarkus profile interaction
+
+SmallRye Config resolves Quarkus profiles before simulation config is
+parsed. The two mechanisms are complementary:
+
+- **Quarkus profiles** — environment-level switching (test/dev/prod)
+- **Simulation profiles** — cross-SPI strategy+corpus bundles
+- **Overlay stack** — runtime scenario switching
+
+Common patterns:
+
+```properties
+# Quarkus profile selects which simulation profile to activate
+%test.casehub.simulation.active-profile=ci-replay
+%dev.casehub.simulation.active-profile=dev-demo
+
+# Quarkus profile scopes simulation profile definitions
+%test.casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
+```
+
+---
+
+## Simulation maturity stages
+
+Each stage has a recommended profile. Copy the profile config block into
+your `application.properties` and adjust SPI names for your project.
+
+### Stage 0: No simulation
+
+Real backends available. No simulation config needed.
+
+### Stage 1: Capture
+
+Record real SPI traffic to build a corpus for later replay.
+
+```properties
+casehub.simulation.active-profile=capture-all
+
+casehub.simulation.profiles.capture-all.agent-provider.invoke.capture=true
+casehub.simulation.profiles.capture-all.case-memory-store.query.capture=true
+casehub.simulation.profiles.capture-all.case-memory-store.store.capture=true
+```
+
+**When to advance:** You have enough captured traffic to cover your
+primary test scenarios (typically after running through the main
+workflows 2-3 times in a dev/staging environment).
+
+### Stage 2: Recorded replay
+
+Replay captured traffic in CI. No network dependency, real-shaped data.
+
+```properties
+casehub.simulation.active-profile=ci-replay
+
+casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
+casehub.simulation.profiles.ci-replay.agent-provider.invoke.key-extractor=field:model
+casehub.simulation.profiles.ci-replay.case-memory-store.query.strategy=recorded-replay
+casehub.simulation.profiles.ci-replay.corpus.files=simulation/captured-traffic.yaml
+```
+
+**When to advance:** You need deterministic, input-dependent responses
+(not just replay order). Or your captured corpus has grown stale and
+maintaining it is more work than curating fixtures.
+
+### Stage 3: Curated
+
+Key-lookup with hand-curated or CorpusSeed-built fixtures. Fully
+deterministic — same input always produces the same output.
+
+```properties
+casehub.simulation.active-profile=curated-test
+
+casehub.simulation.profiles.curated-test.agent-provider.invoke.strategy=key-lookup
+casehub.simulation.profiles.curated-test.agent-provider.invoke.key-extractor=field:model
+casehub.simulation.profiles.curated-test.case-memory-store.query.strategy=key-lookup
+casehub.simulation.profiles.curated-test.case-memory-store.query.key-extractor=composite:entityIds,domain
+casehub.simulation.profiles.curated-test.corpus.files=simulation/curated-fixtures.yaml
+```
+
+**When to advance:** You need volume testing, fuzzing, or statistical
+coverage beyond what hand-curated fixtures provide.
+
+### Stage 4: Synthetic
+
+Sequential or random strategies with generated data from CorpusSeed
+builders or LlmCorpusPopulator.
+
+```properties
+casehub.simulation.active-profile=load-test
+
+casehub.simulation.profiles.load-test.agent-provider.invoke.strategy=sequential
+casehub.simulation.profiles.load-test.agent-provider.invoke.exhaustion-policy=WRAP
+casehub.simulation.profiles.load-test.case-memory-store.query.strategy=random
+casehub.simulation.profiles.load-test.corpus.files=simulation/generated-data.yaml
+```
 
 ---
 
@@ -776,13 +934,20 @@ All configuration lives under the `casehub.simulation` prefix:
 casehub.simulation.<spi-name>.<method-name>.strategy=<strategy-key>
 casehub.simulation.<spi-name>.<method-name>.capture=true|false
 casehub.simulation.<spi-name>.<method-name>.exhaustion-policy=WRAP|THROW
+
+casehub.simulation.active-profile=<profile-name>
+casehub.simulation.profiles.<name>.<spi-name>.<method-name>.strategy=<strategy-key>
+casehub.simulation.profiles.<name>.<spi-name>.<method-name>.capture=true|false
+casehub.simulation.profiles.<name>.corpus.files=<comma-separated-paths>
 ```
 
 | Property | Values | Default |
 |----------|--------|---------|
-| `strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay` | none (passthrough) |
+| `strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay`, `nearest-match` | none (passthrough) |
 | `capture` | `true`, `false` | `false` |
 | `exhaustion-policy` | `WRAP`, `THROW` | `WRAP` |
+| `active-profile` | profile name | none |
+| `profiles.<name>.corpus.files` | comma-separated classpath/file paths | none |
 
 ### SPI name resolution
 

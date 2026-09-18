@@ -1076,3 +1076,112 @@ will extend the patterns above:
 
 Each extends the existing strategy/corpus/config model — no breaking
 changes to the patterns documented above.
+
+## Scenario Integration
+
+The simulation framework supports runtime-scoped overlays for per-scenario
+isolation. Scenario scripts can configure strategies, seed corpora, and
+assert against invocations — all without affecting boot-time configuration.
+
+### SimulationOverlay API
+
+`SimulationRuntime` provides an overlay stack. Each overlay contains its
+own `SimulationConfig`, `SimulationCorpus`, and `InvocationJournal`.
+
+```java
+// Push an overlay with strategy overrides and isolated corpus
+SimulationOverlay overlay = runtime.pushOverlay(config, corpus);
+
+// Pop the overlay — corpus and journal discarded
+runtime.popOverlay(overlay);
+
+// Pop all overlays (teardown convenience)
+runtime.popAll();
+
+// Check if overlays are active
+runtime.hasActiveOverlay();
+
+// Query the journal for assertion support
+List<JournalEntry> entries = runtime.journal(overlay);
+```
+
+**Strategy resolution** walks the overlay stack top-down. The first overlay
+whose config returns a strategy for a given qualified name wins. If no
+overlay has a strategy, resolution falls through to the base (boot-time)
+config.
+
+### MapSimulationConfig
+
+Programmatic `SimulationConfig` for scenario use (no SmallRye Config):
+
+```java
+var config = MapSimulationConfig.of(Map.of(
+    "agent-provider.invoke", "sequential",
+    "case-memory-store.query", "key-lookup"
+));
+```
+
+### InvocationJournal
+
+Every intercepted call is recorded in the active overlay's journal:
+
+```java
+// After scenario execution, query the journal
+var entries = overlay.journal().entriesFor("agent-provider.invoke");
+long count = overlay.journal().countFor("agent-provider.invoke");
+
+// JournalEntry fields:
+// - qualifiedName: SPI method identifier
+// - input: the method argument(s)
+// - output: the return value
+// - timestamp: when the call occurred
+// - simulated: true if strategy resolved, false if delegate was called
+```
+
+### Mid-Scenario Strategy Switching
+
+Push multiple overlays to change strategies during execution:
+
+```java
+// Phase 1: real implementations
+var overlay1 = runtime.pushOverlay(MapSimulationConfig.of(Map.of()));
+
+// ... run real steps ...
+
+// Phase 2: switch to simulation
+var overlay2 = runtime.pushOverlay(MapSimulationConfig.of(Map.of(
+    "agent-provider.invoke", "key-lookup"
+)), seededCorpus);
+
+// ... run simulated steps ...
+
+// Teardown
+runtime.popAll();
+```
+
+### Scenario YAML (casehub-pages)
+
+Scenarios declare simulation configuration in a `simulation:` block:
+
+```yaml
+scenario: Patient intake with simulated LLM
+simulation:
+  strategies:
+    agent-provider.invoke: sequential
+    case-memory-store.query: key-lookup
+  corpus:
+    - fixtures/agent-responses.yaml
+    - fixtures/memory-data.yaml
+  capture:
+    - preference-provider.get
+steps:
+  - label: start-case
+    target: browser
+    commands:
+      - action: navigate
+        value: /cases/new
+```
+
+The `ScenarioOrchestrator` calls `pushOverlay()` on start and
+`popOverlay()` on stop/completion. Each scenario gets an isolated
+corpus — no bleed between scenarios.

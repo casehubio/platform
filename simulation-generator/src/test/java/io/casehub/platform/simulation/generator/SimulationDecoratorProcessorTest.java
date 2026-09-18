@@ -170,6 +170,36 @@ class SimulationDecoratorProcessorTest {
         assertThat(occurrences(code, "simulation.strategyFor")).isGreaterThanOrEqualTo(4);
     }
 
+    // --- journal recording ---
+
+    @Test
+    void generatedSourceContainsJournalRecording() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("simulation.recordJournal(qualifiedName,");
+        assertThat(occurrences(code, "simulation.recordJournal")).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void journalRecordingForSimulatedPathUsesTrue() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("simResult, true)");
+    }
+
+    @Test
+    void journalRecordingForDelegatePathUsesFalse() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("result, false)");
+    }
+
     // --- listing file support ---
 
     @Test

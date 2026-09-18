@@ -230,6 +230,40 @@ seed.seedInto(corpus);
 runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
 ```
 
+#### Schema-driven random generation
+
+For load testing or integration tests where data shape matters more than
+content, use `SchemaDataGenerator` to populate a corpus from JSON Schema:
+
+```java
+import io.casehub.schema.generator.PlatformSchemaGenerator;
+import io.casehub.schema.generator.SchemaDataGenerator;
+
+var schemaGen = new PlatformSchemaGenerator();
+var dataGen = new SchemaDataGenerator();
+
+// Generate typed instances directly
+JsonNode schema = schemaGen.generate(MyRecord.class);
+List<MyRecord> instances = dataGen.generate(schema, 50, MyRecord.class, objectMapper);
+
+// Or use RandomCorpusPopulator for CorpusSeed integration
+RandomCorpusPopulator.populate(seed, InputType.class, OutputType.class, 50, objectMapper);
+seed.seedInto(corpus);
+```
+
+`SchemaDataGenerator` respects Jakarta Validation constraints from the
+schema (min/max, minLength/maxLength, pattern, enum values). It resolves
+`$ref`/`$defs` for nested types and supports `format: uuid` and
+`format: date-time`. Use a seeded `Random` for reproducible output:
+
+```java
+var dataGen = new SchemaDataGenerator(new Random(42));
+```
+
+This maps to `DataRealism.STRUCTURALLY_VALID` — correct types, shapes,
+and constraint-bounded values, but no semantic awareness. For
+domain-plausible data, use `LlmCorpusPopulator` instead.
+
 ---
 
 ## Core concepts
@@ -636,8 +670,8 @@ The `DataRealism` enum classifies how realistic corpus data is:
 | Level | Meaning | Source |
 |-------|---------|--------|
 | `GARBAGE` | Structurally valid but semantically meaningless | Random generation |
-| `STRUCTURALLY_VALID` | Correct types and shapes, plausible values | Schema-driven generation |
-| `DOMAIN_PLAUSIBLE` | Realistic within the domain | Hand-crafted or LLM-generated |
+| `STRUCTURALLY_VALID` | Correct types and shapes, constraint-bounded values | `SchemaDataGenerator` / `RandomCorpusPopulator` |
+| `DOMAIN_PLAUSIBLE` | Realistic within the domain | `LlmCorpusPopulator` or hand-crafted |
 | `RECORDED_REAL` | Captured from a real system | Capture mode |
 
 Choose the realism level that matches your testing goal. Load testing

@@ -933,6 +933,79 @@ The scheduler calls `emitter.tick()` on the configured interval. Set
 
 ---
 
+## REST client simulation
+
+Simulates `@RegisterRestClient` interfaces — external HTTP APIs that may
+not be available during scenario execution.
+
+### Quick start
+
+Add the processor and runtime dependencies to the module containing or
+depending on the REST client interface:
+
+```xml
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-rest-client-simulation-generator</artifactId>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-simulation-core</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-simulation-config</artifactId>
+</dependency>
+```
+
+The processor auto-detects `@RegisterRestClient` interfaces in the Jandex
+index and generates `@Decorator` classes with `@RestClient`-qualified
+delegates.
+
+### Configuration
+
+```properties
+# Simulate ScimClient.membersOf with key-lookup strategy
+casehub.simulation.scim.membersOf.strategy=key-lookup
+casehub.simulation.scim.membersOf.key-extractor=rest-client
+
+# Capture real responses from ScimClient.getGroup
+casehub.simulation.scim.getGroup.capture=true
+```
+
+The spi name is the `configKey` from `@RegisterRestClient` (e.g., `scim`
+for `@RegisterRestClient(configKey = "scim")`), or the kebab-cased
+interface name if no configKey is set.
+
+### RestInvocation
+
+All REST client method calls are wrapped in a `RestInvocation` record:
+
+```java
+RestInvocation(
+    String spiName,       // "scim"
+    String methodName,    // "membersOf"
+    String httpMethod,    // "GET"
+    String pathTemplate,  // "/Groups/{id}/Members"
+    Map<String, Object> params,  // {id: "grp-1"}
+    Object body           // null (or request body POJO)
+)
+```
+
+### Key extraction
+
+The built-in `rest-client` key extractor produces keys like
+`GET /Groups/grp-1/Members` — HTTP method + resolved path template.
+
+### Limitations
+
+- Reactive return types (`Uni<T>`, `Multi<T>`) are passed through to
+  the real client without simulation or capture.
+- Interfaces annotated with both `@SimulationEligible` and
+  `@RegisterRestClient` are handled by the base
+  `SimulationDecoratorProcessor`, not this processor.
+
 ## What's next
 
 The simulation framework is actively growing. Planned capabilities that
@@ -943,8 +1016,6 @@ will extend the patterns above:
 - **Verification API** — assertion DSL on captured invocations
   (`wasCalled()`, `wasCalledWith()`, `verifyInOrder()`) replacing
   ad-hoc corpus inspection
-- **REST client simulation** — `@RegisterRestClient` proxy with
-  strategy dispatch for simulating external HTTP services
 
 Each extends the existing strategy/corpus/config model — no breaking
 changes to the patterns documented above.

@@ -164,6 +164,18 @@
         <module>rest-spring-generator</module>
         <module>graphql-spring-generator</module>
         <module>mcp-spring-generator</module>
+        <module>agent-runtime-spring</module>
+        <module>agent-claude-spring</module>
+        <module>agent-openai-spring</module>
+        <module>agent-codex-spring</module>
+        <module>agent-gemini-spring</module>
+        <module>agent-gemini-cli-spring</module>
+        <module>agent-langchain4j-spring</module>
+        <module>agent-config-spring</module>
+        <module>agent-router-spring</module>
+        <module>governance-spring</module>
+        <module>expression-spring</module>
+        <module>identity-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

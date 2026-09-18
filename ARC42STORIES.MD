@@ -3,8 +3,8 @@
 **Spec:** Arc42Stories v0.1
 **Profile:** CaseHub — Foundation tier
 **Profile ref:** `../parent/docs/arc42stories-casehub-profile.md` · fallback: `https://raw.githubusercontent.com/casehubio/parent/main/docs/arc42stories-casehub-profile.md`
-**Build position:** First in the foundation stack — no casehubio dependencies. Must publish before ledger, work, qhorus, engine.
-**Consumed by:** casehub-ledger, casehub-work, casehub-qhorus, casehub-engine, claudony, devtown, aml, clinical
+**Build position:** First in the foundation stack — no casehubio dependencies. Must publish before ledger, connectors, work, qhorus, eidos, engine.
+**Consumed by:** casehub-ledger, casehub-connectors, casehub-work (api), casehub-qhorus, casehub-eidos, casehub-engine, all application-tier harness apps
 **Depends on:** None — zero casehubio dependencies. Pure Java APIs + Quarkus extension modules with no upstream casehub deps.
 
 ---
@@ -15,9 +15,9 @@
 
 `casehub-platform` is the zero-dependency foundational SPI layer for the CaseHub ecosystem. It defines shared interfaces and default implementations that all foundation modules and application-tier repos depend on without creating circular dependencies.
 
-Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `deny`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI), `NotificationStore` / `SubscriptionEngine` (notification pipeline), `DataSourceRegistry` (alpha network event routing), `CallbackRegistry` (lease-based callback SPI), `@McpDomain` annotation processing (REST + GraphQL + MCP generation from interfaces or classes), `ModelRegistry` (model catalog + resolution), `SubjectViewStore` (label-pattern filtered views).
+Core capabilities: `Path` (hierarchical scope keys for preferences), `PreferenceKey` / `PreferenceProvider` (scoped configuration SPIs), `CurrentPrincipal` (identity context), `ActorType` / `ActorTypeResolver` (actor classification), `GroupMembershipProvider` / `GroupMember` (directory-backed group lookup), `CaseMemoryStore` (semantic cross-case memory SPI) + `GraphCaseMemoryStore` (graph-native extension: `graphQuery(GraphMemoryQuery)`), `MemoryCapability` (adapter self-description enum), `AgentProvider` (agent execution SPI) + `AgentSession` (multi-turn serial API), `AccessControlProvider` (flat-grant ACL SPI — `canAccess`, `grant`, `revoke`, `accessibleResources`), `ActorStateContributor` / `ActorStateAccumulator` (actor workload state SPI).
 
-Module structure (70+ modules across 22 layers): `platform-api` (SPIs, zero heavy deps), `platform` (@DefaultBean mocks), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (MVEL3 + JQ expression engines), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal graph), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider + AgentBackend SPIs), `agent-runtime/` (SubprocessRuntime), `agent-claude/`, `agent-openai/`, `agent-ollama/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/` (backend providers), `agent-router/` (four-step model resolution), `agent-gate/` (CDI @Decorator rate limiter), `agent-config-core/` + `agent-config/` (YAML manifest loading), `endpoints-memory/`, `endpoints-config/` (endpoint registry), `acl-inmem/`, `acl-jpa/`, `acl-admin/`, `acl-worker/` (access control), `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` (stream ingestion), `governance/` (PolicyEnforcer), `notifications/`, `notifications-inmem/`, `notifications-jpa/`, `notification-dispatch/`, `notification-settings-inmem/`, `notification-settings-jpa/`, `delivery-channel-inmem/`, `delivery-tracking-inmem/`, `delivery-tracking-jpa/`, `digest-inmem/`, `digest-jpa/` (notification pipeline), `subscriptions/`, `subscriptions-inmem/`, `subscriptions-jpa/` (subscription engine), `datasource-alpha/`, `datasource-inmem/`, `datasource-jpa/` (alpha network), `callback-api/`, `callback/`, `callback-inmem/`, `callback-client/`, `callback-generator/`, `callback-spring/` (callback infrastructure), `mcp/`, `graphql/`, `graphql-client/`, `graphql-generator/`, `graphql-spring-generator/`, `rest-spring-generator/`, `mcp-spring-generator/`, `generator-common/`, `drift-detection/` (MCP & API generation), `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` (subject views), `platform-pdf/` (PDF generation), `platform-signing/` (document signing), `schema-generator/` (JSON Schema), `yaml-core/`, `yaml-jackson/`, `yaml-codegen/` (YAML primitives), `credentials-quarkus/` (credential bridge), `preferences-editor/` (preference CRUD), `llm-config-core/`, `llm-config/`, `llm-config-vertex/`, `llm-config-bedrock/` (LLM configuration). Framework-neutral `-core` and Spring `-spring` companion modules for dual-framework deployment.
+Module structure: `platform-api` (SPIs, zero heavy deps — includes CompiledExpression/ExpressionEngine/ExpressionEngineRegistry expression SPI), `platform` (@DefaultBean mocks + NoOpExpressionEngineRegistry), `testing` (@Alternative @Priority(1) fixtures), `config/` (YAML preferences), `oidc/` (OIDC CurrentPrincipal), `expression/` (DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3 transpiler) + JQExpressionEngine + JQEvaluator), `persistence-jpa/` (JPA PreferenceProvider), `persistence-mongodb/` (MongoDB PreferenceProvider), `memory-inmem/` (volatile), `memory-jpa/` (PostgreSQL + FTS), `memory-sqlite/` (embedded + FTS5), `memory-mem0/` (Mem0 REST + vector), `memory-graphiti/` (Graphiti REST + temporal knowledge graph, @Priority(2)), `scim/` (SCIM 2.0 GroupMembershipProvider), `identity/` (DID/VC agent identity), `agent-api/` (AgentProvider + AgentBackend SPIs + AgentSession multi-turn + AgentRuntime/AgentProcess), `agent-runtime/` (SubprocessRuntime), `agent-claude/` (AgentBackend "claude" — Claude CLI subprocess), `agent-openai/` (AgentBackend "openai" — native OpenAI SDK), `agent-codex/` (AgentBackend "codex" — Codex CLI via AgentRuntime), `agent-gemini/` (AgentBackend "gemini" — native Google GenAI SDK), `agent-gemini-cli/` (AgentBackend "gemini-cli" — Gemini CLI via AgentRuntime), `agent-langchain4j/` (AgentBackend "langchain4j" — bidirectional LangChain4j interop), `agent-router/` (RoutingAgentProvider — three-step model resolution: ModelRegistry → key → fail-fast, config rewriting; NoOpModelRegistry @DefaultBean), `agent-gate/` (CDI @Decorator rate limiter — token bucket + concurrency gate), `endpoints-memory/` (volatile InMemoryEndpointRegistry), `endpoints-config/` (YAML-backed endpoint populator), `acl-inmem/` (volatile InMemoryAccessControlProvider), `acl-jpa/` (JPA-backed JpaAccessControlProvider + Flyway V2000), `streams-kafka/` (static Kafka @Incoming channel), `streams-amqp/` (static AMQP @Incoming channel), `streams-webhook/` (JAX-RS CloudEvents HTTP binding receiver), `streams-poll/` (@Scheduled HTTP GET poller), `streams-camel/` (dynamic Camel route builder via EndpointRegistered), `governance/` (PolicyEnforcer — retry/timeout/backoff; virtual-thread executor shared at bean level).
 
 ### Artifact Schema
 
@@ -139,25 +139,19 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 | L1: API Tier | `platform-api` | Zero-dep Java SPIs, records, enums, types |
 | L2: Default Implementations | `platform` | `@DefaultBean` CDI mocks |
 | L3: Testing Infrastructure | `testing` | `@Alternative @Priority(1)` test fixtures |
-| L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/`, `credentials-quarkus/`, `preferences-editor/`, `governance/` | Opt-in non-mock implementations — expression/ provides MvelExpressionEngine (MVEL3 transpiler), JQExpressionEngine, DefaultExpressionEngineRegistry; credentials-quarkus/ bridges to Quarkus CredentialsProvider (Vault/AWS/GCP); preferences-editor/ REST/MCP CRUD for preferences; governance/ provides PolicyEnforcer (retry/timeout/backoff/circuit-breaker) |
+| L4: Platform Extensions | `config/`, `oidc/`, `expression/`, `endpoints-config/` | Opt-in non-mock implementations — expression/ provides MvelExpressionEngine (MVEL3 transpiler), JQExpressionEngine, DefaultExpressionEngineRegistry |
 | L5: Preference Persistence | `persistence-jpa/`, `persistence-mongodb/` | Database-backed PreferenceProvider |
 | L6: Memory Adapters | `memory-inmem/`, `memory-jpa/`, `memory-sqlite/`, `memory-mem0/`, `memory-graphiti/` | CaseMemoryStore / GraphCaseMemoryStore implementations (mutually exclusive per priority tier) |
 | L7: Identity Extensions | `scim/`, `identity/` | SCIM group membership, DID/VC agent identity |
-| L8: Agent Infrastructure | `agent-api/`, `agent-runtime/`, `agent-claude/`, `agent-openai/`, `agent-ollama/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/`, `agent-router/`, `agent-gate/`, `agent-config-core/`, `agent-config/` | AgentProvider (caller SPI) + AgentBackend (implementor SPI) + RoutingAgentProvider (four-step model resolution: alias → tier → registry → key → fail-fast) + ModelRegistry SPI (ModelDescriptor, ModelSource, ModelQuery) + InMemoryModelRegistry + SeedCatalogModelSource (17 models, 5 vendors) + native providers (Claude CLI, OpenAI API, Ollama, Gemini API, Codex CLI, Gemini CLI) + LangChain4j interop + SubprocessRuntime (AgentRuntime SPI) + CDI @Decorator rate limiter + agent-config manifest loading (YAML hierarchy, credential resolution, profile support) |
+| L8: Agent Infrastructure | `agent-api/`, `agent-runtime/`, `agent-claude/`, `agent-openai/`, `agent-codex/`, `agent-gemini/`, `agent-gemini-cli/`, `agent-langchain4j/`, `agent-router/`, `agent-gate/` | AgentProvider (caller SPI) + AgentBackend (implementor SPI) + RoutingAgentProvider (three-step model resolution: ModelRegistry → key → fail-fast) + ModelRegistry SPI (ModelDescriptor, ModelSource, ModelQuery) + InMemoryModelRegistry + SeedCatalogModelSource (17 models, 5 vendors) + native providers (Claude CLI, OpenAI API, Gemini API, Codex CLI, Gemini CLI) + LangChain4j interop + SubprocessRuntime (AgentRuntime SPI) + CDI @Decorator rate limiter |
 | L9: Endpoint Registry Adapters | `endpoints-memory/` | EndpointRegistry adapter implementations (separate SPI from CaseMemoryStore — must not be conflated with L6) |
-| L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-webhook-core/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
-| L11: Access Control | `acl-inmem/`, `acl-jpa/`, `acl-admin/`, `acl-worker/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped, deny entries; `AclService` REST/MCP admin; `WorkerCredentialFilter` @Provider. Flyway V3 for JPA adapter |
+| L10: Stream Ingestion | `streams-kafka/`, `streams-amqp/`, `streams-webhook/`, `streams-poll/`, `streams-camel/` | Classpath-activated transports each firing `Event<CloudEvent>.fireAsync()` |
+| L11: Access Control | `acl-inmem/`, `acl-jpa/` | `AccessControlProvider` SPI implementations — flat-grant, tenant-scoped; Flyway V2000 for JPA adapter |
 | L12: Digest Buffer Adapters | `digest-inmem/`, `digest-jpa/` | `DigestBuffer` SPI implementations — volatile in-memory or persistent JPA; mutually exclusive per CDI priority tier |
-| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/`, `platform-view-core/`, `platform-view-spring/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
+| L13: Subject View Adapters | `platform-view/`, `platform-view-inmem/`, `platform-view-jpa/` | Filtered views of labeled subjects — `SubjectViewStore` + `ViewMembershipTracker` SPIs with label-pattern matching, `SubjectViewOrchestrator` (evaluator + store + tracker composition with TTL caching), ADDED/REMOVED/CHANGED lifecycle events, scope-aware evaluation, `InMemorySubjectViewQuerySupport` abstract query helper. Generalizes work-queues' `QueueView` pattern for any entity type. Flyway V5000-V5001 for JPA adapter |
 | L14: PDF Generation | `platform-pdf/` | HTML-to-PDF conversion with PDF/A-2b conformance (ISO 19005-2). `PdfGenerator` SPI in `platform-api/api/pdf/` with `@DefaultBean NoOpPdfGenerator` in `platform/` (returns `Optional.empty()`). Implementation: OpenHTMLtoPDF 1.1.37 with bundled Liberation Sans + Mono fonts (~1.4MB). Optional module — classpath activation. First consumer: qhorus compliance-report (#417) |
 | L15: Document Signing | `platform-signing/` | EU DSS 6.2-backed PAdES PDF signatures + CAdES detached (.p7s). `DocumentSigningService` + `DocumentVerificationService` SPIs in `platform-api/.../signing/document/` with `@DefaultBean NoOp*` in `platform/`. Implementation: `DssDocumentSigningService` (PAdES via `PAdESService`, CAdES via `CAdESService`), `DssDocumentVerificationService` (format auto-detection via `SignedDocumentValidator`, optional EU Trusted List validation via `TrustedListManager`), `KeyStoreManager @ApplicationScoped` (PKCS#12, `@Inject` from config). Certificate lifecycle: `CertificateExpiryMonitor` (`@Scheduled` 6h, fires `CertificateExpiryEvent`), `KeyStoreRotationService` (atomic swap via `AtomicReference`). Multi-tenant: `TenantKeyStoreResolver` (per-tenant PKCS#12, cached, fallback to default). EU Trusted List: `TrustedListManager` loads LOTL via `dss-tsl-validation` (file-cached 24h, disabled by default). Profile enforcement: B_T+ without TSA fails (no silent downgrade). PDFBox 3.0.4 via DSS (compatible with L14's 3.0.3). `DssSigningConfig @ConfigMapping(prefix = "casehub.signing")`. Optional module — classpath activation. First consumer: qhorus compliance-report (#418) |
-| L16: Notification & Delivery | `notifications/`, `notifications-inmem/`, `notifications-jpa/`, `notification-dispatch/`, `notification-settings-inmem/`, `notification-settings-jpa/`, `delivery-channel-inmem/`, `delivery-tracking-inmem/`, `delivery-tracking-jpa/`, `notifications-core/`, `notification-dispatch-core/`, `notification-settings-inmem-core/`, `delivery-tracking-inmem-core/`, `delivery-channel-inmem-core/` | Full notification pipeline: `NotificationStore` SPI (store/query/status), `NotificationDispatcher` (target resolution → suppression → template → channel routing → delivery or digest buffer), `DeliveryAttemptStore` (tracking + retry), `DigestFlushScheduler` (polymorphic schedule), `EngagementRecorder`. REST/MCP endpoints generated from @McpDomain SPIs. CDI event push via `EventBroadcaster`. Mutually exclusive adapters per CDI priority |
-| L17: Subscription Engine | `subscriptions/`, `subscriptions-inmem/`, `subscriptions-jpa/`, `subscriptions-core/`, `subscriptions-inmem-core/` | `SubscriptionEngine` wires subscriptions into the alpha network via `EventTypeObjectType`. Expression-compiled filters (MVEL, JQ). `SubscriptionMatched` CDI event (async) fires `NotificationDispatcher`. REST CRUD + event-type discovery. Glob-pattern event matching (`io.casehub.work.workitem.*`) |
-| L18: Datasource & Alpha Network | `datasource-alpha/`, `datasource-inmem/`, `datasource-jpa/`, `datasource-inmem-core/` | Rete alpha network runtime — `AlphaDataSource`, `TypeNode`, `FilterNode`, `FanOutProcessor`. `DataSourceRegistry` SPI (register/resolve/discover/deregister). `datasource-alpha/` is pure runtime (no CDI, no persistence). Adapters: volatile in-memory or JPA-backed with startup reconciliation |
-| L19: Callback Infrastructure | `callback-api/`, `callback/`, `callback-inmem/`, `callback-client/`, `callback-client-core/`, `callback-generator/`, `callback-spring/`, `callback-core/` | Lease-based callback registration SPI. `CallbackInvoker` (HTTP POST + retry via PolicyEnforcer). `CallbackAutoRegistrar` (client-side @Startup discovery + heartbeat). `CallbackDecoratorProcessor` APT (generates @Decorator proxies from @CallbackEligible SPIs). Spring `BeanPostProcessor` equivalent |
-| L20: MCP & API Generation | `mcp/`, `mcp-core/`, `graphql/`, `graphql-client/`, `graphql-generator/`, `graphql-spring-generator/`, `rest-spring-generator/`, `mcp-spring-generator/`, `generator-common/`, `drift-detection/`, `schema-generator/` | MCP runtime: `GraphQLModelScanner` auto-discovers `@McpDomain` domains (classes and interfaces) at startup, `DynamicToolRegistrar`, `McpSchemaBuilder`, `McpResourceRegistryBridge`. `graphql-generator` APT: `@McpDomain` + `@PlatformQuery`/`@PlatformMutation` → `@GraphQLApi` resolver + `@Path` JAX-RS REST resource. Spring generators mirror for Spring Boot. `GraphQL` module: JSON scalar, pagination types. `schema-generator`: JSON Schema from Java types (victools). `drift-detection`: Maven Enforcer rule for codegen drift |
-| L21: Dual-Framework Core & Spring | `platform-core/`, `platform-spring/`, `spring-testing/`, `spring-generator/`, `expression-core/`, `governance-core/`, `identity-core/`, `agent-runtime-core/`, `agent-claude-core/`, `agent-openai-core/`, `agent-codex-core/`, `agent-gemini-core/`, `agent-gemini-cli-core/`, `agent-config-core/`, `agent-router-core/`, `agent-gate-core/`, `agent-langchain4j-core/`, `llm-config-core/`, `config-core/`, `endpoints-config-core/`, `endpoints-memory-core/`, `acl-inmem-core/`, `preferences-editor-core/`, `mcp-core/` | Framework-neutral constructor-injected POJOs extracted from CDI-coupled modules. Each `-core` module has zero CDI imports. Quarkus modules retain existing artifact names and depend on their `-core`. Spring auto-configuration modules (`-spring`) are generated from Quarkus `@Produces` via `spring-generator` (extends `generator-common` base classes) |
-| L22: LLM Configuration | `llm-config-core/`, `llm-config/`, `llm-config-vertex/`, `llm-config-bedrock/` | UI-driven LLM provider setup wizard. `LlmConfigApi` SPI (configure/validate/pull). Vendor discovery clients: Vertex AI (ADC auth, project/region/model), Bedrock (credential chain, region/model). Framework-neutral core types + Quarkus wiring |
+| L16: Simulation Framework | `simulation-api/`, `simulation-core/`, `simulation-inmem/`, `simulation-config-core/`, `simulation-config/`, `simulation-generator/`, `simulation-testing/`, `platform-simulation-core/`, `memory-simulation-core/`, `agent-simulation-core/`, `event-simulation-core/`, `event-simulation/`, `rest-client-simulation-generator/`, `schema-generator/` (SchemaDataGenerator) | SPI-level simulation without Mockito. 4 tiers: API (`SimulationStrategy<I,O>`, `SimulationCorpus<I,O>`, `InvocationRecord<I,O>`, `KeyExtractor<I>`, `SimilarityScorer<I>`, `CorpusSeed<I,O>`, `DataRealism`, `ExhaustionPolicy`, `@SimulationEligible`), Core (5 strategies: Sequential, KeyLookup, Random, RecordedReplay, NearestMatch + `SimulationRuntime` + `SimulationOverlay` + `InvocationJournal`/`JournalEntry` + `SimulationVerifier`/`MethodVerification` + `SimulationConfig`/`MapSimulationConfig` + `ProfileSource`/`SimulationProfile`), Generator (`SimulationDecoratorProcessor` APT — `@Decorator` + `*QN` constants per SPI; `RestClientSimulationProcessor` for `@RegisterRestClient`), Integration (`SmallRyeSimulationConfig` prefix scanning, `YamlCorpusLoader`, `DeclarativeExtractorFactory`/`DeclarativeScorerFactory`, `SimulatedEventEmitter`/`TimedSequence`/`EventSequenceRunner`, corpus descriptors: `AclCorpus`/`ModelCorpus`/`NotificationCorpus`/`PreferenceCorpus`/`CredentialCorpus`/`AgentCorpus`, `LlmCorpusPopulator`, `RandomCorpusPopulator`, `SchemaDataGenerator`). Config: `casehub.simulation.<spi>.<method>.{strategy,capture,exhaustion-policy,threshold}`, named profiles via `casehub.simulation.profiles.<name>.*` |
 
 ### Journey and Chapter sequencing rationale
 
@@ -173,6 +167,7 @@ See `../parent/docs/PLATFORM.md` Capability Ownership table for the full boundar
 - C19 after C14: `AgentSession` extends `AgentProvider` — the SPI and `ClaudeAgentClient` must exist first; LangChain4j bridge depends on `AgentSession`
 - C20 after C17/C18: `streams-camel` observes `EndpointRegistered` (fired by `InMemoryEndpointRegistry` from C17); all stream modules require `cloudevents-core` declared in parent BOM
 - C21 after C12: `AccessControlProvider` SPI is independent of memory; `groupsOf()` inverse lookup added to `GroupMembershipProvider` in C12 is a prerequisite for role-based ACL resolution
+- C23 after C14: simulation decorators inject `CurrentPrincipal` (from C3) and wrap `AgentProvider` (from C14); simulation-api is a new module independent of platform-api
 
 ---
 
@@ -186,7 +181,7 @@ C4Container
     Container(api, "casehub-platform-api", "Java 21", "SPIs, types, records — zero deps")
   }
   Container_Boundary(l2, "L2: Default Implementations") {
-    Container(platform, "casehub-platform", "Quarkus", "@DefaultBean mocks + configurable defaults")
+    Container(platform, "casehub-platform", "Quarkus", "@DefaultBean mocks + BlockingToReactiveBridge")
   }
   Container_Boundary(l3, "L3: Testing") {
     Container(testing, "casehub-platform-testing", "Java 21", "@Alternative @Priority(1) identity fixtures")
@@ -195,14 +190,11 @@ C4Container
     Container(config, "casehub-platform-config", "Quarkus", "YAML ConfigFilePreferenceProvider")
     Container(oidc, "casehub-platform-oidc", "Quarkus OIDC", "@RequestScoped OidcCurrentPrincipal")
     Container(expr, "casehub-platform-expression", "Quarkus", "DefaultExpressionEngineRegistry + MvelExpressionEngine (MVEL3) + JQExpressionEngine + JQEvaluator + SecretManager/ConfigManager mocks")
-    Container(endpointsConfig, "casehub-platform-endpoints-config", "Quarkus", "@Startup YAML-backed EndpointDescriptor populator")
-    Container(credsQuarkus, "casehub-platform-credentials-quarkus", "Quarkus", "@Alternative @Priority(1) CredentialResolver — Vault/AWS/GCP bridge")
-    Container(prefsEditor, "casehub-platform-preferences-editor", "Quarkus", "PreferenceService REST/MCP — @McpDomain CRUD + schema discovery")
-    Container(governance, "casehub-platform-governance", "Java", "PolicyEnforcer — retry/timeout/backoff/circuit-breaker via virtual threads")
+    Container(endpointsConfig, "casehub-platform-endpoints-config", "Quarkus", "@Startup @ApplicationScoped YAML-backed EndpointDescriptor populator")
   }
   Container_Boundary(l5, "L5: Preference Persistence") {
     Container(jpaPrefs, "casehub-platform-persistence-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaPreferenceProvider")
-    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "MongoDB Java driver", "@Alternative @Priority(1) MongoPreferenceProvider")
+    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "Panache MongoDB", "@Alternative @Priority(1) MongoPreferenceProvider")
   }
   Container_Boundary(l6, "L6: Memory Adapters — mutually exclusive per priority tier") {
     Container(memInmem, "casehub-platform-memory-inmem", "Java", "@Alternative @Priority(10) InMemoryMemoryStore")
@@ -217,18 +209,9 @@ C4Container
   }
   Container_Boundary(l8, "L8: Agent Infrastructure") {
     Container(agentApi, "casehub-platform-agent-api", "Mutiny", "AgentProvider SPI + AgentSession multi-turn + AgentEvent types")
-    Container(agentRuntime, "casehub-platform-agent-runtime", "Quarkus", "SubprocessRuntime — local process execution for CLI agents")
     Container(agentClaude, "casehub-platform-agent-claude", "Quarkus", "ClaudeAgentProvider subprocess + ClaudeAgentSession (IDLE/ACTIVE/CLOSED)")
-    Container(agentOpenai, "casehub-platform-agent-openai", "OpenAI SDK", "OpenAiAgentBackend — native SDK with prompt_cache_key")
-    Container(agentOllama, "casehub-platform-agent-ollama", "OpenAI SDK", "OllamaAgentBackend — local models via OpenAI-compat API")
-    Container(agentCodex, "casehub-platform-agent-codex", "Quarkus", "CodexAgentBackend — Codex CLI via AgentRuntime")
-    Container(agentGemini, "casehub-platform-agent-gemini", "Google GenAI SDK", "GeminiAgentBackend — native SDK with cached content")
-    Container(agentGeminiCli, "casehub-platform-agent-gemini-cli", "Quarkus", "GeminiCliAgentBackend — Gemini CLI via AgentRuntime")
-    Container(agentLangchain4j, "casehub-platform-agent-langchain4j", "LangChain4j", "Bidirectional: ChatModelAgentProvider + AgentProviderChatModel")
-    Container(agentRouter, "casehub-platform-agent-router", "Quarkus", "RoutingAgentProvider — four-step model resolution")
-    Container(agentGate, "casehub-platform-agent-gate", "CDI @Decorator", "GatedAgentProvider — token bucket + concurrency gate")
-    Container(agentConfigCore, "casehub-platform-agent-config-core", "Java", "ManifestLoader + ManifestProcessor — YAML hierarchy, credential resolution")
-    Container(agentConfig, "casehub-platform-agent-config", "Quarkus", "@Startup manifest loading + ManifestResult producer")
+    Container(agentLangchain4j, "casehub-platform-agent-langchain4j", "LangChain4j", "Bidirectional: ChatModelAgentProvider (@Alternative @Priority(1)) + AgentProviderChatModel (@DefaultBean @Priority(10))")
+    Container(agentGate, "casehub-platform-agent-gate", "CDI @Decorator", "GatedAgentProvider @Decorator @Priority(APPLICATION) — token bucket + concurrency gate, deferred admission, per-query session rate limiting")
   }
   Container_Boundary(l9, "L9: Endpoint Registry Adapters") {
     Container(endpointsMem, "casehub-platform-endpoints-memory", "Java", "@Alternative @Priority(100) InMemoryEndpointRegistry — volatile, tenant-filtered, ConcurrentHashMap")
@@ -240,11 +223,9 @@ C4Container
     Container(streamsPoll, "casehub-platform-streams-poll", "Quarkus Scheduler", "@Startup @Scheduled HTTP GET — java.net.http.HttpClient field, explicit status check")
     Container(streamsCamel, "casehub-platform-streams-camel", "Apache Camel Quarkus", "@ApplicationScoped dynamic route builder via @ObservesAsync EndpointRegistered")
   }
-  Container_Boundary(l11, "L11: Access Control") {
-    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, deny entries, parent hierarchy")
-    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging + deny + recursive CTE")
-    Container(aclAdmin, "casehub-platform-acl-admin", "Quarkus", "AclService REST/MCP — @McpDomain, @RolesAllowed(ADMIN)")
-    Container(aclWorker, "casehub-platform-acl-worker", "Quarkus", "WorkerCredentialFilter @Provider — fail-closed by default")
+  Container_Boundary(l11, "L11: ACL Adapters — mutually exclusive per priority tier") {
+    Container(aclInmem, "casehub-platform-acl-inmem", "Java", "@Alternative @Priority(10) InMemoryAccessControlProvider — volatile, ConcurrentHashMap")
+    Container(aclJpa, "casehub-platform-acl-jpa", "Hibernate ORM Panache + Flyway", "@ApplicationScoped JpaAccessControlProvider + audit logging")
   }
   Container_Boundary(l12, "L12: Digest Buffer Adapters — mutually exclusive per priority tier") {
     Container(digestInmem, "casehub-platform-digest-inmem", "Java", "@Alternative @Priority(100) InMemoryDigestBuffer — volatile, ConcurrentHashMap")
@@ -253,50 +234,7 @@ C4Container
 
   Container_Boundary(l_decl, "Declaration Primitives") {
     Container(yamlCore, "casehub-platform-yaml-core", "Java 21", "VariableResolver, ForEachExpander, Truthiness, CsvParser — zero deps")
-    Container(yamlJackson, "casehub-platform-yaml-jackson", "Jackson", "Jackson mixins for yaml-core types — @JsonAnySetter builder, case-insensitive enums")
-    Container(yamlCodegen, "casehub-platform-yaml-codegen", "Maven plugin", "Java records + POJOs from JSON Schema via jsonschema2pojo")
     Container(tsCore, "casehub-platform-ts-core", "Java 21", "TsExecutor SPI, NodeTsExecutor (Node.js subprocess) — zero deps")
-  }
-  Container_Boundary(l16, "L16: Notification & Delivery") {
-    Container(notifications, "casehub-platform-notifications", "Quarkus", "REST/MCP endpoints from @McpDomain SPIs + WebSocket push via EventBroadcaster")
-    Container(notifsInmem, "casehub-platform-notifications-inmem", "Java", "@Alternative @Priority(100) InMemoryNotificationStore")
-    Container(notifsJpa, "casehub-platform-notifications-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA NotificationStore + retention purge")
-    Container(notifDispatch, "casehub-platform-notification-dispatch", "Quarkus", "NotificationDispatcher — target → suppression → template → channel → delivery/digest")
-    Container(notifSettingsInmem, "casehub-platform-notification-settings-inmem", "Java", "@Alternative InMemoryNotificationPreferenceStore + SuppressionStore")
-    Container(notifSettingsJpa, "casehub-platform-notification-settings-jpa", "Hibernate ORM + Flyway", "JPA NotificationPreferenceStore + SuppressionStore")
-    Container(deliveryChan, "casehub-platform-delivery-channel-inmem", "Java", "InMemoryDeliveryChannelRegistry — startup-populated, production impl")
-    Container(deliveryTrackInmem, "casehub-platform-delivery-tracking-inmem", "Java", "@Alternative InMemoryDeliveryAttemptStore — size-based eviction")
-    Container(deliveryTrackJpa, "casehub-platform-delivery-tracking-jpa", "Hibernate ORM + Flyway", "JPA DeliveryAttemptStore — SELECT FOR UPDATE SKIP LOCKED retry")
-  }
-  Container_Boundary(l17, "L17: Subscription Engine") {
-    Container(subscriptions, "casehub-platform-subscriptions", "Quarkus", "SubscriptionEngine — alpha network wiring, glob patterns, ExpressionEngine filters")
-    Container(subsInmem, "casehub-platform-subscriptions-inmem", "Java", "@Alternative @Priority(100) InMemorySubscriptionStore")
-    Container(subsJpa, "casehub-platform-subscriptions-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA SubscriptionStore")
-  }
-  Container_Boundary(l18, "L18: Datasource & Alpha Network") {
-    Container(dsAlpha, "casehub-platform-datasource-alpha", "Java", "Rete alpha network runtime — AlphaDataSource, TypeNode, FilterNode, FanOutProcessor")
-    Container(dsInmem, "casehub-platform-datasource-inmem", "Java", "@Alternative @Priority(100) InMemoryDataSourceRegistry — reference-counted pruning")
-    Container(dsJpa, "casehub-platform-datasource-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JPA DataSourceRegistry — startup reconciliation")
-  }
-  Container_Boundary(l19, "L19: Callback Infrastructure") {
-    Container(callbackApi, "casehub-platform-callback-api", "Java", "Pure Java callback registration SPI — lease + deregister model")
-    Container(callback, "casehub-platform-callback", "Quarkus", "CallbackInvoker (HTTP POST + retry) + LeaseReaper + CallbackService REST/MCP")
-    Container(callbackInmem, "casehub-platform-callback-inmem", "Java", "@Alternative @Priority(100) InMemoryCallbackRegistry")
-    Container(callbackClient, "casehub-platform-callback-client", "Quarkus", "Client-side CallbackAutoRegistrar + CallbackDispatchResource")
-    Container(callbackGen, "casehub-platform-callback-generator", "APT", "@CallbackEligible → @Decorator proxy generation")
-    Container(callbackSpring, "casehub-platform-callback-spring", "Spring Boot", "CallbackDecoratorBeanPostProcessor — JDK Proxy equivalent")
-  }
-  Container_Boundary(l20, "L20: MCP & API Generation") {
-    Container(mcp, "casehub-platform-mcp", "Quarkus", "GraphQLModelScanner + DynamicToolRegistrar + McpResourceRegistryBridge")
-    Container(graphql, "casehub-platform-graphql", "SmallRye GraphQL", "JSON scalar, PageInput/PageInfo pagination, GraphQLError")
-    Container(graphqlClient, "casehub-graphql-client", "SmallRye GraphQL Client", "Typed per-domain CaseHub GraphQL client")
-    Container(graphqlGen, "casehub-platform-graphql-generator", "APT", "@McpDomain → @GraphQLApi + @Path REST — interfaces and classes")
-    Container(graphqlSpringGen, "casehub-platform-graphql-spring-generator", "Maven plugin", "@McpDomain → Spring @Controller + @RestController")
-    Container(restSpringGen, "casehub-platform-rest-spring-generator", "Maven plugin", "@Path → Spring @RestController")
-    Container(mcpSpringGen, "casehub-platform-mcp-spring-generator", "Maven plugin", "Quarkus @Tool → Spring @Tool")
-    Container(genCommon, "casehub-platform-generator-common", "Java", "McpDomainJandexScanner + DomainScanResult + AbstractGeneratorMojo")
-    Container(schemaGen, "casehub-platform-schema-generator", "victools", "JSON Schema generation from Java types — Draft 2020-12")
-    Container(driftDetect, "casehub-platform-drift-detection", "Maven Enforcer", "Codegen drift detection — hand-written types in generated packages")
   }
 
   Rel(platform, api, "implements SPIs from")
@@ -325,23 +263,6 @@ C4Container
   Rel(streamsWebhook, api, "fires Event<CloudEvent> via")
   Rel(streamsPoll, api, "fires Event<CloudEvent> via")
   Rel(streamsCamel, api, "observes EndpointRegistered, fires Event<CloudEvent> via")
-  Rel(agentRouter, agentApi, "routes AgentProvider calls via ModelRegistry")
-  Rel(agentGate, agentRouter, "decorates RoutingAgentProvider with rate limits")
-  Rel(agentOpenai, agentApi, "implements AgentBackend from")
-  Rel(agentOllama, agentApi, "implements AgentBackend from")
-  Rel(agentCodex, agentApi, "implements AgentBackend via AgentRuntime")
-  Rel(agentGemini, agentApi, "implements AgentBackend from")
-  Rel(agentGeminiCli, agentApi, "implements AgentBackend via AgentRuntime")
-  Rel(aclAdmin, api, "implements AclApi from")
-  Rel(notifications, api, "implements NotificationApi from")
-  Rel(notifDispatch, api, "observes SubscriptionMatched, delivers via channels")
-  Rel(subscriptions, api, "implements SubscriptionStore/SubscribableEvent from")
-  Rel(dsAlpha, api, "implements DataSource from")
-  Rel(callbackApi, api, "defines CallbackRegistry SPI")
-  Rel(callback, callbackApi, "implements CallbackInvoker + CallbackService")
-  Rel(mcp, api, "discovers @McpDomain domains via CDI BeanManager")
-  Rel(graphqlGen, api, "generates code from @McpDomain annotations")
-  Rel(graphqlSpringGen, genCommon, "consumes DomainScanResult from")
 ```
 
 ---
@@ -423,53 +344,6 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | `casehub-platform-digest-inmem` | `test` (isolation) or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile digest buffer. Do NOT combine with `digest-jpa` in same scope |
 | `casehub-platform-digest-jpa` | `compile` + Flyway location | `classpath:db/digest/migration` required; Flyway `V2000` schema. Configurable `casehub.notification.digest.max-buffer-size` (default 0 = no eviction) |
 | `casehub-platform-streams-camel` | `compile` | Requires `quarkus-camel` extension; routes built from CAMEL-protocol `EndpointDescriptor` records |
-| `casehub-platform-streams-webhook-core` | `compile` | Framework-neutral WebhookReceiver POJO — CloudEvents HTTP binding |
-| `casehub-platform-notifications` | `compile` | REST/MCP endpoints + WebSocket push — generated from @McpDomain SPIs |
-| `casehub-platform-notifications-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile NotificationStore |
-| `casehub-platform-notifications-jpa` | `compile` + Flyway location | `classpath:db/notification/migration` required |
-| `casehub-platform-notification-dispatch` | `compile` | Full delivery pipeline — target resolution → suppression → channel routing |
-| `casehub-platform-notification-settings-inmem` | `test` or `compile` (ephemeral) | InMemory preference + suppression stores |
-| `casehub-platform-notification-settings-jpa` | `compile` + Flyway location | `classpath:db/notification-settings/migration` required |
-| `casehub-platform-delivery-channel-inmem` | `compile` | InMemoryDeliveryChannelRegistry — startup-populated, production impl |
-| `casehub-platform-delivery-tracking-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile delivery attempt store |
-| `casehub-platform-delivery-tracking-jpa` | `compile` + Flyway location | `classpath:db/delivery-tracking/migration` required |
-| `casehub-platform-subscriptions` | `compile` | SubscriptionEngine + REST CRUD + event-type discovery |
-| `casehub-platform-subscriptions-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile SubscriptionStore |
-| `casehub-platform-subscriptions-jpa` | `compile` + Flyway location | `classpath:db/subscription/migration` required |
-| `casehub-platform-datasource-alpha` | `compile` | Rete alpha network runtime — pure runtime, no CDI, no persistence |
-| `casehub-platform-datasource-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile DataSourceRegistry |
-| `casehub-platform-datasource-jpa` | `compile` + Flyway location | `classpath:db/datasource/migration` required |
-| `casehub-platform-callback-api` | `compile` | Pure Java callback registration SPI — zero deps |
-| `casehub-platform-callback` | `compile` | CallbackInvoker + LeaseReaper + CallbackService REST/MCP |
-| `casehub-platform-callback-inmem` | `test` or `compile` (ephemeral) | `@Alternative @Priority(100)` volatile CallbackRegistry |
-| `casehub-platform-callback-client` | `compile` | Client-side auto-registration + heartbeat + dispatch |
-| `casehub-platform-callback-generator` | `compile` (build-time APT) | @CallbackEligible → @Decorator proxy generation |
-| `casehub-platform-callback-spring` | `compile` | Spring Boot BeanPostProcessor for @CallbackEligible |
-| `casehub-platform-mcp` | `compile` | MCP hierarchical model — GraphQLModelScanner, DynamicToolRegistrar, McpResourceRegistryBridge |
-| `casehub-platform-graphql` | `compile` | JSON scalar, PageInput/PageInfo pagination, GraphQLError |
-| `casehub-graphql-client` | `compile` | Typed per-domain CaseHub GraphQL client — configure `quarkus.smallrye-graphql-client.casehub.url` |
-| `casehub-platform-graphql-generator` | `compile` (build-time APT) | @McpDomain → @GraphQLApi + @Path REST. Options: -AdomainFilter, -AgenerateGraphQL, -AgenerateRest |
-| `casehub-platform-graphql-spring-generator` | `compile` (build-time Maven plugin) | @McpDomain → Spring @Controller + @RestController |
-| `casehub-platform-rest-spring-generator` | `compile` (build-time Maven plugin) | @Path → Spring @RestController |
-| `casehub-platform-mcp-spring-generator` | `compile` (build-time Maven plugin) | Quarkus @Tool → Spring @Tool |
-| `casehub-platform-generator-common` | `compile` (build-time) | Shared McpDomainJandexScanner + AbstractGeneratorMojo |
-| `casehub-platform-schema-generator` | `compile` | JSON Schema from Java types — victools/jsonschema-generator Draft 2020-12 |
-| `casehub-platform-drift-detection` | `compile` (build-time Maven Enforcer rule) | Detects hand-written types in codegen-managed packages |
-| `casehub-platform-agent-ollama` | `compile` | AgentBackend "ollama" — local models via OpenAI-compat API, 120s timeout |
-| `casehub-platform-agent-config-core` | `compile` | Framework-neutral manifest types — ManifestLoader, ManifestProcessor |
-| `casehub-platform-agent-config` | `compile` | Quarkus @Startup manifest loading + ManifestResult producer |
-| `casehub-platform-acl-admin` | `compile` | REST/MCP admin for ACL — @RolesAllowed("admin") on mutations |
-| `casehub-platform-acl-worker` | `compile` | WorkerCredentialFilter @Provider — fail-closed by default |
-| `casehub-platform-credentials-quarkus` | `compile` | @Alternative @Priority(1) CredentialResolver → Quarkus CredentialsProvider (Vault/AWS/GCP) |
-| `casehub-platform-preferences-editor` | `compile` | PreferenceService REST/MCP — @McpDomain CRUD + PreferenceSchemaService |
-| `casehub-platform-governance` | `compile` | PolicyEnforcer — retry/timeout/backoff/circuit-breaker, shared virtual-thread executor |
-| `casehub-platform-llm-config-core` | `compile` | Framework-neutral LLM config types — LlmConfigApi SPI |
-| `casehub-platform-llm-config` | `compile` | LlmConfigService — UI-driven LLM provider setup |
-| `casehub-platform-llm-config-vertex` | `compile` | Vertex AI vendor client — ADC auth, project/region/model discovery |
-| `casehub-platform-llm-config-bedrock` | `compile` | Bedrock vendor client — credential chain, region/model discovery |
-| `casehub-platform-yaml-jackson` | `compile` | Jackson mixins for yaml-core — @JsonAnySetter dynamic section capture |
-| `casehub-platform-yaml-codegen` | `compile` (build-time Maven plugin) | Java records + POJOs from JSON Schema |
-| `casehub-platform-platform-pdf` | `compile` (optional) | HTML-to-PDF via OpenHTMLtoPDF — classpath activation |
 
 ---
 
@@ -554,6 +428,7 @@ Published to GitHub Packages. CI: GitHub Actions. No GraalVM native target — f
 | J5: Stream Ingestion | CloudEvent-envelope transports — five classpath-activated stream adapters firing CDI events | C20 | ✅ Complete |
 | J6: Access Control | Flat-grant ACL SPI — resource-level `canAccess` / `grant` / `revoke`, parent-resource hierarchy, JPA and in-memory adapters | C21 | ✅ Complete |
 | J7: Subject Views | Filtered views of any labeled subject — label-pattern matching, membership tracking, ADDED/REMOVED lifecycle events. Generalizes work-queues' QueueView pattern. | C22 | ✅ Complete (#175) |
+| J8: Simulation Framework | SPI-level simulation without Mockito — generated CDI decorators intercept SPI calls, corpus-backed strategies resolve responses, overlay stack isolates scenarios, verification API asserts interactions. 5 data population paths, event simulation, named profiles. | C23 | ✅ Complete (#294) |
 
 ### §9.2 Chapter Index
 
@@ -579,6 +454,7 @@ flowchart LR
   C14 --> C19["C19: AgentSession\n+LangChain4j\nL8"]
   C18 --> C20["C20: Stream Ingestion\nL10"]
   C12 --> C21["C21: ACL Phase 1\nL1+L2+L11"]
+  C14 --> C23["C23: Simulation Framework\nL1+L16"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -601,6 +477,7 @@ flowchart LR
   style C19 fill:#90EE90,color:#000
   style C20 fill:#90EE90,color:#000
   style C21 fill:#90EE90,color:#000
+  style C23 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -627,6 +504,7 @@ flowchart LR
 | 20 | Stream Ingestion | J5 | L10 | ✅ |
 | 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
 | 22 | Subject View Toolkit | J7 | L1, L2, L13 | ✅ |
+| 23 | Simulation Framework | J8 | L1, L16 | ✅ |
 
 **Layer × Chapter matrix**
 
@@ -658,7 +536,7 @@ flowchart LR
 
 #### C1 — Core SPIs Baseline
 
-**Journey:** J1 | **Sequence:** 1 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 1 of 15 | **Status:** ✅
 **Delivered:** 2026-05-18/19 | **Issues:** #1, #2 | **Blog:** `blog/2026-05-19-mdp01-laying-platform-foundation.md`
 
 **What this delivers**
@@ -680,7 +558,7 @@ Consumers can declare a `@ConfigProperty`-backed `PreferenceKey<T>`, resolve it 
 
 #### C2 — YAML Preferences Provider
 
-**Journey:** J1 | **Sequence:** 2 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 2 of 15 | **Status:** ✅
 **Delivered:** 2026-05-20 | **Issues:** #2 | **Blog:** `blog/2026-05-20-mdp01-preferences-drools-cascade.md`
 
 **What this delivers**
@@ -700,7 +578,7 @@ Harness apps can ship a YAML preferences file, and `ConfigFilePreferenceProvider
 
 #### C3 — OIDC CurrentPrincipal + Tenancy
 
-**Journey:** J1 | **Sequence:** 3 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 3 of 15 | **Status:** ✅
 **Delivered:** 2026-05-21 | **Issues:** #3, #16, #17 | **Blog:** `blog/2026-05-21-mdp02-oidc-optional-module.md`, `blog/2026-05-21-mdp01-tenancy-id-before-the-fields.md`
 
 **What this delivers**
@@ -721,7 +599,7 @@ Consumers that add `casehub-platform-oidc` get JWT-backed identity context with 
 
 #### C4 — ActorType Migration
 
-**Journey:** J1 | **Sequence:** 4 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 4 of 15 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** #22 | **Blog:** `blog/2026-05-22-mdp01-moving-actortype-upstream.md`
 
 **What this delivers**
@@ -740,7 +618,7 @@ Consumers that add `casehub-platform-oidc` get JWT-backed identity context with 
 
 #### C5 — JQ Expression Evaluator
 
-**Journey:** J1 | **Sequence:** 5 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 5 of 15 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** engine#319 | **Blog:** `blog/2026-05-22-mdp02-jq-moves-to-platform.md`
 
 **What this delivers**
@@ -758,7 +636,7 @@ Foundation-tier repos (`casehub-work`, `casehub-qhorus`) can evaluate JQ express
 
 #### C6 — JPA Preferences Backend
 
-**Journey:** J1 | **Sequence:** 6 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 6 of 15 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** #6 | **Blog:** `blog/2026-05-22-mdp03-preferences-meet-database.md`
 
 **What this delivers**
@@ -776,7 +654,7 @@ Preference values survive restarts and can be updated without a redeployment. Sc
 
 #### C7 — MongoDB Preferences Backend
 
-**Journey:** J1 | **Sequence:** 7 of 21 | **Status:** ✅
+**Journey:** J1 | **Sequence:** 7 of 15 | **Status:** ✅
 **Delivered:** 2026-05-22 | **Issues:** — | **Blog:** `blog/2026-05-22-mdp06-mongodb-preferences-missing-rung.md`
 
 **What this delivers**
@@ -794,14 +672,15 @@ Consumers co-deploying Postgres JPA and MongoDB can use MongoDB as the preferenc
 
 #### C8 — Memory SPI + InMem + JPA Adapters
 
-**Journey:** J2 | **Sequence:** 8 of 21 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 8 of 15 | **Status:** ✅
 **Delivered:** 2026-05-28 to 2026-06-01 | **Issues:** #27, #32, #36, #48 | **Blog:** `blog/2026-05-28-mdp01-teaching-platform-to-remember.md`
 
 **What this delivers**
-Applications can store and query agent memories that persist across case boundaries. `CaseMemoryStore.store()` is append-only; `query()` supports multi-entity fan-out, `CHRONOLOGICAL` and `RELEVANCE` ordering, and `since` filtering. `assertTenant()` enforces per-store tenant isolation before any entity reaches the persistence layer.
+Applications can store and query agent memories that persist across case boundaries. `CaseMemoryStore.store()` is append-only; `query()` supports multi-entity fan-out, `CHRONOLOGICAL` and `RELEVANCE` ordering, and `since` filtering. `assertTenant()` enforces per-store tenant isolation before any entity reaches the persistence layer. The `BlockingToReactiveBridge` wraps any blocking adapter as `ReactiveCaseMemoryStore @DefaultBean`, so reactive callers need no adapter-specific code.
 
 **Accountability gaps closed**
 - Cross-case agent memory — before: every case starts cold, no shared knowledge → L6 (`CaseMemoryStore` SPI + `InMemoryMemoryStore`, `JpaMemoryStore`)
+- Reactive memory access without adapter-specific code → L2 (`BlockingToReactiveBridge`)
 - Tenant assertion before persistence — GDPR-adjacent correctness → L1 (`MemoryPermissions.assertTenant`)
 
 **Layer Impact**
@@ -816,7 +695,7 @@ Applications can store and query agent memories that persist across case boundar
 
 #### C9 — SQLite Durable Memory
 
-**Journey:** J2 | **Sequence:** 9 of 21 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 9 of 15 | **Status:** ✅
 **Delivered:** 2026-05-31 | **Issues:** #37 | **Blog:** `blog/2026-05-31-mdp01-durable-memory-no-server.md`
 
 **What this delivers**
@@ -835,7 +714,7 @@ Single-process deployments and local installs get durable agent memory without a
 
 #### C10 — Mem0 Vector Memory
 
-**Journey:** J2 | **Sequence:** 10 of 21 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 10 of 15 | **Status:** ✅
 **Delivered:** 2026-06-04 | **Issues:** #33 | **Blog:** `blog/2026-06-04-mdp01-mem0-adapter.md`
 
 **What this delivers**
@@ -853,7 +732,7 @@ Agent memories are stored with vector embeddings in Mem0 OSS, enabling semantic 
 
 #### C11 — Memory Contract Hardening
 
-**Journey:** J2 | **Sequence:** 11 of 21 | **Status:** ✅
+**Journey:** J2 | **Sequence:** 11 of 15 | **Status:** ✅
 **Delivered:** 2026-06-05 | **Issues:** #39, #49 | **Blog:** `blog/2026-06-05-mdp01-storeall-contract.md`
 
 **What this delivers**
@@ -873,7 +752,7 @@ Agent memories are stored with vector embeddings in Mem0 OSS, enabling semantic 
 
 #### C12 — SCIM GroupMembershipProvider
 
-**Journey:** J3 | **Sequence:** 12 of 21 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 12 of 15 | **Status:** ✅
 **Delivered:** 2026-05-30 to 2026-06-01 | **Issues:** #45, #47 | **Blog:** `blog/2026-05-30-mdp01-asking-directories-whos-in-the-group.md`
 
 **What this delivers**
@@ -895,7 +774,7 @@ The `GroupMembershipProvider` answers the inverse membership query ("who is in g
 
 #### C13 — Agent Identity (DID/VC)
 
-**Journey:** J3 | **Sequence:** 13 of 21 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 13 of 15 | **Status:** ✅
 **Delivered:** 2026-06-02 | **Issues:** #52, #53, #54 | **Blog:** `blog/2026-06-01-mdp03-the-permission-layer.md`
 
 **What this delivers**
@@ -914,7 +793,7 @@ Agent actors can prove their identity via DID (did:key, did:web) and verifiable 
 
 #### C14 — Agent SPI (Claude)
 
-**Journey:** J3 | **Sequence:** 14 of 21 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 14 of 15 | **Status:** ✅
 **Delivered:** 2026-06-03 | **Issues:** #55 | **Blog:** `blog/2026-06-03-mdp01-shipping-platform-agent.md`
 
 **What this delivers**
@@ -934,7 +813,7 @@ Application code can submit a prompt to a Claude subprocess and receive a `Multi
 
 #### C15 — ActorState SPI
 
-**Journey:** J3 | **Sequence:** 15 of 21 | **Status:** ✅
+**Journey:** J3 | **Sequence:** 15 of 16 | **Status:** ✅
 **Delivered:** 2026-06-03 | **Issues:** casehubio/parent#56 | **Blog:** —
 
 **What this delivers**
@@ -1079,6 +958,34 @@ Five classpath-activated transports that each receive external events and fire `
 
 ---
 
+#### C23 — Simulation Framework
+
+**Journey:** J8 | **Sequence:** 23 of 23 | **Status:** ✅
+**Delivered:** 2026-09-18 | **Issues:** platform#294 (epic), platform#312–#332
+**Blog:** —
+
+**What this delivers**
+SPI-level simulation without Mockito — a complete replacement for `when/thenReturn` (corpus + strategy) and `verify()` (journal + SimulationVerifier). Generated CDI `@Decorator` classes intercept every `@SimulationEligible` SPI method, resolve responses from a corpus of `InvocationRecord`s via configurable strategies, record all interactions in an `InvocationJournal` with tenant context, and capture real backend traffic for corpus building. The framework supports 5 data population paths (YAML fixtures, programmatic `CorpusSeed`, LLM-driven generation via `LlmCorpusPopulator`, schema-driven random generation via `SchemaDataGenerator`/`RandomCorpusPopulator`, and capture mode), runtime overlays for per-scenario isolation (no ThreadLocal), named profiles for strategy bundles, event simulation via `TimedSequence` + CloudEvent CDI bus injection, and REST client simulation via a separate `@RegisterRestClient` annotation processor.
+
+18 modules across 4 tiers: simulation-api (pure Java SPIs), simulation-core (5 strategies + runtime + overlay + journal + verifier), simulation-generator + rest-client-simulation-generator (APT code generators), and 10 integration modules (config, event, testing, per-domain generated decorators). The simulation-api module is deliberately not in platform-api — simulation is opt-in, not universal. Generated decorators wrap `@DefaultBean` NoOps without modifying them — NoOps remain zero-dependency.
+
+**Accountability gaps closed**
+- Mockito-free SPI testing with real CDI wiring → L16 (corpus + strategy replaces when/thenReturn; SimulationVerifier replaces verify())
+- SPI call recording with tenant context → L16 (InvocationJournal + JournalEntry with tenancyId)
+- Schema-driven random data generation → L16 (SchemaDataGenerator: JSON Schema → constraint-respecting random instances)
+- Per-scenario test isolation without ThreadLocal → L16 (SimulationOverlay stack with isolated corpus + journal)
+- Declarative simulation configuration → L16 (SmallRyeSimulationConfig prefix scanning, named profiles)
+- Event simulation with timing preservation → L16 (TimedSequence + SimulatedEventEmitter + @Scheduled continuous tick)
+- REST client simulation → L16 (RestClientSimulationProcessor generates decorators for @RegisterRestClient interfaces)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | Low — `@SimulationEligible` annotation, `DataRealism` enum added to platform-api |
+| L16: Simulation Framework | High — 18 new modules: complete simulation infrastructure from SPI to verification |
+
+---
+
 ### §9.4 Layer Entries
 
 #### Layer — L1: API Tier
@@ -1158,7 +1065,7 @@ Not closed here: L2 (mock implementations), L4–L8 (concrete adapters).
 
 **Why `ActorType` is in `platform-api`, not `casehub-ledger-api`:** Actor classification is an identity concern. `CurrentPrincipal.actorType()` must be expressible without a ledger dependency — `platform-api` is zero-dependency and adding `casehub-ledger-api` would break the tier model. ADR-0005.
 
-**Why `MemoryPermissions.assertTenant` is static:** A `default` method on `CaseMemoryStore` would couple tenant validation to a specific SPI instance. A static utility is callable from any adapter without requiring the interface reference — simpler and decoupled.
+**Why `MemoryPermissions.assertTenant` is static:** Reactive-only `CaseMemoryStore` adapters (those implementing `ReactiveCaseMemoryStore` directly, without going through `BlockingToReactiveBridge`) have no reference to the blocking SPI instance. A `default` method on `CaseMemoryStore` is unreachable from those adapters. A static utility is callable from both paths.
 
 #### Pattern introduced
 
@@ -1183,7 +1090,7 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 #### Layer — L2: Default Implementations
 
 **Participates in chapters:** C1, C2, C3, C4, C5, C8, C11, C12, C14, C16, C17
-**Architectural patterns:** `@DefaultBean` CDI displacement
+**Architectural patterns:** `@DefaultBean` CDI displacement, Blocking-to-reactive bridge
 **Key protocols:** `docs/protocols/casehub/alternative-extension-patterns.md`
 **Issues:** #1, #27
 **Navigation:** `git log --grep="#1\|#27" --oneline`
@@ -1197,6 +1104,7 @@ Typed-key SPI — every configuration concern is expressed as a `PreferenceKey<T
 
 What this layer adds:
 - **`@DefaultBean` mocks** — all mocks read values from `@ConfigProperty`; no hardcoded values; `Optional<T>` for fields where the config key may be absent
+- **`BlockingToReactiveBridge @DefaultBean`** — wraps whichever blocking `CaseMemoryStore` is active; reactive callers need not reference adapters directly
 - **`PathParserConfigurator @Startup`** — wires the config-driven `PathParser` at application start before any `Path.parse()` call reaches it
 - **`NoOpAgentProvider @DefaultBean`** — emits a WARN per invocation; dev misconfiguration is loud, not silent
 
@@ -1207,6 +1115,7 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 | Gap | What breaks without it | Closed by |
 |---|---|---|
 | CDI context at startup | Every injection point for a platform SPI fails at boot | `@DefaultBean` mocks |
+| Reactive CaseMemoryStore without adapter coupling | Reactive callers must reference each adapter directly | `BlockingToReactiveBridge` |
 
 #### Key files
 
@@ -1215,6 +1124,8 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 - `platform/src/main/java/io/casehub/platform/mock/MockGroupMembershipProvider.java` — returns configurable group members
 - `platform/src/main/java/io/casehub/platform/mock/PathParserConfigurator.java` — `@Startup @ApplicationScoped`; wires `PathParser` before first `Path.parse()` call
 - `platform/src/main/java/io/casehub/platform/memory/NoOpCaseMemoryStore.java` — `@DefaultBean`; `store()` returns a dummy `Memory`; `query()` returns empty; no persistence
+- `platform/src/main/java/io/casehub/platform/memory/ReactiveCaseMemoryStore.java` — reactive SPI (Mutiny); `@DefaultBean` bridge is `BlockingToReactiveBridge`
+- `platform/src/main/java/io/casehub/platform/memory/BlockingToReactiveBridge.java` — `@DefaultBean`; injects active blocking `CaseMemoryStore`; delegates on Quarkus worker thread
 - `platform/src/main/java/io/casehub/platform/agent/NoOpAgentProvider.java` — `@DefaultBean`; logs WARN per invocation; returns empty stream
 - `platform/src/main/java/io/casehub/platform/converter/PathParamConverter.java` — JAX-RS `@Provider`; `fromString()` → `Path.parse()`; `toString()` → `path.value()`
 
@@ -1222,6 +1133,7 @@ Not closed here: L4–L8 (real implementations of the mocks defined here).
 
 **`@DefaultBean` yields to any non-default `@ApplicationScoped` on the classpath.** No exclusion config required. Add an optional module, the mock steps aside. Remove it, the mock returns. This is the activation contract for all optional modules in this repo.
 
+**`BlockingToReactiveBridge` thread dispatch is the entrypoint's responsibility.** Do not annotate bridge methods `@Blocking` — Quarkus's `ExecutionModelAnnotationsProcessor` only recognises that annotation on JAX-RS resources, reactive messaging consumers, and GraphQL resolvers, not plain CDI bean methods. If a JAX-RS resource method is `@Blocking`, the entire call chain (including the bridge) runs on a worker thread already. GE-20260528-xxxx captures this.
 
 **Mock `@ConfigProperty Optional<T>` fields for absent config keys.** SmallRye Config throws `NoSuchElementException` for non-Optional fields with no configured value. Use `Optional<List<String>>` for groups, `Optional<Map<String,String>>` for preference overrides.
 
@@ -1369,7 +1281,7 @@ Not closed here: preference write path (`preferences-editor`, issue #8 — not y
 
 - `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceProvider.java` — scope ancestor list → single `IN` query → map merge; `effectiveAt` ignored (ADR-0006)
 - `persistence-jpa/src/main/resources/db/platform/migration/V1__create_platform_preference.sql` — `platform_preference` table; `pref_name`, `pref_value` (not `name`, `value` — H2 reserved words)
-- `persistence-mongodb/src/main/java/io/casehub/platform/persistence/mongodb/MongoPreferenceProvider.java` — compound `_id`; `Filters.in("scope", scopes)` (MongoDB Java driver Bson filter API)
+- `persistence-mongodb/src/main/java/io/casehub/platform/persistence/mongodb/MongoPreferenceProvider.java` — compound `_id`; `Filters.in("scope", scopes)` (not Panache JPQL syntax)
 
 #### Key wiring
 
@@ -1381,7 +1293,7 @@ Not closed here: preference write path (`preferences-editor`, issue #8 — not y
 
 **Comparator fallback for unknown scopes must be `-1`, not `0`.** When sorting query results by ancestor list index, `getOrDefault(scope, 0)` gives unknown scopes the same priority as root scope (index 0). Safe by construction (only ancestor-list rows are returned), but semantically wrong. Use `-1` as the fallback so any data anomaly sorts below root rather than equal to it.
 
-**`MongoPreferenceProvider` uses `Filters.in("scope", scopes)` — the MongoDB Java driver's Bson filter API.** Direct use of the driver API avoids query parser abstraction layers and ensures correct `IN` semantics.
+**`MongoPreferenceProvider` uses `Filters.in("scope", scopes)` not Panache JPQL string syntax.** Panache MongoDB and Panache ORM share the same surface API but different query parsers. The JPQL `IN` form is not guaranteed to parse correctly in the MongoDB adapter. Use the `Bson` filter overload.
 
 **MongoDB scope index created at startup by `@Startup @ApplicationScoped` bean.** No Flyway for MongoDB — `createIndex()` is idempotent; MongoDB ignores it if the index already exists.
 
@@ -1408,7 +1320,7 @@ CDI priority ladder — `@DefaultBean` (lowest) → `@ApplicationScoped` (middle
 #### Layer — L6: Memory Adapters
 
 **Participates in chapters:** C8, C9, C10, C11, C16
-**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
+**Architectural patterns:** `@Alternative @Priority` CDI ladder (test-override tier at 10+), contract test inheritance, blocking SPI with reactive bridge; graph-native SPI extension (`GraphCaseMemoryStore`) for temporal knowledge graph adapters
 **ADRs:** ADR-0008
 **Issues:** #27, #32, #33, #36, #37, #39, #48, #49, #65, #66, #67, #69, #70, #87, #90, #99
 **Navigation:** `git log --grep="#32\|#33\|#36\|#37\|#39\|#48\|#49" --oneline`
@@ -1627,6 +1539,7 @@ C19 delivered #58: multi-turn `AgentSession` — serial `query()`/`interrupt()`/
 
 #### Architectural decisions
 
+**Why `@Blocking` was removed from `BlockingToReactiveBridge` methods:** Quarkus's `ExecutionModelAnnotationsProcessor` only processes `@Blocking` on framework entrypoints — JAX-RS resources, reactive messaging consumers, GraphQL resolvers. On a plain `@ApplicationScoped` CDI bean returning `Uni<T>`, the annotation is illegal and the build fails. Thread dispatch on the bridge is the entrypoint's responsibility.
 
 #### Pattern introduced
 
@@ -1786,8 +1699,8 @@ ACL Phase 2 (identity propagation) closed by platform#220 + engine#768. ACL Phas
 - `platform/src/main/java/io/casehub/platform/acl/NoOpAccessControlProvider.java` — `@DefaultBean @ApplicationScoped`
 - `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java` — `@Alternative @Priority(10) @ApplicationScoped`
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` — `@ApplicationScoped`; Flyway V2000
-- `acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
-- `acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)
+- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java` — JPA entity: actorId, resourceId, action, expires (nullable)
+- `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java` — JPA entity: childResourceId, parentResourceId (hierarchy)
 
 #### Key wiring
 
@@ -1806,6 +1719,124 @@ Flat-grant ACL with parent-resource hierarchy — grant propagates from parent t
 **Symptom:** `canAccess()` returns `true` despite no grant having been issued.
 **Cause:** `NoOpAccessControlProvider @DefaultBean` is active — no `acl-inmem` or `acl-jpa` on the classpath.
 **Fix:** Add `acl-inmem` (test) or `acl-jpa` (production) to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+---
+
+#### Layer — L16: Simulation Framework
+
+**Participates in chapters:** C23
+**Architectural patterns:** Generated CDI `@Decorator` (APT), overlay stack (per-scenario isolation), config-driven strategy selection (boot-time), corpus-backed response resolution, tenant-aware invocation recording
+**Issues:** platform#294 (epic), platform#312–#332
+**Blog:** —
+**Completed:** 2026-09-18
+
+#### What it adds
+
+**Before:** SPI testing required Mockito: `@InjectMock` for stub responses, `verify()` for interaction assertions. Mocks bypass CDI wiring — interceptors, decorators, and @PostConstruct lifecycle are invisible to tests. No capture path for building test fixtures from real traffic.
+**After:** Generated `@Decorator` classes intercept SPI calls through real CDI. Corpus + strategy replaces `when/thenReturn`. `InvocationJournal` + `SimulationVerifier` replaces `verify()`. Five data population paths from zero-effort random generation to captured real traffic.
+
+What this layer adds:
+
+**API tier (simulation-api):**
+- **`SimulationStrategy<I, O>`** — generic strategy contract: `canResolve(I)`, `resolve(I) → O`
+- **`SimulationCorpus<I, O>`** — SPI for corpus storage: `seed()`, `entriesFor()`, `allEntries()`
+- **`InvocationRecord<I, O>`** — record: tenancyId, key, input, output, recordedAt; `of()` factories
+- **`KeyExtractor<I>`** — functional interface for key derivation from inputs
+- **`SimilarityScorer<I>`** — functional interface for nearest-match scoring
+- **`CorpusSeed<I, O>`** — typed accumulator with `withKeyExtractor()`, `withOutputMapper()`, `add()`, `seedInto(corpus)`
+- **`DataRealism`** — enum: GARBAGE, PLACEHOLDER, STRUCTURALLY_VALID, DOMAIN_PLAUSIBLE, RECORDED_REAL
+- **`ExhaustionPolicy`** — enum: WRAP, THROW
+- **`@SimulationEligible`** — marks SPI interfaces for decorator generation
+
+**Core tier (simulation-core):**
+- **5 strategies:** `SequentialStrategy` (round-robin), `KeyLookupStrategy` (exact key match), `RandomStrategy` (random corpus selection), `RecordedReplayStrategy` (key-matched replay), `NearestMatchStrategy` (similarity scoring with threshold)
+- **`SimulationRuntime`** — strategy factory + cache, overlay stack, capture dispatch, `recordJournal()` with tenancyId, `pushProfile()/pushOverlay()/popOverlay()/popAll()`
+- **`SimulationOverlay`** — opaque handle: config + corpus + journal per scenario
+- **`InvocationJournal`** + **`JournalEntry`** — tenant-aware invocation recording: qualifiedName, tenancyId, input, output, timestamp, simulated
+- **`SimulationVerifier`** — stateful verification: `method(qn)` → `MethodVerification`, `inOrder(qn...)`, `noUnverifiedCalls()`
+- **`MethodVerification`** — fluent assertion builder: `forTenant(id)`, `matching(Predicate<JournalEntry>)`, `wasCalled()/wasNeverCalled()/wasCalledAtLeast()/wasCalledAtMost()`, `allSimulated()/noneSimulated()`
+- **`ProfileSource`** / **`SimulationProfile`** — named profile resolution for strategy bundles
+- **`RestInvocation`** — REST client invocation context: spiName, methodName, httpMethod, pathTemplate, params, body
+- **`MapSimulationConfig`** — programmatic SimulationConfig from `Map<String, String>`
+
+**Config tier (simulation-config-core + simulation-config):**
+- **`SmallRyeSimulationConfig`** — manual prefix scanning of `casehub.simulation.*` properties; profile parsing, `ProfileSource` implementation
+- **`YamlCorpusLoader`** — YAML fixture parsing into `InvocationRecord<Object, Object>`
+- **`DeclarativeExtractorFactory`** — config string → `KeyExtractor` (identity/field/composite)
+- **`DeclarativeScorerFactory`** — config string → `RecordFieldScorer` (weighted per-field scoring)
+
+**Generator tier (simulation-generator + rest-client-simulation-generator):**
+- **`SimulationDecoratorProcessor`** — APT: scans `@SimulationEligible` interfaces + `META-INF/simulation-eligible.txt` listings via Jandex, generates `@Decorator @Priority(APPLICATION + 200)` classes + `*QN` constants classes per SPI. Generated decorators inject `SimulationRuntime` + `CurrentPrincipal`, handle strategy resolution, journal recording with tenancyId, and capture dispatch.
+- **`RestClientSimulationProcessor`** — APT: scans `@RegisterRestClient` interfaces, generates `@Decorator` with `@RestClient`-qualified delegate and `RestInvocation` inputs
+
+**Event tier (event-simulation-core + event-simulation):**
+- **`SimulatedEventEmitter`** — `tick()` method emits CloudEvents via `Consumer<CloudEvent>` callback
+- **`TimedSequence<E>`** / **`TimedEntry<E>`** — relative-delay event sequences with `withMultiplier()` for time compression, `fromRecorded()` for timing preservation
+- **`EventSequenceRunner`** — virtual-thread sequence executor
+
+**Testing tier (simulation-testing):**
+- **5 corpus descriptors:** `AclCorpus`, `ModelCorpus`, `NotificationCorpus`, `PreferenceCorpus`, `CredentialCorpus` — typed `CorpusSeed` factories, domain fixture factories, default `KeyExtractor`
+- **`AgentCorpus`** in agent-simulation-core — descriptor for AgentProvider simulation + `llmFunction()` adapter
+- **`LlmCorpusPopulator`** — takes `Function<String, String>` (framework-agnostic), uses `PlatformSchemaGenerator` for JSON Schema prompts, hybrid few-shot from existing seed entries
+- **`RandomCorpusPopulator`** — schema-driven random generation via `SchemaDataGenerator` + `PlatformSchemaGenerator`
+- **`SchemaDataGenerator`** — JSON Schema → random instances: all types, constraints (min/max, minLength/maxLength, pattern, enum, const), format (uuid, date-time), `$ref`/`$defs` with depth guard (20), typed `List<T>` API
+
+**Generated decorator modules:**
+- **`platform-simulation-core`** — 11 platform-api SPIs (AccessControlProvider, DataSourceRegistry, SubscriptionStore, NotificationStore, EndpointRegistry, ExpressionEngineRegistry, DocumentSigningService, CredentialResolver, ModelRegistry, PreferenceProvider, CurrentPrincipal)
+- **`memory-simulation-core`** — CaseMemoryStore (cross-repo SPI in neocortex-memory-api)
+
+#### Accountability gaps closed
+
+| Gap | What breaks without it | Closed by |
+|---|---|---|
+| SPI tests bypass CDI wiring | Mockito mocks miss decorator interceptors, @PostConstruct lifecycle, CDI event observers | Generated `@Decorator` — real CDI, no mocks |
+| No standard verification for SPI interactions | Each test re-implements journal filtering and assertion logic | `SimulationVerifier` + `MethodVerification` fluent API |
+| Corpus population requires manual authoring | Every test writes InvocationRecords by hand | 5 data population paths: YAML, CorpusSeed, LLM, SchemaDataGenerator, capture |
+| Test scenarios share mutable state | Mockito mocks are per-test but don't isolate corpus/strategy combinations | `SimulationOverlay` stack — push/pop per scenario, isolated corpus + journal |
+| No tenant context in interaction recording | Tenant-scoped assertions require parsing SPI method parameters | `JournalEntry.tenancyId` + `MethodVerification.forTenant()` |
+
+#### Key files
+
+- `simulation-api/src/main/java/io/casehub/platform/simulation/SimulationStrategy.java` — generic strategy contract
+- `simulation-api/src/main/java/io/casehub/platform/simulation/CorpusSeed.java` — typed corpus accumulator
+- `simulation-core/src/main/java/io/casehub/platform/simulation/SimulationRuntime.java` — strategy factory, overlay stack, recording
+- `simulation-core/src/main/java/io/casehub/platform/simulation/SimulationVerifier.java` — stateful verification entry point
+- `simulation-core/src/main/java/io/casehub/platform/simulation/MethodVerification.java` — fluent assertion builder
+- `simulation-core/src/main/java/io/casehub/platform/simulation/JournalEntry.java` — tenant-aware invocation record
+- `simulation-generator/src/main/java/io/casehub/platform/simulation/generator/SimulationDecoratorProcessor.java` — APT code generator
+- `simulation-config-core/src/main/java/io/casehub/platform/simulation/config/SmallRyeSimulationConfig.java` — prefix scanning + profiles
+- `schema-generator/src/main/java/io/casehub/schema/generator/SchemaDataGenerator.java` — JSON Schema → random instances
+- `simulation-testing/src/main/java/io/casehub/platform/simulation/testing/RandomCorpusPopulator.java` — CorpusSeed integration
+
+#### Key wiring
+
+**Generated decorators are inert without config.** The `@Decorator @Priority(APPLICATION + 200)` wraps whatever SPI bean is active. Without `casehub.simulation.<spi>.<method>.strategy=...`, the decorator passes through to the delegate — zero overhead beyond a `ConcurrentHashMap.get()` returning `Optional.empty()`.
+
+**`@SimulationEligible` on the SPI interface + `simulation-generator` APT dependency triggers generation.** For SPIs in other repos that can't depend on `simulation-api`, a `META-INF/simulation-eligible.txt` listing file triggers generation without the annotation.
+
+**Two simulation paths exist:** Path A (listing-file) for SPIs that can't depend on simulation-api (CaseMemoryStore in neocortex), Path B (direct annotation) for SPIs in this repo. Both produce identical `@Decorator` classes.
+
+**Overlay stack replaces ThreadLocal for scenario isolation.** `pushOverlay(config, corpus)` adds a layer; the strategy cache is invalidated. `popOverlay()` discards the layer's corpus and journal. Sequential scenario execution means no concurrency concerns on the stack.
+
+**SimulationVerifier tracks verified methods for exhaustive checking.** Each `method(qn)` call registers the qualified name. `noUnverifiedCalls()` asserts every distinct qualified name in the journal has been checked — catching unexpected SPI interactions.
+
+#### Pattern introduced
+
+Generated CDI @Decorator for SPI simulation — annotation processor generates one decorator per SPI interface, handling strategy resolution, journal recording, and capture dispatch. The decorator wraps the active CDI bean (real implementation or NoOp) without displacing it. Config-driven activation means the decorator is present but dormant unless explicitly configured.
+
+#### Gotchas
+
+**Symptom:** Simulation strategy is configured but the SPI returns NoOp responses.
+**Cause:** `simulation-generator` (or `platform-simulation-core` / `memory-simulation-core`) is not on the classpath — no decorator was generated for this SPI.
+**Fix:** Add the appropriate generated-decorator module to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+**Symptom:** `variable tenancyId is already defined` compilation error in generated decorator.
+**Cause:** The SPI method has a parameter named `tenancyId`, conflicting with the generator's local variable.
+**Fix:** The generator uses `__simTenancyId` to avoid collisions. If this persists, check for a generator version mismatch — clean and rebuild.
+
+**Symptom:** `SimulationConfigException: Strategy for X requires a KeyExtractor, but none registered`.
+**Cause:** `key-lookup` or `recorded-replay` strategy configured without a corresponding `registerExtractor()` call. The extractor must be registered before the first SPI call that triggers strategy creation.
+**Fix:** Register the extractor at startup or in test setup: `runtime.registerExtractor(qn, extractor)`.
 
 ---
 
@@ -1866,9 +1897,10 @@ Cross-cutting decisions not captured in layer entries:
 | `ActorId` | A principal performing an action in a specific context. Use for execution attribution, audit, and delegation. Wraps a `PrincipalId`. See §8 Identity Hierarchy. |
 | `ParticipantId` | An actor involved in a multi-party interaction (conversation, session, collaboration). Wraps an `ActorId`. See §8 Identity Hierarchy. |
 | `GroupMember` | Record: `actorId` (SCIM `value` = OIDC `sub` = stable identity key) + `displayName` (human label — never use as a routing key). |
-| `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking. `store()` is append-only. |
+| `CaseMemoryStore` | SPI for semantic cross-case memory — store and recall observations about entities across case boundaries. Blocking; wrapped by `BlockingToReactiveBridge` for reactive callers. `store()` is append-only. |
 | `MemoryQuery` | Query builder for `CaseMemoryStore.query()` — multi-entity fan-out, `MemoryOrder` (CHRONOLOGICAL / RELEVANCE), `since` filter, domain filter. |
 | `MemoryPermissions` | Static utility — `assertTenant(tenantId, CurrentPrincipal)` throws `SecurityException` if the current principal's tenancy does not match. Static so callable from both blocking and reactive adapters; `assertCrossTenantAdmin(principal)` — requires `isCrossTenantAdmin()=true`, no async bypass form. |
+| `BlockingToReactiveBridge` | `@DefaultBean` `ReactiveCaseMemoryStore` implementation that wraps whichever blocking `CaseMemoryStore` is active. Thread dispatch is the entrypoint's responsibility. |
 | `AgentProvider` | SPI for agent execution — `execute(prompt, AgentSessionConfig)` returns `Multi<AgentEvent>`. `NoOpAgentProvider @DefaultBean` active when no implementation is on the classpath. |
 | `ActorStateContributor` | SPI: `contribute(actorId, ActorStateAccumulator)` — each contributor adds its slice of actor workload data (active cases, open WorkItems, open obligations). |
 | `SettingsScope` | Wraps a `Path` and an `effectiveAt Instant` for preference resolution. `SettingsScope.of(path)` defaults `effectiveAt` to `Instant.now()`. |
@@ -1896,6 +1928,7 @@ Cross-cutting decisions not captured in layer entries:
 | `CbrCaseEntry` | Standard schema for the CBR Retain step: `problem` → `MemoryInput.text`, `solution` → `SOLUTION` attribute, `outcome` → `OUTCOME` attribute, `origin` → `CONFIDENCE` attribute. `toMemoryInput()` converts to store input; `CbrCaseEntry.from(Memory)` reconstructs from a recalled memory. |
 | `StoreAllResult` | Return type of `CaseMemoryStore.storeAll()` — carries `stored()` (IDs of successfully persisted inputs) and `failures()` (list of `StoreFailure`). Backend `RuntimeException`s are collected per input; `SecurityException` always propagates immediately and terminates the batch. |
 | `StoreFailure` | Record inside `StoreAllResult` — `inputIndex`, `input`, `cause`. Allows callers to correlate partial-write failures back to the original `MemoryInput` list for retry. |
+| `ReactiveCaseMemoryStore` | Mutiny SPI mirror of `CaseMemoryStore` — `Uni`/`Multi` return types. Lives in `platform-api` (L1). `BlockingToReactiveBridge @DefaultBean` in `platform/` wraps the active blocking adapter so reactive callers need no adapter-specific code. |
 | `GraphCaseMemoryStore` | Extension of `CaseMemoryStore` adding `graphQuery(GraphMemoryQuery)` for temporal knowledge graph adapters. `NoOpCaseMemoryStore` implements this interface so injection of the graph type does not fail when no graph adapter is deployed. |
 | `GraphMemoryQuery` | Query record for graph-native adapters — `tenantId`, `entityIds`, `domain`, `question`, `limit`, `since`, `validAt`, `entityTypes`, `resultType`. |
 | `MemoryCapability` | Enum declaring what a `CaseMemoryStore` adapter supports (e.g. `GRAPH_QUERY`, `CROSS_TENANT_ERASE`). `capabilities()` default on `CaseMemoryStore` returns `EnumSet.noneOf(MemoryCapability.class)`; adapters override. `requireCapability()` throws `MemoryCapabilityException` if not supported. |

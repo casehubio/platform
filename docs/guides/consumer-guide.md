@@ -9,7 +9,7 @@
 
 ## Purpose
 
-casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, governance, labels, subject views, and agent infrastructure. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
+casehub-platform defines the domain abstractions that every casehub module shares: identity, preferences, paths, memory, data sources, endpoints, notifications, subscriptions, expressions, access control, credentials, governance, labels, subject views, agent infrastructure, and simulation. These are pure Java SPIs with zero external dependencies in `platform-api/`. Quarkus-specific implementations live in companion modules that activate by classpath presence via CDI `@DefaultBean` displacement.
 
 This repo is not a parallel framework to Quarkus -- it is a thin domain layer that Quarkus-specific code implements. `CurrentPrincipal` wraps `SecurityIdentity`, `PreferenceProvider` complements `@ConfigMapping`, and `Path` replaces `java.nio.file.Path` with domain semantics. They solve different problems and belong together.
 
@@ -83,161 +83,110 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 
 ### Agent infrastructure
 
-Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `model` field via four-step resolution: (0) alias lookup (named constraint sets from manifest), (1) tier reference (`tier:FLAGSHIP`), (2) `ModelRegistry` lookup by model ID, (3) direct backend key match, (4) fail-fast. Add one or more backend modules to the classpath; the router discovers them automatically.
+Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `model` field via three-step resolution: (1) `ModelRegistry` lookup by model ID (routes to backend via descriptor's `backendKey`), (2) direct backend key match, (3) fail-fast. Add one or more backend modules to the classpath; the router discovers them automatically.
 
 | Artifact | What it provides |
 |----------|------------------|
-| `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); `AgentSessionConfig.withModel(String)` and `withModel(ModelQuery)` for model selection. Depends on platform-api |
-| `casehub-platform-agent-config-core` | Framework-neutral manifest loader and processor. `ManifestLoader` discovers `agent-config.yaml` from directory hierarchy (project → user → system → seed catalog), parses YAML, merges by model ID. `ManifestProcessor` drives existing SPIs from merged manifest. `ManifestCredentialResolver` handles `env:`/`file:`/`ref:` credential references. `model-selection.schema.json` published as Maven artifact resource for cross-repo `$ref`. Pure Java + Jackson -- no CDI |
-| `casehub-platform-agent-config` | Quarkus `@Startup @Priority(50)` wiring -- runs ManifestLoader + ManifestProcessor at boot, produces `ManifestResult` for router consumption. Profile support via `CASEHUB_AGENT_PROFILE` env var |
+| `casehub-platform-agent-api` | `AgentProvider` + `AgentBackend` SPIs; `AgentRuntime` + `AgentProcess` (subprocess abstraction); `AgentEvent` sealed interface; `AgentMcpServer` (Stdio/Sse/Http); Mutiny only, no Quarkus |
 | `casehub-platform-agent-runtime` | `SubprocessRuntime` -- local process execution for CLI agent providers |
-| `casehub-platform-agent-router` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking. Consumes `ManifestResult` for aliases and default backend. Config: `casehub.platform.agent.default-backend` |
+| `casehub-platform-agent-router` | `RoutingAgentProvider` -- three-step model resolution (registry → key → fail-fast) with config rewriting. Config: `casehub.platform.agent.default-backend` |
 | `casehub-platform-agent-claude` | AgentBackend "claude" -- Claude CLI subprocess via `claude-code-sdk` |
 | `casehub-platform-agent-openai` | AgentBackend "openai" -- native OpenAI Java SDK with `prompt_cache_key` support |
 | `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `casehub-platform-agent-gemini` | AgentBackend "gemini" -- native Google GenAI SDK with explicit caching |
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `casehub-platform-agent-ollama` | AgentBackend "ollama" -- local model invocation via Ollama's OpenAI-compatible API (`localhost:11434/v1/`). 120s default timeout |
 | `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
-### Agent configuration manifest
+### Simulation
 
-Drop an `agent-config.yaml` in your project root and `AgentProvider` works at startup -- no custom wiring code needed. The manifest declares what vendors are available, how to authenticate, and how to select models.
+Complete SPI testing framework — replaces Mockito for platform SPI tests. Configurable simulation for any SPI: real responses when you have a real backend, simulated responses when you don't, captured traffic when you want to build a corpus, and a verification API for asserting SPI interactions. See the [Simulation Guide](simulation-guide.md) for full documentation.
 
-**Directory hierarchy:** The loader discovers manifest files from a fixed priority chain. Higher priority wins for the same model ID or vendor.
+**Core framework:**
 
-| Level | Path | Priority |
-|-------|------|----------|
-| Platform | `classpath:models/seed-catalog.yaml` | 0 |
-| System | `/etc/casehub/agent-config.yaml` | 10 |
-| User | `~/.casehub/agent-config.yaml` | 20 |
-| User profile | `~/.casehub/agent-config-{profile}.yaml` | 25 |
-| Project | `./agent-config.yaml` | 30 |
-| Project profile | `./agent-config-{profile}.yaml` | 35 |
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-api` | compile | Core SPIs: `SimulationStrategy<I,O>`, `SimulationCorpus<I,O>`, `InvocationRecord<I,O>` (with `.of()` factories), `CorpusSeed<I,O>` (typed accumulator with `withKeyExtractor`/`withOutputMapper`), `KeyExtractor<I>`, `SimilarityScorer<I>`, `DataRealism`, `ExhaustionPolicy`, `@SimulationEligible`. Zero deps |
+| `casehub-platform-simulation-core` | compile | Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay, NearestMatch) + `SimulationRuntime` (strategy factory, overlay stack, profile activation) + `SimulationOverlay` (per-scenario isolation) + `InvocationJournal`/`JournalEntry` (call recording with tenancyId) + `SimulationVerifier`/`MethodVerification` (fluent verification API) + `ProfileSource`/`SimulationProfile` + `RestInvocation`/`RestClientKeyExtractor` |
+| `casehub-platform-simulation-inmem` | compile | `InMemorySimulationCorpus` — volatile, thread-safe, ConcurrentHashMap-backed |
 
-Set `CASEHUB_AGENT_PROFILE` env var to activate profile-specific files (e.g. `ci`). In Quarkus, falls back to `QUARKUS_PROFILE` if unset.
+**Configuration and wiring:**
 
-**Credential references:** Manifests never contain raw secrets. Three reference types:
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-config-core` | compile | `SmallRyeSimulationConfig` (prefix scanning, named profiles), `YamlCorpusLoader`, `DeclarativeExtractorFactory`, `DeclarativeScorerFactory`, `RecordFieldScorer` |
+| `casehub-platform-simulation-config` | compile | Quarkus CDI beans: `@Produces SimulationConfig`, `SimulationCorpus`, `SimulationRuntime`; `@Startup` corpus populator; profile wiring. Required alongside `simulation-generator` |
 
-| Prefix | Resolves via | Use case |
-|--------|-------------|----------|
-| `env:VAR_NAME` | `System.getenv()` | Dev machines, CI (secrets in environment) |
-| `file:/path` | File contents | Kubernetes mounted secrets |
-| `ref:credential-ref` | `CredentialResolver` SPI → Quarkus `CredentialsProvider` → Vault/AWS/GCP | Production |
+**Code generation (annotation processors):**
 
-**Example -- developer machine:**
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-generator` | provided | APT: generates `@Decorator` + `*QN` constants class per `@SimulationEligible` SPI |
+| `casehub-platform-rest-client-simulation-generator` | provided | APT: generates `@Decorator` for `@RegisterRestClient` interfaces with `RestInvocation` input |
 
-```yaml
-# ~/.casehub/agent-config.yaml
-providers:
-  - vendor: anthropic
-    credential: env:ANTHROPIC_API_KEY
-  - vendor: ollama
-aliases:
-  reasoning-heavy:
-    tier: FLAGSHIP
-    capabilities: [reasoning]
-    min-context: 128000
-  cheap-fast:
-    tier: FAST
-    max-cost: LOW
-defaults:
-  backend: claude
-```
+**Pre-built simulation adapters:**
 
-**Example -- CI with Ollama:**
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-platform-simulation-core` | compile | Generated decorators for 11 platform-api SPIs (AccessControlProvider, DataSourceRegistry, SubscriptionStore, NotificationStore, EndpointRegistry, ExpressionEngineRegistry, DocumentSigningService, CredentialResolver, ModelRegistry, PreferenceProvider, CurrentPrincipal) |
+| `casehub-platform-memory-simulation-core` | compile | Generated decorator for `CaseMemoryStore` |
+| `casehub-platform-agent-simulation-core` | compile | `SimulatedAgentBackend` (Path B), `AgentCorpus` descriptor, `AgentSimulationInput` |
 
-```yaml
-# ./agent-config-ci.yaml
-providers:
-  - vendor: ollama
-local-models:
-  - id: llama-4-scout
-    ensure: present
-defaults:
-  backend: ollama
-```
+**Event simulation:**
 
-**Example -- production with Vault:**
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-event-simulation-core` | compile | `SimulatedEventEmitter` (tick-based), `EventTrigger`, `CloudEventFixtureBuilder`, `TimedSequence<E>`/`TimedEntry<E>` (relative delays, time multiplier), `EventSequenceRunner` (virtual-thread executor) |
+| `casehub-platform-event-simulation` | compile | Quarkus CDI wiring: `@Produces SimulatedEventEmitter` with `Event<CloudEvent>` sink, `@Scheduled` continuous tick |
 
-```yaml
-# /etc/casehub/agent-config.yaml
-providers:
-  - vendor: anthropic
-    credential: ref:vault/casehub/anthropic-api-key
-  - vendor: vertex
-    credential:
-      project-id: ref:vault/casehub/gcp-project
-      location: ref:vault/casehub/gcp-location
-      service-account-json: ref:vault/casehub/gcp-service-account
-defaults:
-  backend: claude
-```
+**Test utilities:**
 
-**Using AgentProvider in code:**
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-testing` | test | Per-SPI corpus descriptors (`AclCorpus`, `ModelCorpus`, `NotificationCorpus`, `PreferenceCorpus`, `CredentialCorpus`), `LlmCorpusPopulator` (LLM-generated corpus), `RandomCorpusPopulator` (schema-driven random generation) |
+| `casehub-platform-schema-generator` | compile/test | `PlatformSchemaGenerator` (Java → JSON Schema), `SchemaDataGenerator` (JSON Schema → random instances with constraint support) |
+
+**Quick start (3 steps):**
+
+1. Add dependencies — `simulation-config` + `platform-simulation-core` (or `memory-simulation-core` for CaseMemoryStore)
+2. Configure strategies in `application.properties`:
+   ```properties
+   casehub.simulation.access-control-provider.canAccess.strategy=key-lookup
+   casehub.simulation.case-memory-store.store.strategy=sequential
+   ```
+3. Seed corpus via YAML (`casehub.simulation.corpus.files=sim-corpus.yaml`) or programmatic `CorpusSeed`
+
+**Verification (replaces Mockito verify):**
 
 ```java
-@Inject AgentProvider agentProvider;
-
-// By alias (resolves differently per environment)
-agentProvider.invoke(config.withModel("reasoning-heavy"));
-
-// By tier
-agentProvider.invoke(config.withModel("tier:FAST"));
-
-// By model ID
-agentProvider.invoke(config.withModel("claude-opus-5"));
-
-// By inline constraints (ModelQuery)
-var query = ModelQuery.builder()
-    .tier(ModelTier.FLAGSHIP)
-    .requiredCapabilities(Set.of("vision", "reasoning"))
-    .minContextWindow(128000)
-    .build();
-agentProvider.invoke(config.withModel(query));
-
-// No model -- uses default backend from manifest
-agentProvider.invoke(config);
+var verifier = SimulationVerifier.on(overlay.journal());
+verifier.method("case-memory-store.store").forTenant("hospital-a").wasCalled(2);
+verifier.method("case-memory-store.erase").wasNeverCalled();
+verifier.inOrder("case-memory-store.query", "case-memory-store.store");
+verifier.noUnverifiedCalls();
 ```
 
-**In YAML definitions (eidos):**
+**Five data population paths:**
 
-```yaml
-tasks:
-  analyze:
-    agent:
-      model: reasoning-heavy
-  triage:
-    agent:
-      model:
-        tier: FAST
-        max-cost: LOW
-        locality: LOCAL
-```
+| Path | Realism level | When to use |
+|------|--------------|-------------|
+| YAML fixtures (`corpus.files`) | Domain-plausible | Quick scenario setup |
+| `CorpusSeed` + descriptors | Domain-plausible | Typed, per-SPI, programmatic |
+| `LlmCorpusPopulator` | Domain-plausible | LLM-generated realistic data |
+| `RandomCorpusPopulator` / `SchemaDataGenerator` | Structurally valid | Load testing, integration tests |
+| Capture mode (`capture=true`) | Recorded real | CI replay, regression |
 
-**ModelQuery fields** (all nullable -- null means "don't care"):
+**Configuration reference:**
 
-| Field | Type | Purpose |
-|-------|------|---------|
-| `vendor` | String | Exact vendor match |
-| `family` | String | Exact model family match |
-| `tier` | ModelTier | FLAGSHIP / STANDARD / FAST / EMBEDDING |
-| `requiredCapabilities` | Set\<String\> | All listed capabilities must be present |
-| `locality` | ModelLocality | CLOUD / LOCAL |
-| `maxCostTier` | CostTier | Maximum cost (ranked: FREE < LOW < MEDIUM < HIGH < PREMIUM) |
-| `minContextWindow` | Integer | Minimum context window in tokens |
-| `minMaxOutput` | Integer | Minimum max output tokens |
-| `preferVendor` | String | Tiebreaker among matching models (not a filter) |
-
-### LLM configuration
-
-| Artifact | What it provides |
-|----------|------------------|
-| `casehub-platform-llm-config` | `LlmConfigService` — UI-driven LLM provider setup wizard. Vendor discovery, credential validation, model pull |
-| `casehub-platform-llm-config-core` | Framework-neutral LLM config types — `LlmConfigApi` SPI, request/result records. Pure Java, no CDI |
-| `casehub-platform-llm-config-vertex` | Google Vertex AI vendor client — project/region/model discovery, ADC authentication |
-| `casehub-platform-llm-config-bedrock` | AWS Bedrock vendor client — region/model discovery, credential chain authentication |
+| Property | Values | Default |
+|----------|--------|---------|
+| `casehub.simulation.<spi>.<method>.strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay`, `nearest-match` | (none — passthrough) |
+| `casehub.simulation.<spi>.<method>.capture` | `true`/`false` | `false` |
+| `casehub.simulation.<spi>.<method>.threshold` | `0.0`–`1.0` | `0.0` |
+| `casehub.simulation.<spi>.<method>.exhaustion-policy` | `WRAP`, `THROW` | `WRAP` |
+| `casehub.simulation.corpus.files` | comma-separated paths | (none) |
+| `casehub.simulation.active-profile` | profile name | (none) |
+| `casehub.simulation.profiles.<name>.<spi>.<method>.*` | per-profile overrides | (none) |
 
 ### Access control
 
@@ -567,11 +516,11 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 
 ### Agent Infrastructure
 
-**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and resolves the `model` field via four-step resolution: (0) alias lookup (named constraint sets from the agent config manifest), (1) tier reference (`tier:FLAGSHIP`), (2) `ModelRegistry.resolveById` — routes to backend from `descriptor.backendKey()`, rewrites config with the API model ID, (3) direct backend key match — model nulled so backend uses its default, (4) fail-fast `IllegalArgumentException`. When `ManifestResult` is available (from `agent-config` module), aliases and default backend override config properties. Callers always inject `AgentProvider`, never `AgentBackend`.
+**Two-SPI design:** `AgentProvider` is the caller-facing SPI. `AgentBackend` is the implementor-facing SPI. `RoutingAgentProvider` bridges them — it implements `AgentProvider`, discovers `AgentBackend` beans via CDI `Instance`, and resolves the `model` field via three-step resolution: (1) `ModelRegistry.resolveById` — routes to backend from `descriptor.backendKey()`, rewrites config with the API model ID, (2) direct `backends.get(model)` — model nulled so backend uses its default, (3) fail-fast `IllegalArgumentException`. Callers always inject `AgentProvider`, never `AgentBackend`.
 
 `AgentProvider` has two execution paths:
-- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, nullable `model` (string), and nullable `modelQuery` (`ModelQuery` for direct constraint dispatch). Use `config.withModel(String)` for aliases/IDs or `config.withModel(ModelQuery)` for inline constraints.
-- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). Same `withModel` overloads.
+- `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model` (provider key).
+- `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). `AgentSessionInit` carries `systemPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model`.
 
 `AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no backend key and no `ModelRegistry` entry, resolution fails fast with `IllegalArgumentException`.
 
@@ -590,7 +539,7 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 - `casehub_activate` — on-demand per-operation tool registration. Agents discover and activate tools at runtime instead of exposing all tools at startup.
 - **Resource subscriptions:** `McpResourceRegistry` SPI for registering subscribable MCP resources. `McpResourceRegistryBridge` tracks subscriptions and fires notifications on resource changes.
 - **Dynamic tool schema:** The operation catalog is injected into the `casehub_action` tool definition at runtime, providing contextual tool descriptions.
-- `@McpDomain` interfaces or concrete classes discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations. The `graphql-generator` APT generates both `@GraphQLApi` resolvers and `@Path` JAX-RS REST resources from these. For single-implementation domains, annotate the class directly with `@McpDomain` — no SPI interface needed. Classes must be CDI beans (the APT emits a WARNING if no visible scope annotation is present). Discovery sources: Jandex indexes from dependency JARs + RoundEnvironment (consumer SPIs/classes in the current compilation unit are found automatically). Use `@RestMethod(HttpMethod.DELETE)` for non-POST mutations, `@PathParam` for path segments. Processor options: `-AdomainFilter` to scope generation per module, `-AgenerateGraphQL=false` to suppress GraphQL output, `-AgenerateRest=false` to suppress REST output. NOTE-level diagnostic logging reports received options, discovered domains (with source: JANDEX or ROUND_ENV), and filter decisions; WARNING emitted when domainFilter matches zero domains.
+- `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations. The `graphql-generator` APT generates both `@GraphQLApi` resolvers and `@Path` JAX-RS REST resources from these interfaces. Discovery sources: Jandex indexes from dependency JARs + RoundEnvironment (consumer SPIs in the current compilation unit are found automatically). Use `@RestMethod(HttpMethod.DELETE)` for non-POST mutations, `@PathParam` for path segments. Processor options: `-AdomainFilter` to scope generation per module, `-AgenerateGraphQL=false` to suppress GraphQL output, `-AgenerateRest=false` to suppress REST output. NOTE-level diagnostic logging reports received options, discovered domains (with source: JANDEX or ROUND_ENV), and filter decisions; WARNING emitted when domainFilter matches zero domains.
 
 ---
 
@@ -650,6 +599,14 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `%prod.quarkus.kubernetes-config.config-maps` | Kubernetes ConfigMaps to read | -- |
 | `%prod.quarkus.kubernetes-config.secrets` | Kubernetes Secrets to read | -- |
 
+### Simulation
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `casehub.simulation.<spi>.<method>.strategy` | Strategy key: `sequential`, `key-lookup`, `random`, `recorded-replay` | none (passthrough) |
+| `casehub.simulation.<spi>.<method>.capture` | Enable capture mode | false |
+| `casehub.simulation.<spi>.<method>.exhaustion-policy` | Sequential exhaustion: `WRAP` or `THROW` | WRAP |
+
 ### Streams
 
 | Property | Purpose | Default |
@@ -667,6 +624,16 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `casehub.delivery.retention.attempt-days` | Delivery attempt retention | -- |
 | `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | -- |
 | `casehub.delivery.retention.engagement-days` | Engagement event retention | -- |
+
+### Modular Notification Targets
+
+The notification pipeline supports two target kinds:
+- **USER** (TargetType: `USER`, `GROUP`, `EVENT_FIELD`, `ENTITY_WATCHERS`) — full pipeline with preferences, suppression, digest, inbox persistence
+- **NON_USER** (TargetType: `AGENT`, `SYSTEM`) — skip suppression, fire-and-forget via `CdiEventDeliverer`
+
+To make a domain event subscribable, implement `SubscribableEvent` (`type()`, `tenancyId()`). The subscription engine matches it automatically. Create subscriptions with `AGENT` or `SYSTEM` targets for operational alerts.
+
+Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `CertificateExpiryEvent` (`certificate.expiry`).
 
 ### Subject Views
 

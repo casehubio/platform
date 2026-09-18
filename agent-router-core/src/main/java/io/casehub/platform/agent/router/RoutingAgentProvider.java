@@ -7,6 +7,8 @@ import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
+import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.api.FactoryMethod;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRef;
@@ -46,6 +48,22 @@ public class RoutingAgentProvider implements AgentProvider {
         LOG.infof("Agent router initialized with registry, default=%s, aliases=%d",
                   defaultBackendKey, this.aliases.size());
     }
+
+    @FactoryMethod
+    public static RoutingAgentProvider create(
+            BackendInstanceRegistry registry,
+            String configDefaultBackend,
+            ModelRegistry modelRegistry,
+            Optional<ManifestResult> manifestResult) {
+        if (manifestResult.isPresent()) {
+            var result = manifestResult.get();
+            var defaultBackend = result.defaultBackendKey() != null
+                                 ? result.defaultBackendKey() : configDefaultBackend;
+            return new RoutingAgentProvider(registry, defaultBackend, modelRegistry, result.aliases());
+        }
+        return new RoutingAgentProvider(registry, configDefaultBackend, modelRegistry);
+    }
+
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {

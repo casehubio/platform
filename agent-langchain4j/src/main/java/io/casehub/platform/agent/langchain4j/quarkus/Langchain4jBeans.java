@@ -25,13 +25,8 @@ public class Langchain4jBeans {
     public ChatModelAgentProvider chatModelAgentProvider(
             @Any Instance<ChatModel> chatModels,
             AgentLangchain4jConfig config) {
-        List<ChatModel> candidates = chatModels.select(Default.Literal.INSTANCE).stream()
-            .filter(m -> !(m instanceof AgentProviderChatModel))
-            .toList();
-        ChatModel chatModel = candidates.isEmpty() ? null : candidates.get(0);
-        StreamingChatModel streamingChatModel =
-                (chatModel instanceof StreamingChatModel s) ? s : null;
-        return new ChatModelAgentProvider(chatModel, streamingChatModel, config);
+        List<ChatModel> allModels = chatModels.select(Default.Literal.INSTANCE).stream().toList();
+        return ChatModelAgentProvider.create(allModels, config);
     }
 
     @Produces

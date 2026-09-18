@@ -1,15 +1,12 @@
 package io.casehub.platform.agent.config.quarkus;
 
+import io.casehub.platform.agent.config.AgentConfigLoader;
 import io.casehub.platform.agent.config.LocalModelReconciler;
-import io.casehub.platform.agent.config.ManifestCredentialResolver;
-import io.casehub.platform.agent.config.ManifestLoader;
-import io.casehub.platform.agent.config.ManifestProcessor;
 import io.casehub.platform.agent.config.ManifestResult;
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.credentials.LlmCredentialStore;
 import io.casehub.platform.api.model.MutableModelRegistry;
 import io.casehub.platform.llm.config.LlmConfigApi;
-import io.casehub.platform.llm.config.OllamaClient;
 import io.casehub.platform.llm.config.PullRequest;
 import io.casehub.platform.llm.config.VendorClient;
 import io.quarkus.runtime.StartupEvent;
@@ -41,22 +38,11 @@ public class AgentConfigBeans {
     private ManifestResult result;
 
     void onStartup(@Observes @Priority(50) StartupEvent event) {
-        var vendorReqs = buildVendorRequirements();
-        var reconciler = buildReconciler();
-        var resolver = new ManifestCredentialResolver(credentialResolver);
-        var loader = new ManifestLoader();
-        var profile = resolveProfile();
-
-        var projectDir = Path.of(System.getProperty("user.dir"));
-        var manifest = loader.load(projectDir, profile);
-
-        var processor = new ManifestProcessor(
-                credentialStore, modelRegistry, resolver, vendorReqs, reconciler);
-        this.result = processor.process(manifest);
-
-        LOG.infof("Agent config manifest processed: %d aliases, default backend: %s",
-                result.aliases().size(),
-                result.defaultBackendKey() != null ? result.defaultBackendKey() : "(not set)");
+        var loader = new AgentConfigLoader(
+                credentialStore, modelRegistry, credentialResolver,
+                buildVendorRequirements(), buildReconciler(),
+                resolveProfile(), Path.of(System.getProperty("user.dir")));
+        this.result = loader.load();
     }
 
     @Produces

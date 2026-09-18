@@ -100,16 +100,93 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 
 ### Simulation
 
-Configurable simulation for any SPI — real responses when you have a real backend, simulated responses when you don't, captured traffic when you want to build a corpus. See the [Simulation Guide](simulation-guide.md) for full documentation.
+Complete SPI testing framework — replaces Mockito for platform SPI tests. Configurable simulation for any SPI: real responses when you have a real backend, simulated responses when you don't, captured traffic when you want to build a corpus, and a verification API for asserting SPI interactions. See the [Simulation Guide](simulation-guide.md) for full documentation.
 
-| Artifact | What it provides |
-|----------|------------------|
-| `casehub-platform-simulation-api` | Core contracts: `SimulationStrategy`, `SimulationCorpus`, `InvocationRecord`, `KeyExtractor`, `@SimulationEligible`. Zero deps |
-| `casehub-platform-simulation-core` | Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay) + `SimulationRuntime` |
-| `casehub-platform-simulation-inmem` | In-memory `SimulationCorpus` @Alternative @Priority(100) — volatile, thread-safe |
-| `casehub-platform-simulation-config` | Config binding (`application.properties` → `SimulationConfig`), YAML corpus fixtures, declarative KeyExtractors. Required alongside `simulation-generator` |
-| `casehub-platform-simulation-generator` (provided scope) | APT: generates `@Decorator` per `@SimulationEligible` SPI |
-| `casehub-platform-agent-simulation-core` | `SimulatedAgentBackend` — Path B integration for `AgentProvider` simulation |
+**Core framework:**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-api` | compile | Core SPIs: `SimulationStrategy<I,O>`, `SimulationCorpus<I,O>`, `InvocationRecord<I,O>` (with `.of()` factories), `CorpusSeed<I,O>` (typed accumulator with `withKeyExtractor`/`withOutputMapper`), `KeyExtractor<I>`, `SimilarityScorer<I>`, `DataRealism`, `ExhaustionPolicy`, `@SimulationEligible`. Zero deps |
+| `casehub-platform-simulation-core` | compile | Strategy implementations (Sequential, KeyLookup, Random, RecordedReplay, NearestMatch) + `SimulationRuntime` (strategy factory, overlay stack, profile activation) + `SimulationOverlay` (per-scenario isolation) + `InvocationJournal`/`JournalEntry` (call recording with tenancyId) + `SimulationVerifier`/`MethodVerification` (fluent verification API) + `ProfileSource`/`SimulationProfile` + `RestInvocation`/`RestClientKeyExtractor` |
+| `casehub-platform-simulation-inmem` | compile | `InMemorySimulationCorpus` — volatile, thread-safe, ConcurrentHashMap-backed |
+
+**Configuration and wiring:**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-config-core` | compile | `SmallRyeSimulationConfig` (prefix scanning, named profiles), `YamlCorpusLoader`, `DeclarativeExtractorFactory`, `DeclarativeScorerFactory`, `RecordFieldScorer` |
+| `casehub-platform-simulation-config` | compile | Quarkus CDI beans: `@Produces SimulationConfig`, `SimulationCorpus`, `SimulationRuntime`; `@Startup` corpus populator; profile wiring. Required alongside `simulation-generator` |
+
+**Code generation (annotation processors):**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-generator` | provided | APT: generates `@Decorator` + `*QN` constants class per `@SimulationEligible` SPI |
+| `casehub-platform-rest-client-simulation-generator` | provided | APT: generates `@Decorator` for `@RegisterRestClient` interfaces with `RestInvocation` input |
+
+**Pre-built simulation adapters:**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-platform-simulation-core` | compile | Generated decorators for 11 platform-api SPIs (AccessControlProvider, DataSourceRegistry, SubscriptionStore, NotificationStore, EndpointRegistry, ExpressionEngineRegistry, DocumentSigningService, CredentialResolver, ModelRegistry, PreferenceProvider, CurrentPrincipal) |
+| `casehub-platform-memory-simulation-core` | compile | Generated decorator for `CaseMemoryStore` |
+| `casehub-platform-agent-simulation-core` | compile | `SimulatedAgentBackend` (Path B), `AgentCorpus` descriptor, `AgentSimulationInput` |
+
+**Event simulation:**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-event-simulation-core` | compile | `SimulatedEventEmitter` (tick-based), `EventTrigger`, `CloudEventFixtureBuilder`, `TimedSequence<E>`/`TimedEntry<E>` (relative delays, time multiplier), `EventSequenceRunner` (virtual-thread executor) |
+| `casehub-platform-event-simulation` | compile | Quarkus CDI wiring: `@Produces SimulatedEventEmitter` with `Event<CloudEvent>` sink, `@Scheduled` continuous tick |
+
+**Test utilities:**
+
+| Artifact | Scope | What it provides |
+|----------|-------|------------------|
+| `casehub-platform-simulation-testing` | test | Per-SPI corpus descriptors (`AclCorpus`, `ModelCorpus`, `NotificationCorpus`, `PreferenceCorpus`, `CredentialCorpus`), `LlmCorpusPopulator` (LLM-generated corpus), `RandomCorpusPopulator` (schema-driven random generation) |
+| `casehub-platform-schema-generator` | compile/test | `PlatformSchemaGenerator` (Java → JSON Schema), `SchemaDataGenerator` (JSON Schema → random instances with constraint support) |
+
+**Quick start (3 steps):**
+
+1. Add dependencies — `simulation-config` + `platform-simulation-core` (or `memory-simulation-core` for CaseMemoryStore)
+2. Configure strategies in `application.properties`:
+   ```properties
+   casehub.simulation.access-control-provider.canAccess.strategy=key-lookup
+   casehub.simulation.case-memory-store.store.strategy=sequential
+   ```
+3. Seed corpus via YAML (`casehub.simulation.corpus.files=sim-corpus.yaml`) or programmatic `CorpusSeed`
+
+**Verification (replaces Mockito verify):**
+
+```java
+var verifier = SimulationVerifier.on(overlay.journal());
+verifier.method("case-memory-store.store").forTenant("hospital-a").wasCalled(2);
+verifier.method("case-memory-store.erase").wasNeverCalled();
+verifier.inOrder("case-memory-store.query", "case-memory-store.store");
+verifier.noUnverifiedCalls();
+```
+
+**Five data population paths:**
+
+| Path | Realism level | When to use |
+|------|--------------|-------------|
+| YAML fixtures (`corpus.files`) | Domain-plausible | Quick scenario setup |
+| `CorpusSeed` + descriptors | Domain-plausible | Typed, per-SPI, programmatic |
+| `LlmCorpusPopulator` | Domain-plausible | LLM-generated realistic data |
+| `RandomCorpusPopulator` / `SchemaDataGenerator` | Structurally valid | Load testing, integration tests |
+| Capture mode (`capture=true`) | Recorded real | CI replay, regression |
+
+**Configuration reference:**
+
+| Property | Values | Default |
+|----------|--------|---------|
+| `casehub.simulation.<spi>.<method>.strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay`, `nearest-match` | (none — passthrough) |
+| `casehub.simulation.<spi>.<method>.capture` | `true`/`false` | `false` |
+| `casehub.simulation.<spi>.<method>.threshold` | `0.0`–`1.0` | `0.0` |
+| `casehub.simulation.<spi>.<method>.exhaustion-policy` | `WRAP`, `THROW` | `WRAP` |
+| `casehub.simulation.corpus.files` | comma-separated paths | (none) |
+| `casehub.simulation.active-profile` | profile name | (none) |
+| `casehub.simulation.profiles.<name>.<spi>.<method>.*` | per-profile overrides | (none) |
 
 ### Access control
 

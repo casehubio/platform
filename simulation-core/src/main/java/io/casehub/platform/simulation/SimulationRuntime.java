@@ -1,6 +1,7 @@
 package io.casehub.platform.simulation;
 
 import io.casehub.platform.simulation.strategy.KeyLookupStrategy;
+import io.casehub.platform.simulation.strategy.NearestMatchStrategy;
 import io.casehub.platform.simulation.strategy.RandomStrategy;
 import io.casehub.platform.simulation.strategy.RecordedReplayStrategy;
 import io.casehub.platform.simulation.strategy.SequentialStrategy;
@@ -15,6 +16,7 @@ public class SimulationRuntime {
     private final SimulationConfig config;
     private final SimulationCorpus corpus;
     private final ConcurrentHashMap<String, KeyExtractor<?>> extractors = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, SimilarityScorer<?>> scorers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
 
     public SimulationRuntime(final SimulationConfig config, final SimulationCorpus corpus) {
@@ -24,6 +26,10 @@ public class SimulationRuntime {
 
     public <I> void registerExtractor(final String qualifiedName, final KeyExtractor<I> extractor) {
         extractors.put(qualifiedName, extractor);
+    }
+
+    public <I> void registerScorer(final String qualifiedName, final SimilarityScorer<I> scorer) {
+        scorers.put(qualifiedName, scorer);
     }
 
     public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(final String qualifiedName) {
@@ -59,9 +65,23 @@ public class SimulationRuntime {
                 final KeyExtractor extractor = requireExtractor(qualifiedName);
                 yield new RecordedReplayStrategy<>(corpus, qualifiedName, extractor);
             }
+            case "nearest-match" -> {
+                final SimilarityScorer scorer = requireScorer(qualifiedName);
+                final double threshold = config.threshold(qualifiedName).orElse(0.0);
+                yield new NearestMatchStrategy<>(corpus, qualifiedName, scorer, threshold);
+            }
             default -> throw new SimulationConfigException(
                     "Unknown strategy '" + strategyName + "' for " + qualifiedName);
         };
+    }
+
+    private SimilarityScorer<?> requireScorer(final String qualifiedName) {
+        final SimilarityScorer<?> scorer = scorers.get(qualifiedName);
+        if (scorer == null) {
+            throw new SimulationConfigException(
+                    "Strategy for " + qualifiedName + " requires a SimilarityScorer, but none registered");
+        }
+        return scorer;
     }
 
     private KeyExtractor<?> requireExtractor(final String qualifiedName) {

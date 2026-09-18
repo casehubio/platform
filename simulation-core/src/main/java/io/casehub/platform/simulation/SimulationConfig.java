@@ -9,4 +9,8 @@ public interface SimulationConfig {
     boolean captureEnabled(String qualifiedName);
 
     Optional<ExhaustionPolicy> exhaustionPolicy(String qualifiedName);
+
+    default Optional<Double> threshold(String qualifiedName) {
+        return Optional.empty();
+    }
 }

@@ -1,0 +1,11 @@
+io.casehub.platform.api.acl.AccessControlProvider=access-control-provider
+io.casehub.platform.api.datasource.DataSourceRegistry=data-source-registry
+io.casehub.platform.api.subscription.SubscriptionStore=subscription-store
+io.casehub.platform.api.notification.NotificationStore=notification-store
+io.casehub.platform.api.endpoints.EndpointRegistry=endpoint-registry
+io.casehub.platform.api.expression.ExpressionEngineRegistry=expression-engine-registry
+io.casehub.platform.api.signing.document.DocumentSigningService=document-signing-service
+io.casehub.platform.api.credentials.CredentialResolver=credential-resolver
+io.casehub.platform.api.model.ModelRegistry=model-registry
+io.casehub.platform.api.preferences.PreferenceProvider=preference-provider
+io.casehub.platform.api.identity.CurrentPrincipal=current-principal

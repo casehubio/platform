@@ -158,11 +158,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
 
         for (final MethodInfo method : spiClass.methods()) {
             if (method.isSynthetic()) continue;
-            if (java.lang.reflect.Modifier.isAbstract(method.flags())) {
-                generateSimulatedMethod(sb, method, spiName);
-            } else {
-                generateDelegatingMethod(sb, method);
-            }
+            generateSimulatedMethod(sb, method, spiName);
         }
 
         sb.append("}\n");
@@ -198,7 +194,16 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         }
 
         sb.append("    @Override\n");
-        sb.append("    public ").append(returnType).append(" ").append(method.name());
+        sb.append("    public ");
+        if (!method.typeParameters().isEmpty()) {
+            sb.append("<");
+            for (int i = 0; i < method.typeParameters().size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(method.typeParameters().get(i).identifier());
+            }
+            sb.append("> ");
+        }
+        sb.append(returnType).append(" ").append(method.name());
         sb.append("(").append(params).append(") {\n");
 
         sb.append("        String qualifiedName = \"").append(qualifiedName).append("\";\n");
@@ -226,34 +231,6 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
             sb.append("        return result;\n");
         }
 
-        sb.append("    }\n\n");
-    }
-
-    private void generateDelegatingMethod(final StringBuilder sb, final MethodInfo method) {
-        final String returnType = typeToJava(method.returnType());
-        final boolean isVoid = method.returnType().kind() == Type.Kind.VOID;
-
-        final StringBuilder params = new StringBuilder();
-        final StringBuilder args = new StringBuilder();
-        for (int i = 0; i < method.parameterTypes().size(); i++) {
-            if (i > 0) {
-                params.append(", ");
-                args.append(", ");
-            }
-            final String paramType = typeToJava(method.parameterTypes().get(i));
-            final String paramName = method.parameterName(i) != null ? method.parameterName(i) : "arg" + i;
-            params.append(paramType).append(" ").append(paramName);
-            args.append(paramName);
-        }
-
-        sb.append("    @Override\n");
-        sb.append("    public ").append(returnType).append(" ").append(method.name());
-        sb.append("(").append(params).append(") {\n");
-        if (isVoid) {
-            sb.append("        delegate.").append(method.name()).append("(").append(args).append(");\n");
-        } else {
-            sb.append("        return delegate.").append(method.name()).append("(").append(args).append(");\n");
-        }
         sb.append("    }\n\n");
     }
 
@@ -330,6 +307,17 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
                 yield sb.toString();
             }
             case ARRAY -> typeToJava(type.asArrayType().constituent()) + "[]";
+            case TYPE_VARIABLE -> type.asTypeVariable().identifier();
+            case WILDCARD_TYPE -> {
+                final var wt = type.asWildcardType();
+                if (wt.extendsBound() != null && !wt.extendsBound().name().equals(DotName.createSimple("java.lang.Object"))) {
+                    yield "? extends " + typeToJava(wt.extendsBound());
+                } else if (wt.superBound() != null) {
+                    yield "? super " + typeToJava(wt.superBound());
+                } else {
+                    yield "?";
+                }
+            }
             default -> type.name().toString();
         };
     }

@@ -125,21 +125,14 @@ class RestClientSimulationProcessorTest {
     }
 
     @Test
-    void defaultMethodDelegatesWithoutSimulation() {
-        var source = findSource("TestRestClient");
-
-        assertThat(source).contains("return delegate.healthCheck()");
-    }
-
-    @Test
-    void defaultMethodHasNoSimulationLogic() {
+    void defaultMethodGetsSimulationLogic() {
         var source = findSource("TestRestClient");
 
         int healthIdx = source.indexOf("healthCheck");
         int braceEnd = source.indexOf("}\n", healthIdx);
         String healthSection = source.substring(healthIdx, braceEnd);
-        assertThat(healthSection).doesNotContain("RestInvocation");
-        assertThat(healthSection).doesNotContain("strategyFor");
+        assertThat(healthSection).contains("RestInvocation");
+        assertThat(healthSection).contains("strategyFor");
     }
 
     @Test

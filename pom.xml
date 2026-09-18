@@ -20,6 +20,7 @@
         <module>simulation-config-core</module>
         <module>simulation-config</module>
         <module>memory-simulation-core</module>
+        <module>platform-simulation-core</module>
         <module>event-simulation-core</module>
         <module>event-simulation</module>
         <module>agent-api</module>

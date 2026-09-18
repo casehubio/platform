@@ -1008,6 +1008,63 @@ The built-in `rest-client` key extractor produces keys like
 
 ## What's next
 
+## Platform SPIs
+
+The `platform-simulation-core` module generates simulation decorators for
+11 platform-api SPIs. Add it to your classpath to enable simulation and
+capture for any of these SPIs — no code changes, no NoOp modifications.
+
+### Dependency
+
+```xml
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-platform-simulation-core</artifactId>
+</dependency>
+```
+
+### Available SPIs
+
+| SPI | Qualified name prefix | Key methods |
+|-----|-----------------------|-------------|
+| AccessControlProvider | access-control-provider | canAccess, grant, revoke, deny, accessibleResources |
+| DataSourceRegistry | data-source-registry | register, resolve, resolveSource, discover, deregister, update |
+| SubscriptionStore | subscription-store | store, findById, find, update, delete, findAllEnabled |
+| NotificationStore | notification-store | store, storeAll, find, unreadCount, markRead, dismiss, markAllRead |
+| EndpointRegistry | endpoint-registry | register, resolve, discover, deregister |
+| ExpressionEngineRegistry | expression-engine-registry | register, resolve, compile, validate |
+| DocumentSigningService | document-signing-service | signPdf, signDetached |
+| CredentialResolver | credential-resolver | resolve |
+| ModelRegistry | model-registry | resolveById, query, all |
+| PreferenceProvider | preference-provider | resolve |
+| CurrentPrincipal | current-principal | actorId, groups, tenancyId, isCrossTenantAdmin |
+
+### Example: simulate AccessControlProvider
+
+```properties
+# application.properties
+casehub.simulation.access-control-provider.canAccess.strategy=sequential
+```
+
+```java
+@Inject SimulationCorpus<Object, Object> corpus;
+
+corpus.seed("access-control-provider.canAccess", List.of(
+    new InvocationRecord<>("tenant-1", null,
+        null, true, Instant.now()),   // first call → allow
+    new InvocationRecord<>("tenant-1", null,
+        null, false, Instant.now()))); // second call → deny
+```
+
+The decorator wraps whatever bean CDI resolves — a @DefaultBean NoOp or
+a real implementation. When a strategy is configured, it intercepts. When
+not, it passes through. No changes to the SPI, the NoOp, or production
+code.
+
+---
+
+## What's next
+
 The simulation framework is actively growing. Planned capabilities that
 will extend the patterns above:
 

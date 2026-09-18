@@ -1,0 +1,2 @@
+# Test listing — maps unannotated SPIs for simulation
+io.casehub.platform.simulation.generator.test.TestUnannotatedSpi=test-unannotated

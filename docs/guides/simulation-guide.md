@@ -455,10 +455,23 @@ generates a `@Decorator` class that:
 
 No manual decorator code needed. No changes to the SPI or its implementations.
 
-**For SPIs that can't depend on simulation-api** (e.g., zero-dependency modules),
-the generator also reads `META-INF/simulation-eligible.txt` alongside the
-annotation scan. List the fully qualified interface name in this file and the
-generator picks it up without requiring the annotation on the interface itself.
+**For SPIs that can't depend on simulation-api** (e.g., SPIs in peer repos
+like `CaseMemoryStore` in neocortex-memory-api), the generator also reads
+`META-INF/simulation-eligible.txt` alongside the annotation scan:
+
+```
+# META-INF/simulation-eligible.txt
+io.casehub.neocortex.memory.CaseMemoryStore=case-memory-store
+```
+
+Each line maps a fully qualified interface name to an SPI name (the config
+key prefix). The generator indexes the class from the classpath and generates
+the same decorator as the annotation path. The SPI's JAR must be on the
+`annotationProcessorPaths` in the consuming module's pom.xml so the generator
+can read the class bytes. Annotation takes precedence when both are present.
+
+The first consumer of this mechanism is `memory-simulation-core`, which
+generates `SimulatedCaseMemoryStore` for CaseMemoryStore.
 
 ### Path B — Backend integration (routed SPIs)
 
@@ -717,7 +730,8 @@ simulation-api            zero-dep: contracts, @SimulationEligible, NoOp corpus
   ├── simulation-inmem    InMemorySimulationCorpus (plain POJO)
   ├── simulation-config   CDI wiring, YAML corpus, declarative extractors
   ├── simulation-generator  APT: generates @Decorator per @SimulationEligible
-  └── agent-simulation-core SimulatedAgentBackend (Path B)
+  ├── agent-simulation-core SimulatedAgentBackend (Path B)
+  └── memory-simulation-core SimulatedCaseMemoryStore (Path A, listing file)
 ```
 
 | Module | pom.xml scope | When to add |
@@ -727,6 +741,7 @@ simulation-api            zero-dep: contracts, @SimulationEligible, NoOp corpus
 | `simulation-config` | compile | Config binding, YAML corpus, declarative extractors — required alongside `simulation-generator` |
 | `simulation-generator` | provided | Your SPI has `@SimulationEligible` and you want generated decorators |
 | `agent-simulation-core` | compile | You want to simulate AgentProvider responses |
+| `memory-simulation-core` | compile | You want to simulate CaseMemoryStore (store/query/erase) |
 
 ---
 

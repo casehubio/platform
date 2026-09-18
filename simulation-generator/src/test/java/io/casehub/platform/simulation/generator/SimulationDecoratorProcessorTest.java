@@ -3,6 +3,8 @@ package io.casehub.platform.simulation.generator;
 import io.casehub.platform.simulation.SimulationEligible;
 import io.casehub.platform.simulation.generator.test.TestDefaultNameSpi;
 import io.casehub.platform.simulation.generator.test.TestSimpleService;
+import io.casehub.platform.simulation.generator.test.TestSpiWithDefaults;
+import io.casehub.platform.simulation.generator.test.TestUnannotatedSpi;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.Indexer;
 import org.junit.jupiter.api.BeforeAll;
@@ -23,6 +25,8 @@ class SimulationDecoratorProcessorTest {
         indexer.indexClass(SimulationEligible.class);
         indexer.indexClass(TestSimpleService.class);
         indexer.indexClass(TestDefaultNameSpi.class);
+        indexer.indexClass(TestSpiWithDefaults.class);
+        indexer.indexClass(TestUnannotatedSpi.class);
         index = indexer.complete();
     }
 
@@ -57,7 +61,7 @@ class SimulationDecoratorProcessorTest {
                 .map(SimulationDecoratorProcessor.GeneratedSource::className)
                 .toList();
 
-        assertThat(classNames).hasSize(2);
+        assertThat(classNames).hasSize(4);
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestSimpleService"));
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestDefaultNameSpi"));
     }
@@ -151,7 +155,78 @@ class SimulationDecoratorProcessorTest {
         assertThat(code).contains("\"test-default-name-spi.process\"");
     }
 
+    // --- default method handling ---
+
+    @Test
+    void abstractMethodsGetSimulationLogic() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSpiWithDefaults");
+
+        assertThat(code).contains("\"spi-with-defaults.query\"");
+        assertThat(code).contains("\"spi-with-defaults.store\"");
+        assertThat(occurrences(code, "simulation.strategyFor")).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void defaultMethodsDelegateWithoutSimulation() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSpiWithDefaults");
+
+        assertThat(code).contains("delegate.queryAll(");
+        assertThat(code).contains("delegate.count(");
+        assertThat(code).doesNotContain("\"spi-with-defaults.queryAll\"");
+        assertThat(code).doesNotContain("\"spi-with-defaults.count\"");
+    }
+
+    // --- listing file support ---
+
+    @Test
+    void listingFileRegistersUnannotatedSpi() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+
+        final List<String> classNames = sources.stream()
+                .map(SimulationDecoratorProcessor.GeneratedSource::className)
+                .toList();
+
+        assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestUnannotatedSpi"));
+    }
+
+    @Test
+    void listingFileGeneratedDecoratorHasCorrectQualifiedNames() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestUnannotatedSpi");
+
+        assertThat(code).contains("\"test-unannotated.resolve\"");
+        assertThat(code).contains("\"test-unannotated.delete\"");
+        assertThat(code).contains("implements TestUnannotatedSpi");
+    }
+
+    @Test
+    void annotationTakesPrecedenceOverListingFile() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+
+        final long testSimpleServiceCount = sources.stream()
+                .filter(s -> s.className().contains("TestSimpleService"))
+                .count();
+        assertThat(testSimpleServiceCount).isEqualTo(1);
+    }
+
     // --- helpers ---
+
+    private static int occurrences(final String text, final String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = text.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
+    }
 
     private static String findSource(final List<SimulationDecoratorProcessor.GeneratedSource> sources,
                                      final String spiName) {

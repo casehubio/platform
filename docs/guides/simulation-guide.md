@@ -886,6 +886,51 @@ from `EventSourceConfig.tenancyId()` and the `tenancyid` CloudEvent
 extension in the corpus. For multi-tenant testing, configure multiple
 EventSourceConfig entries with different tenant IDs.
 
+### Timed sequences
+
+`TimedSequence<E>` provides ordered events with relative delays:
+
+```java
+var sequence = new TimedSequence<>(List.of(
+        new TimedEntry<>(eventA, Duration.ZERO),
+        new TimedEntry<>(eventB, Duration.ofSeconds(5)),
+        new TimedEntry<>(eventC, Duration.ofSeconds(30))));
+
+// 10x speed — 35s becomes 3.5s
+var fast = sequence.withMultiplier(10.0);
+```
+
+Build from captured data — timing derived from
+`InvocationRecord.recordedAt()`:
+
+```java
+var sequence = TimedSequence.fromRecorded(capturedRecords);
+var demo = sequence.withMultiplier(100.0); // 30 minutes → 18 seconds
+```
+
+Execute with `EventSequenceRunner` (sleeps between events on caller's
+thread — run on a virtual thread for non-blocking execution):
+
+```java
+var runner = new EventSequenceRunner(event -> cloudEventBus.fireAsync(event));
+SequenceResult result = runner.run(sequence);
+assertThat(result.emittedCount()).isEqualTo(3);
+```
+
+### Continuous emission
+
+Add the `event-simulation` module and configure:
+
+```properties
+casehub.simulation.event.interval=10s
+casehub.simulation.event.sources.workitem-completed.event-type=io.casehub.work.workitem.completed
+casehub.simulation.event.sources.workitem-completed.tenancy-id=default
+casehub.simulation.event-emitter.workitem-completed.strategy=sequential
+```
+
+The scheduler calls `emitter.tick()` on the configured interval. Set
+`interval=OFF` (default) to disable.
+
 ---
 
 ## What's next
@@ -893,8 +938,6 @@ EventSourceConfig entries with different tenant IDs.
 The simulation framework is actively growing. Planned capabilities that
 will extend the patterns above:
 
-- **Timed event simulation** — @Scheduled wrapper for continuous
-  background event emission with configurable timing patterns
 - **Corpus builders** — fluent, domain-specific builders that eliminate
   hand-crafted `InvocationRecord` construction
 - **Verification API** — assertion DSL on captured invocations

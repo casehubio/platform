@@ -10,6 +10,7 @@ import org.jboss.jandex.Type;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class JandexProducerScanner {
 
@@ -22,8 +23,13 @@ public class JandexProducerScanner {
     private static final DotName CDI_EVENT = DotName.createSimple("jakarta.enterprise.event.Event");
     private static final DotName INJECT = DotName.createSimple("jakarta.inject.Inject");
     private static final DotName CONFIG_MAPPING = DotName.createSimple("io.smallrye.config.ConfigMapping");
+    private static final DotName FACTORY_METHOD = DotName.createSimple("io.casehub.platform.api.FactoryMethod");
+    private static final DotName QUALIFIER = DotName.createSimple("jakarta.inject.Qualifier");
+    private static final DotName POST_CONSTRUCT = DotName.createSimple("jakarta.annotation.PostConstruct");
+    private static final DotName JAVA_LIST = DotName.createSimple("java.util.List");
+    private static final DotName JAVA_OPTIONAL = DotName.createSimple("java.util.Optional");
 
-    private static final java.util.Set<DotName> KNOWN_METHOD_ANNOTATIONS = java.util.Set.of(
+    private static final Set<DotName> KNOWN_METHOD_ANNOTATIONS = Set.of(
             PRODUCES, DEFAULT_BEAN, ALTERNATIVE, PRIORITY,
             DotName.createSimple("jakarta.enterprise.context.ApplicationScoped"),
             DotName.createSimple("jakarta.inject.Singleton"),
@@ -47,10 +53,10 @@ public class JandexProducerScanner {
 
             boolean            isDefaultBean = method.hasAnnotation(DEFAULT_BEAN);
             boolean            isAlternative = method.hasAnnotation(ALTERNATIVE);
-            int                priority      = 0;
+            int                priorityVal   = 0;
             AnnotationInstance priorityAnn   = method.annotation(PRIORITY);
             if (priorityAnn != null) {
-                priority = priorityAnn.value().asInt();
+                priorityVal = priorityAnn.value().asInt();
             }
 
             boolean hasCdiDeps = false;
@@ -69,7 +75,6 @@ public class JandexProducerScanner {
                 }
             }
 
-            // Skip methods from classes with @Inject fields or constructors
             if (declaringClass.fields().stream()
                               .anyMatch(f -> f.hasAnnotation(INJECT) || f.hasAnnotation(CONFIG_PROPERTY))) {
                 hasCdiDeps = true;
@@ -79,12 +84,13 @@ public class JandexProducerScanner {
                 hasCdiDeps = true;
             }
 
-            // Skip methods with CDI qualifier annotations beyond the known set
             if (hasUnknownCdiQualifiers(method)) {
                 hasCdiDeps = true;
             }
 
             List<ProducerDescriptor.ParameterDescriptor> params = new ArrayList<>();
+            List<String> qualifiers = new ArrayList<>();
+
             for (MethodParameterInfo param : method.parameters()) {
                 DotName typeName = param.type().kind() == Type.Kind.PARAMETERIZED_TYPE
                                    ? param.type().asParameterizedType().name()
@@ -92,6 +98,7 @@ public class JandexProducerScanner {
 
                 if (CDI_INSTANCE.equals(typeName) || CDI_EVENT.equals(typeName)) {
                     hasCdiDeps = true;
+                    collectQualifiers(param, resolveIndex, qualifiers);
                 }
 
                 ClassInfo paramTypeInfo = resolveIndex.getClassByName(typeName);
@@ -101,7 +108,6 @@ public class JandexProducerScanner {
 
                 boolean hasQuarkusQualifier = param.annotations().stream()
                                                    .anyMatch(a -> a.name().toString().startsWith("io.quarkus."));
-
                 if (hasQuarkusQualifier) {
                     hasCdiDeps = true;
                 }
@@ -118,6 +124,66 @@ public class JandexProducerScanner {
                 params.add(new ProducerDescriptor.ParameterDescriptor(paramType, paramName, configProp));
             }
 
+            // --- Constructor following: resolve core POJO constructor ---
+            List<ProducerDescriptor.ConstructorParam> constructorParams = List.of();
+            String configPrefix = null;
+            String configInterface = null;
+            boolean hasFactory = false;
+            String factoryName = null;
+
+            ClassInfo effectiveType = concreteReturnType != null
+                    ? resolveIndex.getClassByName(DotName.createSimple(concreteReturnType))
+                    : returnTypeInfo;
+
+            if (effectiveType != null && !isAbstractOrInterface(effectiveType)
+                    && !returnTypeName.toString().startsWith("java.")) {
+
+                MethodInfo targetMethod = findFactoryMethod(effectiveType);
+                if (targetMethod != null) {
+                    hasFactory = true;
+                    factoryName = targetMethod.name();
+                } else {
+                    targetMethod = findConstructor(effectiveType);
+                }
+
+                if (targetMethod != null) {
+                    var ctorParams = new ArrayList<ProducerDescriptor.ConstructorParam>();
+                    for (int i = 0; i < targetMethod.parametersCount(); i++) {
+                        Type paramType = targetMethod.parameterType(i);
+                        String pName = targetMethod.parameterName(i);
+                        if (pName == null) {
+                            pName = "arg" + i;
+                        }
+                        var result2 = resolveParamKind(paramType, scanIndex, resolveIndex);
+                        ctorParams.add(new ProducerDescriptor.ConstructorParam(
+                                result2.type, pName, result2.kind));
+                        if (result2.kind == ProducerDescriptor.ParamKind.CONFIG_PROPERTIES) {
+                            configPrefix = result2.configPrefix;
+                            configInterface = result2.configInterface;
+                        }
+                    }
+                    constructorParams = List.copyOf(ctorParams);
+                }
+            }
+
+            // Detect @PostConstruct init method on declaring class
+            String initMethod = null;
+            for (MethodInfo m : declaringClass.methods()) {
+                if (m.hasAnnotation(POST_CONSTRUCT)) {
+                    initMethod = m.name();
+                    break;
+                }
+            }
+
+            // Detect if composite needs @Primary (takes qualified List of same type)
+            boolean primaryBean = false;
+            if (!qualifiers.isEmpty()) {
+                primaryBean = true;
+            }
+
+            // Order value from @Priority on the method
+            int orderValue = priorityVal;
+
             result.add(new ProducerDescriptor(
                     declaringClass.name().toString(),
                     method.name(),
@@ -126,11 +192,128 @@ public class JandexProducerScanner {
                     params,
                     isDefaultBean,
                     isAlternative,
-                    priority,
-                    hasCdiDeps));
+                    priorityVal,
+                    hasCdiDeps,
+                    constructorParams,
+                    configPrefix,
+                    configInterface,
+                    qualifiers,
+                    initMethod,
+                    primaryBean,
+                    orderValue,
+                    hasFactory,
+                    factoryName));
         }
 
         return result;
+    }
+
+    private record ParamResolution(String type, ProducerDescriptor.ParamKind kind,
+                                   String configPrefix, String configInterface) {}
+
+    private ParamResolution resolveParamKind(Type paramType, IndexView scanIndex, IndexView resolveIndex) {
+        if (paramType.kind() == Type.Kind.PARAMETERIZED_TYPE) {
+            DotName rawName = paramType.asParameterizedType().name();
+            if (JAVA_LIST.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
+                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.LIST, null, null);
+            }
+            if (JAVA_OPTIONAL.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
+                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.OPTIONAL, null, null);
+            }
+        }
+
+        DotName typeName = paramType.name();
+        var configResult = findConfigMapping(typeName, scanIndex, resolveIndex);
+        if (configResult != null) {
+            return new ParamResolution(typeName.toString(),
+                    ProducerDescriptor.ParamKind.CONFIG_PROPERTIES,
+                    configResult.prefix, configResult.interfaceName);
+        }
+
+        return new ParamResolution(typeName.toString(), ProducerDescriptor.ParamKind.PLAIN, null, null);
+    }
+
+    private record ConfigMappingResult(String prefix, String interfaceName) {}
+
+    private ConfigMappingResult findConfigMapping(DotName typeName, IndexView scanIndex, IndexView resolveIndex) {
+        ClassInfo typeInfo = resolveIndex.getClassByName(typeName);
+        if (typeInfo == null) {
+            typeInfo = scanIndex.getClassByName(typeName);
+        }
+        if (typeInfo == null) {
+            return null;
+        }
+
+        if (typeInfo.hasAnnotation(CONFIG_MAPPING)) {
+            AnnotationInstance ann = typeInfo.annotation(CONFIG_MAPPING);
+            String prefix = ann.value("prefix") != null ? ann.value("prefix").asString() : "";
+            return new ConfigMappingResult(prefix, typeName.toString());
+        }
+
+        // Walk UP: check superinterfaces and superclass
+        for (DotName iface : typeInfo.interfaceNames()) {
+            var result = findConfigMapping(iface, scanIndex, resolveIndex);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        DotName superName = typeInfo.superName();
+        if (superName != null && !superName.toString().equals("java.lang.Object")) {
+            var result = findConfigMapping(superName, scanIndex, resolveIndex);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        // Walk DOWN: scan all @ConfigMapping-annotated types and check if any extend this type
+        // (e.g., SampleProperties is extended by SampleConfig which has @ConfigMapping)
+        for (AnnotationInstance cmAnn : scanIndex.getAnnotations(CONFIG_MAPPING)) {
+            if (cmAnn.target().kind() == org.jboss.jandex.AnnotationTarget.Kind.CLASS) {
+                ClassInfo cmClass = cmAnn.target().asClass();
+                if (cmClass.interfaceNames().contains(typeName) || typeName.equals(cmClass.superName())) {
+                    String prefix = cmAnn.value("prefix") != null ? cmAnn.value("prefix").asString() : "";
+                    return new ConfigMappingResult(prefix, typeName.toString());
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private MethodInfo findFactoryMethod(ClassInfo classInfo) {
+        for (MethodInfo method : classInfo.methods()) {
+            if (method.hasAnnotation(FACTORY_METHOD)
+                    && java.lang.reflect.Modifier.isStatic(method.flags())
+                    && java.lang.reflect.Modifier.isPublic(method.flags())) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private MethodInfo findConstructor(ClassInfo classInfo) {
+        List<MethodInfo> constructors = classInfo.constructors();
+        if (constructors.size() == 1) {
+            return constructors.get(0);
+        }
+        for (MethodInfo ctor : constructors) {
+            if (java.lang.reflect.Modifier.isPublic(ctor.flags()) && ctor.parametersCount() > 0) {
+                return ctor;
+            }
+        }
+        return constructors.isEmpty() ? null : constructors.get(0);
+    }
+
+    private void collectQualifiers(MethodParameterInfo param, IndexView resolveIndex, List<String> qualifiers) {
+        for (AnnotationInstance ann : param.annotations()) {
+            ClassInfo annClass = resolveIndex.getClassByName(ann.name());
+            if (annClass != null && annClass.hasAnnotation(QUALIFIER)) {
+                qualifiers.add(ann.name().toString());
+            }
+        }
     }
 
     private String inferParamName(String typeName) {

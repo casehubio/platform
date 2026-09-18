@@ -53,11 +53,11 @@ public record ProducerDescriptor(
             boolean cdiDeps) {
         this(producerClassName, methodName, returnType, concreteReturnType,
                 parameters, defaultBean, alternative, priority, cdiDeps,
-                List.of(), null, null, List.of(), null, false, 0, false, null);
+                null, null, null, List.of(), null, false, 0, false, null);
     }
 
-    public boolean hasConstructorParams() {
-        return constructorParams != null && !constructorParams.isEmpty();
+    public boolean constructorResolved() {
+        return constructorParams != null;
     }
 
     public boolean hasConfigProperties() {
@@ -69,7 +69,7 @@ public record ProducerDescriptor(
     }
 
     public boolean requiresManualConfig() {
-        if (hasConstructorParams()) {
+        if (constructorResolved()) {
             return false;
         }
         return hasConfigProperties() || hasCdiDependencies();

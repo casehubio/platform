@@ -11,7 +11,7 @@ class InvocationJournalTest {
     @Test
     void recordAndRetrieveEntries() {
         var journal = new InvocationJournal();
-        var entry = new JournalEntry("spi.method", "input", "output", Instant.now(), true);
+        var entry = new JournalEntry("spi.method", "t1", "input", "output", Instant.now(), true);
         journal.record(entry);
 
         assertThat(journal.entries()).hasSize(1);
@@ -22,9 +22,9 @@ class InvocationJournalTest {
     @Test
     void entriesForFiltersByQualifiedName() {
         var journal = new InvocationJournal();
-        journal.record(new JournalEntry("spi.a", "in1", "out1", Instant.now(), true));
-        journal.record(new JournalEntry("spi.b", "in2", "out2", Instant.now(), false));
-        journal.record(new JournalEntry("spi.a", "in3", "out3", Instant.now(), true));
+        journal.record(new JournalEntry("spi.a", "t1", "in1", "out1", Instant.now(), true));
+        journal.record(new JournalEntry("spi.b", "t1", "in2", "out2", Instant.now(), false));
+        journal.record(new JournalEntry("spi.a", "t1", "in3", "out3", Instant.now(), true));
 
         assertThat(journal.entriesFor("spi.a")).hasSize(2);
         assertThat(journal.entriesFor("spi.b")).hasSize(1);
@@ -34,8 +34,8 @@ class InvocationJournalTest {
     @Test
     void countForReturnsCorrectCount() {
         var journal = new InvocationJournal();
-        journal.record(new JournalEntry("spi.a", "in1", "out1", Instant.now(), true));
-        journal.record(new JournalEntry("spi.a", "in2", "out2", Instant.now(), false));
+        journal.record(new JournalEntry("spi.a", "t1", "in1", "out1", Instant.now(), true));
+        journal.record(new JournalEntry("spi.a", "t1", "in2", "out2", Instant.now(), false));
 
         assertThat(journal.countFor("spi.a")).isEqualTo(2);
         assertThat(journal.countFor("spi.b")).isZero();
@@ -44,10 +44,10 @@ class InvocationJournalTest {
     @Test
     void entriesReturnsDefensiveCopy() {
         var journal = new InvocationJournal();
-        journal.record(new JournalEntry("spi.a", "in", "out", Instant.now(), true));
+        journal.record(new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), true));
 
         var entries = journal.entries();
-        journal.record(new JournalEntry("spi.b", "in2", "out2", Instant.now(), false));
+        journal.record(new JournalEntry("spi.b", "t1", "in2", "out2", Instant.now(), false));
 
         assertThat(entries).hasSize(1);
         assertThat(journal.entries()).hasSize(2);

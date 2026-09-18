@@ -182,6 +182,31 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- REST Assured 6.0 — overrides Quarkus BOM's 5.5 (incompatible with Groovy 5) -->
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>rest-assured</artifactId>
+                <version>6.0.1</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>rest-assured-common</artifactId>
+                <version>6.0.1</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>json-path</artifactId>
+                <version>6.0.1</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>xml-path</artifactId>
+                <version>6.0.1</version>
+                <scope>test</scope>
+            </dependency>
             <dependency>
                 <groupId>io.casehub</groupId>
                 <artifactId>casehub-parent</artifactId>

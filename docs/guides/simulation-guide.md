@@ -264,6 +264,48 @@ This maps to `DataRealism.STRUCTURALLY_VALID` — correct types, shapes,
 and constraint-bounded values, but no semantic awareness. For
 domain-plausible data, use `LlmCorpusPopulator` instead.
 
+#### Verification — asserting SPI interactions
+
+After running a scenario with an overlay, verify which methods were called:
+
+```java
+var overlay = runtime.pushOverlay(config, corpus);
+// ... run the code under test ...
+
+var verifier = SimulationVerifier.on(overlay.journal());
+
+// Count assertions
+verifier.method("case-memory-store.store").wasCalled(3);
+verifier.method("case-memory-store.erase").wasNeverCalled();
+
+// Tenant-scoped
+verifier.method("case-memory-store.store")
+    .forTenant("hospital-a")
+    .wasCalled(2);
+
+// Argument matching
+verifier.method("case-memory-store.store")
+    .matching(e -> ((MemoryInput) e.input()).domain().equals("cardiology"))
+    .wasCalled(1);
+
+// Simulation path — was the strategy used or the real delegate?
+verifier.method("case-memory-store.store").allSimulated();
+
+// Order — methods called in this sequence (interleaved calls allowed)
+verifier.inOrder("case-memory-store.query", "case-memory-store.store");
+
+// Exhaustive — no unexpected SPI calls
+verifier.noUnverifiedCalls();
+
+runtime.popOverlay(overlay);
+```
+
+This replaces Mockito's `verify()` for SPI testing. The mapping:
+- `verify(mock).method(args)` → `verifier.method(qn).matching(...).wasCalled()`
+- `verify(mock, times(N))` → `verifier.method(qn).wasCalled(N)`
+- `verify(mock, never())` → `verifier.method(qn).wasNeverCalled()`
+- `verifyNoMoreInteractions(mock)` → `verifier.noUnverifiedCalls()`
+
 ---
 
 ## Core concepts

@@ -1,0 +1,19 @@
+case-memory-store.query:
+  - tenancy-id: default
+    key: dev-context
+    input:
+      domain: development
+      question: "recent changes to auth module"
+    output:
+      - id: mem-001
+        content: "Refactored OAuth2 token refresh logic to handle expired tokens gracefully"
+        domain: development
+  - tenancy-id: default
+    key: review-context
+    input:
+      domain: code-review
+      question: "PR review guidelines"
+    output:
+      - id: mem-002
+        content: "All PRs require at least one approval, CI must be green, no force-pushes to main"
+        domain: code-review

@@ -1,0 +1,39 @@
+github-api.getPullRequest:
+  - tenancy-id: default
+    key: "GET /repos/acme/webapp/pulls/42"
+    input:
+      spiName: github-api
+      methodName: getPullRequest
+      httpMethod: GET
+      pathTemplate: "/repos/{owner}/{repo}/pulls/{pull_number}"
+      params:
+        owner: acme
+        repo: webapp
+        pull_number: 42
+    output:
+      number: 42
+      title: "feat: add user dashboard"
+      state: open
+      head:
+        ref: feat/dashboard
+        sha: abc123def456
+      base:
+        ref: main
+
+github-api.getRef:
+  - tenancy-id: default
+    key: "GET /repos/acme/webapp/git/refs/heads/main"
+    input:
+      spiName: github-api
+      methodName: getRef
+      httpMethod: GET
+      pathTemplate: "/repos/{owner}/{repo}/git/refs/{ref}"
+      params:
+        owner: acme
+        repo: webapp
+        ref: heads/main
+    output:
+      ref: refs/heads/main
+      object:
+        sha: def456abc789
+        type: commit

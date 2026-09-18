@@ -1,0 +1,25 @@
+model-registry.resolveById:
+  - tenancy-id: default
+    key: screening-model
+    input: "aml-screening-v2"
+    output:
+      id: aml-screening-v2
+      backendKey: openai
+      vendor: OpenAI
+      family: gpt-4o
+      displayName: "AML Screening Model"
+      tier: FLAGSHIP
+      contextWindow: 128000
+      maxOutput: 16384
+  - tenancy-id: default
+    key: classification-model
+    input: "aml-classification-v1"
+    output:
+      id: aml-classification-v1
+      backendKey: claude
+      vendor: Anthropic
+      family: claude-sonnet
+      displayName: "AML Classification Model"
+      tier: STANDARD
+      contextWindow: 200000
+      maxOutput: 8192

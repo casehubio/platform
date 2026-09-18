@@ -106,11 +106,10 @@ use the pattern name — it's more precise than describing the mechanism.
     <artifactId>casehub-platform-simulation-core</artifactId>
 </dependency>
 
-<!-- In-memory corpus — tests and ephemeral dev -->
+<!-- Config binding + YAML corpus + declarative extractors -->
 <dependency>
     <groupId>io.casehub</groupId>
-    <artifactId>casehub-platform-simulation-inmem</artifactId>
-    <scope>test</scope>
+    <artifactId>casehub-platform-simulation-config</artifactId>
 </dependency>
 ```
 
@@ -715,7 +714,8 @@ recorded-replay.
 ```
 simulation-api            zero-dep: contracts, @SimulationEligible, NoOp corpus
   ├── simulation-core     strategies, SimulationRuntime, SimulationConfig
-  ├── simulation-inmem    InMemorySimulationCorpus @Alternative
+  ├── simulation-inmem    InMemorySimulationCorpus (plain POJO)
+  ├── simulation-config   CDI wiring, YAML corpus, declarative extractors
   ├── simulation-generator  APT: generates @Decorator per @SimulationEligible
   └── agent-simulation-core SimulatedAgentBackend (Path B)
 ```
@@ -724,7 +724,7 @@ simulation-api            zero-dep: contracts, @SimulationEligible, NoOp corpus
 |--------|--------------------|-------------|
 | `simulation-api` | compile | Your SPI uses `@SimulationEligible` |
 | `simulation-core` | compile | You need SimulationRuntime (strategy resolution) |
-| `simulation-inmem` | test or compile | You need an in-memory corpus |
+| `simulation-config` | compile | Config binding, YAML corpus, declarative extractors — required alongside `simulation-generator` |
 | `simulation-generator` | provided | Your SPI has `@SimulationEligible` and you want generated decorators |
 | `agent-simulation-core` | compile | You want to simulate AgentProvider responses |
 

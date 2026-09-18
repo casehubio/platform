@@ -1,0 +1,17 @@
+test-spi.query:
+  - key: first
+    tenancy-id: t1
+    input: "q1"
+    output: "response-1"
+  - key: second
+    tenancy-id: t1
+    input: "q2"
+    output: "response-2"
+
+test-spi.lookup:
+  - key: alice
+    tenancy-id: t1
+    input:
+      name: alice
+      age: 30
+    output: "found-alice"

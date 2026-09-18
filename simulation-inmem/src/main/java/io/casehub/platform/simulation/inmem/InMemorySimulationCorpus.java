@@ -2,17 +2,12 @@ package io.casehub.platform.simulation.inmem;
 
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.SimulationCorpus;
-import jakarta.annotation.Priority;
-import jakarta.enterprise.inject.Alternative;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-@Alternative
-@Priority(100)
 public class InMemorySimulationCorpus<I, O> implements SimulationCorpus<I, O> {
 
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<InvocationRecord<I, O>>> store =

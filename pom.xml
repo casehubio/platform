@@ -94,6 +94,7 @@
         <module>subscriptions-jpa-common</module>
         <module>subscriptions-jpa</module>
         <module>subscriptions-spring-jpa</module>
+        <module>streams-core</module>
         <module>streams-kafka</module>
         <module>streams-amqp</module>
         <module>streams-webhook-core</module>

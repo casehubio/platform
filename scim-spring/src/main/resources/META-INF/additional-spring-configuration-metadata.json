@@ -1,0 +1,20 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.scim.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the SCIM 2.0 endpoint."
+    },
+    {
+      "name": "casehub.platform.scim.token",
+      "type": "java.lang.String",
+      "description": "Static bearer token for SCIM authentication."
+    },
+    {
+      "name": "casehub.platform.scim.member-page-size",
+      "type": "java.lang.Integer",
+      "description": "Number of members fetched per SCIM page when paginating group members.",
+      "defaultValue": 1000
+    }
+  ]
+}

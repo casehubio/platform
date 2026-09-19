@@ -72,7 +72,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     @Override
     public boolean captureEnabled(String qualifiedName) {
         return Optional.ofNullable(methods.get(qualifiedName))
-                .map(MethodConfig::capture)
+                .map(mc -> Boolean.TRUE.equals(mc.capture()))
                 .orElse(false);
     }
 
@@ -170,8 +170,8 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             @Override
             public boolean captureEnabled(String qualifiedName) {
                 MethodConfig pm = profile.methods().get(qualifiedName);
-                if (pm != null && pm.capture()) {
-                    return true;
+                if (pm != null && pm.capture() != null) {
+                    return pm.capture();
                 }
                 return YamlSimulationConfig.this.captureEnabled(qualifiedName);
             }
@@ -234,7 +234,8 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     @SuppressWarnings("unchecked")
     private MethodConfig parseMethodConfig(Map<String, Object> props) {
         String strategy = (String) props.get("strategy");
-        boolean capture = Boolean.TRUE.equals(props.get("capture"));
+        Boolean capture = props.containsKey("capture")
+                ? Boolean.TRUE.equals(props.get("capture")) : null;
         ExhaustionPolicy ep = props.containsKey("exhaustion-policy")
                 ? ExhaustionPolicy.valueOf(
                 ((String) props.get("exhaustion-policy")).toUpperCase().replace("-", "_"))
@@ -362,7 +363,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
     record MethodConfig(
             String strategy,
-            boolean capture,
+            Boolean capture,
             ExhaustionPolicy exhaustionPolicy,
             String keyExtractor,
             String scorer,

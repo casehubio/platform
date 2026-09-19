@@ -285,6 +285,43 @@ class YamlSimulationConfigTest {
     }
 
     @Test
+    void profileCanTurnCaptureOff() {
+        var config = load("""
+                methods:
+                  test-spi.query:
+                    strategy: key
+                    capture: true
+                profiles:
+                  no-capture:
+                    methods:
+                      test-spi.query:
+                        capture: false
+                """);
+        assertThat(config.captureEnabled("test-spi.query")).isTrue();
+        var profile = config.resolve("no-capture");
+        assertThat(profile).isPresent();
+        assertThat(profile.get().config().captureEnabled("test-spi.query")).isFalse();
+    }
+
+    @Test
+    void profileOmittingCaptureFallsBackToBase() {
+        var config = load("""
+                methods:
+                  test-spi.query:
+                    strategy: key
+                    capture: true
+                profiles:
+                  other:
+                    methods:
+                      test-spi.query:
+                        strategy: seq
+                """);
+        var profile = config.resolve("other");
+        assertThat(profile).isPresent();
+        assertThat(profile.get().config().captureEnabled("test-spi.query")).isTrue();
+    }
+
+    @Test
     void resolveUnknownProfileReturnsEmpty() {
         var config = load("""
                 methods:

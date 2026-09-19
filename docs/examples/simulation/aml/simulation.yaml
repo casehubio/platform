@@ -1,0 +1,13 @@
+default-tenancy-id: compliance-unit
+
+methods:
+  model-registry.query:
+    strategy: key
+    corpus-files:
+      - classpath:simulation/aml/model-registry-corpus.yaml
+
+profiles:
+  ci-replay:
+    methods:
+      model-registry.query:
+        strategy: replay

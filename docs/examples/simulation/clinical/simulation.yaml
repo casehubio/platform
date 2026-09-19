@@ -1,0 +1,23 @@
+default-tenancy-id: hospital-a
+
+methods:
+  agent-provider.invoke:
+    strategy: key
+    key-extractor: "field:systemPrompt"
+    corpus:
+      - key: triage-assessment
+        input:
+          systemPrompt: "You are a clinical triage agent."
+          userPrompt: "Patient presents with acute chest pain."
+        output:
+          - type: TextDelta
+            text: "Priority 1 — Immediate cardiology consult."
+    corpus-files:
+      - classpath:simulation/clinical/agent-provider-corpus.yaml
+
+profiles:
+  load-test:
+    methods:
+      agent-provider.invoke:
+        strategy: rand
+        exhaustion-policy: WRAP

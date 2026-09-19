@@ -1,0 +1,19 @@
+default-tenancy-id: trading-desk
+
+methods:
+  model-registry.query:
+    strategy: key
+    corpus-files:
+      - classpath:simulation/fsitrading/model-registry-corpus.yaml
+
+  agent-provider.invoke:
+    strategy: seq
+    corpus-files:
+      - classpath:simulation/fsitrading/agent-provider-corpus.yaml
+
+profiles:
+  demo:
+    methods:
+      agent-provider.invoke:
+        strategy: key
+        key-extractor: "field:model"

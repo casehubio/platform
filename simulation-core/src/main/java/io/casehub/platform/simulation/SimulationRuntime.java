@@ -135,9 +135,20 @@ public class SimulationRuntime {
                 Instant.now(), simulated));
     }
 
+    static String resolveAlias(final String name) {
+        return switch (name) {
+            case "seq" -> "sequential";
+            case "key" -> "key-lookup";
+            case "rand" -> "random";
+            case "replay" -> "recorded-replay";
+            case "nearest" -> "nearest-match";
+            default -> name;
+        };
+    }
+
     private SimulationStrategy<?, ?> createStrategy(final String qualifiedName, final String strategyName,
                                                       final SimulationCorpus corpus) {
-        return switch (strategyName) {
+        return switch (resolveAlias(strategyName)) {
             case "sequential" -> new SequentialStrategy<>(corpus, qualifiedName,
                     config.exhaustionPolicy(qualifiedName).orElse(ExhaustionPolicy.WRAP));
             case "key-lookup" -> {

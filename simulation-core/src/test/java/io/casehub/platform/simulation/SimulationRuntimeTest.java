@@ -85,6 +85,46 @@ class SimulationRuntimeTest {
         assertThat(strategy.get()).isInstanceOf(RecordedReplayStrategy.class);
     }
 
+    // --- strategy aliases ---
+
+    @Test
+    void aliasSeqResolvesToSequential() {
+        final var config = stubConfig(Optional.of("seq"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        assertThat(runtime.strategyFor(QN).get()).isInstanceOf(SequentialStrategy.class);
+    }
+
+    @Test
+    void aliasKeyResolvesToKeyLookup() {
+        final var config = stubConfig(Optional.of("key"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.registerExtractor(QN, (String s) -> s);
+        assertThat(runtime.strategyFor(QN).get()).isInstanceOf(KeyLookupStrategy.class);
+    }
+
+    @Test
+    void aliasRandResolvesToRandom() {
+        final var config = stubConfig(Optional.of("rand"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        assertThat(runtime.strategyFor(QN).get()).isInstanceOf(RandomStrategy.class);
+    }
+
+    @Test
+    void aliasReplayResolvesToRecordedReplay() {
+        final var config = stubConfig(Optional.of("replay"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.registerExtractor(QN, (String s) -> s);
+        assertThat(runtime.strategyFor(QN).get()).isInstanceOf(RecordedReplayStrategy.class);
+    }
+
+    @Test
+    void aliasNearestResolvesToNearestMatch() {
+        final var config = stubConfig(Optional.of("nearest"), false, Optional.empty());
+        final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.registerScorer(QN, (String a, String b) -> 1.0);
+        assertThat(runtime.strategyFor(QN).get()).isInstanceOf(NearestMatchStrategy.class);
+    }
+
     @Test
     void strategyForThrowsOnUnknownStrategyName() {
         final var config = stubConfig(Optional.of("nonexistent"), false, Optional.empty());

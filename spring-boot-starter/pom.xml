@@ -166,6 +166,27 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Credentials -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-credentials-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- OIDC -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-oidc-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- SCIM -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-scim-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Jackson 2 bridge — Spring Boot 4 defaults to Jackson 3.
              Keeps both frameworks on Jackson 2 ObjectMapper until
              Quarkus 4 aligns on Jackson 3 (~Nov 2026). -->

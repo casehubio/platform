@@ -739,6 +739,151 @@ Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `Ce
 
 ---
 
+## Spring Boot
+
+casehub-platform ships dual-framework support. Every Quarkus CDI module has a Spring Boot auto-configuration counterpart. The same core POJOs, SPIs, and `platform-api` types work in both frameworks — only the wiring layer differs.
+
+### Quick Start
+
+Add the starter to your `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-spring-boot-starter</artifactId>
+    <version>${casehub.version}</version>
+</dependency>
+```
+
+This pulls in all platform Spring modules: persistence (JPA), MCP, callbacks, agent infrastructure, identity, governance, expression engines, and mock fallbacks.
+
+For selective dependencies, add individual modules instead (see table below).
+
+### Application setup
+
+```java
+@SpringBootApplication
+@EntityScan("io.casehub.platform")
+public class MyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+}
+```
+
+`@EntityScan("io.casehub.platform")` is required for Hibernate to find JPA entities from platform modules.
+
+### Minimal `application.properties`
+
+```properties
+# DataSource — PostgreSQL for production
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+spring.datasource.username=myuser
+spring.datasource.password=mypass
+
+# Flyway — add locations for each JPA module you use
+spring.flyway.locations=classpath:db/migration,classpath:db/platform/migration,classpath:db/acl/migration,classpath:db/notification/migration
+
+# Jackson 2 bridge — required until Quarkus 4 aligns on Jackson 3
+# (spring-boot-jackson2 is included in the starter)
+```
+
+### Spring modules
+
+| Spring Module | Quarkus Counterpart | What it provides |
+|---------------|-------------------|------------------|
+| `casehub-platform-spring` | `casehub-platform` | Mock fallback beans (`CurrentPrincipal`, `PreferenceProvider`) via `@ConditionalOnMissingBean` |
+| `casehub-platform-persistence-spring-jpa` | `casehub-platform-persistence-jpa` | Spring Data JPA `PreferenceStore` + `PreferenceProvider` |
+| `casehub-platform-acl-spring-jpa` | `casehub-platform-acl-jpa` | Spring Data JPA `AccessControlProvider` with deny entries and audit |
+| `casehub-platform-notifications-spring-jpa` | `casehub-platform-notifications-jpa` | Spring Data JPA `NotificationStore` with retention scheduler |
+| `casehub-platform-notification-settings-spring-jpa` | `casehub-platform-notification-settings-jpa` | Spring Data JPA `NotificationPreferenceStore` + `SuppressionStore` |
+| `casehub-platform-subscriptions-spring-jpa` | `casehub-platform-subscriptions-jpa` | Spring Data JPA `SubscriptionStore` |
+| `casehub-platform-datasource-spring-jpa` | `casehub-platform-datasource-jpa` | Spring Data JPA `DataSourceRegistry` |
+| `casehub-platform-digest-spring-jpa` | `casehub-platform-digest-jpa` | Spring Data JPA `DigestBuffer` |
+| `casehub-platform-delivery-tracking-spring-jpa` | `casehub-platform-delivery-tracking-jpa` | Spring Data JPA `DeliveryAttemptStore` with `SKIP LOCKED` claims |
+| `casehub-platform-view-spring-jpa` | `casehub-platform-view-jpa` | Spring Data JPA `SubjectViewStore` + `ViewMembershipTracker` |
+| `casehub-platform-view-spring` | `casehub-platform-view` | `SubjectViewOrchestrator` + `SubjectViewEvaluator` |
+| `casehub-platform-identity-spring` | `casehub-platform-identity` | DID resolver composite + credential validation |
+| `casehub-platform-expression-spring` | `casehub-platform-expression` | Expression engine registry (JQ, MVEL, JEXL) |
+| `casehub-platform-governance-spring` | `casehub-platform-governance` | `PolicyEnforcer` for retry/timeout/circuit-breaker |
+| `casehub-platform-callback-spring` | `casehub-platform-callback` | `BeanPostProcessor` that wraps `@CallbackEligible` SPIs |
+| `casehub-platform-mcp-spring` | `casehub-platform-mcp` | MCP tool infrastructure |
+| `casehub-platform-agent-*-spring` | `casehub-platform-agent-*` | Agent backend auto-configs (Claude, OpenAI, Codex, Gemini, Gemini CLI, LangChain4j, Router, Config, Gate) |
+
+### Auto-configuration behaviour
+
+Every Spring module uses `@AutoConfiguration` with `@ConditionalOnMissingBean`. To override a platform default, declare your own `@Bean` of the same type — it takes precedence automatically.
+
+```java
+@Configuration
+public class MyPrincipalConfig {
+
+    @Bean
+    public CurrentPrincipal currentPrincipal(SecurityContext securityContext) {
+        return new MyOidcPrincipal(securityContext);
+    }
+}
+```
+
+The platform mock (`MockCurrentPrincipal`) backs off because your bean satisfies `@ConditionalOnMissingBean`.
+
+### CDI to Spring mapping
+
+| CDI (Quarkus) | Spring Boot | Notes |
+|---------------|-------------|-------|
+| `@ApplicationScoped` | `@Bean` in `@AutoConfiguration` | Singleton scope |
+| `@DefaultBean` | `@ConditionalOnMissingBean` | Backs off when app provides its own |
+| `@Alternative @Priority(N)` | `@Primary` or `@Order(N)` | Priority-based selection |
+| `@Inject` | Constructor injection | Both prefer constructor injection |
+| `@ConfigMapping(prefix)` | `@ConfigurationProperties(prefix)` | Type-safe config binding |
+| `@Observes StartupEvent` | `@EventListener ApplicationStartedEvent` | Startup hooks |
+| `@Scheduled(every)` | `@Scheduled(fixedDelay/cron)` | Periodic tasks |
+| `Instance<T>` | `ObjectProvider<T>` or `List<T>` | Optional/multi injection |
+| CDI `@Decorator` | `BeanPostProcessor` | Transparent wrapping |
+| `Event.fire()` | `ApplicationEventPublisher` | CDI events → Spring events |
+
+### Test setup
+
+Add `casehub-platform-spring-testing` (test scope) for mutable `CurrentPrincipal` and SPI stubs.
+
+**Basic test with H2:**
+
+```java
+@SpringBootTest
+@Import(TestStubConfiguration.class)
+class MyTest {
+
+    @Autowired
+    private PreferenceProvider preferenceProvider;
+
+    @Test
+    void preferencesWork() {
+        // ...
+    }
+}
+```
+
+**Test `application.properties`:**
+
+```properties
+spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL
+spring.datasource.driver-class-name=org.h2.Driver
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.flyway.enabled=false
+```
+
+H2 with `MODE=PostgreSQL` approximates PostgreSQL behaviour for integration tests. Disable Flyway and use `ddl-auto=create-drop` so Hibernate generates the schema from entities.
+
+### Spring configuration properties
+
+All `casehub.*` properties have IDE autocomplete metadata (`additional-spring-configuration-metadata.json`). See the [Configuration](#configuration) section above for the full property reference — the same property names apply in both `application.properties` (Spring) and `application.properties`/`application.yml` (Quarkus).
+
+### Jackson 2 bridge
+
+Spring Boot 4 defaults to Jackson 3 (`tools.jackson`). casehub core modules use Jackson 2 (`com.fasterxml`). The starter includes `spring-boot-jackson2` to auto-configure a Jackson 2 `ObjectMapper` so both frameworks inject the same type. This bridge will be removed when Quarkus 4 GA aligns on Jackson 3 (~Nov 2026).
+
+---
+
 ## What This Repo Does NOT Do
 
 - **Domain logic.** No case definitions, work items, or business rules. Those live in consumer repos (ledger, work, engine, devtown, etc.).

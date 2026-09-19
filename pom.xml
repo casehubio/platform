@@ -51,6 +51,7 @@
         <module>datasource-jpa-common</module>
         <module>datasource-jpa</module>
         <module>datasource-spring-jpa</module>
+        <module>scim-core</module>
         <module>scim</module>
         <module>identity-core</module>
         <module>identity</module>
@@ -177,6 +178,9 @@
         <module>governance-spring</module>
         <module>expression-spring</module>
         <module>identity-spring</module>
+        <module>credentials-spring</module>
+        <module>oidc-spring</module>
+        <module>scim-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

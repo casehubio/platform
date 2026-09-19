@@ -6,11 +6,10 @@ import io.smallrye.config.WithDefault;
 import java.util.Optional;
 
 @ConfigMapping(prefix = "casehub.platform.scim")
-public interface ScimConfig {
-    /** Bearer token for static auth. If absent, OIDC client "scim" is used. */
+public interface ScimConfig extends ScimProperties {
     Optional<String> token();
 
-    /** Number of members fetched per SCIM page when paginating group members. */
+    @Override
     @WithDefault("1000")
     int memberPageSize();
 }

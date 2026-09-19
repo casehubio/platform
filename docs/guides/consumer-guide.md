@@ -148,7 +148,7 @@ Complete SPI testing framework — replaces Mockito for platform SPI tests. Conf
 
 **Quick start (3 steps):**
 
-1. Add dependencies — `simulation-config` + `platform-simulation-core` (or `memory-simulation-core` for CaseMemoryStore)
+1. Add `simulation-starter` (single aggregate dependency) + `simulation-generator` (provided, for APT)
 2. Create `simulation.yaml` on the classpath root (convention discovery):
    ```yaml
    methods:

@@ -7,17 +7,18 @@ import io.casehub.platform.api.endpoints.EndpointProtocol;
 import io.casehub.platform.api.endpoints.EndpointType;
 import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.path.Path;
+import io.casehub.platform.streams.StreamCloudEventFactory;
+import io.casehub.platform.streams.StreamConstants;
 import io.cloudevents.CloudEvent;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CamelStreamProcessorTest {
-
-    private final CamelStreamProcessor processor = new CamelStreamProcessor();
 
     private EndpointDescriptor descriptor(String uri, String streamType) {
         return new EndpointDescriptor(
@@ -32,25 +33,31 @@ class CamelStreamProcessorTest {
     }
 
     @Test
-    void buildCloudEvent_type_from_descriptor() {
-        CloudEvent ce = processor.buildCloudEvent(new byte[0], descriptor("direct:test", "io.casehub.camel.event"));
+    void cloud_event_type_from_descriptor() {
+        var desc = descriptor("direct:test", "io.casehub.camel.event");
+        CloudEvent ce = StreamCloudEventFactory.build(new byte[0], desc, null,
+            URI.create("/platform/streams/camel"), StreamConstants.UNREGISTERED_TYPE);
         assertThat(ce.getType()).isEqualTo("io.casehub.camel.event");
     }
 
     @Test
-    void buildCloudEvent_tenancyid_from_descriptor() {
-        CloudEvent ce = processor.buildCloudEvent(new byte[0], descriptor("direct:test", "io.casehub.camel.event"));
+    void cloud_event_tenancyid_from_descriptor() {
+        var desc = descriptor("direct:test", "io.casehub.camel.event");
+        CloudEvent ce = StreamCloudEventFactory.build(new byte[0], desc, null,
+            URI.create("/platform/streams/camel"), StreamConstants.UNREGISTERED_TYPE);
         assertThat(ce.getExtension("tenancyid")).isEqualTo(TenancyConstants.DEFAULT_TENANT_ID);
     }
 
     @Test
-    void buildCloudEvent_source_contains_camel() {
-        CloudEvent ce = processor.buildCloudEvent(new byte[0], descriptor("direct:test", "io.casehub.camel.event"));
+    void cloud_event_source_contains_camel() {
+        var desc = descriptor("direct:test", "io.casehub.camel.event");
+        CloudEvent ce = StreamCloudEventFactory.build(new byte[0], desc, null,
+            URI.create("/platform/streams/camel"), StreamConstants.UNREGISTERED_TYPE);
         assertThat(ce.getSource().toString()).contains("camel");
     }
 
     @Test
-    void buildCloudEvent_withContentType_setsDataContentType() {
+    void cloud_event_with_content_type() {
         EndpointDescriptor desc = new EndpointDescriptor(
             Path.of("streams", "camel-data"),
             TenancyConstants.DEFAULT_TENANT_ID,
@@ -61,24 +68,17 @@ class CamelStreamProcessorTest {
                    EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE, "application/json"),
             null,
             Set.of(EndpointCapability.RECEIVE));
-
-        CloudEvent ce = processor.buildCloudEvent(new byte[0], desc);
-
+        CloudEvent ce = StreamCloudEventFactory.build(new byte[0], desc, null,
+            URI.create("/platform/streams/camel"), StreamConstants.UNREGISTERED_TYPE);
         assertThat(ce.getDataContentType()).isEqualTo("application/json");
     }
 
     @Test
-    void buildCloudEvent_withoutContentType_omitsDataContentType() {
-        CloudEvent ce = processor.buildCloudEvent(new byte[0],
-            descriptor("direct:test", "io.casehub.camel.event"));
-
-        assertThat(ce.getDataContentType()).isNull();
-    }
-
-    @Test
-    void buildCloudEvent_data_is_raw_bytes() {
+    void cloud_event_data_is_raw_bytes() {
         byte[] payload = "payload".getBytes();
-        CloudEvent ce = processor.buildCloudEvent(payload, descriptor("direct:test", "io.casehub.camel.event"));
+        var desc = descriptor("direct:test", "io.casehub.camel.event");
+        CloudEvent ce = StreamCloudEventFactory.build(payload, desc, null,
+            URI.create("/platform/streams/camel"), StreamConstants.UNREGISTERED_TYPE);
         assertThat(ce.getData().toBytes()).isEqualTo(payload);
     }
 }

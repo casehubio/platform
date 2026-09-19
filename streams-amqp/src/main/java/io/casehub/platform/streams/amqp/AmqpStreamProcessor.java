@@ -1,14 +1,7 @@
 package io.casehub.platform.streams.amqp;
 
-import io.casehub.platform.api.endpoints.EndpointCapability;
-import io.casehub.platform.api.endpoints.EndpointDescriptor;
-import io.casehub.platform.api.endpoints.EndpointPropertyKeys;
-import io.casehub.platform.api.endpoints.EndpointProtocol;
-import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
-import io.casehub.platform.api.identity.TenancyConstants;
 import io.cloudevents.CloudEvent;
-import io.cloudevents.core.builder.CloudEventBuilder;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.reactive.messaging.amqp.IncomingAmqpMetadata;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,13 +13,8 @@ import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.reactive.messaging.Message;
 import org.jboss.logging.Logger;
 
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -50,7 +38,6 @@ public class AmqpStreamProcessor {
 
     private static final Logger LOG = Logger.getLogger(AmqpStreamProcessor.class);
     private static final String CHANNEL_NAME = "casehub-amqp-stream";
-    private static final String UNREGISTERED_TYPE = "io.casehub.platform.streams.amqp.unregistered";
 
     @Inject
     EndpointRegistry endpointRegistry;
@@ -58,30 +45,20 @@ public class AmqpStreamProcessor {
     @Inject
     Event<CloudEvent> cloudEventBus;
 
-    /** address → EndpointDescriptor, populated at startup. */
-    private final Map<String, EndpointDescriptor> addressToDescriptor = new HashMap<>();
+    private AmqpStreamProcessorCore core;
 
     void onStartup(@Observes StartupEvent ev) {
         String address = ConfigProvider.getConfig()
             .getOptionalValue("mp.messaging.incoming." + CHANNEL_NAME + ".address", String.class)
             .orElse("");
 
-        if (address.isBlank()) {
-            LOG.warnf("No address configured for channel '%s' — no AMQP streams will be processed",
-                CHANNEL_NAME);
-            return;
-        }
-
-        var descriptors = endpointRegistry.discover(
-            new EndpointQuery(TenancyConstants.DEFAULT_TENANT_ID, null,
-                EndpointProtocol.AMQP, Set.of(EndpointCapability.RECEIVE)));
-
-        descriptors.stream()
-            .filter(d -> address.equals(d.properties().get(EndpointPropertyKeys.TOPIC)))
-            .findFirst()
-            .ifPresentOrElse(
-                d -> addressToDescriptor.put(address, d),
-                () -> LOG.warnf("No EndpointDescriptor found for AMQP address '%s'", address));
+        core = new AmqpStreamProcessorCore(endpointRegistry,
+            ce -> cloudEventBus.fireAsync(ce)
+                .whenComplete((e, t) -> {
+                    if (t != null) LOG.warnf(t, "CloudEvent observer failed");
+                }),
+            address.isBlank() ? Map.of() : Map.of(CHANNEL_NAME, address));
+        core.init();
     }
 
     @Incoming(CHANNEL_NAME)
@@ -95,53 +72,7 @@ public class AmqpStreamProcessor {
             return props != null ? props.getString("X-Tenancy-ID") : null;
         }).orElse(null);
 
-        EndpointDescriptor descriptor = addressToDescriptor.get(address);
-        CloudEvent ce = buildCloudEvent(message.getPayload(), descriptor, tenancyId);
-
-        return cloudEventBus.fireAsync(ce)
-            .whenComplete((e, t) -> {
-                if (t != null) LOG.warnf(t, "CloudEvent observer failed for AMQP address %s", address);
-            })
-            .thenCompose(ignored -> message.ack());
-    }
-
-    /**
-     * Package-private: exposed for direct unit testing.
-     *
-     * @param body       raw message bytes
-     * @param descriptor matched EndpointDescriptor, or {@code null} if unregistered
-     * @param tenancyId  from AMQP application property X-Tenancy-ID, or {@code null}
-     *                   to fall back to descriptor tenancyId
-     */
-    CloudEvent buildCloudEvent(byte[] body, EndpointDescriptor descriptor, String tenancyId) {
-        String address = descriptor != null
-            ? descriptor.properties().getOrDefault(EndpointPropertyKeys.TOPIC, "unknown")
-            : "unknown";
-
-        String type = descriptor != null
-            ? descriptor.properties().getOrDefault(EndpointPropertyKeys.STREAM_EVENT_TYPE,
-                UNREGISTERED_TYPE)
-            : UNREGISTERED_TYPE;
-
-        String effectiveTenancyId = tenancyId != null
-            ? tenancyId
-            : (descriptor != null ? descriptor.tenancyId() : TenancyConstants.DEFAULT_TENANT_ID);
-
-        CloudEventBuilder builder = CloudEventBuilder.v1()
-            .withId(UUID.randomUUID().toString())
-            .withType(type)
-            .withSource(URI.create("/platform/streams/amqp/" + address))
-            .withTime(OffsetDateTime.now())
-            .withData(body)
-            .withExtension("tenancyid", effectiveTenancyId);
-
-        final String contentType = descriptor != null
-            ? descriptor.properties().get(EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE)
-            : null;
-        if (contentType != null) {
-            builder = builder.withDataContentType(contentType);
-        }
-
-        return builder.build();
+        core.processMessage(message.getPayload(), address, tenancyId);
+        return message.ack();
     }
 }

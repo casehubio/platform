@@ -1,0 +1,15 @@
+{
+  "properties": [
+    {
+      "name": "casehub.streams.amqp.queue",
+      "type": "java.lang.String",
+      "description": "AMQP queue to consume for stream ingestion."
+    },
+    {
+      "name": "casehub.streams.amqp.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the AMQP stream listener is enabled.",
+      "defaultValue": true
+    }
+  ]
+}

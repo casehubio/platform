@@ -94,11 +94,16 @@
         <module>subscriptions-jpa-common</module>
         <module>subscriptions-jpa</module>
         <module>subscriptions-spring-jpa</module>
+        <module>streams-core</module>
+        <module>streams-kafka-core</module>
         <module>streams-kafka</module>
+        <module>streams-amqp-core</module>
         <module>streams-amqp</module>
         <module>streams-webhook-core</module>
         <module>streams-webhook</module>
+        <module>streams-poll-core</module>
         <module>streams-poll</module>
+        <module>streams-camel-core</module>
         <module>streams-camel</module>
         <module>governance-core</module>
         <module>governance</module>
@@ -181,6 +186,10 @@
         <module>credentials-spring</module>
         <module>oidc-spring</module>
         <module>scim-spring</module>
+        <module>streams-camel-spring</module>
+        <module>streams-amqp-spring</module>
+        <module>streams-kafka-spring</module>
+        <module>streams-poll-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

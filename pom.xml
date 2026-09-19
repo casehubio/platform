@@ -178,6 +178,7 @@
         <module>expression-spring</module>
         <module>identity-spring</module>
         <module>credentials-spring</module>
+        <module>oidc-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

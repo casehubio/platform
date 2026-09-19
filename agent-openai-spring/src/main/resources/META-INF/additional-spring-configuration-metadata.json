@@ -1,0 +1,33 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.agent.openai.api-key",
+      "type": "java.lang.String",
+      "description": "OpenAI API key for authentication."
+    },
+    {
+      "name": "casehub.platform.agent.openai.default-model",
+      "type": "java.lang.String",
+      "description": "Default model to use for OpenAI invocations.",
+      "defaultValue": "gpt-4.1"
+    },
+    {
+      "name": "casehub.platform.agent.openai.default-timeout",
+      "type": "java.time.Duration",
+      "description": "Default timeout for OpenAI agent invocations.",
+      "defaultValue": "PT5M"
+    },
+    {
+      "name": "casehub.platform.agent.openai.max-concurrent-sessions",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of concurrent OpenAI agent sessions.",
+      "defaultValue": 4
+    },
+    {
+      "name": "casehub.platform.agent.openai.prompt-cache-retention",
+      "type": "java.lang.String",
+      "description": "Prompt cache retention strategy. Values: in_memory, none.",
+      "defaultValue": "in_memory"
+    }
+  ]
+}

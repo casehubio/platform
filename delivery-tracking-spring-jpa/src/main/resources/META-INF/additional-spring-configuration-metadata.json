@@ -1,0 +1,40 @@
+{
+  "properties": [
+    {
+      "name": "casehub.delivery.retention.attempt-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain successful delivery attempts before purging.",
+      "defaultValue": 90
+    },
+    {
+      "name": "casehub.delivery.retention.failed-attempt-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain failed delivery attempts before purging.",
+      "defaultValue": 30
+    },
+    {
+      "name": "casehub.delivery.retention.engagement-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain engagement events before purging.",
+      "defaultValue": 365
+    },
+    {
+      "name": "casehub.delivery.retention.attempt-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for the delivery attempt retention purge schedule.",
+      "defaultValue": "0 0 3 * * ?"
+    },
+    {
+      "name": "casehub.delivery.retention.engagement-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for the engagement event retention purge schedule.",
+      "defaultValue": "0 30 3 * * ?"
+    },
+    {
+      "name": "casehub.delivery.retry.claim-timeout",
+      "type": "java.time.Duration",
+      "description": "Timeout for claiming retryable delivery attempts via SELECT FOR UPDATE SKIP LOCKED.",
+      "defaultValue": "5m"
+    }
+  ]
+}

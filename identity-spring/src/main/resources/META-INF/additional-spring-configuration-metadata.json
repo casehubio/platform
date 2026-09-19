@@ -1,0 +1,20 @@
+{
+  "properties": [
+    {
+      "name": "casehub.identity.dids",
+      "type": "java.util.Map<java.lang.String,java.lang.String>",
+      "description": "Map of actor IDs to their DID URIs for config-based DID resolution."
+    },
+    {
+      "name": "casehub.identity.credential-cache-ttl-minutes",
+      "type": "java.lang.Integer",
+      "description": "TTL in minutes for caching credential validation results.",
+      "defaultValue": 1440
+    },
+    {
+      "name": "casehub.identity.credentials",
+      "type": "java.util.Map<java.lang.String,java.lang.String>",
+      "description": "Map of actor IDs to file-based credential paths for JWT VC validation."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.principal.actorId",
+      "type": "java.lang.String",
+      "description": "Actor ID for the default principal.",
+      "defaultValue": "system"
+    },
+    {
+      "name": "casehub.platform.principal.groups",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Group memberships for the default principal.",
+      "defaultValue": []
+    },
+    {
+      "name": "casehub.platform.principal.crossTenantAdmin",
+      "type": "java.lang.Boolean",
+      "description": "Whether the default principal has cross-tenant admin privileges.",
+      "defaultValue": false
+    },
+    {
+      "name": "casehub.tenancy.default-id",
+      "type": "java.lang.String",
+      "description": "Default tenancy ID when no tenant context is available.",
+      "defaultValue": "278776f9-e1b0-46fb-9032-8bddebdcf9ce"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "casehub.notification.suppression.retention-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for purging expired mute rules and snooze entries.",
+      "defaultValue": "0 0 2 * * ?"
+    }
+  ]
+}

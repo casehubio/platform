@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "casehub.acl.retention.audit-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain ACL audit log entries before purging.",
+      "defaultValue": 365
+    },
+    {
+      "name": "casehub.acl.retention.expired-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for purging expired ACL entries.",
+      "defaultValue": "0 0 3 * * ?"
+    },
+    {
+      "name": "casehub.acl.retention.audit-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for purging old ACL audit log entries.",
+      "defaultValue": "0 30 3 * * ?"
+    }
+  ]
+}

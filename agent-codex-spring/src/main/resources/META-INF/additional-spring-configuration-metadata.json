@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.agent.codex.binary-path",
+      "type": "java.lang.String",
+      "description": "Path to the Codex CLI binary.",
+      "defaultValue": "codex"
+    },
+    {
+      "name": "casehub.platform.agent.codex.default-timeout",
+      "type": "java.time.Duration",
+      "description": "Default timeout for Codex agent invocations.",
+      "defaultValue": "PT5M"
+    },
+    {
+      "name": "casehub.platform.agent.codex.max-concurrent-sessions",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of concurrent Codex agent sessions.",
+      "defaultValue": 4
+    }
+  ]
+}

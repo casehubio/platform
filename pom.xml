@@ -183,6 +183,7 @@
         <module>credentials-spring</module>
         <module>oidc-spring</module>
         <module>scim-spring</module>
+        <module>streams-poll-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

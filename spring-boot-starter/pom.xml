@@ -186,6 +186,12 @@
             <artifactId>casehub-platform-scim-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-streams-poll-spring</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
 
         <!-- Jackson 2 bridge — Spring Boot 4 defaults to Jackson 3.
              Keeps both frameworks on Jackson 2 ObjectMapper until

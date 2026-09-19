@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "casehub.streams.poll.interval",
+      "type": "java.lang.Long",
+      "description": "Poll interval in milliseconds.",
+      "defaultValue": 60000
+    }
+  ]
+}

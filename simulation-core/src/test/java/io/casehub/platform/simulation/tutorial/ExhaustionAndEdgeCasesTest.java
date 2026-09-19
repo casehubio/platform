@@ -111,14 +111,16 @@ class ExhaustionAndEdgeCasesTest {
      * Key-lookup without registering an extractor — config error.
      */
     @Test
-    void keyLookupWithoutExtractorThrowsConfigError() {
+    void keyLookupWithoutExtractorUsesIdentityFallback() {
         final var corpus = new InMemorySimulationCorpus<String, String>();
+        corpus.seed(METHOD, java.util.List.of(
+                new io.casehub.platform.simulation.InvocationRecord<>(
+                        "t1", "hello", "hello", "world", java.time.Instant.now())));
         final var runtime = new SimulationRuntime(configFor(METHOD, "key-lookup"), corpus);
 
-        // Forgot to call runtime.registerExtractor() — should fail clearly
-        assertThatThrownBy(() -> runtime.strategyFor(METHOD))
-                .isInstanceOf(SimulationConfigException.class)
-                .hasMessageContaining("KeyExtractor");
+        final var strategy = runtime.<String, String>strategyFor(METHOD);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("hello")).isEqualTo("world");
     }
 
     /**

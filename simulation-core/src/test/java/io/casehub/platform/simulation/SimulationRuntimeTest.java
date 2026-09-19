@@ -64,13 +64,11 @@ class SimulationRuntimeTest {
     }
 
     @Test
-    void strategyForThrowsWhenKeyLookupWithoutExtractor() {
+    void keyLookupUsesIdentityExtractorWhenNoneRegistered() {
         final var config = stubConfig(Optional.of("key-lookup"), false, Optional.empty());
         final var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
 
-        assertThatThrownBy(() -> runtime.strategyFor(QN))
-                .isInstanceOf(SimulationConfigException.class)
-                .hasMessageContaining("KeyExtractor");
+        assertThat(runtime.strategyFor(QN)).isPresent();
     }
 
     @Test
@@ -362,6 +360,32 @@ class SimulationRuntimeTest {
         final var strategy = runtime.<String, String>strategyFor(QN);
         assertThat(strategy).isPresent();
         assertThat(strategy.get().resolve("in")).isEqualTo("base");
+    }
+
+    // --- auto-detect identity extractor ---
+
+    @Test
+    void keyLookupFallsBackToIdentityExtractorWhenNoneRegistered() {
+        final var config = stubConfig(Optional.of("key-lookup"), false, Optional.empty());
+        final var corpus = new TestCorpus();
+        corpus.seed(QN, List.of(new InvocationRecord<>("t1", "patient-123", "patient-123", "result", Instant.now())));
+        final var runtime = new SimulationRuntime(config, corpus);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("patient-123")).isEqualTo("result");
+    }
+
+    @Test
+    void recordedReplayFallsBackToIdentityExtractorWhenNoneRegistered() {
+        final var config = stubConfig(Optional.of("recorded-replay"), false, Optional.empty());
+        final var corpus = new TestCorpus();
+        corpus.seed(QN, List.of(new InvocationRecord<>("t1", "key-1", "input-1", "result-1", Instant.now())));
+        final var runtime = new SimulationRuntime(config, corpus);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("key-1")).isEqualTo("result-1");
     }
 
     // --- apply(CorpusSeed) ---

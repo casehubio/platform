@@ -179,12 +179,9 @@ public class SimulationRuntime {
         return scorer;
     }
 
+    private static final KeyExtractor<Object> IDENTITY_EXTRACTOR = String::valueOf;
+
     private KeyExtractor<?> requireExtractor(final String qualifiedName) {
-        final KeyExtractor<?> extractor = extractors.get(qualifiedName);
-        if (extractor == null) {
-            throw new SimulationConfigException(
-                    "Strategy for " + qualifiedName + " requires a KeyExtractor, but none registered");
-        }
-        return extractor;
+        return extractors.getOrDefault(qualifiedName, IDENTITY_EXTRACTOR);
     }
 }

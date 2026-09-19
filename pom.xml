@@ -22,6 +22,7 @@
         <module>memory-simulation-core</module>
         <module>platform-simulation-core</module>
         <module>simulation-testing</module>
+        <module>simulation-starter</module>
         <module>event-simulation-core</module>
         <module>event-simulation</module>
         <module>agent-api</module>

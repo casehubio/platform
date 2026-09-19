@@ -185,6 +185,7 @@
         <module>credentials-spring</module>
         <module>oidc-spring</module>
         <module>scim-spring</module>
+        <module>streams-amqp-spring</module>
         <module>streams-kafka-spring</module>
         <module>streams-poll-spring</module>
         <module>spring-boot-starter</module>

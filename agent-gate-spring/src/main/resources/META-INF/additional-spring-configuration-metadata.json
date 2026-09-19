@@ -1,0 +1,76 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.agent.gate.acquire-timeout",
+      "type": "java.time.Duration",
+      "description": "Timeout for acquiring a rate-limit permit for agent invocations.",
+      "defaultValue": "PT30S"
+    },
+    {
+      "name": "casehub.platform.agent.gate.query-acquire-timeout",
+      "type": "java.time.Duration",
+      "description": "Timeout for acquiring a rate-limit permit for per-query operations within a session.",
+      "defaultValue": "PT5S"
+    },
+    {
+      "name": "casehub.platform.agent.gate.concurrency.max",
+      "type": "java.lang.Integer",
+      "description": "Maximum concurrent agent sessions. 0 disables concurrency limiting.",
+      "defaultValue": 0
+    },
+    {
+      "name": "casehub.platform.agent.gate.token-bucket.permits-per-second",
+      "type": "java.lang.Double",
+      "description": "Throughput rate limit in permits per second. 0 disables token-bucket limiting.",
+      "defaultValue": 0.0
+    },
+    {
+      "name": "casehub.platform.agent.gate.token-bucket.burst-capacity",
+      "type": "java.lang.Integer",
+      "description": "Maximum burst capacity for the token bucket. 0 disables token-bucket limiting.",
+      "defaultValue": 0
+    },
+    {
+      "name": "casehub.platform.agent.gate.sliding-window.max-actions",
+      "type": "java.lang.Integer",
+      "description": "Maximum actions allowed within the sliding window. 0 disables sliding-window limiting.",
+      "defaultValue": 0
+    },
+    {
+      "name": "casehub.platform.agent.gate.sliding-window.window-seconds",
+      "type": "java.lang.Integer",
+      "description": "Duration of the sliding window in seconds.",
+      "defaultValue": 60
+    },
+    {
+      "name": "casehub.platform.agent.gate.reaper.scan-interval",
+      "type": "java.time.Duration",
+      "description": "Interval between session leak reaper scans.",
+      "defaultValue": "60s"
+    },
+    {
+      "name": "casehub.platform.agent.gate.reaper.warn-threshold",
+      "type": "java.time.Duration",
+      "description": "Session idle duration that triggers a leak warning.",
+      "defaultValue": "5m"
+    },
+    {
+      "name": "casehub.platform.agent.gate.reaper.force-close-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the reaper can force-close leaked sessions.",
+      "defaultValue": false
+    },
+    {
+      "name": "casehub.platform.agent.gate.reaper.force-close-threshold",
+      "type": "java.time.Duration",
+      "description": "Session idle duration that triggers a forced close.",
+      "defaultValue": "30m"
+    },
+    {
+      "name": "casehub.platform.agent.gate.reaper.max-registry-age",
+      "type": "java.time.Duration",
+      "description": "Maximum age for session registry entries before eviction.",
+      "defaultValue": "24h"
+    }
+  ]
+}

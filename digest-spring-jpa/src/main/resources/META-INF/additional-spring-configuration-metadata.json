@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "casehub.notification.digest.max-buffer-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of buffered digest entries per key. 0 disables eviction.",
+      "defaultValue": 0
+    },
+    {
+      "name": "casehub.notification.digest.retention-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain flushed digest entries before purging.",
+      "defaultValue": 30
+    },
+    {
+      "name": "casehub.notification.digest.retention-purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for the digest retention purge schedule.",
+      "defaultValue": "0 0 3 * * ?"
+    }
+  ]
+}

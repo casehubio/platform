@@ -1,0 +1,33 @@
+{
+  "properties": [
+    {
+      "name": "casehub.platform.agent.gemini.api-key",
+      "type": "java.lang.String",
+      "description": "Google GenAI API key for authentication."
+    },
+    {
+      "name": "casehub.platform.agent.gemini.cache-ttl",
+      "type": "java.time.Duration",
+      "description": "TTL for Gemini cached content.",
+      "defaultValue": "PT1H"
+    },
+    {
+      "name": "casehub.platform.agent.gemini.default-model",
+      "type": "java.lang.String",
+      "description": "Default model to use for Gemini invocations.",
+      "defaultValue": "gemini-2.5-flash"
+    },
+    {
+      "name": "casehub.platform.agent.gemini.default-timeout",
+      "type": "java.time.Duration",
+      "description": "Default timeout for Gemini agent invocations.",
+      "defaultValue": "PT5M"
+    },
+    {
+      "name": "casehub.platform.agent.gemini.max-concurrent-sessions",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of concurrent Gemini agent sessions.",
+      "defaultValue": 4
+    }
+  ]
+}

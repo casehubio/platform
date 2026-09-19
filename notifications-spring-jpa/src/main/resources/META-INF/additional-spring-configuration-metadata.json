@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "casehub.notification.retention.read-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain read notifications before purging.",
+      "defaultValue": 90
+    },
+    {
+      "name": "casehub.notification.retention.unread-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain unread notifications before purging.",
+      "defaultValue": 365
+    },
+    {
+      "name": "casehub.notification.retention.purge-cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for the notification retention purge schedule.",
+      "defaultValue": "0 0 3 * * ?"
+    }
+  ]
+}

@@ -58,6 +58,8 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             this.profiles = parseProfiles(
                     (Map<String, Map<String, Object>>) root.get("profiles"));
 
+            warnUnknownKeys(root);
+
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse simulation YAML", e);
         }
@@ -358,6 +360,19 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         } catch (IOException e) {
             throw new UncheckedIOException(
                     "Failed to open corpus file: " + path, e);
+        }
+    }
+
+    private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
+            Set.of("default-tenancy-id", "methods", "profiles");
+
+    private static void warnUnknownKeys(Map<String, Object> root) {
+        for (String key : root.keySet()) {
+            if (!KNOWN_TOP_LEVEL_KEYS.contains(key)) {
+                java.util.logging.Logger.getLogger(YamlSimulationConfig.class.getName())
+                        .warning("Unknown top-level key in simulation.yaml: '" + key
+                                + "'. Known keys: " + KNOWN_TOP_LEVEL_KEYS);
+            }
         }
     }
 

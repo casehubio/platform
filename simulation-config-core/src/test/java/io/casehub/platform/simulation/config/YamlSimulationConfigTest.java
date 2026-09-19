@@ -408,6 +408,30 @@ class YamlSimulationConfigTest {
     }
 
     @Test
+    void unknownTopLevelKeyLogsWarning() {
+        var handler = new java.util.logging.Handler() {
+            final java.util.List<String> warnings = new java.util.ArrayList<>();
+            @Override public void publish(java.util.logging.LogRecord r) {
+                if (r.getLevel() == java.util.logging.Level.WARNING) warnings.add(r.getMessage());
+            }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+        var logger = java.util.logging.Logger.getLogger(YamlSimulationConfig.class.getName());
+        logger.addHandler(handler);
+        try {
+            load("""
+                    methds:
+                      test-spi.query:
+                        strategy: key
+                    """);
+            assertThat(handler.warnings).anyMatch(w -> w.contains("methds"));
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
     void malformedYamlThrowsUncheckedIOException() {
         assertThatThrownBy(() -> load("not: [valid: yaml: {{"))
                 .isInstanceOf(UncheckedIOException.class);

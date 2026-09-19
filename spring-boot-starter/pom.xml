@@ -188,6 +188,12 @@
         </dependency>
         <dependency>
             <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-streams-camel-spring</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-streams-amqp-spring</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>

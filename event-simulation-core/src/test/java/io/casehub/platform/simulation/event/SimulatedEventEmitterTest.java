@@ -127,7 +127,7 @@ class SimulatedEventEmitterTest {
             @Override
             public Optional<String> strategyFor(final String qn) {
                 if (qn.equals("event-emitter.bad")) {
-                    return Optional.of("key-lookup");
+                    return Optional.of("nonexistent-strategy");
                 }
                 return Optional.of("sequential");
             }

@@ -1752,14 +1752,26 @@ Simulation modules are compile-scope dependencies, but the generated
 decorators are inert without strategy config — a `ConcurrentHashMap.get()`
 returning empty on every call.
 
-**YAML corpus files** for CI are loaded via:
+**YAML configuration** for CI uses `simulation.yaml` on the classpath
+root (convention-discovered). Place the file in `src/test/resources/`
+in the consumer module:
 
-```properties
-%test.casehub.simulation.corpus.files=simulation/agent-corpus.yaml,simulation/memory-corpus.yaml
+```yaml
+# src/test/resources/simulation.yaml
+methods:
+  agent-provider.invoke:
+    strategy: sequential
+    corpus:
+      - input: { system-prompt: "You are helpful", user-prompt: "Hello" }
+        output: [{ type: TextDelta, text: "Hello!" }]
+  case-memory-store.query:
+    strategy: key
+    corpus-files:
+      - classpath:simulation/memory-corpus.yaml
 ```
 
-Place fixture files in `src/test/resources/simulation/` in the consumer
-module.
+External corpus files (referenced via `corpus-files:`) use the existing
+format (qualified-name → list of entries).
 
 **Type limitation:** YAML fixtures store input/output as untyped Objects
 (Maps/Lists/Strings). This works for key-lookup and sequential strategies

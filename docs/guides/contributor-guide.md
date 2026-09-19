@@ -483,8 +483,7 @@ A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/
 
 | Type | Role |
 |------|------|
-| `SmallRyeSimulationConfig` | Manual prefix scanning of `casehub.simulation.*` properties. Parses flat config AND named profiles (`casehub.simulation.profiles.<name>.*`). Implements `ProfileSource` for profile resolution. Active profile via `casehub.simulation.active-profile`. |
-| `YamlCorpusLoader` | YAML fixture parsing into `InvocationRecord<Object, Object>` |
+| `YamlSimulationConfig` | Unified YAML parser — reads `simulation.yaml`, provides per-method strategy config, inline corpus entries, external corpus-files refs, named profiles. Implements `SimulationConfig` + `ProfileSource`. Convention-discovered from classpath root. |
 | `DeclarativeExtractorFactory` | Config string → `KeyExtractor` (`identity`, `field:name`, `composite:x,y`) via Jackson `ObjectMapper.convertValue` |
 | `DeclarativeScorerFactory` | Config string → `RecordFieldScorer` (`fields:name:EXACT:1.0,age:NUMERIC_RANGE:0.5`) |
 

@@ -1,0 +1,32 @@
+default-tenancy-id: t1
+
+methods:
+  test-spi.query:
+    strategy: sequential
+    exhaustion-policy: WRAP
+    corpus:
+      - key: first
+        input: "q1"
+        output: "response-1"
+      - key: second
+        input: "q2"
+        output: "response-2"
+
+  test-spi.store:
+    capture: true
+
+  test-spi.lookup:
+    strategy: key-lookup
+    key-extractor: "field:name"
+    corpus:
+      - key: alice
+        input:
+          name: alice
+          age: 30
+        output: "found-alice"
+
+profiles:
+  test-profile:
+    methods:
+      profile-spi.invoke:
+        strategy: sequential

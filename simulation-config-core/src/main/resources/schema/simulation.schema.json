@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://casehub.io/schema/simulation.schema.json",
+  "title": "CaseHub Simulation Configuration",
+  "description": "Unified simulation YAML — per-method strategy, inline corpus, profiles",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "default-tenancy-id": {
+      "type": "string",
+      "description": "Fallback tenancy ID for corpus entries without tenancy-id"
+    },
+    "methods": {
+      "type": "object",
+      "description": "Per-qualified-name method configuration",
+      "additionalProperties": {
+        "$ref": "#/$defs/method-config"
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "description": "Named override sets",
+      "additionalProperties": {
+        "$ref": "#/$defs/profile-config"
+      }
+    }
+  },
+  "$defs": {
+    "method-config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "description": "Strategy name",
+          "enum": [
+            "key-lookup", "key",
+            "sequential", "seq",
+            "random", "rand",
+            "recorded-replay", "replay",
+            "nearest-match", "nearest"
+          ]
+        },
+        "key-extractor": {
+          "type": "string",
+          "description": "Declarative key extractor spec (identity, field:<path>, composite:<f1>,<f2>)"
+        },
+        "capture": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable invocation capture"
+        },
+        "exhaustion-policy": {
+          "type": "string",
+          "enum": ["WRAP", "THROW"],
+          "description": "Behaviour when corpus entries are exhausted"
+        },
+        "scorer": {
+          "type": "string",
+          "description": "Nearest-match scorer spec (fields:<name>:<scorer>:<weight>,...)"
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Nearest-match threshold"
+        },
+        "corpus": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/corpus-entry"
+          },
+          "description": "Inline corpus entries"
+        },
+        "corpus-files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "External corpus file paths (classpath: or filesystem)"
+        }
+      }
+    },
+    "corpus-entry": {
+      "type": "object",
+      "required": ["output"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Lookup key for key-lookup strategy"
+        },
+        "tenancy-id": {
+          "type": "string",
+          "description": "Tenant ID (falls back to default-tenancy-id)"
+        },
+        "input": {
+          "description": "Input value — any YAML type"
+        },
+        "output": {
+          "description": "Output value — any YAML type"
+        }
+      }
+    },
+    "profile-config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "methods": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/method-config"
+          }
+        },
+        "corpus-files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Profile-level corpus files (all methods)"
+        }
+      }
+    }
+  }
+}

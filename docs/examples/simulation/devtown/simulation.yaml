@@ -1,0 +1,26 @@
+default-tenancy-id: default
+
+methods:
+  github-api.getPullRequest:
+    strategy: key
+    key-extractor: "composite:httpMethod,pathTemplate"
+    corpus-files:
+      - classpath:simulation/devtown/github-api-corpus.yaml
+
+  case-memory-store.query:
+    strategy: key
+    key-extractor: "field:domain"
+    corpus:
+      - key: coding
+        input:
+          domain: coding
+          question: "recent PRs"
+        output: "3 PRs merged this week"
+    corpus-files:
+      - classpath:simulation/devtown/case-memory-store-corpus.yaml
+
+profiles:
+  demo:
+    methods:
+      github-api.getPullRequest:
+        strategy: sequential

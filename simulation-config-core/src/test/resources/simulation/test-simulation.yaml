@@ -1,0 +1,41 @@
+default-tenancy-id: test-tenant
+
+methods:
+  test-spi.query:
+    strategy: key
+    key-extractor: "field:domain"
+    capture: true
+    exhaustion-policy: WRAP
+    scorer: "fields:domain:exact:1.0"
+    threshold: 0.8
+    corpus:
+      - key: cardiology
+        tenancy-id: hospital-a
+        input:
+          domain: cardiology
+          question: "latest labs"
+        output: "Lab results for cardiology"
+      - key: neurology
+        input:
+          domain: neurology
+        output: "MRI results"
+    corpus-files:
+      - classpath:simulation/test-corpus.yaml
+
+  test-spi.store:
+    strategy: sequential
+    corpus:
+      - input: "store-input"
+        output: "stored"
+
+profiles:
+  demo:
+    methods:
+      test-spi.query:
+        strategy: sequential
+        corpus:
+          - input:
+              domain: oncology
+            output: "Demo results"
+    corpus-files:
+      - classpath:simulation/extra-corpus.yaml

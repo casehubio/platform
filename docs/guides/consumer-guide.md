@@ -114,7 +114,7 @@ Complete SPI testing framework — replaces Mockito for platform SPI tests. Conf
 
 | Artifact | Scope | What it provides |
 |----------|-------|------------------|
-| `casehub-platform-simulation-config-core` | compile | `SmallRyeSimulationConfig` (prefix scanning, named profiles), `YamlCorpusLoader`, `DeclarativeExtractorFactory`, `DeclarativeScorerFactory`, `RecordFieldScorer` |
+| `casehub-platform-simulation-config-core` | compile | `YamlSimulationConfig` (unified YAML parser: strategy + inline corpus + profiles), `DeclarativeExtractorFactory`, `DeclarativeScorerFactory`, `RecordFieldScorer`, JSON Schema (`schema/simulation.schema.json`) |
 | `casehub-platform-simulation-config` | compile | Quarkus CDI beans: `@Produces SimulationConfig`, `SimulationCorpus`, `SimulationRuntime`; `@Startup` corpus populator; profile wiring. Required alongside `simulation-generator` |
 
 **Code generation (annotation processors):**
@@ -149,12 +149,29 @@ Complete SPI testing framework — replaces Mockito for platform SPI tests. Conf
 **Quick start (3 steps):**
 
 1. Add dependencies — `simulation-config` + `platform-simulation-core` (or `memory-simulation-core` for CaseMemoryStore)
-2. Configure strategies in `application.properties`:
-   ```properties
-   casehub.simulation.access-control-provider.canAccess.strategy=key-lookup
-   casehub.simulation.case-memory-store.store.strategy=sequential
+2. Create `simulation.yaml` on the classpath root (convention discovery):
+   ```yaml
+   methods:
+     access-control-provider.canAccess:
+       strategy: key-lookup
+       corpus:
+         - key: "case:123"
+           input: { actorId: "actor-1", resourceId: "case:123", action: "READ" }
+           output: true
+     case-memory-store.store:
+       strategy: sequential
+       corpus:
+         - input: { domain: cardiology }
+           output: "stored"
    ```
-3. Seed corpus via YAML (`casehub.simulation.corpus.files=sim-corpus.yaml`) or programmatic `CorpusSeed`
+3. Optionally reference external corpus files per method:
+   ```yaml
+   methods:
+     case-memory-store.query:
+       strategy: key
+       corpus-files:
+         - classpath:simulation/domain-corpus.yaml
+   ```
 
 **Verification (replaces Mockito verify):**
 
@@ -170,7 +187,7 @@ verifier.noUnverifiedCalls();
 
 | Path | Realism level | When to use |
 |------|--------------|-------------|
-| YAML fixtures (`corpus.files`) | Domain-plausible | Quick scenario setup |
+| Inline corpus (`simulation.yaml`) | Domain-plausible | Quick scenario setup |
 | `CorpusSeed` + descriptors | Domain-plausible | Typed, per-SPI, programmatic |
 | `LlmCorpusPopulator` | Domain-plausible | LLM-generated realistic data |
 | `RandomCorpusPopulator` / `SchemaDataGenerator` | Structurally valid | Load testing, integration tests |
@@ -178,15 +195,15 @@ verifier.noUnverifiedCalls();
 
 **Configuration reference:**
 
-| Property | Values | Default |
-|----------|--------|---------|
-| `casehub.simulation.<spi>.<method>.strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay`, `nearest-match` | (none — passthrough) |
-| `casehub.simulation.<spi>.<method>.capture` | `true`/`false` | `false` |
-| `casehub.simulation.<spi>.<method>.threshold` | `0.0`–`1.0` | `0.0` |
-| `casehub.simulation.<spi>.<method>.exhaustion-policy` | `WRAP`, `THROW` | `WRAP` |
-| `casehub.simulation.corpus.files` | comma-separated paths | (none) |
+Simulation config lives in `simulation.yaml` (classpath root, convention-discovered). Per-method settings are under the `methods:` key. Profiles are under `profiles:`. Environment-level knobs remain in MicroProfile Config:
+
+| MicroProfile Config Property | Values | Default |
+|------------------------------|--------|---------|
+| `casehub.simulation.config` | classpath: or filesystem path | `simulation.yaml` (convention) |
 | `casehub.simulation.active-profile` | profile name | (none) |
-| `casehub.simulation.profiles.<name>.<spi>.<method>.*` | per-profile overrides | (none) |
+| `casehub.simulation.default-tenancy-id` | tenant ID string | (none) |
+
+Per-method YAML keys: `strategy`, `capture`, `exhaustion-policy`, `key-extractor`, `scorer`, `threshold`, `corpus`, `corpus-files`. See `schema/simulation.schema.json` for the full schema.
 
 ### Access control
 

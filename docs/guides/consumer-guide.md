@@ -75,6 +75,7 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 | `casehub-platform-datasource-jpa` | JPA DataSource registry (production) -- startup reconciliation |
 | `casehub-platform-endpoints-memory` | In-memory endpoint registry |
 | `casehub-platform-endpoints-config` | YAML-backed endpoint populator -- `${VAR}` interpolation, multi-file |
+| `casehub-platform-streams-core` | Shared CloudEvent construction -- `StreamCloudEventFactory` |
 | `casehub-platform-streams-kafka` | Kafka event stream connector -- static `@Incoming`, CloudEvent builder |
 | `casehub-platform-streams-amqp` | AMQP event stream connector -- single address per channel |
 | `casehub-platform-streams-webhook` | Webhook event stream connector -- structured CloudEvents HTTP binding |
@@ -876,6 +877,27 @@ H2 with `MODE=PostgreSQL` approximates PostgreSQL behaviour for integration test
 ### Spring configuration properties
 
 All `casehub.*` properties have IDE autocomplete metadata (`additional-spring-configuration-metadata.json`). See the [Configuration](#configuration) section above for the full property reference — the same property names apply in both `application.properties` (Spring) and `application.properties`/`application.yml` (Quarkus).
+
+### Streams (Spring Boot)
+
+Spring adapters for the four streaming modules. Each delegates to a framework-neutral core POJO.
+
+| Spring module | Listener | Configuration |
+|---------------|----------|---------------|
+| `streams-poll-spring` | `@Scheduled` | `casehub.streams.poll.interval` (ms, default 60000) |
+| `streams-kafka-spring` | `@KafkaListener` | `casehub.streams.kafka.topic`, `spring.kafka.consumer.*` |
+| `streams-amqp-spring` | `@RabbitListener` | `casehub.streams.amqp.queue`, `spring.rabbitmq.*` |
+| `streams-camel-spring` | `@EventListener` | Requires `camel-spring-boot-starter` on classpath |
+
+All streams modules use synchronous `ApplicationEventPublisher.publishEvent()` for CloudEvent dispatch — semantically equivalent to Quarkus CDI `fireAsync()` (message acked after all listeners complete). A slow `@EventListener` blocks the consumer thread. Add `@Async` to individual listeners if throughput is a concern.
+
+**Kafka config mapping** (SmallRye → Spring):
+- `mp.messaging.incoming.<channel>.topic` → `casehub.streams.kafka.topic`
+- `mp.messaging.incoming.<channel>.bootstrap.servers` → `spring.kafka.consumer.bootstrap-servers`
+
+**AMQP config mapping** (SmallRye → Spring):
+- `mp.messaging.incoming.<channel>.address` → `casehub.streams.amqp.queue`
+- `mp.messaging.incoming.<channel>.host` → `spring.rabbitmq.host`
 
 ### Jackson 2 bridge
 

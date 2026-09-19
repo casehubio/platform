@@ -99,6 +99,7 @@
         <module>streams-amqp</module>
         <module>streams-webhook-core</module>
         <module>streams-webhook</module>
+        <module>streams-poll-core</module>
         <module>streams-poll</module>
         <module>streams-camel</module>
         <module>governance-core</module>

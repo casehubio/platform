@@ -18,6 +18,10 @@ public final class SimulationVerifier {
         return new SimulationVerifier(journal);
     }
 
+    public static SimulationVerifier on(SimulationOverlay overlay) {
+        return new SimulationVerifier(overlay.journal());
+    }
+
     public MethodVerification method(String qualifiedName) {
         verifiedMethods.add(qualifiedName);
         return new MethodVerification(qualifiedName, journal);

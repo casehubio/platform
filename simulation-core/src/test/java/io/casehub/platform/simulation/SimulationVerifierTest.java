@@ -213,4 +213,15 @@ class SimulationVerifierTest {
         var journal = new InvocationJournal();
         SimulationVerifier.on(journal).noUnverifiedCalls();
     }
+
+    // --- on(SimulationOverlay) overload ---
+
+    @Test
+    void onOverlayDelegatesToJournal() {
+        var overlay = new SimulationOverlay(
+                MapSimulationConfig.of(java.util.Map.of()), new NoOpSimulationCorpus<>());
+        overlay.journal().record(entry("spi.a"));
+
+        SimulationVerifier.on(overlay).method("spi.a").wasCalled(1);
+    }
 }

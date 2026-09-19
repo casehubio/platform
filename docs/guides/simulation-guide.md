@@ -94,34 +94,23 @@ use the pattern name — it's more precise than describing the mechanism.
 ### 1. Add dependencies
 
 ```xml
-<!-- Core contracts — always needed -->
+<!-- One dependency pulls everything -->
 <dependency>
     <groupId>io.casehub</groupId>
-    <artifactId>casehub-platform-simulation-api</artifactId>
+    <artifactId>casehub-platform-simulation-starter</artifactId>
 </dependency>
 
-<!-- Strategy implementations -->
-<dependency>
-    <groupId>io.casehub</groupId>
-    <artifactId>casehub-platform-simulation-core</artifactId>
-</dependency>
-
-<!-- Config binding + YAML corpus + declarative extractors -->
-<dependency>
-    <groupId>io.casehub</groupId>
-    <artifactId>casehub-platform-simulation-config</artifactId>
-</dependency>
-```
-
-For generated `@Decorator` per `@SimulationEligible` SPI:
-
-```xml
+<!-- APT — generates @Decorator per @SimulationEligible SPI -->
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-platform-simulation-generator</artifactId>
     <scope>provided</scope>
 </dependency>
 ```
+
+`simulation-starter` is an aggregate POM that pulls simulation-api, simulation-core,
+simulation-inmem, simulation-config-core, simulation-config, and simulation-testing.
+For fine-grained control over individual modules, see the [consumer guide](consumer-guide.md).
 
 For AgentProvider simulation (Path B):
 
@@ -134,40 +123,62 @@ For AgentProvider simulation (Path B):
 
 ### 2. Configure simulation
 
-```properties
-# Simulate with sequential responses
-casehub.simulation.my-spi.query.strategy=sequential
+Create `simulation.yaml` on the classpath root (convention-discovered):
 
-# Capture real calls for corpus building
-casehub.simulation.my-spi.store.capture=true
+```yaml
+# simulation.yaml
+methods:
+  my-spi.query:
+    strategy: sequential
+    corpus:
+      - input: "q1"
+        output: "response-a"
+      - input: "q2"
+        output: "response-b"
 
-# No config → passthrough (transparent delegation)
+  my-spi.store:
+    capture: true
+
+  # No config → passthrough (transparent delegation)
 ```
 
-### 3. Seed a corpus and resolve
+Strategy aliases for less typing: `key` (key-lookup), `seq` (sequential),
+`rand` (random), `replay` (recorded-replay), `nearest` (nearest-match).
+
+### 3. Resolve in a test
+
+**For unit tests** — the fluent harness needs no CDI container:
 
 ```java
-@Inject SimulationCorpus corpus;
-@Inject SimulationRuntime simulation;
+var sim = Simulation.forTest()
+    .stub("my-spi.query", "input-a", "response-a")
+    .stub("my-spi.query", "input-b", "response-b")
+    .build();
 
-void setup() {
-    corpus.seed("my-spi.query", List.of(
-        new InvocationRecord<>("tenant-1", "key-1",
-            "input-a", "response-a", Instant.now()),
-        new InvocationRecord<>("tenant-1", "key-2",
-            "input-b", "response-b", Instant.now())));
-}
+assertThat(sim.resolve("my-spi.query", "input-a")).isEqualTo("response-a");
+```
 
-void resolve() {
-    var strategy = simulation.strategyFor("my-spi.query");
-    // strategy.resolve("input-a") → "response-a"
+`stub()` implies key-lookup strategy and auto-registers an identity extractor.
+`seed()` implies sequential. Three lines for the common case.
+
+**For CDI integration tests** — the YAML config above drives everything:
+
+```java
+@Inject SimulationRuntime runtime;
+
+@Test
+void strategyResolvesFromCorpus() {
+    var strategy = runtime.<String, String>strategyFor("my-spi.query").orElseThrow();
+    assertThat(strategy.resolve("q1")).isEqualTo("response-a");
 }
 ```
 
-That's it. The generated `@Decorator` intercepts your SPI method,
-resolves from the corpus via the configured strategy, and returns the
-seeded response. No changes to the SPI, no changes to the NoOp, no
-changes to production code.
+The generated `@Decorator` intercepts your SPI method, resolves from the
+corpus via the configured strategy, and returns the seeded response. No
+changes to the SPI, no changes to the NoOp, no changes to production code.
+
+**For single-param SPIs**, no manual `KeyExtractor` registration is needed — the
+framework auto-detects an identity extractor that calls `String.valueOf(input)`.
 
 ### 4. Use corpus builders (recommended)
 
@@ -397,9 +408,12 @@ public interface SimulationStrategy<I, O> {
 Returns responses in corpus insertion order. When the list runs out,
 behaviour depends on the exhaustion policy.
 
-```properties
-casehub.simulation.my-spi.method.strategy=sequential
-casehub.simulation.my-spi.method.exhaustion-policy=THROW  # default: WRAP
+```yaml
+# in simulation.yaml
+methods:
+  my-spi.method:
+    strategy: seq              # alias for sequential
+    exhaustion-policy: THROW   # default: WRAP
 ```
 
 | Policy | Behaviour | Pattern |
@@ -423,8 +437,10 @@ strategy.resolve("x");  // → SimulationExhaustedException
 Same input → same output, every time. Requires a `KeyExtractor<I>` that
 derives a lookup key from the method input.
 
-```properties
-casehub.simulation.my-spi.method.strategy=key-lookup
+```yaml
+methods:
+  my-spi.method:
+    strategy: key              # alias for key-lookup
 ```
 
 ```java
@@ -443,8 +459,10 @@ point for simulation.
 Picks a random entry from the corpus each time. Pass a seeded `Random`
 for reproducible tests.
 
-```properties
-casehub.simulation.my-spi.method.strategy=random
+```yaml
+methods:
+  my-spi.method:
+    strategy: rand             # alias for random
 ```
 
 Use for load testing with varied responses, or fuzzing.
@@ -454,8 +472,10 @@ Use for load testing with varied responses, or fuzzing.
 Tries key-based lookup first. If the key matches, returns it
 (deterministic). If not, falls back to sequential traversal.
 
-```properties
-casehub.simulation.my-spi.method.strategy=recorded-replay
+```yaml
+methods:
+  my-spi.method:
+    strategy: replay           # alias for recorded-replay
 ```
 
 This is the **Best-Effort Replay** pattern — ideal for replaying captured
@@ -469,10 +489,12 @@ and returns the best match above a configurable threshold. Use when inputs
 vary between runs (different UUIDs, amounts, entity names) but the response
 shape is stable — and a normalizing KeyExtractor can't make the key exact.
 
-```properties
-casehub.simulation.my-spi.method.strategy=nearest-match
-casehub.simulation.my-spi.method.threshold=0.7
-casehub.simulation.my-spi.method.scorer=fields:domain:exact:1.0,question:substring:0.5
+```yaml
+methods:
+  my-spi.method:
+    strategy: nearest          # alias for nearest-match
+    threshold: 0.7
+    scorer: "fields:domain:exact:1.0,question:substring:0.5"
 ```
 
 Programmatic registration for complex scoring:
@@ -561,8 +583,10 @@ Capture records real SPI invocations to the corpus while the real
 implementation runs. Use it to build a corpus from production or staging
 traffic. This is the first half of the **Capture → Replay** pattern.
 
-```properties
-casehub.simulation.my-spi.query.capture=true
+```yaml
+methods:
+  my-spi.query:
+    capture: true
 ```
 
 The generated decorator does this automatically:
@@ -586,11 +610,15 @@ This enables the **Tenant-Isolated Capture** pattern.
 2. Run the scenarios you want to simulate
 3. Export the corpus (or keep it in memory for the session)
 4. Switch config from capture to simulation:
-   ```properties
+   ```yaml
    # Before: capture
-   casehub.simulation.my-spi.query.capture=true
+   methods:
+     my-spi.query:
+       capture: true
    # After: simulate
-   casehub.simulation.my-spi.query.strategy=recorded-replay
+   methods:
+     my-spi.query:
+       strategy: replay
    ```
 5. The captured corpus now drives simulation
 
@@ -656,8 +684,10 @@ routing infrastructure.
 `SimulatedAgentBackend` (key: `"simulated"`) is dispatched by the router
 when the model resolves to the simulated backend:
 
-```properties
-casehub.simulation.agent-provider.invoke.strategy=sequential
+```yaml
+methods:
+  agent-provider.invoke:
+    strategy: seq
 ```
 
 ```java
@@ -729,15 +759,16 @@ needs volume (`STRUCTURALLY_VALID`). Scenario testing needs accuracy
 Different strategies for different methods is normal — it's the
 **Per-Method Mix** pattern:
 
-```properties
-# Simulate query with deterministic responses
-casehub.simulation.bank-feed.list-transactions.strategy=key-lookup
+```yaml
+# in simulation.yaml
+methods:
+  bank-feed.list-transactions:
+    strategy: key              # deterministic responses
 
-# Pass through to real balance API
-# (no config = passthrough)
+  # bank-feed.get-balance: not listed → passthrough
 
-# Capture real payment calls for corpus building
-casehub.simulation.bank-feed.post-payment.capture=true
+  bank-feed.post-payment:
+    capture: true              # capture real calls for corpus building
 ```
 
 ### Cross-SPI coordination
@@ -745,15 +776,14 @@ casehub.simulation.bank-feed.post-payment.capture=true
 Multiple SPIs can be simulated simultaneously, each with its own
 strategy and corpus:
 
-```properties
-# LLM: replay captured traffic
-casehub.simulation.agent-provider.invoke.strategy=recorded-replay
-
-# Memory: deterministic test data
-casehub.simulation.case-memory-store.query.strategy=key-lookup
-
-# Notifications: sequential to verify delivery order
-casehub.simulation.notification-store.store.strategy=sequential
+```yaml
+methods:
+  agent-provider.invoke:
+    strategy: replay           # LLM: replay captured traffic
+  case-memory-store.query:
+    strategy: key              # Memory: deterministic test data
+  notification-store.store:
+    strategy: seq              # Notifications: verify delivery order
 ```
 
 ### Strategy lifecycle progression
@@ -779,39 +809,62 @@ these strategies with this data" as a reusable unit.
 
 ### Declaring a profile
 
-```properties
-# Named profile — bundles strategy + corpus config
-casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
-casehub.simulation.profiles.ci-replay.case-memory-store.query.strategy=key-lookup
-casehub.simulation.profiles.ci-replay.notification-store.store.strategy=sequential
-casehub.simulation.profiles.ci-replay.corpus.files=fixtures/captured-traffic.yaml
+Profiles are nested under the `profiles:` key in `simulation.yaml`:
+
+```yaml
+# in simulation.yaml
+profiles:
+  ci-replay:
+    methods:
+      agent-provider.invoke:
+        strategy: replay
+      case-memory-store.query:
+        strategy: key
+      notification-store.store:
+        strategy: seq
+    corpus-files:
+      - classpath:fixtures/captured-traffic.yaml
 ```
 
 ### Activating a profile at boot time
+
+Profile activation stays in MicroProfile Config (supports Quarkus `%test.` qualifiers):
 
 ```properties
 casehub.simulation.active-profile=ci-replay
 ```
 
 Resolution order when an active profile is set:
-1. Active profile entries (for matching qualified names)
-2. Flat config entries (fallback)
+1. Active profile methods (for matching qualified names)
+2. Base `methods:` entries (fallback)
 3. Empty (no strategy configured — passthrough)
 
-Existing flat config works unchanged. Profiles are purely additive.
+Base methods work unchanged. Profiles are purely additive.
 
 ### Profile corpus files
 
-Each profile can bundle its own corpus data:
+Each profile can bundle its own corpus data — both inline and via file refs:
 
-```properties
-casehub.simulation.profiles.ci-replay.corpus.files=fixtures/captured-traffic.yaml
-casehub.simulation.profiles.dev-demo.corpus.files=fixtures/demo-data.yaml
+```yaml
+profiles:
+  ci-replay:
+    methods:
+      agent-provider.invoke:
+        strategy: replay
+        corpus:
+          - input: { system-prompt: "You are helpful", user-prompt: "Hello" }
+            output: [{ type: TextDelta, text: "Hello!" }]
+    corpus-files:
+      - classpath:fixtures/captured-traffic.yaml
+
+  dev-demo:
+    corpus-files:
+      - classpath:fixtures/demo-data.yaml
 ```
 
-At boot time, the active profile's corpus files are loaded into the
-base corpus alongside base corpus files. At runtime (via `pushProfile`),
-corpus files are loaded into an overlay-isolated corpus that is
+At boot time, the active profile's corpus (inline + file refs) is loaded
+into the base corpus alongside base method corpus. At runtime (via
+`pushProfile`), corpus is loaded into an overlay-isolated corpus that is
 discarded when the overlay is popped.
 
 ### Runtime activation with pushProfile
@@ -832,30 +885,33 @@ mechanics are unchanged — profiles are a naming layer.
 
 ### Quarkus profile interaction
 
-SmallRye Config resolves Quarkus profiles before simulation config is
-parsed. The two mechanisms are complementary:
+Simulation config uses an additive model: structured data (per-method
+strategies, corpus, profiles) lives in `simulation.yaml`. Environment-level
+knobs stay in MicroProfile Config where Quarkus profile qualification
+(`%test.`, `%dev.`) can reach them:
 
 - **Quarkus profiles** — environment-level switching (test/dev/prod)
-- **Simulation profiles** — cross-SPI strategy+corpus bundles
+- **Simulation profiles** — cross-SPI strategy+corpus bundles (in `simulation.yaml`)
 - **Overlay stack** — runtime scenario switching
 
-Common patterns:
+Common pattern:
 
 ```properties
-# Quarkus profile selects which simulation profile to activate
+# application.properties — Quarkus profile selects simulation profile
 %test.casehub.simulation.active-profile=ci-replay
 %dev.casehub.simulation.active-profile=dev-demo
-
-# Quarkus profile scopes simulation profile definitions
-%test.casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
 ```
+
+The profile definitions themselves live in `simulation.yaml` — not in
+`application.properties`. `YamlSimulationConfig` parses the YAML; the
+active-profile property tells `SimulationConfigBeans` which profile to activate.
 
 ---
 
 ## Simulation maturity stages
 
-Each stage has a recommended profile. Copy the profile config block into
-your `application.properties` and adjust SPI names for your project.
+Each stage has a recommended profile. Define profiles in your
+`simulation.yaml` and activate per environment via MicroProfile Config.
 
 ### Stage 0: No simulation
 
@@ -865,12 +921,22 @@ Real backends available. No simulation config needed.
 
 Record real SPI traffic to build a corpus for later replay.
 
-```properties
-casehub.simulation.active-profile=capture-all
+```yaml
+# simulation.yaml
+profiles:
+  capture-all:
+    methods:
+      agent-provider.invoke:
+        capture: true
+      case-memory-store.query:
+        capture: true
+      case-memory-store.store:
+        capture: true
+```
 
-casehub.simulation.profiles.capture-all.agent-provider.invoke.capture=true
-casehub.simulation.profiles.capture-all.case-memory-store.query.capture=true
-casehub.simulation.profiles.capture-all.case-memory-store.store.capture=true
+```properties
+# application.properties
+casehub.simulation.active-profile=capture-all
 ```
 
 **When to advance:** You have enough captured traffic to cover your
@@ -881,13 +947,21 @@ workflows 2-3 times in a dev/staging environment).
 
 Replay captured traffic in CI. No network dependency, real-shaped data.
 
-```properties
-casehub.simulation.active-profile=ci-replay
+```yaml
+profiles:
+  ci-replay:
+    methods:
+      agent-provider.invoke:
+        strategy: replay
+        key-extractor: "field:model"
+      case-memory-store.query:
+        strategy: replay
+    corpus-files:
+      - classpath:simulation/captured-traffic.yaml
+```
 
-casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy=recorded-replay
-casehub.simulation.profiles.ci-replay.agent-provider.invoke.key-extractor=field:model
-casehub.simulation.profiles.ci-replay.case-memory-store.query.strategy=recorded-replay
-casehub.simulation.profiles.ci-replay.corpus.files=simulation/captured-traffic.yaml
+```properties
+%test.casehub.simulation.active-profile=ci-replay
 ```
 
 **When to advance:** You need deterministic, input-dependent responses
@@ -899,14 +973,22 @@ maintaining it is more work than curating fixtures.
 Key-lookup with hand-curated or CorpusSeed-built fixtures. Fully
 deterministic — same input always produces the same output.
 
-```properties
-casehub.simulation.active-profile=curated-test
+```yaml
+profiles:
+  curated-test:
+    methods:
+      agent-provider.invoke:
+        strategy: key
+        key-extractor: "field:model"
+      case-memory-store.query:
+        strategy: key
+        key-extractor: "composite:entityIds,domain"
+    corpus-files:
+      - classpath:simulation/curated-fixtures.yaml
+```
 
-casehub.simulation.profiles.curated-test.agent-provider.invoke.strategy=key-lookup
-casehub.simulation.profiles.curated-test.agent-provider.invoke.key-extractor=field:model
-casehub.simulation.profiles.curated-test.case-memory-store.query.strategy=key-lookup
-casehub.simulation.profiles.curated-test.case-memory-store.query.key-extractor=composite:entityIds,domain
-casehub.simulation.profiles.curated-test.corpus.files=simulation/curated-fixtures.yaml
+```properties
+%test.casehub.simulation.active-profile=curated-test
 ```
 
 **When to advance:** You need volume testing, fuzzing, or statistical
@@ -917,13 +999,21 @@ coverage beyond what hand-curated fixtures provide.
 Sequential or random strategies with generated data from CorpusSeed
 builders or LlmCorpusPopulator.
 
+```yaml
+profiles:
+  load-test:
+    methods:
+      agent-provider.invoke:
+        strategy: seq
+        exhaustion-policy: WRAP
+      case-memory-store.query:
+        strategy: rand
+    corpus-files:
+      - classpath:simulation/generated-data.yaml
+```
+
 ```properties
 casehub.simulation.active-profile=load-test
-
-casehub.simulation.profiles.load-test.agent-provider.invoke.strategy=sequential
-casehub.simulation.profiles.load-test.agent-provider.invoke.exhaustion-policy=WRAP
-casehub.simulation.profiles.load-test.case-memory-store.query.strategy=random
-casehub.simulation.profiles.load-test.corpus.files=simulation/generated-data.yaml
 ```
 
 ---
@@ -1004,26 +1094,48 @@ to see the exact output for your SPI.
 
 ## Configuration reference
 
-All configuration lives under the `casehub.simulation` prefix:
+Simulation configuration uses two mechanisms:
 
-```
-casehub.simulation.<spi-name>.<method-name>.strategy=<strategy-key>
-casehub.simulation.<spi-name>.<method-name>.capture=true|false
-casehub.simulation.<spi-name>.<method-name>.exhaustion-policy=WRAP|THROW
+**`simulation.yaml`** (on classpath root — convention-discovered) for structured config:
 
-casehub.simulation.active-profile=<profile-name>
-casehub.simulation.profiles.<name>.<spi-name>.<method-name>.strategy=<strategy-key>
-casehub.simulation.profiles.<name>.<spi-name>.<method-name>.capture=true|false
-casehub.simulation.profiles.<name>.corpus.files=<comma-separated-paths>
+```yaml
+default-tenancy-id: test-tenant          # fallback for corpus entries
+
+methods:
+  <spi-name>.<method-name>:
+    strategy: <strategy-key>             # key, seq, rand, replay, nearest
+    capture: true|false                  # default: false
+    exhaustion-policy: WRAP|THROW        # default: WRAP
+    key-extractor: "<spec>"              # identity, field:<path>, composite:<f1>,<f2>
+    scorer: "<spec>"                     # fields:<name>:<scorer>:<weight>,...
+    threshold: 0.0-1.0                   # nearest-match threshold
+    corpus:                              # inline entries
+      - key: "<lookup-key>"
+        tenancy-id: "<tenant>"
+        input: <any YAML value>
+        output: <any YAML value>
+    corpus-files:                        # external file refs
+      - classpath:path/to/corpus.yaml
+
+profiles:
+  <profile-name>:
+    methods:
+      <spi-name>.<method-name>:
+        strategy: <key>                  # overrides base
+    corpus-files:
+      - classpath:path/to/profile-corpus.yaml
 ```
+
+**MicroProfile Config** (`application.properties`) for environment knobs:
 
 | Property | Values | Default |
 |----------|--------|---------|
-| `strategy` | `sequential`, `key-lookup`, `random`, `recorded-replay`, `nearest-match` | none (passthrough) |
-| `capture` | `true`, `false` | `false` |
-| `exhaustion-policy` | `WRAP`, `THROW` | `WRAP` |
-| `active-profile` | profile name | none |
-| `profiles.<name>.corpus.files` | comma-separated classpath/file paths | none |
+| `casehub.simulation.active-profile` | profile name | none |
+| `casehub.simulation.config` | classpath: or filesystem path | `simulation.yaml` (convention) |
+| `casehub.simulation.default-tenancy-id` | tenant ID string | none |
+
+A JSON Schema (`schema/simulation.schema.json`) is published on the classpath
+for IDE auto-completion and validation of `simulation.yaml` files.
 
 ### SPI name resolution
 
@@ -1267,13 +1379,15 @@ delegates.
 
 ### Configuration
 
-```properties
-# Simulate ScimClient.membersOf with key-lookup strategy
-casehub.simulation.scim.membersOf.strategy=key-lookup
-casehub.simulation.scim.membersOf.key-extractor=rest-client
+```yaml
+# in simulation.yaml
+methods:
+  scim.membersOf:
+    strategy: key
+    key-extractor: "rest-client"
 
-# Capture real responses from ScimClient.getGroup
-casehub.simulation.scim.getGroup.capture=true
+  scim.getGroup:
+    capture: true
 ```
 
 The spi name is the `configKey` from `@RegisterRestClient` (e.g., `scim`
@@ -1343,19 +1457,25 @@ capture for any of these SPIs — no code changes, no NoOp modifications.
 
 ### Example: simulate AccessControlProvider
 
-```properties
-# application.properties
-casehub.simulation.access-control-provider.canAccess.strategy=sequential
+```yaml
+# in simulation.yaml
+methods:
+  access-control-provider.canAccess:
+    strategy: seq
+    corpus:
+      - input: null
+        output: true      # first call → allow
+      - input: null
+        output: false      # second call → deny
 ```
 
-```java
-@Inject SimulationCorpus<Object, Object> corpus;
+Or programmatically via `Simulation.forTest()`:
 
-corpus.seed("access-control-provider.canAccess", List.of(
-    new InvocationRecord<>("tenant-1", null,
-        null, true, Instant.now()),   // first call → allow
-    new InvocationRecord<>("tenant-1", null,
-        null, false, Instant.now()))); // second call → deny
+```java
+var sim = Simulation.forTest()
+    .seed("access-control-provider.canAccess", null, true)
+    .seed("access-control-provider.canAccess", null, false)
+    .build();
 ```
 
 The decorator wraps whatever bean CDI resolves — a @DefaultBean NoOp or
@@ -1367,17 +1487,25 @@ code.
 
 ## What's next
 
-The simulation framework is actively growing. Planned capabilities that
-will extend the patterns above:
+Recent additions building on the patterns above:
 
-- **Corpus builders** — fluent, domain-specific builders that eliminate
-  hand-crafted `InvocationRecord` construction
-- **Verification API** — assertion DSL on captured invocations
-  (`wasCalled()`, `wasCalledWith()`, `verifyInOrder()`) replacing
-  ad-hoc corpus inspection
+- **`Simulation.forTest()`** — fluent test harness: 3 lines from setup
+  to assertion. `stub()` for key-lookup, `seed()` for sequential, built-in
+  overlay and verification support.
+- **`SimulationVerifier`** — assertion DSL on captured invocations:
+  `wasCalled()`, `wasNeverCalled()`, `matching()`, `inOrder()`,
+  `noUnverifiedCalls()`.
+- **`simulation-starter`** — single Maven dependency pulls all simulation
+  modules.
+- **Unified `simulation.yaml`** — strategy + inline corpus + profiles in
+  one file. Convention-discovered, JSON Schema for IDE validation.
+- **Strategy aliases** — `key`, `seq`, `rand`, `replay`, `nearest` for
+  less typing.
+- **`MapSimulationConfig.builder()`** — fluent programmatic config.
 
-Each extends the existing strategy/corpus/config model — no breaking
-changes to the patterns documented above.
+Planned:
+- **Scenario YAML integration** (casehub-pages#453, #454) — scenario
+  scripts drive simulation declaratively with event emission.
 
 ## Scenario Integration
 
@@ -1414,7 +1542,7 @@ config.
 
 ### MapSimulationConfig
 
-Programmatic `SimulationConfig` for scenario use (no SmallRye Config):
+Programmatic `SimulationConfig` for scenario use (no YAML config file):
 
 ```java
 var config = MapSimulationConfig.of(Map.of(
@@ -1502,15 +1630,7 @@ specific SPI priorities and config for each application.
    ```xml
    <dependency>
        <groupId>io.casehub</groupId>
-       <artifactId>casehub-platform-simulation-api</artifactId>
-   </dependency>
-   <dependency>
-       <groupId>io.casehub</groupId>
-       <artifactId>casehub-platform-simulation-core</artifactId>
-   </dependency>
-   <dependency>
-       <groupId>io.casehub</groupId>
-       <artifactId>casehub-platform-simulation-config</artifactId>
+       <artifactId>casehub-platform-simulation-starter</artifactId>
    </dependency>
    <dependency>
        <groupId>io.casehub</groupId>
@@ -1531,10 +1651,16 @@ specific SPI priorities and config for each application.
 3. **Create YAML corpus fixtures** — copy from
    `docs/examples/simulation/<your-app>/` and adapt field values.
 
-4. **Add `%test` profile simulation config** to `application.properties`:
-   ```properties
-   %test.casehub.simulation.<spi>.<method>.strategy=<strategy>
+4. **Create `simulation.yaml`** on the classpath root (e.g., `src/test/resources/`):
+   ```yaml
+   methods:
+     <spi>.<method>:
+       strategy: <strategy>
+       corpus:
+         - input: <value>
+           output: <value>
    ```
+   Activate per Quarkus profile via `%test.casehub.simulation.active-profile=<name>` if using profiles.
 
 5. **Migrate @InjectMock tests** to simulation-based tests — see
    "Migrating from @InjectMock" below.
@@ -1570,10 +1696,12 @@ io.casehub.neocortex.memory.cbr.CbrCaseMemoryStore=cbr-case-memory-store
 This is consumer-side work — the listing-file path avoids adding
 `simulation-api` as a dependency to neocortex-memory-api.
 
-**Example config:**
+**Example config** (`simulation.yaml`):
 
-```properties
-%test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
+```yaml
+methods:
+  agent-provider.invoke:
+    strategy: key
 ```
 
 **Example fixtures:** `docs/examples/simulation/clinical/`
@@ -1597,12 +1725,15 @@ All five GitHub APIs share `configKey="github-api"`, so their qualified
 names use the `github-api` prefix. The `rest-client` key extractor
 produces keys like `GET /repos/owner/repo/pulls/1`.
 
-**Example config:**
+**Example config** (`simulation.yaml`):
 
-```properties
-%test.casehub.simulation.github-api.getPullRequest.strategy=key-lookup
-%test.casehub.simulation.github-api.getPullRequest.key-extractor=rest-client
-%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
+```yaml
+methods:
+  github-api.getPullRequest:
+    strategy: key
+    key-extractor: "rest-client"
+  case-memory-store.query:
+    strategy: key
 ```
 
 **Example fixtures:** `docs/examples/simulation/devtown/`
@@ -1618,10 +1749,12 @@ gap as clinical. ModelRegistry is a minor target.
 | **CbrCaseMemoryStore** | — | — | **Not covered** (same gap as clinical) |
 | **ModelRegistry** | key-lookup | `model-registry.resolveById` | platform-simulation-core |
 
-**Example config:**
+**Example config** (`simulation.yaml`):
 
-```properties
-%test.casehub.simulation.model-registry.resolveById.strategy=key-lookup
+```yaml
+methods:
+  model-registry.resolveById:
+    strategy: key
 ```
 
 **Example fixtures:** `docs/examples/simulation/aml/`
@@ -1648,12 +1781,16 @@ are domain-specific, not platform SPIs. Two enablement paths:
    `META-INF/simulation-eligible.txt` in the module hosting the
    generated decorator. No annotation dependency on the SPI module.
 
-**Example config:**
+**Example config** (`simulation.yaml`):
 
-```properties
-%test.casehub.simulation.agent-provider.invoke.strategy=sequential
-%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
-%test.casehub.simulation.model-registry.resolveById.strategy=key-lookup
+```yaml
+methods:
+  agent-provider.invoke:
+    strategy: seq
+  case-memory-store.query:
+    strategy: key
+  model-registry.resolveById:
+    strategy: key
 ```
 
 **Example fixtures:** `docs/examples/simulation/fsitrading/`
@@ -1677,9 +1814,11 @@ void setup() {
 
 // AFTER: simulation config + corpus
 // 1. Remove @InjectMock — let CDI inject the real (or NoOp) bean
-// 2. Add to application.properties:
-//    %test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
-// 3. Seed corpus (YAML or programmatic):
+// 2. Add to simulation.yaml:
+//    methods:
+//      agent-provider.invoke:
+//        strategy: key
+// 3. Seed corpus (inline in YAML or programmatic):
 //    agent-provider.invoke:
 //      - tenancy-id: default
 //        key: any-prompt
@@ -1697,7 +1836,10 @@ when(store.query(any()))
     .thenReturn(List.of(memory3));
 
 // AFTER: sequential strategy with seeded corpus
-// %test.casehub.simulation.case-memory-store.query.strategy=sequential
+// In simulation.yaml:
+//   methods:
+//     case-memory-store.query:
+//       strategy: seq
 // Seed 3 entries in corpus order — sequential returns them in order.
 // WRAP policy (default) cycles; THROW policy fails after exhaustion.
 ```
@@ -1724,27 +1866,38 @@ try {
 }
 // The journal records every intercepted call with input, output,
 // timestamp, and whether it was simulated or passthrough.
-// Issue #332 will add a convenience DSL (wasCalled(), wasCalledWith(),
-// verifyInOrder()) over this same journal.
+// SimulationVerifier provides a fluent DSL over this journal:
+var verifier = SimulationVerifier.on(overlay.journal());
+verifier.method("agent-provider.invoke").wasCalled(2);
+verifier.method("agent-provider.invoke")
+    .matching(e -> e.input().toString().contains("triage")).wasCalled(1);
 ```
 
 ### CI integration with Quarkus profiles
 
-Simulation activates only when `casehub.simulation.*` config is present.
-Use Quarkus profiles to enable simulation in CI and disable it in
-staging/production:
+Simulation activates only when `simulation.yaml` is on the classpath (or
+`casehub.simulation.active-profile` is set). Place `simulation.yaml` in
+`src/test/resources/` — it's on the classpath during tests but not in
+production builds:
+
+```yaml
+# src/test/resources/simulation.yaml
+methods:
+  agent-provider.invoke:
+    strategy: key
+    corpus:
+      - key: "gpt-4"
+        input: { system-prompt: "...", user-prompt: "..." }
+        output: [{ type: TextDelta, text: "simulated response" }]
+  case-memory-store.query:
+    strategy: key
+```
+
+Use Quarkus profiles to switch simulation profiles per environment:
 
 ```properties
-# application.properties — %test profile enables simulation
-
-# CI: simulate AgentProvider
-%test.casehub.simulation.agent-provider.invoke.strategy=key-lookup
-
-# CI: simulate CaseMemoryStore
-%test.casehub.simulation.case-memory-store.query.strategy=key-lookup
-
-# Staging/prod: no simulation config → passthrough
-# (no %staging or %prod prefixed simulation keys needed)
+# application.properties
+%test.casehub.simulation.active-profile=ci-replay
 ```
 
 No Maven profile changes needed. No CI pipeline changes needed.

@@ -1,15 +1,8 @@
 package io.casehub.platform.streams.camel;
 
-import io.casehub.platform.api.endpoints.EndpointCapability;
-import io.casehub.platform.api.endpoints.EndpointDescriptor;
-import io.casehub.platform.api.endpoints.EndpointPropertyKeys;
-import io.casehub.platform.api.endpoints.EndpointProtocol;
-import io.casehub.platform.api.endpoints.EndpointQuery;
 import io.casehub.platform.api.endpoints.EndpointRegistered;
 import io.casehub.platform.api.endpoints.EndpointRegistry;
-import io.casehub.platform.api.identity.TenancyConstants;
 import io.cloudevents.CloudEvent;
-import io.cloudevents.core.builder.CloudEventBuilder;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -17,15 +10,6 @@ import jakarta.enterprise.event.ObservesAsync;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.camel.CamelContext;
-import org.apache.camel.builder.RouteBuilder;
-import org.jboss.logging.Logger;
-
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Dynamic Camel route builder for runtime-registered CAMEL endpoints.
@@ -52,8 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ApplicationScoped
 public class CamelStreamProcessor {
 
-    private static final Logger LOG = Logger.getLogger(CamelStreamProcessor.class);
-
     @Inject
     EndpointRegistry endpointRegistry;
 
@@ -63,82 +45,17 @@ public class CamelStreamProcessor {
     @Inject
     CamelContext camelContext;
 
-    private final AtomicBoolean camelStarted = new AtomicBoolean(false);
-    private final Set<String> routedUris = ConcurrentHashMap.newKeySet();
+    private CamelStreamProcessorCore core;
 
     void onStartup(@Observes StartupEvent ev) {
-        // @Startup @ApplicationScoped beans complete @PostConstruct before StartupEvent fires,
-        // so discover() sees the complete pre-startup registry state.
-        endpointRegistry.discover(
-            new EndpointQuery(TenancyConstants.DEFAULT_TENANT_ID, null,
-                EndpointProtocol.CAMEL, Set.of(EndpointCapability.RECEIVE))
-        ).forEach(d -> {
-            String uri = d.properties().get(EndpointPropertyKeys.URL);
-            if (routedUris.add(uri)) {
-                addRoute(d);  // RuntimeException propagates out of forEach, aborts startup.
-                              // Remaining descriptors not processed — fail-fast is correct.
-            }
-        });
-        camelStarted.set(true);
+        core = new CamelStreamProcessorCore(camelContext, endpointRegistry,
+            ce -> cloudEventBus.fireAsync(ce));
+        core.init();
     }
 
     void onEndpointRegistered(@ObservesAsync EndpointRegistered event) {
-        EndpointDescriptor d = event.descriptor();
-        if (d.protocol() != EndpointProtocol.CAMEL) return;
-        if (!camelStarted.get()) return;  // Pre-startup events delivered late: covered by onStartup
-        String uri = d.properties().get(EndpointPropertyKeys.URL);
-        if (routedUris.add(uri)) {
-            addRoute(d);  // idempotent: skip if URI already routed
-        }
-    }
-
-    /**
-     * Package-private for direct unit testing.
-     */
-    CloudEvent buildCloudEvent(byte[] body, EndpointDescriptor descriptor) {
-        String type = descriptor.properties().getOrDefault(
-            EndpointPropertyKeys.STREAM_EVENT_TYPE,
-            "io.casehub.platform.streams.camel.unregistered");
-
-        CloudEventBuilder builder = CloudEventBuilder.v1()
-            .withId(UUID.randomUUID().toString())
-            .withType(type)
-            .withSource(URI.create("/platform/streams/camel"))
-            .withTime(OffsetDateTime.now())
-            .withData(body)
-            .withExtension("tenancyid", descriptor.tenancyId());
-
-        final String contentType = descriptor.properties()
-            .get(EndpointPropertyKeys.STREAM_DATA_CONTENT_TYPE);
-        if (contentType != null) {
-            builder = builder.withDataContentType(contentType);
-        }
-
-        return builder.build();
-    }
-
-    private void addRoute(EndpointDescriptor d) {
-        String uri = d.properties().get(EndpointPropertyKeys.URL);
-        try {
-            camelContext.addRoutes(new RouteBuilder() {
-                @Override
-                public void configure() {
-                    from(uri).process(exchange -> {
-                        byte[] body = exchange.getIn().getBody(byte[].class);
-                        CloudEvent ce = buildCloudEvent(body, d);
-                        cloudEventBus.fireAsync(ce)
-                            .exceptionally(t -> {
-                                LOG.warnf(t, "CloudEvent observer failed for Camel route %s", uri);
-                                return null;
-                            });
-                    });
-                }
-            });
-        } catch (Exception e) {
-            // In onStartup: propagates out, aborts startup (remaining descriptors not processed).
-            // In onEndpointRegistered: CDI async executor catches RuntimeException, wraps in
-            // CompletionException, which fireAsync().whenComplete in register() WARN-logs.
-            throw new RuntimeException("Failed to add Camel route for URI: " + uri, e);
+        if (core != null) {
+            core.onEndpointRegistered(event.descriptor());
         }
     }
 }

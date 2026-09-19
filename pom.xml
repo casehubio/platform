@@ -103,6 +103,7 @@
         <module>streams-webhook</module>
         <module>streams-poll-core</module>
         <module>streams-poll</module>
+        <module>streams-camel-core</module>
         <module>streams-camel</module>
         <module>governance-core</module>
         <module>governance</module>

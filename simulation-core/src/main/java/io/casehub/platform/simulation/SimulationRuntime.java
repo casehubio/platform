@@ -35,6 +35,14 @@ public class SimulationRuntime {
         extractors.put(qualifiedName, extractor);
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void apply(final CorpusSeed<?, ?> seed) {
+        ((CorpusSeed) seed).seedInto(corpus);
+        if (seed.keyExtractor() != null) {
+            registerExtractor(seed.qualifiedName(), seed.keyExtractor());
+        }
+    }
+
     public <I> void registerScorer(final String qualifiedName, final SimilarityScorer<I> scorer) {
         scorers.put(qualifiedName, scorer);
     }

@@ -324,6 +324,45 @@ class SimulationRuntimeTest {
         assertThat(strategy.get().resolve("in")).isEqualTo("base");
     }
 
+    // --- apply(CorpusSeed) ---
+
+    @Test
+    void applySeedsCorpusAndRegistersExtractor() {
+        final var config = stubConfig(Optional.of("key-lookup"), false, Optional.empty());
+        final var corpus = new TestCorpus();
+        final var runtime = new SimulationRuntime(config, corpus);
+
+        final var seed = new CorpusSeed<String, String>("test-spi.query", "tenant-1")
+                .withKeyExtractor(String::toLowerCase);
+        seed.add("alice", "Alice", "Hello Alice!");
+        seed.add("bob", "Bob", "Hello Bob!");
+
+        runtime.apply(seed);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("ALICE")).isEqualTo("Hello Alice!");
+        assertThat(strategy.get().resolve("Bob")).isEqualTo("Hello Bob!");
+    }
+
+    @Test
+    void applyWithoutExtractorSeedsCorpusOnly() {
+        final var config = stubConfig(Optional.of("sequential"), false, Optional.empty());
+        final var corpus = new TestCorpus();
+        final var runtime = new SimulationRuntime(config, corpus);
+
+        final var seed = new CorpusSeed<String, String>("test-spi.query", "tenant-1");
+        seed.add("Alice", "Hello Alice!");
+        seed.add("Bob", "Hello Bob!");
+
+        runtime.apply(seed);
+
+        final var strategy = runtime.<String, String>strategyFor(QN);
+        assertThat(strategy).isPresent();
+        assertThat(strategy.get().resolve("anyone")).isEqualTo("Hello Alice!");
+        assertThat(strategy.get().resolve("anyone")).isEqualTo("Hello Bob!");
+    }
+
     // --- helpers ---
 
 

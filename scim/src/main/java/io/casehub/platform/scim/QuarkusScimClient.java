@@ -12,7 +12,7 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 @RegisterRestClient(configKey = "scim")
 @RegisterProvider(ScimAuthFilter.class)
 @Path("/")
-public interface ScimClient {
+public interface QuarkusScimClient extends ScimClient {
 
     @GET
     @Path("/Groups")

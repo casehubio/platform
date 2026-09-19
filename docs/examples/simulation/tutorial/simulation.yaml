@@ -1,0 +1,39 @@
+# Simulation config — inline corpus + profile example
+# Place on classpath root (src/test/resources/) for convention discovery
+
+default-tenancy-id: test-tenant
+
+methods:
+  case-memory-store.query:
+    strategy: key
+    key-extractor: "field:domain"
+    corpus:
+      - key: cardiology
+        input:
+          domain: cardiology
+          question: "latest labs"
+        output: "Lab results for cardiology"
+      - key: neurology
+        input:
+          domain: neurology
+          question: "MRI results"
+        output: "Normal MRI findings"
+
+  agent-provider.invoke:
+    strategy: seq
+    corpus:
+      - input:
+          system-prompt: "You are a helpful assistant"
+          user-prompt: "Hello"
+        output:
+          - type: TextDelta
+            text: "Hello! How can I help you today?"
+
+profiles:
+  demo:
+    methods:
+      case-memory-store.query:
+        strategy: seq
+      agent-provider.invoke:
+        strategy: key
+        key-extractor: "field:user-prompt"

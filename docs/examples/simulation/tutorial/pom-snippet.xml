@@ -1,0 +1,15 @@
+<!-- Add to your module's pom.xml -->
+<dependencies>
+    <!-- One dependency pulls everything -->
+    <dependency>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-simulation-starter</artifactId>
+    </dependency>
+
+    <!-- APT — generates @Decorator per @SimulationEligible SPI -->
+    <dependency>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-simulation-generator</artifactId>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>

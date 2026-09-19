@@ -1,0 +1,10 @@
+my-spi.query:
+  - key: cardiology
+    input:
+      domain: cardiology
+    output: "Lab results"
+  - key: neurology
+    tenancy-id: explicit-tenant
+    input:
+      domain: neurology
+    output: "MRI results"

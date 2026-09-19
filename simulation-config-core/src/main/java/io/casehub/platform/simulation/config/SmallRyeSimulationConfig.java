@@ -21,17 +21,20 @@ public class SmallRyeSimulationConfig implements SimulationConfig, ProfileSource
     private static final String PREFIX = "casehub.simulation.";
     private static final String PROFILES_SEGMENT = "profiles.";
     private static final String ACTIVE_PROFILE_KEY = "casehub.simulation.active-profile";
+    private static final String DEFAULT_TENANCY_KEY = "casehub.simulation.default-tenancy-id";
 
     private final Map<String, MethodSimulationConfig> methods;
     private final Map<String, Map<String, MethodSimulationConfig>> profiles;
     private final Map<String, List<String>> profileCorpusFiles;
     private final String activeProfile;
+    private final String defaultTenancyId;
 
     public SmallRyeSimulationConfig(Config config) {
         this.methods = new HashMap<>();
         this.profiles = new HashMap<>();
         this.profileCorpusFiles = new HashMap<>();
         this.activeProfile = config.getOptionalValue(ACTIVE_PROFILE_KEY, String.class).orElse(null);
+        this.defaultTenancyId = config.getOptionalValue(DEFAULT_TENANCY_KEY, String.class).orElse(null);
 
         for (String name : config.getPropertyNames()) {
             if (!name.startsWith(PREFIX)) {
@@ -41,7 +44,7 @@ public class SmallRyeSimulationConfig implements SimulationConfig, ProfileSource
 
             if (suffix.startsWith(PROFILES_SEGMENT)) {
                 parseProfileEntry(config, name, suffix.substring(PROFILES_SEGMENT.length()));
-            } else if (suffix.equals("active-profile")) {
+            } else if (suffix.equals("active-profile") || suffix.equals("default-tenancy-id")) {
                 continue;
             } else {
                 parseFlatEntry(config, name, suffix);
@@ -174,6 +177,10 @@ public class SmallRyeSimulationConfig implements SimulationConfig, ProfileSource
                         e -> e.getValue().keyExtractor().orElseThrow()));
     }
 
+    public Optional<String> defaultTenancyId() {
+        return Optional.ofNullable(defaultTenancyId);
+    }
+
     public Set<String> profileNames() {
         return Collections.unmodifiableSet(profiles.keySet());
     }
@@ -240,7 +247,7 @@ public class SmallRyeSimulationConfig implements SimulationConfig, ProfileSource
         var corpus      = new InMemorySimulationCorpus<>();
         var corpusFiles = profileCorpusFiles.get(name);
         if (corpusFiles != null && !corpusFiles.isEmpty()) {
-            var loader = new YamlCorpusLoader();
+            var loader = new YamlCorpusLoader(defaultTenancyId);
             loader.loadFromPaths(corpusFiles).forEach(corpus::seed);
         }
 

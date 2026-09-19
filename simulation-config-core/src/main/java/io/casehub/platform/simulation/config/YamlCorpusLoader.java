@@ -16,6 +16,15 @@ import java.util.Map;
 public class YamlCorpusLoader {
 
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
+    private final String defaultTenancyId;
+
+    public YamlCorpusLoader() {
+        this(null);
+    }
+
+    public YamlCorpusLoader(String defaultTenancyId) {
+        this.defaultTenancyId = defaultTenancyId;
+    }
 
     @SuppressWarnings("unchecked")
     public Map<String, List<InvocationRecord<Object, Object>>> load(InputStream input) {
@@ -26,8 +35,12 @@ public class YamlCorpusLoader {
             raw.forEach((qualifiedName, entries) -> {
                 List<InvocationRecord<Object, Object>> records = new ArrayList<>();
                 for (Map<String, Object> entry : entries) {
+                    String tenancyId = (String) entry.get("tenancy-id");
+                    if (tenancyId == null) {
+                        tenancyId = defaultTenancyId;
+                    }
                     records.add(new InvocationRecord<>(
-                            (String) entry.get("tenancy-id"),
+                            tenancyId,
                             (String) entry.get("key"),
                             entry.get("input"),
                             entry.get("output"),

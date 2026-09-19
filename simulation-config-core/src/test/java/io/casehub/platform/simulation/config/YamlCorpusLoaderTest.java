@@ -75,6 +75,37 @@ class YamlCorpusLoaderTest {
         assertThat(result.get("my-spi.query")).hasSize(3);
     }
 
+    @Test
+    void defaultTenancyIdAppliedWhenEntryOmitsTenancy() {
+        var loaderWithDefault = new YamlCorpusLoader("test-tenant");
+        InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("simulation/no-tenant-corpus.yaml");
+        var result = loaderWithDefault.load(is);
+
+        assertThat(result.get("my-spi.query").get(0).tenancyId())
+                .isEqualTo("test-tenant");
+    }
+
+    @Test
+    void explicitTenancyIdOverridesDefault() {
+        var loaderWithDefault = new YamlCorpusLoader("test-tenant");
+        InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("simulation/no-tenant-corpus.yaml");
+        var result = loaderWithDefault.load(is);
+
+        assertThat(result.get("my-spi.query").get(1).tenancyId())
+                .isEqualTo("explicit-tenant");
+    }
+
+    @Test
+    void noDefaultTenancyIdPreservesNull() {
+        InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("simulation/no-tenant-corpus.yaml");
+        var result = loader.load(is);
+
+        assertThat(result.get("my-spi.query").get(0).tenancyId()).isNull();
+    }
+
     private Map<String, List<InvocationRecord<Object, Object>>> loadTestCorpus(
             String resource) {
         InputStream is = getClass().getClassLoader().getResourceAsStream(resource);

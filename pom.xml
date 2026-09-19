@@ -97,6 +97,7 @@
         <module>streams-core</module>
         <module>streams-kafka-core</module>
         <module>streams-kafka</module>
+        <module>streams-amqp-core</module>
         <module>streams-amqp</module>
         <module>streams-webhook-core</module>
         <module>streams-webhook</module>

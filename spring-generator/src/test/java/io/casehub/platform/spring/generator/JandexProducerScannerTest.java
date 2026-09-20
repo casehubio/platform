@@ -222,6 +222,27 @@ void followsReturnType_supplierParam_detectsSupplierDep() throws IOException {
             .isEqualTo(ProducerDescriptor.ParamKind.SUPPLIER_DEP);
     assertThat(desc.constructorParams().get(1).type()).endsWith("SomeDep");
 }
+@Test
+void qhorusStyleBeans_eventAndSupplier_allResolved() throws IOException {
+    Index scanIndex = indexClasses(SampleConstructorBeans.class, SimplePojo.class,
+            SampleConfig.class, SampleProperties.class, SomeInterface.class,
+            SomeDep.class, ConfigPojo.class, ListPojo.class, OptionalPojo.class,
+            FactoryPojo.class, EventConsumerPojo.class, SupplierDepPojo.class);
+    var scanner = new JandexProducerScanner();
+
+    List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);
+
+    // All fixture beans should have resolved constructors
+    for (ProducerDescriptor desc : descriptors) {
+        assertThat(desc.constructorResolved())
+                .as("Bean %s should have resolved constructor", desc.methodName())
+                .isTrue();
+        assertThat(desc.requiresManualConfig())
+                .as("Bean %s should not require manual config", desc.methodName())
+                .isFalse();
+    }
+}
+
 
 
     private ProducerDescriptor findByMethod(List<ProducerDescriptor> descriptors, String methodName) {

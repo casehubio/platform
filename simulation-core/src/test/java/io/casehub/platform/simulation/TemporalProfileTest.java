@@ -65,4 +65,21 @@ class TemporalProfileTest {
         var profile = new TemporalProfile<>("n", "qn", null, seq, false, 1.0);
         assertThat(profile.tenancyId()).isNull();
     }
+
+    @Test
+    void mapTransformsPayloadPreservesMetadata() {
+        var seq = new TimedSequence<>(List.of(
+                new TimedEntry<>("hello", Duration.ZERO, "step")));
+        var profile = new TemporalProfile<>("test", "qn", "t1", seq, true, 5.0);
+
+        var mapped = profile.map(String::length);
+
+        assertThat(mapped.name()).isEqualTo("test");
+        assertThat(mapped.qualifiedName()).isEqualTo("qn");
+        assertThat(mapped.tenancyId()).isEqualTo("t1");
+        assertThat(mapped.loop()).isTrue();
+        assertThat(mapped.speed()).isEqualTo(5.0);
+        assertThat(mapped.sequence().entries().get(0).event()).isEqualTo(5);
+        assertThat(mapped.sequence().entries().get(0).label()).isEqualTo("step");
+    }
 }

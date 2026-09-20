@@ -166,4 +166,26 @@ class TimedSequenceTest {
         entries.add(new TimedEntry<>("B", Duration.ofSeconds(1)));
         assertThat(seq.size()).isEqualTo(1);
     }
+
+    @Test
+    void timedEntryMapTransformsPayload() {
+        var entry  = new TimedEntry<>("hello", Duration.ofSeconds(5), "lbl", "qn");
+        var mapped = entry.map(String::length);
+        assertThat(mapped.event()).isEqualTo(5);
+        assertThat(mapped.delay()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(mapped.label()).isEqualTo("lbl");
+        assertThat(mapped.qualifiedName()).isEqualTo("qn");
+    }
+
+    @Test
+    void sequenceMapTransformsAllEntries() {
+        var seq = new TimedSequence<>(List.of(
+                new TimedEntry<>("ab", Duration.ZERO, "a"),
+                new TimedEntry<>("cde", Duration.ofSeconds(1), "b")));
+        var mapped = seq.map(String::length);
+        assertThat(mapped.entries().get(0).event()).isEqualTo(2);
+        assertThat(mapped.entries().get(1).event()).isEqualTo(3);
+        assertThat(mapped.entries().get(0).label()).isEqualTo("a");
+        assertThat(mapped.entries().get(1).delay()).isEqualTo(Duration.ofSeconds(1));
+    }
 }

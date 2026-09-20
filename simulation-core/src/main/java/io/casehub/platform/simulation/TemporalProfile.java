@@ -16,4 +16,9 @@ public record TemporalProfile<E>(
         Objects.requireNonNull(sequence, "sequence");
         if (speed <= 0) throw new IllegalArgumentException("speed must be positive");
     }
+
+    public <R> TemporalProfile<R> map(java.util.function.Function<E, R> mapper) {
+        return new TemporalProfile<>(name, qualifiedName, tenancyId,
+                                     sequence.map(mapper), loop, speed);
+    }
 }

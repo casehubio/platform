@@ -23,4 +23,8 @@ public record TimedEntry<E>(E event, Duration delay, String label, String qualif
             throw new IllegalArgumentException("delay must not be negative");
         }
     }
+
+    public <R> TimedEntry<R> map(java.util.function.Function<E, R> mapper) {
+        return new TimedEntry<>(mapper.apply(event), delay, label, qualifiedName);
+    }
 }

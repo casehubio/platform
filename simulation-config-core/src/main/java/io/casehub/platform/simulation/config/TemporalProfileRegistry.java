@@ -19,6 +19,12 @@ public class TemporalProfileRegistry {
         return Optional.ofNullable(profiles.get(name));
     }
 
+    public <T> Optional<TemporalProfile<T>> resolve(String name, Class<T> type,
+                                                    com.fasterxml.jackson.databind.ObjectMapper mapper) {
+        return resolve(name).map(p -> p.map(map -> mapper.convertValue(map, type)));
+    }
+
+
     public Set<String> profileNames() {
         return Collections.unmodifiableSet(profiles.keySet());
     }

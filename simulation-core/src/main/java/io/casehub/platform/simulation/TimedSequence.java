@@ -22,6 +22,11 @@ public record TimedSequence<E>(List<TimedEntry<E>> entries) {
                 .toList());
     }
 
+    public <R> TimedSequence<R> map(java.util.function.Function<E, R> mapper) {
+        return new TimedSequence<>(entries.stream().map(e -> e.map(mapper)).toList());
+    }
+
+
     public Duration totalDuration() {
         return entries.stream()
                 .map(TimedEntry::delay)

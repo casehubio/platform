@@ -313,54 +313,11 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         return records;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, List<InvocationRecord<Object, Object>>> loadExternalCorpusFiles(
             List<String> paths) {
-        Map<String, List<InvocationRecord<Object, Object>>> merged = new HashMap<>();
-        for (String path : paths) {
-            try (InputStream is = openStream(path.trim())) {
-                Map<String, List<Map<String, Object>>> raw =
-                        YAML_MAPPER.readValue(is, Map.class);
-                if (raw == null) continue;
-                raw.forEach((qn, entries) -> {
-                    List<InvocationRecord<Object, Object>> records = new ArrayList<>();
-                    for (Map<String, Object> entry : entries) {
-                        String tenancyId = (String) entry.get("tenancy-id");
-                        if (tenancyId == null) {
-                            tenancyId = defaultTenancyId;
-                        }
-                        records.add(new InvocationRecord<>(
-                                tenancyId, (String) entry.get("key"),
-                                entry.get("input"), entry.get("output"),
-                                Instant.now()));
-                    }
-                    merged.computeIfAbsent(qn, k -> new ArrayList<>()).addAll(records);
-                });
-            } catch (IOException e) {
-                throw new UncheckedIOException(
-                        "Failed to load corpus file: " + path, e);
-            }
-        }
-        return merged;
-    }
-
-    private InputStream openStream(String path) {
-        if (path.startsWith("classpath:")) {
-            String resource = path.substring("classpath:".length());
-            InputStream is = Thread.currentThread().getContextClassLoader()
-                    .getResourceAsStream(resource);
-            if (is == null) {
-                throw new IllegalArgumentException(
-                        "Corpus file not found on classpath: " + resource);
-            }
-            return is;
-        }
-        try {
-            return java.nio.file.Files.newInputStream(java.nio.file.Path.of(path));
-        } catch (IOException e) {
-            throw new UncheckedIOException(
-                    "Failed to open corpus file: " + path, e);
-        }
+        var composite = new CompositeCorpusLoader(
+                new YamlCorpusLoader(), new JsonCorpusLoader(), new CsvCorpusLoader());
+        return composite.loadFromPaths(paths, defaultTenancyId);
     }
 
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS =

@@ -4,11 +4,12 @@ import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.config.CompositeCorpusLoader;
+import io.casehub.platform.simulation.config.TemporalProfileRegistry;
 import io.casehub.platform.simulation.config.CsvCorpusLoader;
 import io.casehub.platform.simulation.config.DeclarativeExtractorFactory;
 import io.casehub.platform.simulation.config.DeclarativeScorerFactory;
-import io.casehub.platform.simulation.config.ParameterRegistry;
 import io.casehub.platform.simulation.config.JsonCorpusLoader;
+import io.casehub.platform.simulation.config.ParameterRegistry;
 import io.casehub.platform.simulation.config.YamlCorpusLoader;
 import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
@@ -71,6 +72,17 @@ public class SimulationConfigBeans {
         return new CompositeCorpusLoader(
                 new YamlCorpusLoader(), new JsonCorpusLoader(), new CsvCorpusLoader());
     }
+
+    @Produces
+    @ApplicationScoped
+    public TemporalProfileRegistry temporalProfileRegistry(YamlSimulationConfig config) {
+        var resolved = new java.util.LinkedHashMap<String, io.casehub.platform.simulation.TemporalProfile<java.util.Map<String, Object>>>();
+        for (String name : config.temporalProfiles().keySet()) {
+            config.resolveTemporalProfile(name).ifPresent(p -> resolved.put(name, p));
+        }
+        return new TemporalProfileRegistry(resolved);
+    }
+
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     void onStartup(@Observes StartupEvent event,

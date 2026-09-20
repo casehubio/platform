@@ -496,14 +496,17 @@ A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/
 | `ParameterRegistry` | Loads `META-INF/simulation-parameters.properties` — maps qualified method names to parameter name/position pairs. APT-generated, classpath-aggregated. |
 | `DeclarativeExtractorFactory` | Config string → `KeyExtractor`. Prefixed specs: `identity`, `field:name`, `composite:x,y`, `rest-client`. Bare names resolve via `ParameterRegistry` (single-arg → identity, multi-arg → positional). |
 | `DeclarativeScorerFactory` | Config string → `RecordFieldScorer` (`fields:name:EXACT:1.0,age:NUMERIC_RANGE:0.5`) |
+| `TemporalProfileConfig` | YAML temporal profile schema — 4 mutually exclusive sources: `events:`, `events-file:`, `from-corpus:`, `sequence:`. |
+| `TemporalProfileRegistry` | Resolved profile lookup by name. `resolve(name)` → `TemporalProfile<Map>`. Typed overload: `resolve(name, Class<T>, ObjectMapper)` → `TemporalProfile<T>` via `map()`. |
+| `DurationParser` | Parses duration strings: `"5s"`, `"2m"`, `"500ms"`, bare millis. |
 
 ### Temporal Simulation (simulation-core)
 
 | Type | Role |
 |------|------|
-| `TimedEntry<E>` | Event + relative delay + optional label (journal verification) + optional qualifiedName (per-entry override for concat attribution). |
-| `TimedSequence<E>` | Generic timed sequences with relative delays. `withMultiplier(10.0)` compresses a 30-min case to 3 min. `fromRecorded(List<InvocationRecord>)` derives timing from captured data. |
-| `TemporalProfile<E>` | Named sequence + qualifiedName + tenancyId + loop + speed. Wraps `TimedSequence` with lifecycle metadata for the driver. |
+| `TimedEntry<E>` | Event + relative delay + optional label (journal verification) + optional qualifiedName (per-entry override for concat attribution). `map(Function<E,R>)` transforms payload preserving metadata. |
+| `TimedSequence<E>` | Generic timed sequences with relative delays. `withMultiplier(10.0)` compresses a 30-min case to 3 min. `fromRecorded(List<InvocationRecord>)` derives timing from captured data. `map(Function<E,R>)` transforms all entry payloads. |
+| `TemporalProfile<E>` | Named sequence + qualifiedName + tenancyId + loop + speed. Wraps `TimedSequence` with lifecycle metadata for the driver. `map(Function<E,R>)` converts payload type — e.g. `profile.map(map -> mapper.convertValue(map, DomainEvent.class))`. |
 | `TemporalSimulationDriver<E>` | Lifecycle controller: IDLE → RUNNING ↔ PAUSED → STOPPED/COMPLETED. Virtual-thread sleep loop, journal integration via `SimulationRuntime.recordJournal()`, per-event error isolation, runtime speed control via `setSpeed()`. |
 | `TemporalEventSink<E>` | Delivery callback: `deliver(qualifiedName, label, event)`. Provides context for CloudEvent construction. |
 | `TemporalDriverFactory<E>` | Factory for creating driver instances. Drivers are lightweight; `stop()` is terminal. |

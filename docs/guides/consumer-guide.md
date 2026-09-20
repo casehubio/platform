@@ -136,7 +136,7 @@ Complete SPI testing framework — replaces Mockito for platform SPI tests. Conf
 
 | Artifact | Scope | What it provides |
 |----------|-------|------------------|
-| `casehub-platform-simulation-core` | compile | `TimedEntry<E>`/`TimedSequence<E>` (relative delays, time multiplier), `TemporalProfile<E>` (named sequence + loop + speed), `TemporalSimulationDriver<E>` (lifecycle: start/pause/resume/stop/setSpeed, journal integration), `TemporalEventSink<E>`, `TemporalDriverFactory<E>` |
+| `casehub-platform-simulation-core` | compile | `TimedEntry<E>`/`TimedSequence<E>` (relative delays, time multiplier, `map()` payload transformation), `TemporalProfile<E>` (named sequence + loop + speed, `map()` for type-safe domain conversion), `TemporalSimulationDriver<E>` (lifecycle: start/pause/resume/stop/setSpeed, journal integration), `TemporalEventSink<E>`, `TemporalDriverFactory<E>` |
 | `casehub-platform-event-simulation-core` | compile | `SimulatedEventEmitter` (tick-based), `EventTrigger`, `CloudEventFixtureBuilder`, `EventSequenceRunner` (one-shot virtual-thread executor) |
 | `casehub-platform-event-simulation` | compile | Quarkus CDI wiring: `@Produces SimulatedEventEmitter` with `Event<CloudEvent>` sink, `@Scheduled` continuous tick, `TemporalDriverFactory<Map<String, Object>>` (map → CloudEvent conversion) |
 

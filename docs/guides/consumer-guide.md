@@ -899,6 +899,79 @@ All streams modules use synchronous `ApplicationEventPublisher.publishEvent()` f
 - `mp.messaging.incoming.<channel>.address` → `casehub.streams.amqp.queue`
 - `mp.messaging.incoming.<channel>.host` → `spring.rabbitmq.host`
 
+### REST controller generation (`rest-spring-generator`)
+
+The `rest-spring-generator` Maven plugin generates Spring MVC `@RestController` classes from existing JAX-RS `@Path` resources. Each generated controller delegates to a framework-neutral core POJO — the same POJO that the Quarkus resource uses.
+
+**Prerequisite — core extraction.** Each `@Path` resource must delegate to a single injected POJO. The scanner finds the first `@Inject` field (or the first constructor parameter) and treats its type as the delegate. Resources with no injectable delegate are skipped.
+
+```
+MyResource.java                  → thin @Path adapter (one-liner methods)
+core/MyCore.java                 → business logic, constructor-injected, typed returns
+```
+
+Core POJO rules:
+- Constructor injection only — no CDI, no Spring, no JAX-RS imports
+- Typed return values (`List<T>`, `Optional<T>`, `T`, `void`) — never `Response`
+- `@jakarta.transaction.Transactional` on methods where needed (portable annotation)
+- Package: `<resource-package>.core`
+
+**Plugin configuration:**
+
+```xml
+<plugin>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-rest-spring-generator</artifactId>
+    <version>${version.io.casehub}</version>
+    <executions>
+        <execution>
+            <id>generate-rest</id>
+            <goals><goal>generate</goal></goals>
+            <configuration>
+                <quarkusModules>
+                    <quarkusModule>${project.basedir}/../my-module</quarkusModule>
+                </quarkusModules>
+            </configuration>
+        </execution>
+        <execution>
+            <id>verify-rest-drift</id>
+            <goals><goal>verify</goal></goals>
+            <phase>verify</phase>
+            <configuration>
+                <quarkusModules>
+                    <quarkusModule>${project.basedir}/../my-module</quarkusModule>
+                </quarkusModules>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+Point `<quarkusModules>` at each module directory containing `@Path` resources with core delegates. The plugin scans Jandex indexes from those modules' build output.
+
+**What gets generated:**
+
+| JAX-RS | Spring MVC |
+|--------|-----------|
+| `@Path` resource class | `@RestController` + `@RequestMapping` |
+| `@GET`/`@POST`/`@PUT`/`@DELETE`/`@PATCH` | `@GetMapping`/`@PostMapping`/etc. |
+| `@PathParam` | `@PathVariable` |
+| `@QueryParam` | `@RequestParam` |
+| `@HeaderParam` | `@RequestHeader` |
+| Body parameter | `@RequestBody` |
+| `void` return | `ResponseEntity<Void>` (204 No Content) |
+| `Optional<T>` return | `ResponseEntity<T>` (200 or 404) |
+| `T` return | `ResponseEntity<T>` (200 OK) |
+| `Flow.Publisher<T>` return | `SseEmitter` (virtual-thread subscriber) |
+| `ExceptionMapper<T>` | `@ControllerAdvice` + `@ExceptionHandler` |
+| `ContainerRequestFilter` | `Filter` with `@Order` |
+
+Naming convention: `FooResource` → `FooController`. If the class name doesn't end in `Resource`, `Controller` is appended.
+
+**Drift detection:** The `verify` goal compares generated output against the current Jandex state. If a resource is added, renamed, or a method signature changes, `mvn verify` fails with a diff — ensuring generated controllers stay in sync with their Quarkus sources.
+
+**SSE endpoints:** Core methods returning `Flow.Publisher<T>` (JDK reactive streams) generate Spring `SseEmitter`-based controllers. The generated code subscribes on a virtual thread, forwards items via `emitter.send()`, and completes on `onComplete`/`onError`. On the Quarkus side, the resource wraps the same publisher with `Multi.createFrom().publisher()`.
+
 ### Jackson 2 bridge
 
 Spring Boot 4 defaults to Jackson 3 (`tools.jackson`). casehub core modules use Jackson 2 (`com.fasterxml`). The starter includes `spring-boot-jackson2` to auto-configure a Jackson 2 `ObjectMapper` so both frameworks inject the same type. This bridge will be removed when Quarkus 4 GA aligns on Jackson 3 (~Nov 2026).

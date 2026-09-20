@@ -280,4 +280,24 @@ class TemporalSimulationDriverTest {
         assertThat(qualifiedNames.get(0)).isEqualTo("child.method");
         assertThat(qualifiedNames.get(1)).isEqualTo("parent.method");
     }
+
+    @Test
+    void speedReturnsCurrentSpeed() throws InterruptedException {
+        TemporalEventSink<String> sink = (qn, label, event) -> {};
+        var profile = new TemporalProfile<>("speed-test", "my.method", null,
+                                            new TimedSequence<>(List.of(
+                                                    new TimedEntry<>("A", Duration.ofMillis(500)))),
+                                            false, 5.0);
+
+        var driver = new TemporalSimulationDriver<>(sink);
+        assertThat(driver.speed()).isEqualTo(0.0);
+
+        driver.start(profile);
+        assertThat(driver.speed()).isEqualTo(5.0);
+
+        driver.setSpeed(10.0);
+        assertThat(driver.speed()).isEqualTo(10.0);
+
+        driver.stop();
+    }
 }

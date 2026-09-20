@@ -90,6 +90,11 @@ public class TemporalSimulationDriver<E> {
         this.speed = speed;
     }
 
+    public double speed() {
+        return speed;
+    }
+
+
     public State state() {
         return state;
     }

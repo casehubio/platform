@@ -63,6 +63,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
     private static final DotName PAGINATED_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
+    private static final DotName HAND_WRITTEN_ANN  = DotName.createSimple("io.casehub.platform.api.mcp.HandWrittenEndpoint");
+    private static final DotName UNLESS_PROFILE    = DotName.createSimple("io.quarkus.arc.profile.UnlessBuildProfile");
 
 
     private boolean   processed = false;
@@ -148,7 +150,52 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                      + allDomains.size() + " domains. Set -AdomainFilter=... to restrict.");
         }
 
+        enforceNoHandWrittenRest(roundEnv);
+
         return false;
+    }
+
+    private void enforceNoHandWrittenRest(RoundEnvironment roundEnv) {
+        var pathType = processingEnv.getElementUtils().getTypeElement("jakarta.ws.rs.Path");
+        if (pathType == null) return;
+
+        var violations = new ArrayList<String>();
+        for (var element : roundEnv.getElementsAnnotatedWith(pathType)) {
+            if (element.getKind() != javax.lang.model.element.ElementKind.CLASS) continue;
+            String name = ((TypeElement) element).getQualifiedName().toString();
+
+            if (name.contains(".generated.")) continue;
+
+            var mcpDomain = element.getAnnotation(
+                    processingEnv.getElementUtils().getTypeElement(
+                            "io.casehub.platform.api.mcp.McpDomain") != null
+                    ? loadAnnotationClass("io.casehub.platform.api.mcp.McpDomain") : null);
+
+            boolean hasMcpDomain = element.getAnnotationMirrors().stream()
+                    .anyMatch(a -> a.getAnnotationType().toString().endsWith("McpDomain"));
+            boolean hasHandWritten = element.getAnnotationMirrors().stream()
+                    .anyMatch(a -> a.getAnnotationType().toString().endsWith("HandWrittenEndpoint"));
+            boolean hasUnlessProfile = element.getAnnotationMirrors().stream()
+                    .anyMatch(a -> a.getAnnotationType().toString().endsWith("UnlessBuildProfile"));
+
+            if (!hasMcpDomain && !hasHandWritten && !hasUnlessProfile) {
+                violations.add(name);
+            }
+        }
+
+        for (var v : violations) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "Hand-written @Path on " + v
+                    + " — use @McpDomain for tri-channel REST/GraphQL/MCP parity. "
+                    + "If this endpoint must stay hand-written (webhook, SSE, auth), "
+                    + "annotate with @HandWrittenEndpoint(\"reason\").");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <A extends java.lang.annotation.Annotation> Class<A> loadAnnotationClass(String name) {
+        try { return (Class<A>) Class.forName(name); }
+        catch (ClassNotFoundException e) { return null; }
     }
 
     private IndexView loadCombinedIndex() {

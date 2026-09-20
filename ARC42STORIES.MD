@@ -1761,7 +1761,8 @@ What this layer adds:
 
 **Config tier (simulation-config-core + simulation-config):**
 - **`YamlSimulationConfig`** — unified YAML parser: reads `simulation.yaml`, provides per-method strategy config, inline corpus entries, external corpus-files refs, named profiles. Implements `SimulationConfig` + `ProfileSource`. Convention-discovered from classpath root
-- **`DeclarativeExtractorFactory`** — config string → `KeyExtractor` (identity/field/composite)
+- **`DeclarativeExtractorFactory`** — config string → `KeyExtractor` (identity/field/composite/rest-client/bare parameter name via `ParameterRegistry`)
+- **`CorpusLoader` SPI** — format-independent corpus loading (`YamlCorpusLoader`/`JsonCorpusLoader`/`CsvCorpusLoader` + `CompositeCorpusLoader`)
 - **`DeclarativeScorerFactory`** — config string → `RecordFieldScorer` (weighted per-field scoring)
 
 **Generator tier (simulation-generator + rest-client-simulation-generator):**

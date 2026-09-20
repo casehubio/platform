@@ -6,7 +6,11 @@ import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.ProfileSource;
 import io.casehub.platform.simulation.SimulationConfig;
+import io.casehub.platform.simulation.SimulationConfigException;
 import io.casehub.platform.simulation.SimulationProfile;
+import io.casehub.platform.simulation.TemporalProfile;
+import io.casehub.platform.simulation.TimedEntry;
+import io.casehub.platform.simulation.TimedSequence;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 
 import java.io.IOException;
@@ -16,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +35,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     private final String defaultTenancyId;
     private final Map<String, MethodConfig> methods;
     private final Map<String, ProfileConfig> profiles;
+    private final Map<String, TemporalProfileConfig> temporalProfiles;
 
     public YamlSimulationConfig(InputStream yamlInput) {
         this(yamlInput, null);
@@ -54,6 +60,9 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
             this.methods = parseMethods(
                     (Map<String, Map<String, Object>>) root.get("methods"));
+
+            this.temporalProfiles = parseTemporalProfiles(
+                    (Map<String, Map<String, Object>>) root.get("temporal-profiles"));
 
             this.profiles = parseProfiles(
                     (Map<String, Map<String, Object>>) root.get("profiles"));
@@ -281,7 +290,9 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             Map<String, MethodConfig> profileMethods = parseMethods(
                     (Map<String, Map<String, Object>>) props.get("methods"));
             List<String> corpusFiles = (List<String>) props.get("corpus-files");
-            result.put(name, new ProfileConfig(profileMethods, corpusFiles));
+            List<TemporalProfileConfig> temporal = parseTemporalList(
+                    (List<Object>) props.get("temporal"));
+            result.put(name, new ProfileConfig(profileMethods, corpusFiles, temporal));
         });
         return result;
     }
@@ -320,8 +331,183 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         return composite.loadFromPaths(paths, defaultTenancyId);
     }
 
+
+    public Map<String, TemporalProfileConfig> temporalProfiles() {
+        return Collections.unmodifiableMap(temporalProfiles);
+    }
+
+    public Optional<TemporalProfile<Map<String, Object>>> resolveTemporalProfile(String name) {
+        TemporalProfileConfig tpc = temporalProfiles.get(name);
+        if (tpc == null) {return Optional.empty();}
+        return Optional.of(resolveTemporalProfileConfig(name, tpc, new HashSet<>()));
+    }
+
+    public List<TemporalProfileConfig> temporalForProfile(String profileName) {
+        ProfileConfig profile = profiles.get(profileName);
+        if (profile == null) {return List.of();}
+        return profile.temporal() != null ? profile.temporal() : List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private TemporalProfile<Map<String, Object>> resolveTemporalProfileConfig(
+            String name, TemporalProfileConfig tpc, Set<String> visited) {
+        if (!visited.add(name)) {
+            throw new SimulationConfigException(
+                    "Circular temporal profile reference: " + name);
+        }
+
+        TimedSequence<Map<String, Object>> sequence;
+
+        if (tpc.events() != null && !tpc.events().isEmpty()) {
+            var entries = tpc.events().stream()
+                             .map(e -> new TimedEntry<>(
+                                     e.payload(),
+                                     DurationParser.parse(e.delay()),
+                                     e.label()))
+                             .toList();
+            sequence = new TimedSequence<>(entries);
+        } else if (tpc.eventsFile() != null) {
+            sequence = loadTemporalEventsFromFile(tpc.eventsFile());
+        } else if (tpc.fromCorpus() != null) {
+            List<InvocationRecord<Object, Object>> records = loadCorpusForTemporalProfile(tpc.fromCorpus());
+            TimedSequence<Object> raw = TimedSequence.fromRecorded(records);
+            sequence = new TimedSequence<>(raw.entries().stream()
+                    .map(e -> new TimedEntry<>((Map<String, Object>) e.event(), e.delay(), e.label(), e.qualifiedName()))
+                    .toList());
+        } else if (tpc.sequence() != null && !tpc.sequence().isEmpty()) {
+            sequence = resolveSequenceRefs(tpc.sequence(), visited);
+        } else {
+            sequence = new TimedSequence<>(List.of());
+        }
+
+        String tenancyId = tpc.tenancyId() != null ? tpc.tenancyId() : defaultTenancyId;
+        return new TemporalProfile<>(name, tpc.qualifiedName(), tenancyId,
+                                     sequence, tpc.loop(), tpc.speed() > 0 ? tpc.speed() : 1.0);
+    }
+
+    private TimedSequence<Map<String, Object>> resolveSequenceRefs(
+            List<SequenceRef> refs, Set<String> visited) {
+        var allEntries = new ArrayList<TimedEntry<Map<String, Object>>>();
+        for (SequenceRef ref : refs) {
+            TemporalProfileConfig refConfig = temporalProfiles.get(ref.ref());
+            if (refConfig == null) {
+                throw new SimulationConfigException(
+                        "Unknown temporal profile ref: " + ref.ref());
+            }
+            TemporalProfile<Map<String, Object>> resolved =
+                    resolveTemporalProfileConfig(ref.ref(), refConfig, new HashSet<>(visited));
+
+            List<TimedEntry<Map<String, Object>>> refEntries = resolved.sequence().entries();
+            if (!refEntries.isEmpty()) {
+                for (int i = 0; i < refEntries.size(); i++) {
+                    TimedEntry<Map<String, Object>> entry = refEntries.get(i);
+                    String entryQN = entry.qualifiedName() != null
+                                     ? entry.qualifiedName() : resolved.qualifiedName();
+                    if (i == 0 && ref.delay() != null) {
+                        java.time.Duration gap = DurationParser.parse(ref.delay());
+                        allEntries.add(new TimedEntry<>(entry.event(),
+                                                        entry.delay().plus(gap), entry.label(), entryQN));
+                    } else {
+                        allEntries.add(new TimedEntry<>(entry.event(),
+                                                        entry.delay(), entry.label(), entryQN));
+                    }
+                }
+            }
+        }
+        return new TimedSequence<>(allEntries);
+    }
+
+    @SuppressWarnings("unchecked")
+    private TimedSequence<Map<String, Object>> loadTemporalEventsFromFile(String path) {
+        InputStream is = StreamResolver.openStream(path);
+        if (is == null) {
+            throw new SimulationConfigException(
+                    "Temporal events file not found: " + path);
+        }
+        try (is) {
+            List<Map<String, Object>> rawEvents = YAML_MAPPER.readValue(is, List.class);
+            var entries = rawEvents.stream()
+                                   .map(e -> new TimedEntry<>(
+                                           (Map<String, Object>) e.get("payload"),
+                                           DurationParser.parse(String.valueOf(e.getOrDefault("delay", "0"))),
+                                           (String) e.get("label")))
+                                   .toList();
+            return new TimedSequence<>(entries);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load temporal events from " + path, e);
+        }
+    }
+
+    private List<InvocationRecord<Object, Object>> loadCorpusForTemporalProfile(String qn) {
+        MethodConfig mc = methods.get(qn);
+        if (mc == null) {return List.of();}
+        return loadCorpusForMethod(qn, mc);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, TemporalProfileConfig> parseTemporalProfiles(
+            Map<String, Map<String, Object>> raw) {
+        if (raw == null) {return Map.of();}
+        Map<String, TemporalProfileConfig> result = new LinkedHashMap<>();
+        raw.forEach((name, props) -> result.put(name, parseTemporalProfileConfig(props)));
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private TemporalProfileConfig parseTemporalProfileConfig(Map<String, Object> props) {
+        String  qualifiedName = (String) props.get("qualified-name");
+        String  tenancyId     = (String) props.get("tenancy-id");
+        boolean loop          = Boolean.TRUE.equals(props.get("loop"));
+        double speed = props.containsKey("speed")
+                       ? ((Number) props.get("speed")).doubleValue() : 0;
+        String eventsFile = (String) props.get("events-file");
+        String fromCorpus = (String) props.get("from-corpus");
+
+        List<TemporalEventConfig> events    = null;
+        List<Map<String, Object>> rawEvents = (List<Map<String, Object>>) props.get("events");
+        if (rawEvents != null) {
+            events = rawEvents.stream()
+                              .map(e -> new TemporalEventConfig(
+                                      String.valueOf(e.getOrDefault("delay", "0")),
+                                      (String) e.get("label"),
+                                      (Map<String, Object>) e.get("payload")))
+                              .toList();
+        }
+
+        List<SequenceRef>         sequence = null;
+        List<Map<String, Object>> rawSeq   = (List<Map<String, Object>>) props.get("sequence");
+        if (rawSeq != null) {
+            sequence = rawSeq.stream()
+                             .map(s -> new SequenceRef(
+                                     (String) s.get("ref"),
+                                     s.containsKey("delay") ? String.valueOf(s.get("delay")) : null))
+                             .toList();
+        }
+
+        return new TemporalProfileConfig(qualifiedName, tenancyId, loop, speed,
+                                         events, eventsFile, fromCorpus, sequence);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<TemporalProfileConfig> parseTemporalList(List<Object> raw) {
+        if (raw == null) {return List.of();}
+        return raw.stream().map(item -> {
+            Map<String, Object> props = (Map<String, Object>) item;
+            if (props.containsKey("ref") && props.size() == 1) {
+                String                ref       = (String) props.get("ref");
+                TemporalProfileConfig refConfig = temporalProfiles.get(ref);
+                if (refConfig == null) {
+                    throw new SimulationConfigException(
+                            "Unknown temporal profile ref: " + ref);
+                }
+                return refConfig;
+            }
+            return parseTemporalProfileConfig(props);
+        }).toList();
+    }
+
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
-            Set.of("default-tenancy-id", "methods", "profiles");
+            Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles");
 
     private static void warnUnknownKeys(Map<String, Object> root) {
         for (String key : root.keySet()) {
@@ -351,5 +537,6 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
     record ProfileConfig(
             Map<String, MethodConfig> methods,
-            List<String> corpusFiles) {}
+            List<String> corpusFiles,
+            List<TemporalProfileConfig> temporal) {}
 }

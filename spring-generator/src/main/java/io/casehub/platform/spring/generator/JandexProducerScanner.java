@@ -28,6 +28,7 @@ public class JandexProducerScanner {
     private static final DotName POST_CONSTRUCT = DotName.createSimple("jakarta.annotation.PostConstruct");
     private static final DotName JAVA_LIST = DotName.createSimple("java.util.List");
     private static final DotName JAVA_OPTIONAL = DotName.createSimple("java.util.Optional");
+    private static final DotName JAVA_CONSUMER = DotName.createSimple("java.util.function.Consumer");
     private static final DotName WITH_DEFAULT = DotName.createSimple("io.smallrye.config.WithDefault");
 
     private static final Set<DotName> KNOWN_METHOD_ANNOTATIONS = Set.of(
@@ -227,6 +228,10 @@ public class JandexProducerScanner {
             if (JAVA_OPTIONAL.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
                 String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
                 return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.OPTIONAL, null, null);
+            }
+            if (JAVA_CONSUMER.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
+                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.EVENT_CONSUMER, null, null);
             }
         }
 

@@ -26,7 +26,7 @@ public record ProducerDescriptor(
     public record ConfigPropertyMethod(String name, String type, String defaultValue) {}
 
     public enum ParamKind {
-        PLAIN, LIST, OPTIONAL, CONFIG_PROPERTIES
+        PLAIN, LIST, OPTIONAL, CONFIG_PROPERTIES, EVENT_CONSUMER
     }
 
     public record ConstructorParam(String type, String name, ParamKind kind) {

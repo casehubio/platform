@@ -65,3 +65,12 @@ class FactoryPojo {
 class MixedPojo {
     public MixedPojo(SampleProperties config, List<SomeInterface> items, SomeDep dep) {}
 }
+
+class EventConsumerPojo {
+    private final SomeDep dep;
+    private final java.util.function.Consumer<String> eventListener;
+    public EventConsumerPojo(SomeDep dep, java.util.function.Consumer<String> eventListener) {
+        this.dep = dep;
+        this.eventListener = eventListener;
+    }
+}

@@ -1,14 +1,11 @@
 package io.casehub.platform.spring.generator;
 
-import org.jboss.jandex.CompositeIndex;
 import org.jboss.jandex.Index;
-import org.jboss.jandex.IndexView;
 import org.jboss.jandex.Indexer;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -187,6 +184,27 @@ class JandexProducerScannerTest {
     }
 
     // --- Helpers ---
+
+
+    @Test
+    void followsReturnType_consumerParam_detectsEventConsumer() throws IOException {
+        Index scanIndex = indexClasses(SampleConstructorBeans.class, SimplePojo.class,
+                                       SampleConfig.class, SampleProperties.class, SomeInterface.class,
+                                       SomeDep.class, ConfigPojo.class, ListPojo.class, OptionalPojo.class,
+                                       FactoryPojo.class, EventConsumerPojo.class);
+        var scanner = new JandexProducerScanner();
+
+        List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);
+
+        var desc = findByMethod(descriptors, "eventConsumerPojo");
+        assertThat(desc.constructorResolved()).isTrue();
+        assertThat(desc.constructorParams()).hasSize(2);
+        assertThat(desc.constructorParams().get(0).kind())
+                .isEqualTo(ProducerDescriptor.ParamKind.PLAIN);
+        assertThat(desc.constructorParams().get(1).kind())
+                .isEqualTo(ProducerDescriptor.ParamKind.EVENT_CONSUMER);
+        assertThat(desc.requiresManualConfig()).isFalse();
+    }
 
     private ProducerDescriptor findByMethod(List<ProducerDescriptor> descriptors, String methodName) {
         return descriptors.stream()

@@ -44,6 +44,21 @@ class SampleConstructorBeans {
     public FactoryPojo factoryPojo(Instance<SomeInterface> items, Instance<SomeDep> dep) {
         return FactoryPojo.create(items.stream().toList(), dep.stream().findFirst());
     }
+
+    @Produces
+    @ApplicationScoped
+    public SupplierDepPojo supplierDepPojo(SomeDep dep,
+                                            Instance<SomeDep> optionalDep) {
+        return new SupplierDepPojo(dep,
+                optionalDep.isResolvable() ? optionalDep::get : null);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public EventConsumerPojo eventConsumerPojo(SomeDep dep,
+                                               jakarta.enterprise.event.Event<String> stringEvent) {
+        return new EventConsumerPojo(dep, stringEvent::fire);
+    }
 }
 
 @ApplicationScoped

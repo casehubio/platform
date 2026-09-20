@@ -100,6 +100,55 @@ class SimulationSchemaTest {
         assertThat(threshold.get("maximum").asDouble()).isEqualTo(1.0);
     }
 
+    @Test
+    void schemaHasTemporalProfilesProperty() throws IOException {
+        JsonNode props = loadSchema().get("properties");
+        assertThat(props.has("temporal-profiles")).isTrue();
+        assertThat(props.at("/temporal-profiles/additionalProperties/$ref").asText())
+                .isEqualTo("#/$defs/temporal-profile-config");
+    }
+
+    @Test
+    void temporalProfileConfigDefined() throws IOException {
+        JsonNode config = loadSchema().at("/$defs/temporal-profile-config");
+        JsonNode props  = config.get("properties");
+        assertThat(props.has("qualified-name")).isTrue();
+        assertThat(props.has("tenancy-id")).isTrue();
+        assertThat(props.has("loop")).isTrue();
+        assertThat(props.has("speed")).isTrue();
+        assertThat(props.has("events")).isTrue();
+        assertThat(props.has("events-file")).isTrue();
+        assertThat(props.has("from-corpus")).isTrue();
+        assertThat(props.has("sequence")).isTrue();
+        assertThat(config.get("oneOf")).hasSize(4);
+    }
+
+    @Test
+    void temporalEventDefined() throws IOException {
+        JsonNode event = loadSchema().at("/$defs/temporal-event");
+        assertThat(event.get("required").toString()).contains("payload");
+        JsonNode props = event.get("properties");
+        assertThat(props.has("delay")).isTrue();
+        assertThat(props.has("label")).isTrue();
+        assertThat(props.has("payload")).isTrue();
+    }
+
+    @Test
+    void sequenceRefDefined() throws IOException {
+        JsonNode ref = loadSchema().at("/$defs/sequence-ref");
+        assertThat(ref.get("required").toString()).contains("ref");
+        assertThat(ref.get("properties").has("ref")).isTrue();
+        assertThat(ref.get("properties").has("delay")).isTrue();
+    }
+
+    @Test
+    void profileConfigHasTemporalProperty() throws IOException {
+        JsonNode props = loadSchema().at("/$defs/profile-config/properties");
+        assertThat(props.has("temporal")).isTrue();
+        assertThat(props.at("/temporal/type").asText()).isEqualTo("array");
+    }
+
+
     private JsonNode loadSchema() throws IOException {
         InputStream is = getClass().getClassLoader()
                 .getResourceAsStream("schema/simulation.schema.json");

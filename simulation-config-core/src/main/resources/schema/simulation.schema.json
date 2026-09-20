@@ -23,6 +23,13 @@
       "additionalProperties": {
         "$ref": "#/$defs/profile-config"
       }
+    },
+    "temporal-profiles": {
+      "type": "object",
+      "description": "Named temporal simulation profiles",
+      "additionalProperties": {
+        "$ref": "#/$defs/temporal-profile-config"
+      }
     }
   },
   "$defs": {
@@ -114,7 +121,55 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Profile-level corpus files (all methods)"
+        },
+        "temporal": {
+          "type": "array",
+          "description": "Temporal profile references or inline definitions",
+          "items": {
+            "oneOf": [
+              { "type": "string", "description": "Reference to a named temporal profile" },
+              { "$ref": "#/$defs/temporal-profile-config" }
+            ]
+          }
         }
+      }
+    },
+    "temporal-profile-config": {
+      "type": "object",
+      "properties": {
+        "qualified-name": { "type": "string", "description": "Event type / method name for journal tracking" },
+        "tenancy-id": { "type": "string", "description": "Tenant context for journal recording" },
+        "loop": { "type": "boolean", "default": false, "description": "Repeat after last event" },
+        "speed": { "type": "number", "exclusiveMinimum": 0, "default": 1.0, "description": "Speed multiplier (1.0 = real-time)" },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/temporal-event" }, "description": "Inline event list" },
+        "events-file": { "type": "string", "description": "External event file path" },
+        "from-corpus": { "type": "string", "description": "Derive timing from corpus InvocationRecords" },
+        "sequence": { "type": "array", "items": { "$ref": "#/$defs/sequence-ref" }, "description": "Concatenated profile references" }
+      },
+      "oneOf": [
+        { "required": ["events"] },
+        { "required": ["events-file"] },
+        { "required": ["from-corpus"] },
+        { "required": ["sequence"] }
+      ]
+    },
+    "temporal-event": {
+      "type": "object",
+      "required": ["payload"],
+      "additionalProperties": false,
+      "properties": {
+        "delay": { "type": ["string", "number"], "default": 0, "description": "Delay before event (5s, 2m, 500ms, or bare millis)" },
+        "label": { "type": "string", "description": "Human-readable identifier for journal verification" },
+        "payload": { "type": "object", "description": "Event payload" }
+      }
+    },
+    "sequence-ref": {
+      "type": "object",
+      "required": ["ref"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "description": "Reference to a named temporal profile" },
+        "delay": { "type": ["string", "number"], "description": "Gap delay absorbed into referenced profile's first entry" }
       }
     }
   }

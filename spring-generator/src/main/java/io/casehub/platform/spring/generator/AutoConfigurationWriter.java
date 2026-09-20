@@ -39,6 +39,8 @@ public class AutoConfigurationWriter {
             "org.springframework.beans.factory.annotation", "Value");
     private static final ClassName OBJECT_PROVIDER = ClassName.get(
             "org.springframework.beans.factory", "ObjectProvider");
+    private static final ClassName APPLICATION_EVENT_PUBLISHER = ClassName.get(
+            "org.springframework.context", "ApplicationEventPublisher");
 
     public List<JavaFile> generate(String packageName, String className,
                                    List<ProducerDescriptor> descriptors) {
@@ -126,6 +128,12 @@ public class AutoConfigurationWriter {
             builder.addAnnotation(toClassName(qualifier));
         }
 
+        boolean needsPublisher = d.constructorParams().stream()
+                .anyMatch(cp -> cp.kind() == ProducerDescriptor.ParamKind.EVENT_CONSUMER);
+        if (needsPublisher) {
+            builder.addParameter(APPLICATION_EVENT_PUBLISHER, "publisher");
+        }
+
         var paramNames = new ArrayList<String>();
         for (ProducerDescriptor.ConstructorParam cp : d.constructorParams()) {
             switch (cp.kind()) {
@@ -149,6 +157,9 @@ public class AutoConfigurationWriter {
                     TypeName paramType = propsRecordType != null ? propsRecordType : toClassName(cp.type());
                     builder.addParameter(paramType, cp.name());
                     paramNames.add(cp.name());
+                }
+                case EVENT_CONSUMER -> {
+                    paramNames.add("event -> publisher.publishEvent(event)");
                 }
                 case PLAIN -> {
                     builder.addParameter(toClassName(cp.type()), cp.name());

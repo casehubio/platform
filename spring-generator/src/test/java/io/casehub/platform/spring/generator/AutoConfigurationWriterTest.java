@@ -286,6 +286,51 @@ class AutoConfigurationWriterTest {
         assertThat(source).contains("@ConditionalOnClass(AService.class)");
     }
 
+
+    @Test
+    void enhancedPath_eventConsumerParam_emitsPublisherBridge() {
+        var desc = enhancedDescriptor("summaryService", "io.casehub.SummaryService",
+                                      List.of(
+                                              new ProducerDescriptor.ConstructorParam(
+                                                      "io.casehub.SummaryStore", "store",
+                                                      ProducerDescriptor.ParamKind.PLAIN),
+                                              new ProducerDescriptor.ConstructorParam(
+                                                      "io.casehub.SummaryUpdatedEvent", "eventListener",
+                                                      ProducerDescriptor.ParamKind.EVENT_CONSUMER)),
+                                      false, false);
+
+        String source = autoConfigSource(writer.generate("io.casehub.spring",
+                                                         "TestAutoConfiguration", List.of(desc)));
+
+        assertThat(source).contains("ApplicationEventPublisher publisher");
+        assertThat(source).contains("SummaryStore store");
+        assertThat(source).doesNotContain("Consumer");
+        assertThat(source).contains("event -> publisher.publishEvent(event)");
+        assertThat(source).contains("return new SummaryService(store, event -> publisher.publishEvent(event));");
+    }
+@Test
+void enhancedPath_multipleEventConsumers_singlePublisher() {
+    var desc = enhancedDescriptor("gateway", "io.casehub.Gateway",
+            List.of(
+                    new ProducerDescriptor.ConstructorParam(
+                            "io.casehub.Dep", "dep",
+                            ProducerDescriptor.ParamKind.PLAIN),
+                    new ProducerDescriptor.ConstructorParam(
+                            "io.casehub.InitEvent", "initListener",
+                            ProducerDescriptor.ParamKind.EVENT_CONSUMER),
+                    new ProducerDescriptor.ConstructorParam(
+                            "io.casehub.CloseEvent", "closeListener",
+                            ProducerDescriptor.ParamKind.EVENT_CONSUMER)),
+            false, false);
+
+    String source = autoConfigSource(writer.generate("io.casehub.spring",
+            "TestAutoConfiguration", List.of(desc)));
+
+    assertThat(source).containsOnlyOnce("ApplicationEventPublisher publisher");
+    assertThat(source).contains("return new Gateway(dep, event -> publisher.publishEvent(event), event -> publisher.publishEvent(event));");
+}
+
+
     private ProducerDescriptor enhancedDescriptor(String methodName, String returnType,
                                                    List<ProducerDescriptor.ConstructorParam> params,
                                                    boolean defaultBean, boolean alternative) {

@@ -497,13 +497,23 @@ A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/
 | `DeclarativeExtractorFactory` | Config string → `KeyExtractor`. Prefixed specs: `identity`, `field:name`, `composite:x,y`, `rest-client`. Bare names resolve via `ParameterRegistry` (single-arg → identity, multi-arg → positional). |
 | `DeclarativeScorerFactory` | Config string → `RecordFieldScorer` (`fields:name:EXACT:1.0,age:NUMERIC_RANGE:0.5`) |
 
+### Temporal Simulation (simulation-core)
+
+| Type | Role |
+|------|------|
+| `TimedEntry<E>` | Event + relative delay + optional label (journal verification) + optional qualifiedName (per-entry override for concat attribution). |
+| `TimedSequence<E>` | Generic timed sequences with relative delays. `withMultiplier(10.0)` compresses a 30-min case to 3 min. `fromRecorded(List<InvocationRecord>)` derives timing from captured data. |
+| `TemporalProfile<E>` | Named sequence + qualifiedName + tenancyId + loop + speed. Wraps `TimedSequence` with lifecycle metadata for the driver. |
+| `TemporalSimulationDriver<E>` | Lifecycle controller: IDLE → RUNNING ↔ PAUSED → STOPPED/COMPLETED. Virtual-thread sleep loop, journal integration via `SimulationRuntime.recordJournal()`, per-event error isolation, runtime speed control via `setSpeed()`. |
+| `TemporalEventSink<E>` | Delivery callback: `deliver(qualifiedName, label, event)`. Provides context for CloudEvent construction. |
+| `TemporalDriverFactory<E>` | Factory for creating driver instances. Drivers are lightweight; `stop()` is terminal. |
+
 ### Event Simulation (event-simulation-core)
 
 | Type | Role |
 |------|------|
 | `SimulatedEventEmitter` | `tick()`-based emitter, fires via `Consumer<CloudEvent>` callback. CDI wiring provides `Event<CloudEvent>.fireAsync()` for full pipeline fidelity. |
-| `TimedSequence<E>` | Generic timed sequences with relative delays. `withMultiplier(10.0)` compresses a 30-min case to 3 min. `fromRecorded(List<InvocationRecord>)` derives timing from captured data. |
-| `EventSequenceRunner` | Virtual-thread executor for timed sequences. Per-source error isolation. |
+| `EventSequenceRunner` | One-shot virtual-thread executor for timed sequences. Per-source error isolation. |
 
 ### Schema-Driven Data Generation (schema-generator)
 
@@ -533,14 +543,19 @@ simulation-api ──→ simulation-core ──→ simulation-inmem
        │                  │
        │                  ├──→ simulation-testing (test utilities)
        │                  │
-       ├──→ simulation-config-core ──→ simulation-config (Quarkus beans)
+       │                  ├──→ TimedEntry, TimedSequence, TemporalProfile,
+       │                  │    TemporalSimulationDriver (temporal simulation)
+       │                  │
+       ├──→ simulation-config-core ──→ simulation-config (Quarkus beans + TemporalProfileRegistry)
+       │         │
+       │         └──→ TemporalProfileConfig, DurationParser, TemporalProfileRegistry
        │
        ├──→ simulation-generator (APT)
        │         ├──→ platform-simulation-core (11 platform-api SPIs)
        │         ├──→ memory-simulation-core (CaseMemoryStore)
        │         └──→ rest-client-simulation-generator (@RegisterRestClient)
        │
-       └──→ event-simulation-core ──→ event-simulation (Quarkus @Scheduled)
+       └──→ event-simulation-core ──→ event-simulation (Quarkus @Scheduled + TemporalDriverFactory)
 
 agent-api ──→ agent-simulation-core (SimulatedAgentBackend + AgentCorpus)
 

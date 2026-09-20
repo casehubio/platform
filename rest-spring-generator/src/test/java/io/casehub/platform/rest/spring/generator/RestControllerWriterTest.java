@@ -13,6 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RestControllerWriterTest {
 
     private static RestResourceDescriptor descriptor;
+    private static RestResourceDescriptor sseDescriptor;
+
 
     @BeforeAll
     static void scan() throws Exception {
@@ -21,9 +23,18 @@ class RestControllerWriterTest {
         indexer.indexClass(SampleCore.class);
         Index index = indexer.complete();
 
-        var scanner = new RestResourceScanner();
+        var                          scanner     = new RestResourceScanner();
         List<RestResourceDescriptor> descriptors = scanner.scan(index);
         descriptor = descriptors.get(0);
+
+        var sseIndexer = new Indexer();
+        sseIndexer.indexClass(SampleSseResource.class);
+        sseIndexer.indexClass(SampleSseCore.class);
+        Index                        sseIndex       = sseIndexer.complete();
+        List<RestResourceDescriptor> sseDescriptors = scanner.scan(sseIndex);
+        if (!sseDescriptors.isEmpty()) {
+            sseDescriptor = sseDescriptors.get(0);
+        }
     }
 
     @Test
@@ -97,5 +108,15 @@ class RestControllerWriterTest {
         String source = writer.generate(descriptor, "test.spring").toString();
 
         assertThat(source).contains("MediaType.APPLICATION_JSON_VALUE");
+    }
+
+    @Test
+    void generatesSseEmitterForFlowPublisher() {
+        assertThat(sseDescriptor).isNotNull();
+        var    writer = new RestControllerWriter();
+        String source = writer.generate(sseDescriptor, "test.spring").toString();
+        assertThat(source).contains("SseEmitter");
+        assertThat(source).contains("subscribe");
+        assertThat(source).doesNotContain("Flow.Publisher");
     }
 }

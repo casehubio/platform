@@ -89,6 +89,10 @@ public class RestResourceScanner {
                 }
             }
 
+            if (delegateTypeName == null) {
+                continue;
+            }
+
             List<RestMethodDescriptor> methods = scanMethods(classInfo, hasContextHeaders, delegateTypeName, index);
 
             result.add(new RestResourceDescriptor(

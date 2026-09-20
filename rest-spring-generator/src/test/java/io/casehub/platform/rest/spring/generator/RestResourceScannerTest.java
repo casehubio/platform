@@ -94,6 +94,18 @@ class RestResourceScannerTest {
         assertThat(createItem.parameters().get(0).source()).isEqualTo(RestMethodDescriptor.ParameterSource.BODY);
     }
 
+
+    @Test
+    void skipsResourcesWithNoDelegate() throws Exception {
+        var indexer = new Indexer();
+        indexer.indexClass(NoDelegateResource.class);
+        Index noDelegateIndex = indexer.complete();
+
+        var                          scanner     = new RestResourceScanner();
+        List<RestResourceDescriptor> descriptors = scanner.scan(noDelegateIndex);
+        assertThat(descriptors).isEmpty();
+    }
+
     @Test
     void extractsClassLevelMediaTypes() {
         var scanner = new RestResourceScanner();

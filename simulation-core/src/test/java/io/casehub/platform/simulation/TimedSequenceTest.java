@@ -1,6 +1,5 @@
-package io.casehub.platform.simulation.event;
+package io.casehub.platform.simulation;
 
-import io.casehub.platform.simulation.InvocationRecord;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -122,6 +121,41 @@ class TimedSequenceTest {
     void fromRecordedEmptyList() {
         var sequence = TimedSequence.<String, String>fromRecorded(List.of());
         assertThat(sequence.size()).isZero();
+    }
+
+
+    @Test
+    void timedEntryPreservesLabel() {
+        var entry = new TimedEntry<>("event", Duration.ZERO, "my-label");
+        assertThat(entry.label()).isEqualTo("my-label");
+        assertThat(entry.qualifiedName()).isNull();
+    }
+
+    @Test
+    void timedEntryLabelDefaultsToNull() {
+        var entry = new TimedEntry<>("event", Duration.ZERO);
+        assertThat(entry.label()).isNull();
+        assertThat(entry.qualifiedName()).isNull();
+    }
+
+    @Test
+    void timedEntryPreservesQualifiedName() {
+        var entry = new TimedEntry<>("event", Duration.ofSeconds(1), "label", "my.method");
+        assertThat(entry.qualifiedName()).isEqualTo("my.method");
+    }
+
+    @Test
+    void withMultiplierPreservesLabels() {
+        var seq = new TimedSequence<>(List.of(
+                new TimedEntry<>("A", Duration.ofSeconds(10), "step-a", "method.a"),
+                new TimedEntry<>("B", Duration.ofSeconds(20), "step-b")));
+
+        var fast = seq.withMultiplier(10.0);
+
+        assertThat(fast.entries().get(0).label()).isEqualTo("step-a");
+        assertThat(fast.entries().get(0).qualifiedName()).isEqualTo("method.a");
+        assertThat(fast.entries().get(1).label()).isEqualTo("step-b");
+        assertThat(fast.entries().get(1).qualifiedName()).isNull();
     }
 
     @Test

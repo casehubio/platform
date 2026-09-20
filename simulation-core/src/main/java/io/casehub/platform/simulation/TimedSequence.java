@@ -1,6 +1,4 @@
-package io.casehub.platform.simulation.event;
-
-import io.casehub.platform.simulation.InvocationRecord;
+package io.casehub.platform.simulation;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -19,7 +17,8 @@ public record TimedSequence<E>(List<TimedEntry<E>> entries) {
         }
         return new TimedSequence<>(entries.stream()
                 .map(e -> new TimedEntry<>(e.event(),
-                        Duration.ofMillis((long) (e.delay().toMillis() / multiplier))))
+                        Duration.ofMillis((long) (e.delay().toMillis() / multiplier)),
+                        e.label(), e.qualifiedName()))
                 .toList());
     }
 

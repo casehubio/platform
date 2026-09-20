@@ -1,5 +1,7 @@
 package io.casehub.platform.simulation.event;
 
+import io.casehub.platform.simulation.TimedEntry;
+import io.casehub.platform.simulation.TimedSequence;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 

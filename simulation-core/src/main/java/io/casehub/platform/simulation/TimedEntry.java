@@ -1,8 +1,16 @@
-package io.casehub.platform.simulation.event;
+package io.casehub.platform.simulation;
 
 import java.time.Duration;
 
-public record TimedEntry<E>(E event, Duration delay) {
+public record TimedEntry<E>(E event, Duration delay, String label, String qualifiedName) {
+
+    public TimedEntry(E event, Duration delay) {
+        this(event, delay, null, null);
+    }
+
+    public TimedEntry(E event, Duration delay, String label) {
+        this(event, delay, label, null);
+    }
 
     public TimedEntry {
         if (event == null) {

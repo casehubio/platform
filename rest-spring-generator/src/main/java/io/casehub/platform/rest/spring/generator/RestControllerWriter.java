@@ -12,7 +12,6 @@ import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
 
 import javax.lang.model.element.Modifier;
-import java.util.List;
 
 public class RestControllerWriter {
 
@@ -31,6 +30,10 @@ public class RestControllerWriter {
     private static final ClassName MEDIA_TYPE = ClassName.get("org.springframework.http", "MediaType");
     private static final ClassName OPTIONAL = ClassName.get("java.util", "Optional");
     private static final ClassName HTTP_SERVLET_REQUEST = ClassName.get("jakarta.servlet.http", "HttpServletRequest");
+    private static final ClassName SSE_EMITTER          = ClassName.get("org.springframework.web.servlet.mvc.method.annotation", "SseEmitter");
+    private static final ClassName FLOW_SUBSCRIBER      = ClassName.get("java.util.concurrent", "Flow", "Subscriber");
+    private static final ClassName FLOW_SUBSCRIPTION    = ClassName.get("java.util.concurrent", "Flow", "Subscription");
+
 
     public JavaFile generate(RestResourceDescriptor descriptor, String targetPackage) {
         String simpleClassName = simpleClassName(descriptor.className());
@@ -160,8 +163,19 @@ public class RestControllerWriter {
         if (originalType.toString().equals("jakarta.ws.rs.core.Response")) {
             return ParameterizedTypeName.get(RESPONSE_ENTITY, ClassName.OBJECT);
         }
+        if (isFlowPublisher(originalType)) {
+            return SSE_EMITTER;
+        }
         return ParameterizedTypeName.get(RESPONSE_ENTITY, originalType.box());
     }
+
+    private static boolean isFlowPublisher(TypeName type) {
+        if (!(type instanceof ParameterizedTypeName pt)) {return false;}
+        String name = pt.rawType().toString();
+        return name.equals("java.util.concurrent.Flow.Publisher")
+               || name.equals("java.util.concurrent.Flow$Publisher");
+    }
+
 
     private CodeBlock buildMethodBody(RestMethodDescriptor method, String delegateFieldName, boolean hasContextHeaders) {
         String args = method.parameters().stream()
@@ -186,6 +200,40 @@ public class RestControllerWriter {
             return CodeBlock.builder()
                             .addStatement("return $L.$L($L).map($T::ok).orElse($T.notFound().build())",
                                           delegateFieldName, method.methodName(), args, RESPONSE_ENTITY, RESPONSE_ENTITY)
+                            .build();
+        }
+
+        if (isFlowPublisher(method.returnType())) {
+            ParameterizedTypeName pt        = (ParameterizedTypeName) method.returnType();
+            TypeName              eventType = pt.typeArguments().get(0);
+            String                finalArgs = args;
+            return CodeBlock.builder()
+                            .addStatement("$T emitter = new $T(0L)", SSE_EMITTER, SSE_EMITTER)
+                            .beginControlFlow("$T.ofVirtual().start(() ->", Thread.class)
+                            .beginControlFlow("$L.$L($L).subscribe(new $T<$T>()", delegateFieldName, method.methodName(), finalArgs, FLOW_SUBSCRIBER, eventType)
+                            .add("@Override\n")
+                            .beginControlFlow("public void onSubscribe($T<? super $T> subscription)", FLOW_SUBSCRIPTION, eventType)
+                            .addStatement("subscription.request($T.MAX_VALUE)", Long.class)
+                            .endControlFlow()
+                            .add("@Override\n")
+                            .beginControlFlow("public void onNext($T item)", eventType)
+                            .beginControlFlow("try")
+                            .addStatement("emitter.send(item)")
+                            .nextControlFlow("catch ($T e)", Exception.class)
+                            .addStatement("emitter.completeWithError(e)")
+                            .endControlFlow()
+                            .endControlFlow()
+                            .add("@Override\n")
+                            .beginControlFlow("public void onError($T t)", Throwable.class)
+                            .addStatement("emitter.completeWithError(t)")
+                            .endControlFlow()
+                            .add("@Override\n")
+                            .beginControlFlow("public void onComplete()")
+                            .addStatement("emitter.complete()")
+                            .endControlFlow()
+                            .endControlFlow(")") // end anonymous class + subscribe call
+                            .endControlFlow(")") // end lambda + Thread.start
+                            .addStatement("return emitter")
                             .build();
         }
 

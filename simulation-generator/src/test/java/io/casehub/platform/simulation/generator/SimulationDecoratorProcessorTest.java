@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -234,6 +235,29 @@ class SimulationDecoratorProcessorTest {
                 .filter(s -> s.className().contains("TestSimpleService"))
                 .count();
         assertThat(testSimpleServiceCount).isEqualTo(2);
+    }
+
+    // --- parameter registry ---
+
+    @Test
+    void emitsParameterEntriesForAnnotatedSpi() {
+        var processor = new SimulationDecoratorProcessor();
+        Map<String, String> paramEntries = processor.generateParameterEntries(index);
+
+        // TestSimpleService has: lookup(String id), save(String id, String value), count()
+        assertThat(paramEntries).containsEntry("test-service.lookup", "id:0");
+        assertThat(paramEntries).containsEntry("test-service.save", "id:0,value:1");
+        assertThat(paramEntries).containsEntry("test-service.count", "");
+    }
+
+    @Test
+    void emitsParameterEntriesForListingFileSpi() {
+        var processor = new SimulationDecoratorProcessor();
+        Map<String, String> paramEntries = processor.generateParameterEntries(index);
+
+        // TestUnannotatedSpi comes from listing file
+        assertThat(paramEntries).containsKey("test-unannotated.resolve");
+        assertThat(paramEntries).containsKey("test-unannotated.delete");
     }
 
     // --- helpers ---

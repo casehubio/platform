@@ -3,8 +3,13 @@ package io.casehub.platform.simulation.config.quarkus;
 import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
+import io.casehub.platform.simulation.config.CompositeCorpusLoader;
+import io.casehub.platform.simulation.config.CsvCorpusLoader;
 import io.casehub.platform.simulation.config.DeclarativeExtractorFactory;
 import io.casehub.platform.simulation.config.DeclarativeScorerFactory;
+import io.casehub.platform.simulation.config.ParameterRegistry;
+import io.casehub.platform.simulation.config.JsonCorpusLoader;
+import io.casehub.platform.simulation.config.YamlCorpusLoader;
 import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.quarkus.runtime.StartupEvent;
@@ -60,6 +65,13 @@ public class SimulationConfigBeans {
         return new SimulationRuntime(config, corpus);
     }
 
+    @Produces
+    @ApplicationScoped
+    public CompositeCorpusLoader corpusLoader() {
+        return new CompositeCorpusLoader(
+                new YamlCorpusLoader(), new JsonCorpusLoader(), new CsvCorpusLoader());
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     void onStartup(@Observes StartupEvent event,
                    YamlSimulationConfig config,
@@ -78,9 +90,10 @@ public class SimulationConfigBeans {
 
         runtime.setProfileSource(config);
 
-        var factory = new DeclarativeExtractorFactory();
+        var registry = ParameterRegistry.loadFromClasspath();
+        var factory = new DeclarativeExtractorFactory(registry);
         config.extractorSpecs()
-                .forEach((qn, spec) -> runtime.registerExtractor(qn, factory.create(spec)));
+                .forEach((qn, spec) -> runtime.registerExtractor(qn, factory.create(spec, qn)));
 
         var scorerFactory = new DeclarativeScorerFactory();
         config.scorerSpecs()

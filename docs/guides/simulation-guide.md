@@ -1106,7 +1106,7 @@ methods:
     strategy: <strategy-key>             # key, seq, rand, replay, nearest
     capture: true|false                  # default: false
     exhaustion-policy: WRAP|THROW        # default: WRAP
-    key-extractor: "<spec>"              # identity, field:<path>, composite:<f1>,<f2>
+    key-extractor: "<spec>"              # identity, field:<path>, composite:<f1>,<f2>, or bare parameter name
     scorer: "<spec>"                     # fields:<name>:<scorer>:<weight>,...
     threshold: 0.0-1.0                   # nearest-match threshold
     corpus:                              # inline entries
@@ -1114,7 +1114,7 @@ methods:
         tenancy-id: "<tenant>"
         input: <any YAML value>
         output: <any YAML value>
-    corpus-files:                        # external file refs
+    corpus-files:                        # external file refs (.yaml, .yml, .json, .csv)
       - classpath:path/to/corpus.yaml
 
 profiles:

@@ -15,13 +15,23 @@ public class DeclarativeExtractorFactory {
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<>() {};
     private final ObjectMapper objectMapper;
+    private final ParameterRegistry parameterRegistry;
 
     public DeclarativeExtractorFactory() {
+        this(null);
+    }
+
+    public DeclarativeExtractorFactory(ParameterRegistry registry) {
         this.objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+        this.parameterRegistry = registry;
     }
 
     public KeyExtractor<Object> create(String spec) {
+        return create(spec, null);
+    }
+
+    public KeyExtractor<Object> create(String spec, String qualifiedName) {
         if ("identity".equals(spec)) {
             return input -> String.valueOf(input);
         }
@@ -49,6 +59,24 @@ public class DeclarativeExtractorFactory {
                 }
                 return String.valueOf(input);
             };
+        }
+        if (parameterRegistry != null && qualifiedName != null) {
+            var params = parameterRegistry.paramsFor(qualifiedName);
+            if (params.isPresent()) {
+                var pos = params.get().positionOf(spec);
+                if (pos.isPresent()) {
+                    int index = pos.get();
+                    if (params.get().totalParams() == 1) {
+                        return input -> String.valueOf(input);
+                    }
+                    return input -> String.valueOf(((Object[]) input)[index]);
+                }
+                throw new SimulationConfigException(
+                        "Unknown key-extractor spec: '" + spec + "' for " + qualifiedName
+                        + ". Known parameters: " + params.get().nameToPosition().keySet()
+                        + ". Valid specs: identity, field:<name>, composite:<f1>,<f2>, rest-client, "
+                        + "or a parameter name from the SPI method.");
+            }
         }
         throw new SimulationConfigException(
                 "Unknown key-extractor spec: " + spec

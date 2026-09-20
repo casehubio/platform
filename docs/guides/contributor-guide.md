@@ -471,11 +471,13 @@ The simulation framework provides SPI-level testing infrastructure — a complet
 
 ### Code Generator (simulation-generator)
 
-`SimulationDecoratorProcessor` is a Jandex-based annotation processor. It scans `@SimulationEligible` interfaces (via annotation or `META-INF/simulation-eligible.txt` listing file) and generates two files per SPI:
+`SimulationDecoratorProcessor` is a Jandex-based annotation processor. It scans `@SimulationEligible` interfaces (via annotation or `META-INF/simulation-eligible.txt` listing file) and generates three outputs per SPI:
 
 1. **Decorator class** (e.g., `SimulatedAccessControlProvider`) — `@Decorator @Priority(APPLICATION + 200)`. Injects `delegate` + `SimulationRuntime` + `CurrentPrincipal`. Intercepts ALL interface methods (abstract and default). For each method: check strategy → resolve or delegate → record to journal (with tenancyId, null fallback for missing tenancy) → optionally capture.
 
 2. **QN constants class** (e.g., `AccessControlProviderQN`) — one `public static final String` per method (e.g., `CANACCESS = "access-control-provider.canAccess"`). Compile-time safety for qualified names — typos cause compilation errors, not silent runtime mismatches.
+
+3. **Parameter registry** (`META-INF/simulation-parameters.properties`) — maps each qualified method name to its parameter names and positions (e.g., `access-control-provider.canAccess=actorId:0,resourceId:1,action:2`). Consumed by `ParameterRegistry` at runtime so `DeclarativeExtractorFactory` can resolve bare parameter names as key-extractor specs.
 
 A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/` handles `@RegisterRestClient` interfaces with `@RestClient`-qualified delegates and `RestInvocation` input types.
 
@@ -483,8 +485,16 @@ A separate `RestClientSimulationProcessor` in `rest-client-simulation-generator/
 
 | Type | Role |
 |------|------|
-| `YamlSimulationConfig` | Unified YAML parser — reads `simulation.yaml`, provides per-method strategy config, inline corpus entries, external corpus-files refs, named profiles. Implements `SimulationConfig` + `ProfileSource`. Convention-discovered from classpath root. |
-| `DeclarativeExtractorFactory` | Config string → `KeyExtractor` (`identity`, `field:name`, `composite:x,y`) via Jackson `ObjectMapper.convertValue` |
+| `YamlSimulationConfig` | Unified YAML parser — reads `simulation.yaml`, provides per-method strategy config, inline corpus entries, external corpus-files refs, named profiles. Implements `SimulationConfig` + `ProfileSource`. Convention-discovered from classpath root. Delegates corpus file loading to `CompositeCorpusLoader`. |
+| `CorpusLoader` | SPI for format-independent corpus loading. `supports(path)` checks extension, `load(InputStream, defaultTenancyId)` returns `Map<String, List<InvocationRecord>>`. |
+| `YamlCorpusLoader` | `.yaml`/`.yml` corpus files — extracted from `YamlSimulationConfig`. Also used by pages `ScenarioOrchestrator`. |
+| `JsonCorpusLoader` | `.json` corpus files — same structure as YAML, parsed with `ObjectMapper` (no YAMLFactory). |
+| `CsvCorpusLoader` | `.csv` corpus files — reserved columns `_qualified_name`, `_key`, `_tenancy_id`; remaining columns become output map. |
+| `CompositeCorpusLoader` | Aggregates `CorpusLoader` implementations, dispatches by file extension. CDI-produced by `SimulationConfigBeans`. |
+| `CorpusEntryParser` | Shared conversion utility: raw entry maps → `InvocationRecord` list with tenancy-id fallback. |
+| `StreamResolver` | Classpath (`classpath:`) and filesystem path resolution for corpus files. |
+| `ParameterRegistry` | Loads `META-INF/simulation-parameters.properties` — maps qualified method names to parameter name/position pairs. APT-generated, classpath-aggregated. |
+| `DeclarativeExtractorFactory` | Config string → `KeyExtractor`. Prefixed specs: `identity`, `field:name`, `composite:x,y`, `rest-client`. Bare names resolve via `ParameterRegistry` (single-arg → identity, multi-arg → positional). |
 | `DeclarativeScorerFactory` | Config string → `RecordFieldScorer` (`fields:name:EXACT:1.0,age:NUMERIC_RANGE:0.5`) |
 
 ### Event Simulation (event-simulation-core)

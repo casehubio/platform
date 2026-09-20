@@ -114,14 +114,14 @@ Complete SPI testing framework — replaces Mockito for platform SPI tests. Conf
 
 | Artifact | Scope | What it provides |
 |----------|-------|------------------|
-| `casehub-platform-simulation-config-core` | compile | `YamlSimulationConfig` (unified YAML parser: strategy + inline corpus + profiles), `DeclarativeExtractorFactory`, `DeclarativeScorerFactory`, `RecordFieldScorer`, JSON Schema (`schema/simulation.schema.json`) |
+| `casehub-platform-simulation-config-core` | compile | `YamlSimulationConfig` (unified YAML parser: strategy + inline corpus + profiles), `CorpusLoader` SPI + `YamlCorpusLoader`/`JsonCorpusLoader`/`CsvCorpusLoader` + `CompositeCorpusLoader`, `ParameterRegistry` (APT-emitted parameter metadata), `DeclarativeExtractorFactory` (bare parameter name resolution), `DeclarativeScorerFactory`, `RecordFieldScorer`, JSON Schema (`schema/simulation.schema.json`) |
 | `casehub-platform-simulation-config` | compile | Quarkus CDI beans: `@Produces SimulationConfig`, `SimulationCorpus`, `SimulationRuntime`; `@Startup` corpus populator; profile wiring. Required alongside `simulation-generator` |
 
 **Code generation (annotation processors):**
 
 | Artifact | Scope | What it provides |
 |----------|-------|------------------|
-| `casehub-platform-simulation-generator` | provided | APT: generates `@Decorator` + `*QN` constants class per `@SimulationEligible` SPI |
+| `casehub-platform-simulation-generator` | provided | APT: generates `@Decorator` + `*QN` constants class + `META-INF/simulation-parameters.properties` per `@SimulationEligible` SPI |
 | `casehub-platform-rest-client-simulation-generator` | provided | APT: generates `@Decorator` for `@RegisterRestClient` interfaces with `RestInvocation` input |
 
 **Pre-built simulation adapters:**
@@ -204,6 +204,31 @@ Simulation config lives in `simulation.yaml` (classpath root, convention-discove
 | `casehub.simulation.default-tenancy-id` | tenant ID string | (none) |
 
 Per-method YAML keys: `strategy`, `capture`, `exhaustion-policy`, `key-extractor`, `scorer`, `threshold`, `corpus`, `corpus-files`. See `schema/simulation.schema.json` for the full schema.
+
+**Corpus file formats:** The `corpus-files:` key supports YAML (`.yaml`/`.yml`), JSON (`.json`), and CSV (`.csv`). CSV is useful for industries with tabular reference data (finance, clinical, regulatory):
+
+```csv
+_qualified_name,_key,_tenancy_id,accountId,name,balance
+bank-feed.balance,acct-123,tenant-a,acct-123,Checking,1234.56
+bank-feed.balance,acct-456,tenant-a,acct-456,Savings,5678.90
+```
+
+Reserved columns: `_qualified_name` (required), `_key` (optional), `_tenancy_id` (optional). All other columns become the output map.
+
+**Key extractor — parameter names:** For `@SimulationEligible` SPIs, use method parameter names directly as key-extractor specs:
+
+```yaml
+methods:
+  bank-feed-platform.balance:
+    strategy: key
+    key-extractor: accountId    # resolves to the 'accountId' parameter
+    corpus:
+      - key: acct-123
+        input: acct-123
+        output: "1234.56"
+```
+
+The simulation generator emits parameter metadata at build time. For single-arg methods, `key-extractor` defaults to identity — no declaration needed.
 
 ### Access control
 

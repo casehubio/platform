@@ -161,6 +161,12 @@ public class AutoConfigurationWriter {
                 case EVENT_CONSUMER -> {
                     paramNames.add("event -> publisher.publishEvent(event)");
                 }
+                case SUPPLIER_DEP -> {
+                    ParameterizedTypeName providerType = ParameterizedTypeName.get(
+                            OBJECT_PROVIDER, toClassName(cp.type()));
+                    builder.addParameter(providerType, cp.name());
+                    paramNames.add(cp.name() + ".getIfAvailable() != null ? " + cp.name() + "::getObject : null");
+                }
                 case PLAIN -> {
                     builder.addParameter(toClassName(cp.type()), cp.name());
                     paramNames.add(cp.name());

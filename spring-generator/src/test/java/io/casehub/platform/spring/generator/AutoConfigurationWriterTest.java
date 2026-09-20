@@ -329,6 +329,26 @@ void enhancedPath_multipleEventConsumers_singlePublisher() {
     assertThat(source).containsOnlyOnce("ApplicationEventPublisher publisher");
     assertThat(source).contains("return new Gateway(dep, event -> publisher.publishEvent(event), event -> publisher.publishEvent(event));");
 }
+@Test
+void enhancedPath_supplierDepParam_emitsObjectProviderSupplier() {
+    var desc = enhancedDescriptor("gateway", "io.casehub.Gateway",
+            List.of(
+                    new ProducerDescriptor.ConstructorParam(
+                            "io.casehub.Dep", "dep",
+                            ProducerDescriptor.ParamKind.PLAIN),
+                    new ProducerDescriptor.ConstructorParam(
+                            "io.casehub.Tracer", "tracer",
+                            ProducerDescriptor.ParamKind.SUPPLIER_DEP)),
+            false, false);
+
+    String source = autoConfigSource(writer.generate("io.casehub.spring",
+            "TestAutoConfiguration", List.of(desc)));
+
+    assertThat(source).contains("ObjectProvider<Tracer> tracer");
+    assertThat(source).doesNotContain("Supplier");
+    assertThat(source).contains("tracer.getIfAvailable() != null ? tracer::getObject : null");
+}
+
 
 
     private ProducerDescriptor enhancedDescriptor(String methodName, String returnType,

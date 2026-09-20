@@ -47,6 +47,14 @@ class SampleConstructorBeans {
 
     @Produces
     @ApplicationScoped
+    public SupplierDepPojo supplierDepPojo(SomeDep dep,
+                                            Instance<SomeDep> optionalDep) {
+        return new SupplierDepPojo(dep,
+                optionalDep.isResolvable() ? optionalDep::get : null);
+    }
+
+    @Produces
+    @ApplicationScoped
     public EventConsumerPojo eventConsumerPojo(SomeDep dep,
                                                jakarta.enterprise.event.Event<String> stringEvent) {
         return new EventConsumerPojo(dep, stringEvent::fire);

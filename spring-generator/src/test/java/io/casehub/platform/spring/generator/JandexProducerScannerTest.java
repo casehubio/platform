@@ -205,6 +205,24 @@ class JandexProducerScannerTest {
                 .isEqualTo(ProducerDescriptor.ParamKind.EVENT_CONSUMER);
         assertThat(desc.requiresManualConfig()).isFalse();
     }
+@Test
+void followsReturnType_supplierParam_detectsSupplierDep() throws IOException {
+    Index scanIndex = indexClasses(SampleConstructorBeans.class, SimplePojo.class,
+            SampleConfig.class, SampleProperties.class, SomeInterface.class,
+            SomeDep.class, ConfigPojo.class, ListPojo.class, OptionalPojo.class,
+            FactoryPojo.class, EventConsumerPojo.class, SupplierDepPojo.class);
+    var scanner = new JandexProducerScanner();
+
+    List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);
+
+    var desc = findByMethod(descriptors, "supplierDepPojo");
+    assertThat(desc.constructorResolved()).isTrue();
+    assertThat(desc.constructorParams()).hasSize(2);
+    assertThat(desc.constructorParams().get(1).kind())
+            .isEqualTo(ProducerDescriptor.ParamKind.SUPPLIER_DEP);
+    assertThat(desc.constructorParams().get(1).type()).endsWith("SomeDep");
+}
+
 
     private ProducerDescriptor findByMethod(List<ProducerDescriptor> descriptors, String methodName) {
         return descriptors.stream()

@@ -29,8 +29,31 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-graphql-generator</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>io.cloudevents</groupId>
             <artifactId>cloudevents-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -50,6 +73,68 @@
             <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.casehub</groupId>
+                            <artifactId>casehub-platform-graphql-generator</artifactId>
+                            <version>${project.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <arg>-AgenerateGraphQL=false</arg>
+                        <arg>-AdomainFilter=temporal-drivers</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>${jandex-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals><goal>jandex</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

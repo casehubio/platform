@@ -949,6 +949,19 @@ Core POJO rules:
 
 Point `<quarkusModules>` at each module directory containing `@Path` resources with core delegates. The plugin scans Jandex indexes from those modules' build output.
 
+**Excluding resources:** Resources that use framework-specific types the generator cannot translate (JAX-RS SSE, `@RestForm FileUpload`, JSON-RPC dispatch) can be excluded by fully-qualified class name:
+
+```xml
+<configuration>
+    <excludeClassNames>
+        <excludeClassName>com.example.SseResource</excludeClassName>
+    </excludeClassNames>
+    <quarkusModules>...</quarkusModules>
+</configuration>
+```
+
+Add the same `<excludeClassNames>` to both `generate` and `verify` executions.
+
 **What gets generated:**
 
 | JAX-RS | Spring MVC |

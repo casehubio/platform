@@ -1,6 +1,9 @@
 package io.casehub.platform.simulation.generator;
 
 import io.casehub.platform.simulation.SimulationEligible;
+import io.casehub.platform.simulation.generator.test.TestBaseCapability;
+import io.casehub.platform.simulation.generator.test.TestCapability;
+import io.casehub.platform.simulation.generator.test.TestCapabilitySpi;
 import io.casehub.platform.simulation.generator.test.TestDefaultNameSpi;
 import io.casehub.platform.simulation.generator.test.TestSimpleService;
 import io.casehub.platform.simulation.generator.test.TestSpiWithDefaults;
@@ -28,6 +31,9 @@ class SimulationDecoratorProcessorTest {
         indexer.indexClass(TestDefaultNameSpi.class);
         indexer.indexClass(TestSpiWithDefaults.class);
         indexer.indexClass(TestUnannotatedSpi.class);
+        indexer.indexClass(TestCapabilitySpi.class);
+        indexer.indexClass(TestCapability.class);
+        indexer.indexClass(TestBaseCapability.class);
         index = indexer.complete();
     }
 
@@ -62,7 +68,7 @@ class SimulationDecoratorProcessorTest {
                 .map(SimulationDecoratorProcessor.GeneratedSource::className)
                 .toList();
 
-        assertThat(classNames).hasSize(8);
+        assertThat(classNames).hasSize(10);
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestSimpleService"));
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestDefaultNameSpi"));
     }
@@ -311,6 +317,84 @@ class SimulationDecoratorProcessorTest {
 
         assertThat(code).contains("public static final String RESOLVE = \"test-unannotated.resolve\"");
         assertThat(code).contains("public static final String DELETE = \"test-unannotated.delete\"");
+    }
+
+
+// --- capability wrapper generation ---
+
+    @Test
+    void capabilityMethodGeneratesWrapperInnerClass() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).contains("static class DoWork_Wrapper implements TestCapability");
+        assertThat(source).contains("new DoWork_Wrapper(delegate.doWork(), simulation, currentPrincipal)");
+    }
+
+    @Test
+    void wrapperMethodsUseDottedQualifiedNames() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).contains("\"capability-spi.doWork.process\"");
+        assertThat(source).contains("\"capability-spi.doWork.execute\"");
+    }
+
+    @Test
+    void inheritedMethodsGenerated() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).contains("\"capability-spi.doWork.close\"");
+        assertThat(source).contains("throws Exception");
+    }
+
+    @Test
+    void staticAndPrivateMethodsFiltered() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).doesNotContain("noOp");
+        assertThat(source).doesNotContain("internalHelper");
+    }
+
+    @Test
+    void supportsOverrideGenerated() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).contains("public boolean supports(Class<?> capability)");
+        assertThat(source).contains("capability == TestCapability.class");
+        assertThat(source).contains("simulation.strategyFor(\"capability-spi.doWork.process\")");
+        assertThat(source).contains("delegate.supports(capability)");
+    }
+
+    @Test
+    void qnConstantsIncludeDottedCapabilityMethods() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "TestCapabilitySpiQN");
+        assertThat(source).contains("DOWORK_PROCESS = \"capability-spi.doWork.process\"");
+        assertThat(source).contains("DOWORK_EXECUTE = \"capability-spi.doWork.execute\"");
+        assertThat(source).contains("DOWORK_CLOSE = \"capability-spi.doWork.close\"");
+        assertThat(source).contains("ID = \"capability-spi.id\"");
+    }
+
+    @Test
+    void flatSpiUnchangedWithEmptyCapabilities() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestSimpleService");
+        assertThat(source).doesNotContain("_Wrapper");
+        assertThat(source).doesNotContain("supports(Class<?>");
+    }
+
+    @Test
+    void parameterEntriesIncludeCapabilityMethods() {
+        var entries = new SimulationDecoratorProcessor().generateParameterEntries(index);
+        assertThat(entries).containsKey("capability-spi.doWork.process");
+        assertThat(entries).containsKey("capability-spi.doWork.execute");
+        assertThat(entries).containsKey("capability-spi.doWork.close");
+    }
+
+    @Test
+    void capabilityInterfaceTypeImported() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+        assertThat(source).contains("import io.casehub.platform.simulation.generator.test.TestCapability;");
     }
 
     private static int occurrences(final String text, final String sub) {

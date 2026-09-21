@@ -9,6 +9,7 @@ import io.casehub.platform.api.mcp.RestMethod;
 import io.casehub.platform.simulation.DriverResult;
 import io.casehub.platform.simulation.TemporalDriverFactory;
 import io.casehub.platform.simulation.TemporalProfile;
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.TemporalSimulationDriver;
 import io.casehub.platform.simulation.TimedEntry;
 import io.casehub.platform.simulation.TimedSequence;
@@ -28,7 +29,7 @@ public class TemporalDriverService {
 
     private final TemporalDriverFactory<Map<String, Object>> driverFactory;
     private final TemporalProfileRegistry profileRegistry;
-    private final io.casehub.platform.simulation.SimulationRuntime simulationRuntime;
+    private final SimulationRuntime simulationRuntime;
 
     private final ConcurrentHashMap<String, ActiveDriver> activeDrivers = new ConcurrentHashMap<>();
 
@@ -41,7 +42,7 @@ public class TemporalDriverService {
     public TemporalDriverService(
             TemporalDriverFactory<Map<String, Object>> driverFactory,
             TemporalProfileRegistry profileRegistry,
-            io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
+            SimulationRuntime simulationRuntime) {
         this.driverFactory = driverFactory;
         this.profileRegistry = profileRegistry;
         this.simulationRuntime = simulationRuntime;

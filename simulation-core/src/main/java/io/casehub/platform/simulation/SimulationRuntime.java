@@ -24,11 +24,13 @@ public class SimulationRuntime {
     private final ConcurrentHashMap<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<SimulationOverlay> overlayStack = new CopyOnWriteArrayList<>();
     private       ProfileSource                           profileSource;
+    private volatile double                               globalSpeed;
 
 
     public SimulationRuntime(final SimulationConfig config, final SimulationCorpus corpus) {
         this.config = config;
         this.corpus = corpus;
+        this.globalSpeed = config.speed();
     }
 
     public <I> void registerExtractor(final String qualifiedName, final KeyExtractor<I> extractor) {
@@ -108,6 +110,16 @@ public class SimulationRuntime {
     public boolean hasActiveOverlay() {
         return !overlayStack.isEmpty();
     }
+
+    public double globalSpeed() {
+        return globalSpeed;
+    }
+
+    public void setGlobalSpeed(double speed) {
+        if (speed <= 0) {throw new IllegalArgumentException("speed must be positive");}
+        this.globalSpeed = speed;
+    }
+
 
     public void setProfileSource(final ProfileSource profileSource) {
         this.profileSource = profileSource;

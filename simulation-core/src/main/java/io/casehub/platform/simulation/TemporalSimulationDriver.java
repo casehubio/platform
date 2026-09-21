@@ -10,20 +10,21 @@ public class TemporalSimulationDriver<E> {
     private static final int MAX_FAILURES = 100;
 
     private final TemporalEventSink<E> eventSink;
-    private final SimulationRuntime simulation;
+    private final SimulationRuntime    simulation;
 
-    private final ReentrantLock lock = new ReentrantLock();
-    private final Condition pauseCondition = lock.newCondition();
+    private final ReentrantLock lock           = new ReentrantLock();
+    private final Condition     pauseCondition = lock.newCondition();
 
-    private volatile State state = State.IDLE;
-    private volatile double speed;
-    private volatile Thread driverThread;
-    private volatile DriverResult lastResult;
+    private volatile State              state = State.IDLE;
+    private volatile Double             localSpeedOverride;
+    private volatile TemporalProfile<E> activeProfile;
+    private volatile Thread             driverThread;
+    private volatile DriverResult       lastResult;
 
-    public enum State { IDLE, RUNNING, PAUSED, STOPPED, COMPLETED }
+    public enum State {IDLE, RUNNING, PAUSED, STOPPED, COMPLETED}
 
     public TemporalSimulationDriver(TemporalEventSink<E> eventSink, SimulationRuntime simulation) {
-        this.eventSink = eventSink;
+        this.eventSink  = eventSink;
         this.simulation = simulation;
     }
 
@@ -37,11 +38,12 @@ public class TemporalSimulationDriver<E> {
             if (state != State.IDLE) {
                 throw new IllegalStateException("Driver is " + state + ", expected IDLE");
             }
-            speed = profile.speed();
-            state = State.RUNNING;
-            driverThread = Thread.ofVirtual()
-                    .name("temporal-driver-" + profile.name())
-                    .start(() -> runLoop(profile));
+            activeProfile      = profile;
+            localSpeedOverride = null;
+            state              = State.RUNNING;
+            driverThread       = Thread.ofVirtual()
+                                       .name("temporal-driver-" + profile.name())
+                                       .start(() -> runLoop(profile));
         } finally {
             lock.unlock();
         }
@@ -86,14 +88,25 @@ public class TemporalSimulationDriver<E> {
     }
 
     public void setSpeed(double speed) {
-        if (speed <= 0) throw new IllegalArgumentException("speed must be positive");
-        this.speed = speed;
+        if (speed <= 0) {throw new IllegalArgumentException("speed must be positive");}
+        this.localSpeedOverride = speed;
+    }
+
+    public void resetSpeed() {
+        this.localSpeedOverride = null;
     }
 
     public double speed() {
-        return speed;
+        return effectiveSpeed();
     }
 
+    private double effectiveSpeed() {
+        Double local = localSpeedOverride;
+        if (local != null) {return local;}
+        double global       = (simulation != null) ? simulation.globalSpeed() : 1.0;
+        double profileSpeed = (activeProfile != null) ? activeProfile.speed() : 1.0;
+        return profileSpeed * global;
+    }
 
     public State state() {
         return state;
@@ -108,32 +121,32 @@ public class TemporalSimulationDriver<E> {
     }
 
     private void runLoop(TemporalProfile<E> profile) {
-        int emittedCount = 0;
-        int failureCount = 0;
-        int loopIterations = 0;
-        List<DriverFailure> failures = new ArrayList<>();
+        int                 emittedCount   = 0;
+        int                 failureCount   = 0;
+        int                 loopIterations = 0;
+        List<DriverFailure> failures       = new ArrayList<>();
 
         try {
             do {
                 List<TimedEntry<E>> entries = profile.sequence().entries();
                 for (int i = 0; i < entries.size(); i++) {
                     checkPauseOrStop();
-                    if (state == State.STOPPED) break;
+                    if (state == State.STOPPED) {break;}
 
                     TimedEntry<E> entry = entries.get(i);
 
                     if (!entry.delay().isZero()) {
-                        long delayMs = (long) (entry.delay().toMillis() / speed);
+                        long delayMs = (long) (entry.delay().toMillis() / effectiveSpeed());
                         if (delayMs > 0) {
                             Thread.sleep(delayMs);
                         }
                     }
 
                     checkPauseOrStop();
-                    if (state == State.STOPPED) break;
+                    if (state == State.STOPPED) {break;}
 
                     String effectiveQN = entry.qualifiedName() != null
-                            ? entry.qualifiedName() : profile.qualifiedName();
+                                         ? entry.qualifiedName() : profile.qualifiedName();
 
                     try {
                         eventSink.deliver(effectiveQN, entry.label(), entry.event());
@@ -141,8 +154,8 @@ public class TemporalSimulationDriver<E> {
 
                         if (simulation != null) {
                             simulation.recordJournal(effectiveQN,
-                                    profile.tenancyId(), entry.label(),
-                                    entry.event(), true);
+                                                     profile.tenancyId(), entry.label(),
+                                                     entry.event(), true);
                         }
                     } catch (Exception e) {
                         failureCount++;
@@ -163,7 +176,7 @@ public class TemporalSimulationDriver<E> {
         }
 
         lastResult = new DriverResult(emittedCount, failureCount,
-                loopIterations, failures);
+                                      loopIterations, failures);
 
         lock.lock();
         try {

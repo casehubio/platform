@@ -13,4 +13,9 @@ public interface SimulationConfig {
     default Optional<Double> threshold(String qualifiedName) {
         return Optional.empty();
     }
+
+    default double speed() {
+        return 1.0;
+    }
+
 }

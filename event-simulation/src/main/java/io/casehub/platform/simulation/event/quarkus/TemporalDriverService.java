@@ -28,6 +28,8 @@ public class TemporalDriverService {
 
     private final TemporalDriverFactory<Map<String, Object>> driverFactory;
     private final TemporalProfileRegistry profileRegistry;
+    private final io.casehub.platform.simulation.SimulationRuntime simulationRuntime;
+
     private final ConcurrentHashMap<String, ActiveDriver> activeDrivers = new ConcurrentHashMap<>();
 
     record ActiveDriver(
@@ -38,9 +40,11 @@ public class TemporalDriverService {
     @Inject
     public TemporalDriverService(
             TemporalDriverFactory<Map<String, Object>> driverFactory,
-            TemporalProfileRegistry profileRegistry) {
+            TemporalProfileRegistry profileRegistry,
+            io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
         this.driverFactory = driverFactory;
         this.profileRegistry = profileRegistry;
+        this.simulationRuntime = simulationRuntime;
     }
 
     @PlatformMutation("Start a temporal simulation driver")
@@ -108,6 +112,22 @@ public class TemporalDriverService {
                 .map(e -> buildStatus(e.getKey(), e.getValue()))
                 .toList();
     }
+
+    @PlatformMutation("Set the global speed multiplier for all temporal drivers")
+    public void setGlobalSpeed(double speed) {
+        simulationRuntime.setGlobalSpeed(speed);
+    }
+
+    @PlatformQuery("Get the current global speed multiplier")
+    public double globalSpeed() {
+        return simulationRuntime.globalSpeed();
+    }
+
+    @PlatformMutation("Reset a driver's speed override, reverting to global composition")
+    public void resetDriverSpeed(@PathParam String name) {
+        requireDriver(name).driver().resetSpeed();
+    }
+
 
     private ActiveDriver requireDriver(String name) {
         var active = activeDrivers.get(name);

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MapSimulationConfigTest {
 
@@ -108,4 +109,31 @@ class MapSimulationConfigTest {
         assertThat(config.exhaustionPolicy("anything")).isEmpty();
         assertThat(config.threshold("anything")).isEmpty();
     }
+
+    @Test
+    void defaultSpeedIsOne() {
+        var config = MapSimulationConfig.builder().build();
+        assertThat(config.speed()).isEqualTo(1.0);
+    }
+
+    @Test
+    void builderSpeed() {
+        var config = MapSimulationConfig.builder()
+                                        .speed(5.0)
+                                        .build();
+        assertThat(config.speed()).isEqualTo(5.0);
+    }
+
+    @Test
+    void builderSpeedRejectsZero() {
+        assertThatThrownBy(() -> MapSimulationConfig.builder().speed(0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void builderSpeedRejectsNegative() {
+        assertThatThrownBy(() -> MapSimulationConfig.builder().speed(-1.0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

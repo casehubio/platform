@@ -10,24 +10,28 @@ public final class MapSimulationConfig implements SimulationConfig {
     private final Map<String, Boolean> captures;
     private final Map<String, ExhaustionPolicy> exhaustionPolicies;
     private final Map<String, Double> thresholds;
+    private final double              speed;
+
 
     private MapSimulationConfig(final Map<String, String> strategies,
-                                 final Map<String, Boolean> captures,
-                                 final Map<String, ExhaustionPolicy> exhaustionPolicies,
-                                 final Map<String, Double> thresholds) {
-        this.strategies = Map.copyOf(strategies);
-        this.captures = Map.copyOf(captures);
+                                final Map<String, Boolean> captures,
+                                final Map<String, ExhaustionPolicy> exhaustionPolicies,
+                                final Map<String, Double> thresholds,
+                                final double speed) {
+        this.strategies         = Map.copyOf(strategies);
+        this.captures           = Map.copyOf(captures);
         this.exhaustionPolicies = Map.copyOf(exhaustionPolicies);
-        this.thresholds = Map.copyOf(thresholds);
+        this.thresholds         = Map.copyOf(thresholds);
+        this.speed              = speed;
     }
 
     public static MapSimulationConfig of(final Map<String, String> strategies) {
-        return new MapSimulationConfig(strategies, Map.of(), Map.of(), Map.of());
+        return new MapSimulationConfig(strategies, Map.of(), Map.of(), Map.of(), 1.0);
     }
 
     public static MapSimulationConfig of(final Map<String, String> strategies,
-                                          final Map<String, Boolean> captures) {
-        return new MapSimulationConfig(strategies, captures, Map.of(), Map.of());
+                                         final Map<String, Boolean> captures) {
+        return new MapSimulationConfig(strategies, captures, Map.of(), Map.of(), 1.0);
     }
 
     public static Builder builder() {
@@ -54,6 +58,12 @@ public final class MapSimulationConfig implements SimulationConfig {
         return Optional.ofNullable(thresholds.get(qualifiedName));
     }
 
+    @Override
+    public double speed() {
+        return speed;
+    }
+
+
     public Map<String, String> strategies() {
         return strategies;
     }
@@ -64,6 +74,8 @@ public final class MapSimulationConfig implements SimulationConfig {
         private final Map<String, Boolean> captures = new LinkedHashMap<>();
         private final Map<String, ExhaustionPolicy> exhaustionPolicies = new LinkedHashMap<>();
         private final Map<String, Double> thresholds = new LinkedHashMap<>();
+        private       double              speed      = 1.0;
+
 
         Builder() {}
 
@@ -87,8 +99,15 @@ public final class MapSimulationConfig implements SimulationConfig {
             return this;
         }
 
+        public Builder speed(final double speed) {
+            if (speed <= 0) {throw new IllegalArgumentException("speed must be positive");}
+            this.speed = speed;
+            return this;
+        }
+
+
         public MapSimulationConfig build() {
-            return new MapSimulationConfig(strategies, captures, exhaustionPolicies, thresholds);
+            return new MapSimulationConfig(strategies, captures, exhaustionPolicies, thresholds, speed);
         }
     }
 }

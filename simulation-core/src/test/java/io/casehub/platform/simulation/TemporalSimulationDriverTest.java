@@ -290,7 +290,7 @@ class TemporalSimulationDriverTest {
                                             false, 5.0);
 
         var driver = new TemporalSimulationDriver<>(sink);
-        assertThat(driver.speed()).isEqualTo(0.0);
+        assertThat(driver.speed()).isEqualTo(1.0);
 
         driver.start(profile);
         assertThat(driver.speed()).isEqualTo(5.0);
@@ -300,4 +300,112 @@ class TemporalSimulationDriverTest {
 
         driver.stop();
     }
+
+    @Test
+    void globalSpeedComposesWithProfileSpeed() throws InterruptedException {
+        var config  = MapSimulationConfig.builder().speed(2.0).build();
+        var runtime = new SimulationRuntime(config, new InMemorySimulationCorpus<>());
+        var events  = new ArrayList<String>();
+        var latch   = new CountDownLatch(2);
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {
+                    events.add(event);
+                    latch.countDown();
+                }, runtime);
+
+        var profile = new TemporalProfile<>("test", "test.qn", null,
+                                            new TimedSequence<>(List.of(
+                                                    new TimedEntry<>("a", Duration.ofMillis(50)),
+                                                    new TimedEntry<>("b", Duration.ofMillis(50)))),
+                                            false, 10.0);
+
+        driver.start(profile);
+        latch.await(5, TimeUnit.SECONDS);
+        Thread.sleep(50);
+        driver.stop();
+
+        assertThat(events).containsExactly("a", "b");
+        assertThat(driver.speed()).isEqualTo(20.0);
+    }
+
+    @Test
+    void localOverrideTakesPrecedence() throws InterruptedException {
+        var config  = MapSimulationConfig.builder().speed(2.0).build();
+        var runtime = new SimulationRuntime(config, new InMemorySimulationCorpus<>());
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {}, runtime);
+
+        var profile = new TemporalProfile<>("test", "test.qn", null,
+                                            new TimedSequence<>(List.of(new TimedEntry<>("a", Duration.ofMillis(10)))),
+                                            false, 10.0);
+
+        driver.start(profile);
+        driver.setSpeed(5.0);
+        assertThat(driver.speed()).isEqualTo(5.0);
+        driver.stop();
+    }
+
+    @Test
+    void resetSpeedRevertsToGlobalComposition() throws InterruptedException {
+        var config  = MapSimulationConfig.builder().speed(2.0).build();
+        var runtime = new SimulationRuntime(config, new InMemorySimulationCorpus<>());
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {}, runtime);
+
+        var profile = new TemporalProfile<>("test", "test.qn", null,
+                                            new TimedSequence<>(List.of(new TimedEntry<>("a", Duration.ofMillis(10)))),
+                                            false, 10.0);
+
+        driver.start(profile);
+        driver.setSpeed(5.0);
+        assertThat(driver.speed()).isEqualTo(5.0);
+        driver.resetSpeed();
+        assertThat(driver.speed()).isEqualTo(20.0);
+        driver.stop();
+    }
+
+    @Test
+    void reactiveGlobalSpeedSync() throws InterruptedException {
+        var config  = MapSimulationConfig.builder().speed(1.0).build();
+        var runtime = new SimulationRuntime(config, new InMemorySimulationCorpus<>());
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {}, runtime);
+
+        var profile = new TemporalProfile<>("test", "test.qn", null,
+                                            new TimedSequence<>(List.of(new TimedEntry<>("a", Duration.ofMillis(10)))),
+                                            true, 10.0);
+
+        driver.start(profile);
+        assertThat(driver.speed()).isEqualTo(10.0);
+
+        runtime.setGlobalSpeed(3.0);
+        assertThat(driver.speed()).isEqualTo(30.0);
+
+        driver.stop();
+    }
+
+    @Test
+    void preStartSpeedReflectsGlobal() {
+        var config  = MapSimulationConfig.builder().speed(5.0).build();
+        var runtime = new SimulationRuntime(config, new InMemorySimulationCorpus<>());
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {}, runtime);
+
+        assertThat(driver.speed()).isEqualTo(5.0);
+    }
+
+    @Test
+    void nullRuntimeFallsBackToOne() throws InterruptedException {
+        var driver = new TemporalSimulationDriver<String>(
+                (qn, label, event) -> {});
+
+        var profile = new TemporalProfile<>("test", "test.qn", null,
+                                            new TimedSequence<>(List.of(new TimedEntry<>("a", Duration.ofMillis(10)))),
+                                            false, 10.0);
+
+        driver.start(profile);
+        assertThat(driver.speed()).isEqualTo(10.0);
+        driver.stop();
+    }
+
 }

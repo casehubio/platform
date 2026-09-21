@@ -439,6 +439,39 @@ class YamlSimulationConfigTest {
 
     // --- Helpers ---
 
+
+    @Test
+    void speedParsedFromYaml() {
+        var config = load("""
+                          speed: 5.0
+                          methods:
+                            spi.query:
+                              strategy: seq
+                          """);
+        assertThat(config.speed()).isEqualTo(5.0);
+    }
+
+    @Test
+    void speedDefaultsToOneWhenAbsent() {
+        var config = load("""
+                          methods:
+                            spi.query:
+                              strategy: seq
+                          """);
+        assertThat(config.speed()).isEqualTo(1.0);
+    }
+
+    @Test
+    void speedRejectsNonPositive() {
+        assertThatThrownBy(() -> load("""
+                                      speed: 0
+                                      methods:
+                                        spi.query:
+                                          strategy: seq
+                                      """))
+                .isInstanceOf(io.casehub.platform.simulation.SimulationConfigException.class);
+    }
+
     private YamlSimulationConfig load(String yaml) {
         return new YamlSimulationConfig(
                 new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));

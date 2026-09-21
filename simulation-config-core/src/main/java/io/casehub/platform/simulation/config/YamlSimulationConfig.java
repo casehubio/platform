@@ -36,6 +36,8 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     private final Map<String, MethodConfig> methods;
     private final Map<String, ProfileConfig> profiles;
     private final Map<String, TemporalProfileConfig> temporalProfiles;
+    private final double                             speed;
+
 
     public YamlSimulationConfig(InputStream yamlInput) {
         this(yamlInput, null);
@@ -57,6 +59,12 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             String yamlTenancy = (String) root.get("default-tenancy-id");
             this.defaultTenancyId = defaultTenancyIdOverride != null
                     ? defaultTenancyIdOverride : yamlTenancy;
+
+            this.speed = root.containsKey("speed")
+                    ? ((Number) root.get("speed")).doubleValue() : 1.0;
+            if (this.speed <= 0) {
+                throw new SimulationConfigException("speed must be positive, got: " + this.speed);
+            }
 
             this.methods = parseMethods(
                     (Map<String, Map<String, Object>>) root.get("methods"));
@@ -98,6 +106,12 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         return Optional.ofNullable(methods.get(qualifiedName))
                 .map(MethodConfig::threshold);
     }
+
+    @Override
+    public double speed() {
+        return speed;
+    }
+
 
     public Map<String, String> extractorSpecs() {
         return methods.entrySet().stream()
@@ -507,7 +521,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     }
 
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
-            Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles");
+            Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles", "speed");
 
     private static void warnUnknownKeys(Map<String, Object> root) {
         for (String key : root.keySet()) {

@@ -30,6 +30,12 @@
       "additionalProperties": {
         "$ref": "#/$defs/temporal-profile-config"
       }
+    },
+    "speed": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "default": 1.0,
+      "description": "Global speed multiplier applied to all temporal drivers"
     }
   },
   "$defs": {

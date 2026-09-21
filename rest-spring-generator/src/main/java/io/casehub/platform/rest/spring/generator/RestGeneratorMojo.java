@@ -10,6 +10,7 @@ import org.jboss.jandex.IndexView;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
@@ -17,6 +18,9 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
 
     @Parameter(defaultValue = "${project.build.directory}/generated-sources/rest-spring-generator")
     private File outputDirectory;
+
+    @Parameter
+    private List<String> excludeClassNames;
 
     @Override
     protected File getOutputDirectory() { return outputDirectory; }
@@ -34,6 +38,14 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
         if (descriptors.isEmpty()) {
             getLog().info("No @Path resources found — skipping generation.");
             return;
+        }
+
+        var excluded = excludeClassNames != null ? excludeClassNames : Collections.<String>emptyList();
+        if (!excluded.isEmpty()) {
+            descriptors = descriptors.stream()
+                    .filter(d -> !excluded.contains(d.className()))
+                    .toList();
+            getLog().info("Excluded " + excluded.size() + " resource(s): " + excluded);
         }
 
         var providerScanner = new ProviderScanner();

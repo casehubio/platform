@@ -13,7 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -26,6 +28,9 @@ public class RestVerifyMojo extends AbstractVerifyMojo {
     @Parameter(defaultValue = "${project.basedir}/src/main/java")
     private File sourceDir;
 
+    @Parameter
+    private List<String> excludeClassNames;
+
     @Override
     protected File getOutputDirectory() { return outputDirectory; }
 
@@ -35,7 +40,9 @@ public class RestVerifyMojo extends AbstractVerifyMojo {
     @Override
     protected Set<String> collectSourceTypes(IndexView index) {
         var scanner = new RestResourceScanner();
+        var excluded = excludeClassNames != null ? excludeClassNames : Collections.<String>emptyList();
         return scanner.scan(index).stream()
+                .filter(d -> !excluded.contains(d.className()))
                 .map(RestResourceDescriptor::className)
                 .map(this::simpleClassName)
                 .collect(Collectors.toSet());

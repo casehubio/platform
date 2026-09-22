@@ -21,7 +21,8 @@ public record ProducerDescriptor(
         int orderValue,
         boolean hasFactoryMethod,
         String factoryMethodName,
-        List<ConfigPropertyMethod> configMethods) {
+        List<ConfigPropertyMethod> configMethods,
+        String spiInterface) {
 
     public record ConfigPropertyMethod(String name, String type, String defaultValue) {}
 
@@ -56,7 +57,7 @@ public record ProducerDescriptor(
             boolean cdiDeps) {
         this(producerClassName, methodName, returnType, concreteReturnType,
                 parameters, defaultBean, alternative, priority, cdiDeps,
-                null, null, null, List.of(), null, false, 0, false, null, List.of());
+                null, null, null, List.of(), null, false, 0, false, null, List.of(), null);
     }
 
     public boolean constructorResolved() {

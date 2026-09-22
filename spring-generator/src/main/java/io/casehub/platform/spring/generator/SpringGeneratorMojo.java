@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES,
       requiresDependencyResolution = ResolutionScope.COMPILE)
@@ -21,6 +22,9 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Parameter(defaultValue = "${project.build.directory}/generated-sources/spring-generator")
     private File outputDirectory;
+
+    @Parameter(defaultValue = "${project.basedir}/src/main/java")
+    private File sourceDir;
 
     @Override
     protected File getOutputDirectory() { return outputDirectory; }
@@ -42,6 +46,26 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
         }
 
         try {
+            Set<String> manualBeanTypes = new ManualBeanScanner().scan(sourceDir.toPath());
+            if (!manualBeanTypes.isEmpty()) {
+                descriptors = descriptors.stream()
+                        .filter(d -> {
+                            boolean excluded = manualBeanTypes.contains(d.effectiveReturnType())
+                                    || manualBeanTypes.contains(d.returnType());
+                            if (excluded) {
+                                getLog().info("Skipping " + d.effectiveReturnType()
+                                        + " — already defined in manual config");
+                            }
+                            return !excluded;
+                        })
+                        .toList();
+            }
+
+            if (descriptors.isEmpty()) {
+                getLog().info("All @Produces methods covered by manual config — skipping generation.");
+                return;
+            }
+
             String sourcePackage = deriveSpringPackage(descriptors.get(0).producerClassName());
             String configClassName = deriveConfigClassName(quarkusModule.getName());
 

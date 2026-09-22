@@ -6,6 +6,7 @@ import io.casehub.platform.mock.MockCurrentPrincipal;
 import io.casehub.platform.mock.MockPreferenceProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @AutoConfiguration
+@AutoConfigureBefore(name = "io.casehub.platform.spring.PlatformAutoConfiguration")
 public class PlatformDefaultsManualConfig {
 
     @Bean

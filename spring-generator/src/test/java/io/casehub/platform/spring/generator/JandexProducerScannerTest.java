@@ -227,7 +227,8 @@ void qhorusStyleBeans_eventAndSupplier_allResolved() throws IOException {
     Index scanIndex = indexClasses(SampleConstructorBeans.class, SimplePojo.class,
             SampleConfig.class, SampleProperties.class, SomeInterface.class,
             SomeDep.class, ConfigPojo.class, ListPojo.class, OptionalPojo.class,
-            FactoryPojo.class, EventConsumerPojo.class, SupplierDepPojo.class);
+            FactoryPojo.class, EventConsumerPojo.class, SupplierDepPojo.class,
+            GenericInterface.class, WildcardListPojo.class);
     var scanner = new JandexProducerScanner();
 
     List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);
@@ -244,6 +245,25 @@ void qhorusStyleBeans_eventAndSupplier_allResolved() throws IOException {
 }
 
 
+    @Test
+    void followsReturnType_wildcardListParam_preservesWildcard() throws IOException {
+        Index scanIndex = indexClasses(SampleConstructorBeans.class, SimplePojo.class,
+                                       SampleConfig.class, SampleProperties.class, SomeInterface.class,
+                                       SomeDep.class, ConfigPojo.class, ListPojo.class, OptionalPojo.class,
+                                       FactoryPojo.class, EventConsumerPojo.class, SupplierDepPojo.class,
+                                       GenericInterface.class, WildcardListPojo.class);
+        var scanner = new JandexProducerScanner();
+
+        List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);
+
+        var desc = findByMethod(descriptors, "wildcardListPojo");
+        assertThat(desc.constructorResolved()).isTrue();
+        assertThat(desc.constructorParams()).hasSize(1);
+        assertThat(desc.constructorParams().get(0).kind()).isEqualTo(ProducerDescriptor.ParamKind.LIST);
+        assertThat(desc.constructorParams().get(0).resolvedType()).isNotNull();
+        assertThat(desc.constructorParams().get(0).resolvedType().toString())
+                .contains("GenericInterface<?>");
+    }
 
     private ProducerDescriptor findByMethod(List<ProducerDescriptor> descriptors, String methodName) {
         return descriptors.stream()

@@ -1,6 +1,9 @@
 package io.casehub.platform.spring.generator;
 
+import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.JavaFile;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.WildcardTypeName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -174,7 +177,7 @@ class AutoConfigurationWriterTest {
                 "TestAutoConfiguration", List.of(desc)));
 
         assertThat(source).contains("ObjectProvider<Manifest> manifest");
-        assertThat(source).contains("return new Router(manifest.getIfAvailable());");
+        assertThat(source).contains("return new Router(java.util.Optional.ofNullable(manifest.getIfAvailable()));");
     }
 
     @Test
@@ -350,6 +353,23 @@ void enhancedPath_supplierDepParam_emitsObjectProviderSupplier() {
 }
 
 
+    @Test
+    void enhancedPath_wildcardListParam_preservesGenericWildcard() {
+        ParameterizedTypeName wildcardType = ParameterizedTypeName.get(
+                ClassName.get("io.casehub", "GenericInterface"),
+                WildcardTypeName.subtypeOf(Object.class));
+        var desc = enhancedDescriptor("registry", "io.casehub.Registry",
+                                      List.of(new ProducerDescriptor.ConstructorParam(
+                                              "io.casehub.GenericInterface", "items",
+                                              ProducerDescriptor.ParamKind.LIST, wildcardType)),
+                                      false, false);
+
+        String source = autoConfigSource(writer.generate("io.casehub.spring",
+                                                         "TestAutoConfiguration", List.of(desc)));
+
+        assertThat(source).contains("List<GenericInterface<?>> items");
+        assertThat(source).contains("return new Registry(items);");
+    }
 
     private ProducerDescriptor enhancedDescriptor(String methodName, String returnType,
                                                    List<ProducerDescriptor.ConstructorParam> params,

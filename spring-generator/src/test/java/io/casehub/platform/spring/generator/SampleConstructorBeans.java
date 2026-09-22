@@ -59,6 +59,14 @@ class SampleConstructorBeans {
                                                jakarta.enterprise.event.Event<String> stringEvent) {
         return new EventConsumerPojo(dep, stringEvent::fire);
     }
+
+    @Produces
+    @DefaultBean
+    @ApplicationScoped
+    public WildcardListPojo wildcardListPojo(Instance<GenericInterface<?>> items) {
+        return new WildcardListPojo(items.stream().toList());
+    }
+
 }
 
 @ApplicationScoped

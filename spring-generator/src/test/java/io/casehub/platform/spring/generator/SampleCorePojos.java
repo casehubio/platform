@@ -83,3 +83,15 @@ class EventConsumerPojo {
         this.eventListener = eventListener;
     }
 }
+
+interface GenericInterface<T> {}
+
+class WildcardListPojo {
+    private final List<GenericInterface<?>> items;
+
+    public WildcardListPojo(List<GenericInterface<?>> items) {
+        this.items = items;
+    }
+}
+
+

@@ -1,5 +1,7 @@
 package io.casehub.platform.spring.generator;
 
+import com.palantir.javapoet.TypeName;
+import io.casehub.platform.generator.JandexTypeConverter;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
@@ -160,7 +162,7 @@ public class JandexProducerScanner {
                         }
                         var result2 = resolveParamKind(paramType, scanIndex, resolveIndex);
                         ctorParams.add(new ProducerDescriptor.ConstructorParam(
-                                result2.type, pName, result2.kind));
+                                result2.type, pName, result2.kind, result2.resolvedType));
                         if (result2.kind == ProducerDescriptor.ParamKind.CONFIG_PROPERTIES) {
                             configPrefix = result2.configPrefix;
                             configInterface = result2.configInterface;
@@ -217,38 +219,49 @@ public class JandexProducerScanner {
     }
 
     private record ParamResolution(String type, ProducerDescriptor.ParamKind kind,
-                                   String configPrefix, String configInterface) {}
+                                   String configPrefix, String configInterface,
+                                   TypeName resolvedType) {}
 
     private ParamResolution resolveParamKind(Type paramType, IndexView scanIndex, IndexView resolveIndex) {
         if (paramType.kind() == Type.Kind.PARAMETERIZED_TYPE) {
             DotName rawName = paramType.asParameterizedType().name();
             if (JAVA_LIST.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
-                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
-                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.LIST, null, null);
+                Type     innerType = paramType.asParameterizedType().arguments().get(0);
+                String   typeArg   = innerType.name().toString();
+                TypeName resolved  = JandexTypeConverter.toTypeName(innerType);
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.LIST, null, null, resolved);
             }
             if (JAVA_OPTIONAL.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
-                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
-                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.OPTIONAL, null, null);
+                Type     innerType = paramType.asParameterizedType().arguments().get(0);
+                String   typeArg   = innerType.name().toString();
+                TypeName resolved  = JandexTypeConverter.toTypeName(innerType);
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.OPTIONAL, null, null, resolved);
             }
             if (JAVA_CONSUMER.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
-                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
-                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.EVENT_CONSUMER, null, null);
+                Type     innerType = paramType.asParameterizedType().arguments().get(0);
+                String   typeArg   = innerType.name().toString();
+                TypeName resolved  = JandexTypeConverter.toTypeName(innerType);
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.EVENT_CONSUMER, null, null, resolved);
             }
             if (JAVA_SUPPLIER.equals(rawName) && !paramType.asParameterizedType().arguments().isEmpty()) {
-                String typeArg = paramType.asParameterizedType().arguments().get(0).name().toString();
-                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.SUPPLIER_DEP, null, null);
+                Type     innerType = paramType.asParameterizedType().arguments().get(0);
+                String   typeArg   = innerType.name().toString();
+                TypeName resolved  = JandexTypeConverter.toTypeName(innerType);
+                return new ParamResolution(typeArg, ProducerDescriptor.ParamKind.SUPPLIER_DEP, null, null, resolved);
             }
         }
 
-        DotName typeName = paramType.name();
-        var configResult = findConfigMapping(typeName, scanIndex, resolveIndex);
+        DotName typeName     = paramType.name();
+        var     configResult = findConfigMapping(typeName, scanIndex, resolveIndex);
         if (configResult != null) {
             return new ParamResolution(typeName.toString(),
-                    ProducerDescriptor.ParamKind.CONFIG_PROPERTIES,
-                    configResult.prefix, configResult.interfaceName);
+                                       ProducerDescriptor.ParamKind.CONFIG_PROPERTIES,
+                                       configResult.prefix, configResult.interfaceName,
+                                       JandexTypeConverter.toTypeName(paramType));
         }
 
-        return new ParamResolution(typeName.toString(), ProducerDescriptor.ParamKind.PLAIN, null, null);
+        return new ParamResolution(typeName.toString(), ProducerDescriptor.ParamKind.PLAIN, null, null,
+                                   JandexTypeConverter.toTypeName(paramType));
     }
 
     private record ConfigMappingResult(String prefix, String interfaceName) {}

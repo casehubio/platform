@@ -2,7 +2,6 @@ package io.casehub.platform.spring.generator;
 
 import com.palantir.javapoet.AnnotationSpec;
 import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.JavaFile;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.ParameterSpec;
@@ -12,7 +11,6 @@ import com.palantir.javapoet.TypeSpec;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class AutoConfigurationWriter {
@@ -139,22 +137,18 @@ public class AutoConfigurationWriter {
             switch (cp.kind()) {
                 case LIST -> {
                     ParameterizedTypeName listType = ParameterizedTypeName.get(
-                            ClassName.get(java.util.List.class), toClassName(cp.type()));
+                            ClassName.get(java.util.List.class), resolveType(cp));
                     builder.addParameter(listType, cp.name());
                     paramNames.add(cp.name());
                 }
                 case OPTIONAL -> {
                     ParameterizedTypeName providerType = ParameterizedTypeName.get(
-                            OBJECT_PROVIDER, toClassName(cp.type()));
+                            OBJECT_PROVIDER, resolveType(cp));
                     builder.addParameter(providerType, cp.name());
-                    if (d.hasFactoryMethod()) {
-                        paramNames.add("java.util.Optional.ofNullable(" + cp.name() + ".getIfAvailable())");
-                    } else {
-                        paramNames.add(cp.name() + ".getIfAvailable()");
-                    }
+                    paramNames.add("java.util.Optional.ofNullable(" + cp.name() + ".getIfAvailable())");
                 }
                 case CONFIG_PROPERTIES -> {
-                    TypeName paramType = propsRecordType != null ? propsRecordType : toClassName(cp.type());
+                    TypeName paramType = propsRecordType != null ? propsRecordType : resolveType(cp);
                     builder.addParameter(paramType, cp.name());
                     paramNames.add(cp.name());
                 }
@@ -163,12 +157,12 @@ public class AutoConfigurationWriter {
                 }
                 case SUPPLIER_DEP -> {
                     ParameterizedTypeName providerType = ParameterizedTypeName.get(
-                            OBJECT_PROVIDER, toClassName(cp.type()));
+                            OBJECT_PROVIDER, resolveType(cp));
                     builder.addParameter(providerType, cp.name());
                     paramNames.add(cp.name() + ".getIfAvailable() != null ? " + cp.name() + "::getObject : null");
                 }
                 case PLAIN -> {
-                    builder.addParameter(toClassName(cp.type()), cp.name());
+                    builder.addParameter(resolveType(cp), cp.name());
                     paramNames.add(cp.name());
                 }
             }
@@ -272,6 +266,11 @@ public class AutoConfigurationWriter {
                 .findFirst()
                 .map(this::toClassName)
                 .orElse(null);
+    }
+
+
+    private TypeName resolveType(ProducerDescriptor.ConstructorParam cp) {
+        return cp.resolvedType() != null ? cp.resolvedType() : toClassName(cp.type());
     }
 
     private ClassName toClassName(String fqn) {

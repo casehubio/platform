@@ -1,5 +1,7 @@
 package io.casehub.platform.spring.generator;
 
+import com.palantir.javapoet.TypeName;
+
 import java.util.List;
 
 public record ProducerDescriptor(
@@ -29,7 +31,11 @@ public record ProducerDescriptor(
         PLAIN, LIST, OPTIONAL, CONFIG_PROPERTIES, EVENT_CONSUMER, SUPPLIER_DEP
     }
 
-    public record ConstructorParam(String type, String name, ParamKind kind) {
+    public record ConstructorParam(String type, String name, ParamKind kind, TypeName resolvedType) {
+
+        public ConstructorParam(String type, String name, ParamKind kind) {
+            this(type, name, kind, null);
+        }
 
         public String simpleType() {
             int dot = type.lastIndexOf('.');

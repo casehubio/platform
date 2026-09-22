@@ -38,7 +38,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     @Override
     public Set<String> getSupportedOptions() {
-        return Set.of("generateGraphQL", "generateRest", "domainFilter");
+        return Set.of("generateGraphQL", "generateRest", "domainFilter",
+                      "restPackage", "graphqlPackage");
     }
 
 
@@ -165,8 +166,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         for (var element : roundEnv.getElementsAnnotatedWith(pathType)) {
             if (element.getKind() != javax.lang.model.element.ElementKind.CLASS) continue;
             String name = ((TypeElement) element).getQualifiedName().toString();
-
-            if (name.contains(".generated.")) continue;
 
             var mcpDomain = element.getAnnotation(
                     processingEnv.getElementUtils().getTypeElement(
@@ -691,7 +690,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void generateResolverSource(String domain, DomainOperations ops,
                                         Set<String> handWrittenMethods) {
-        String className = "Generated" + toPascalCase(domain) + "Resolver";
+        String className = toPascalCase(domain) + "Resolver";
         if (!SourceVersion.isIdentifier(className)) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                                      "GraphQL generator: domain '" + domain
@@ -699,7 +698,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                      + "'. Domain names must contain only alphanumerics, hyphens, and slashes.");
             return;
         }
-        String packageName = "io.casehub.platform.graphql.generated";
+        String graphqlPkgOverride = processingEnv.getOptions().get("graphqlPackage");
+        String packageName = graphqlPkgOverride != null
+            ? graphqlPkgOverride
+            : deriveOutputPackage(spiPackage(ops), "graphql");
         String fqcn        = packageName + "." + className;
 
         Set<String>             spiImports = new HashSet<>();
@@ -785,7 +787,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void generateRestResourceSource(String domain, DomainOperations ops,
                                             Set<String> handWrittenMethods) {
-        String className = "Generated" + toPascalCase(domain) + "Resource";
+        String className = toPascalCase(domain) + "Resource";
         if (!SourceVersion.isIdentifier(className)) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                                      "REST generator: domain '" + domain
@@ -793,7 +795,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                      + "'. Domain names must contain only alphanumerics, hyphens, and slashes.");
             return;
         }
-        String packageName = "io.casehub.platform.rest.generated";
+        String restPkgOverride = processingEnv.getOptions().get("restPackage");
+        String packageName = restPkgOverride != null
+            ? restPkgOverride
+            : deriveOutputPackage(spiPackage(ops), "rest");
         String fqcn        = packageName + "." + className;
 
         Set<String>             spiImports = new HashSet<>();
@@ -1272,6 +1277,26 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
         return sb.toString();
     }
+
+    static String deriveOutputPackage(String spiPackage, String channel) {
+        int apiIdx = spiPackage.indexOf(".api.");
+        if (apiIdx >= 0) {
+            return spiPackage.substring(0, apiIdx) + "." + channel
+                   + spiPackage.substring(apiIdx + 4);
+        }
+        if (spiPackage.endsWith(".api")) {
+            return spiPackage.substring(0, spiPackage.length() - 4) + "." + channel;
+        }
+        return spiPackage + "." + channel;
+    }
+
+    private static String spiPackage(DomainOperations ops) {
+        if (ops.operations.isEmpty()) {return "";}
+        String fqcn    = ops.operations.get(0).declaringClassFqcn();
+        int    lastDot = fqcn.lastIndexOf('.');
+        return lastDot > 0 ? fqcn.substring(0, lastDot) : "";
+    }
+
 
     static String resolveHttpVerb(OperationType type, String restMethodOverride) {
         if (restMethodOverride != null) {

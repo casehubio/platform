@@ -44,12 +44,13 @@ public class GraphqlSpringGeneratorMojo extends AbstractGeneratorMojo {
             int count = 0;
 
             for (DomainScanResult domain : domains) {
-                String targetPackage = "io.casehub.platform.graphql.spring.generated";
+                String graphqlTargetPackage = deriveOutputPackage(spiPackage(domain), "graphql") + ".spring";
+                String restTargetPackage = deriveOutputPackage(spiPackage(domain), "rest") + ".spring";
 
-                JavaFile graphqlFile = graphqlWriter.generate(domain, targetPackage);
+                JavaFile graphqlFile = graphqlWriter.generate(domain, graphqlTargetPackage);
                 graphqlFile.writeTo(outputDirectory);
 
-                JavaFile restFile = restWriter.generate(domain, targetPackage);
+                JavaFile restFile = restWriter.generate(domain, restTargetPackage);
                 restFile.writeTo(outputDirectory);
 
                 count += 2;
@@ -62,5 +63,23 @@ public class GraphqlSpringGeneratorMojo extends AbstractGeneratorMojo {
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to generate Spring GraphQL controllers", e);
         }
+    }
+
+    static String deriveOutputPackage(String spiPackage, String channel) {
+        int apiIdx = spiPackage.indexOf(".api.");
+        if (apiIdx >= 0) {
+            return spiPackage.substring(0, apiIdx) + "." + channel
+                   + spiPackage.substring(apiIdx + 4);
+        }
+        if (spiPackage.endsWith(".api")) {
+            return spiPackage.substring(0, spiPackage.length() - 4) + "." + channel;
+        }
+        return spiPackage + "." + channel;
+    }
+
+    private static String spiPackage(DomainScanResult domain) {
+        String fqcn    = domain.sourceFqcn();
+        int    lastDot = fqcn.lastIndexOf('.');
+        return lastDot > 0 ? fqcn.substring(0, lastDot) : "";
     }
 }

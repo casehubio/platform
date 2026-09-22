@@ -277,7 +277,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedPagesResource")
+                "test.rest.PagesResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("@QueryParam(\"page_size\")");
         assertThat(content).contains("@QueryParam(\"page_num\")");
@@ -306,7 +306,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedAdminResource")
+                "test.rest.AdminResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("jakarta.annotation.security.RolesAllowed");
         assertThat(content).contains("\"admin\"");
@@ -334,7 +334,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedItemsResource")
+                "test.rest.ItemsResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("Response.ok(");
     }
@@ -363,17 +363,17 @@ class GraphQLResolverProcessorTest {
                                                              .compile(spi);
 
         var restSource = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedSampleResource");
+                "test.rest.SampleResource");
         assertThat(restSource).isPresent();
 
         String content = restSource.get().getCharContent(true).toString();
-        assertThat(content).contains("class GeneratedSampleResource");
+        assertThat(content).contains("class SampleResource");
         assertThat(content).contains("@Path(\"/api/sample\")");
         assertThat(content).contains("import test.SampleApi;");
         assertThat(content).contains("public Response listItems(");
 
         var graphqlSource = compilation.generatedSourceFile(
-                "io.casehub.platform.graphql.generated.GeneratedSampleResolver");
+                "test.graphql.SampleResolver");
         assertThat(graphqlSource).isEmpty();
     }
 
@@ -411,11 +411,11 @@ class GraphQLResolverProcessorTest {
                                                              .compile(spi1, spi2);
 
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedAlphaResource")).isPresent();
+                "test.rest.AlphaResource")).isPresent();
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedBetaResource")).isEmpty();
+                "test.rest.BetaResource")).isEmpty();
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.graphql.generated.GeneratedAlphaResolver")).isEmpty();
+                "test.graphql.AlphaResolver")).isEmpty();
     }
 
     @Test
@@ -439,9 +439,9 @@ class GraphQLResolverProcessorTest {
                                                              .compile(spi);
 
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.graphql.generated.GeneratedGammaResolver")).isEmpty();
+                "test.graphql.GammaResolver")).isEmpty();
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedGammaResource")).isPresent();
+                "test.rest.GammaResource")).isPresent();
     }
 
     @Test
@@ -454,7 +454,7 @@ class GraphQLResolverProcessorTest {
                 import io.casehub.platform.api.mcp.PlatformQuery;
                 import java.util.List;
                 
-                @McpDomain("delivery-channels")
+                @McpDomain("test-delivery-channels")
                 public interface DeliveryChannelApi {
                     @PlatformQuery("List channels") List<String> listChannels();
                 }
@@ -462,16 +462,16 @@ class GraphQLResolverProcessorTest {
 
         var compilation = com.google.testing.compile.Compiler.javac()
                                                              .withProcessors(new GraphQLResolverProcessor())
-                                                             .withOptions("-AdomainFilter=delivery-channels", "-AgenerateGraphQL=false")
+                                                             .withOptions("-AdomainFilter=test-delivery-channels", "-AgenerateGraphQL=false")
                                                              .compile(spi);
 
         var restSource = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedDeliveryChannelsResource");
+                "test.rest.TestDeliveryChannelsResource");
         assertThat(restSource).isPresent();
 
         String content = restSource.get().getCharContent(true).toString();
-        assertThat(content).contains("class GeneratedDeliveryChannelsResource");
-        assertThat(content).contains("@Path(\"/api/delivery-channels\")");
+        assertThat(content).contains("class TestDeliveryChannelsResource");
+        assertThat(content).contains("@Path(\"/api/test-delivery-channels\")");
     }
 
 
@@ -497,7 +497,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         var restSource = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedEventsResource");
+                "test.rest.EventsResource");
         assertThat(restSource).isPresent();
 
         String content = restSource.get().getCharContent(true).toString();
@@ -530,7 +530,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.graphql.generated.GeneratedSubsResolver")
+                "test.graphql.SubsResolver")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("Subscription");
         assertThat(content).doesNotContain("@Query\n");
@@ -558,7 +558,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedPlainResource")
+                "test.rest.PlainResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("@RunOnVirtualThread");
         assertThat(content).contains("public Response getItem(");
@@ -593,7 +593,7 @@ class GraphQLResolverProcessorTest {
                 .compile(spi, pageType);
 
         String content = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedListsResource")
+                "test.rest.ListsResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("X-Total-Count");
         assertThat(content).contains("__pageResult.totalCount()");
@@ -632,7 +632,7 @@ class GraphQLResolverProcessorTest {
                 .compile(cls);
 
         var restSource = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedStatusResource");
+                "test.rest.StatusResource");
         assertThat(restSource).isPresent();
 
         String restContent = restSource.get().getCharContent(true).toString();
@@ -642,7 +642,7 @@ class GraphQLResolverProcessorTest {
         assertThat(restContent).contains("statusService.getStatus()");
 
         var graphqlSource = compilation.generatedSourceFile(
-                "io.casehub.platform.graphql.generated.GeneratedStatusResolver");
+                "test.graphql.StatusResolver");
         assertThat(graphqlSource).isPresent();
 
         String gqlContent = graphqlSource.get().getCharContent(true).toString();
@@ -675,7 +675,7 @@ class GraphQLResolverProcessorTest {
                 assertThat(diag.getMessage(null)).contains("without a visible CDI scope annotation"));
 
         assertThat(compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedUnscopedResource")).isPresent();
+                "test.rest.UnscopedResource")).isPresent();
     }
 
     @Test
@@ -730,13 +730,120 @@ class GraphQLResolverProcessorTest {
                 .compile(cls);
 
         var restSource = compilation.generatedSourceFile(
-                "io.casehub.platform.rest.generated.GeneratedTenantItemsResource");
+                "test.rest.TenantItemsResource");
         assertThat(restSource).isPresent();
 
         String content = restSource.get().getCharContent(true).toString();
         assertThat(content).contains("currentPrincipal.tenancyId()");
         assertThat(content).contains("CurrentPrincipal currentPrincipal;");
         assertThat(content).doesNotContain("@QueryParam(\"tenancyId\")");
+    }
+
+
+    @Test
+    void restPackageOverrideTakesPrecedence() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.OverrideApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("override")
+                public interface OverrideApi {
+                    @PlatformQuery("Get data") String getData();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=override", "-AgenerateGraphQL=false",
+                                                                          "-ArestPackage=custom.pkg")
+                                                             .compile(spi);
+
+        assertThat(compilation.generatedSourceFile(
+                "custom.pkg.OverrideResource")).isPresent();
+    }
+
+    @Test
+    void graphqlPackageOverrideTakesPrecedence() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GqlOverrideApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("gql-override")
+                public interface GqlOverrideApi {
+                    @PlatformQuery("Get data") String getData();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=gql-override", "-AgenerateRest=false",
+                                                                          "-AgraphqlPackage=custom.gql")
+                                                             .compile(spi);
+
+        assertThat(compilation.generatedSourceFile(
+                "custom.gql.GqlOverrideResolver")).isPresent();
+    }
+
+    @Test
+    void apiSubpackageDerivation() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "com.example.api.billing.InvoiceApi",
+                """
+                package com.example.api.billing;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("invoices")
+                public interface InvoiceApi {
+                    @PlatformQuery("List invoices") java.util.List<String> list();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=invoices", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        assertThat(compilation.generatedSourceFile(
+                "com.example.rest.billing.InvoicesResource")).isPresent();
+    }
+
+    @Test
+    void deriveOutputPackage_replacesApiMiddle() {
+        assertThat(GraphQLResolverProcessor.deriveOutputPackage(
+                "io.casehub.platform.api.acl", "rest"))
+                .isEqualTo("io.casehub.platform.rest.acl");
+    }
+
+    @Test
+    void deriveOutputPackage_replacesApiEnd() {
+        assertThat(GraphQLResolverProcessor.deriveOutputPackage(
+                "io.casehub.chat.api", "rest"))
+                .isEqualTo("io.casehub.chat.rest");
+    }
+
+    @Test
+    void deriveOutputPackage_appendsWhenNoApi() {
+        assertThat(GraphQLResolverProcessor.deriveOutputPackage(
+                "io.casehub.something", "rest"))
+                .isEqualTo("io.casehub.something.rest");
+    }
+
+    @Test
+    void deriveOutputPackage_graphqlChannel() {
+        assertThat(GraphQLResolverProcessor.deriveOutputPackage(
+                "io.casehub.platform.api.acl", "graphql"))
+                .isEqualTo("io.casehub.platform.graphql.acl");
+    }
+
+    @Test
+    void deriveOutputPackage_singleSegment() {
+        assertThat(GraphQLResolverProcessor.deriveOutputPackage(
+                "test", "rest"))
+                .isEqualTo("test.rest");
     }
 
     private static String decapitalize(String s) {

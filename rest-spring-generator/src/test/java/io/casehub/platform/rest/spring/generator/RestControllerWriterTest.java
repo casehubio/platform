@@ -118,5 +118,7 @@ class RestControllerWriterTest {
         assertThat(source).contains("SseEmitter");
         assertThat(source).contains("subscribe");
         assertThat(source).doesNotContain("Flow.Publisher");
+        assertThat(source).contains("Flow.Subscription subscription");
+        assertThat(source).doesNotContain("Flow.Subscription<");
     }
 }

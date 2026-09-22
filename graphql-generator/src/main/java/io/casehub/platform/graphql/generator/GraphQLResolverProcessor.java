@@ -63,6 +63,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
     private static final DotName PAGINATED_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
+    private static final DotName VALID_ANN         = DotName.createSimple("jakarta.validation.Valid");
+    private static final DotName DEFAULT_VALUE_ANN = DotName.createSimple("io.casehub.platform.api.mcp.DefaultValue");
     private static final DotName HAND_WRITTEN_ANN  = DotName.createSimple("io.casehub.platform.api.mcp.HandWrittenEndpoint");
     private static final DotName UNLESS_PROFILE    = DotName.createSimple("io.quarkus.arc.profile.UnlessBuildProfile");
 
@@ -381,8 +383,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean isContextParam = cpAnn != null;
             String contextParamKey = (cpAnn != null && cpAnn.value() != null) ? cpAnn.value().asString() : null;
 
+            boolean hasValid = findParameterAnnotation(method, i, VALID_ANN) != null;
+
+            AnnotationInstance dvAnn = findParameterAnnotation(method, i, DEFAULT_VALUE_ANN);
+            String defaultValue = (dvAnn != null && dvAnn.value() != null) ? dvAnn.value().asString() : null;
+
             boolean simple = isSimpleType(typeFqcn, jandexIndex);
-            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
+            params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue));
         }
 
         imports.add(declaringClass.name().toString());
@@ -631,8 +638,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     boolean isContextParam = cpAnn != null;
                     String contextParamKey = isContextParam ? extractAnnotationStringValue(cpAnn) : null;
 
+                    boolean hasValid = findAnnotationMirror(param, "jakarta.validation.Valid") != null;
+
+                    javax.lang.model.element.AnnotationMirror dvAnn = findAnnotationMirror(param,
+                                                                                            "io.casehub.platform.api.mcp.DefaultValue");
+                    String defaultValue = dvAnn != null ? extractAnnotationStringValue(dvAnn) : null;
+
                     boolean simple = isSimpleTypeMirror(param.asType());
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue));
                 }
 
                 String classFqcn   = typeElement.getQualifiedName().toString();
@@ -943,13 +956,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             if (!firstParam) {params.append(", ");}
             firstParam = false;
 
+            if (p.hasValid()) {
+                params.append("@jakarta.validation.Valid ");
+            }
+
             if (pathParamPositions.contains(i)) {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
                 params.append("@jakarta.ws.rs.PathParam(\"").append(pathName).append("\") ");
             } else if (i == bodyParamIndex) {
-                params.append("@jakarta.validation.Valid ");
+                // body param — no additional annotation needed beyond @Valid above
             } else {
                 String qpName = p.restName() != null ? p.restName() : p.name();
+                if (p.defaultValue() != null) {
+                    params.append("@jakarta.ws.rs.DefaultValue(\"").append(escapeJavaString(p.defaultValue())).append("\") ");
+                }
                 params.append("@QueryParam(\"").append(qpName).append("\") ");
             }
             params.append(p.typeStr()).append(" ").append(p.name());
@@ -973,8 +993,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         boolean hasPathParam = !pathParams.isEmpty();
         String delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
         if (op.paginated()) {
-            out.println("        var page = " + delegateCall + ";");
-            out.println("        return Response.ok(page).header(\"X-Total-Count\", String.valueOf(page." + op.totalCountMethod() + "())).build();");
+            out.println("        var __pageResult = " + delegateCall + ";");
+            out.println("        return Response.ok(__pageResult).header(\"X-Total-Count\", String.valueOf(__pageResult." + op.totalCountMethod() + "())).build();");
         } else {
             String responseCode = generateResponseCode(op.returnTypeStr(), delegateCall, isMutation, op.restStatusOverride(), hasPathParam);
             out.println("        " + responseCode);
@@ -1405,7 +1425,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean isSimpleType,
             String restName,
             boolean isContextParam,
-            String contextParamKey
+            String contextParamKey,
+            boolean hasValid,
+            String defaultValue
     ) {}
 
 

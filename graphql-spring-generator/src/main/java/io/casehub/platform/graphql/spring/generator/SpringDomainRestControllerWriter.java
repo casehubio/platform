@@ -148,17 +148,24 @@ public class SpringDomainRestControllerWriter {
             if (p.isContextParam()) { continue; }
             ParameterSpec.Builder paramBuilder = ParameterSpec.builder(p.typeName(), p.name());
 
+            if (p.hasValid()) {
+                paramBuilder.addAnnotation(VALID);
+            }
+
             if (pathParamPositions.contains(i)) {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
                 paramBuilder.addAnnotation(AnnotationSpec.builder(PATH_VARIABLE)
                         .addMember("value", "$S", pathName).build());
             } else if (i == bodyParamIndex) {
-                paramBuilder.addAnnotation(VALID);
                 paramBuilder.addAnnotation(REQUEST_BODY);
             } else {
                 String qpName = p.restName() != null ? p.restName() : p.name();
-                paramBuilder.addAnnotation(AnnotationSpec.builder(REQUEST_PARAM)
-                        .addMember("value", "$S", qpName).build());
+                AnnotationSpec.Builder rp = AnnotationSpec.builder(REQUEST_PARAM)
+                        .addMember("value", "$S", qpName);
+                if (p.defaultValue() != null) {
+                    rp.addMember("defaultValue", "$S", p.defaultValue());
+                }
+                paramBuilder.addAnnotation(rp.build());
             }
 
             builder.addParameter(paramBuilder.build());
@@ -171,8 +178,8 @@ public class SpringDomainRestControllerWriter {
         boolean isMutation = op.type() == OperationType.MUTATION;
 
         if (op.paginated()) {
-            builder.addStatement("var page = $L", delegateCall);
-            builder.addStatement("return $T.ok().header(\"X-Total-Count\", String.valueOf(page.$L())).body(page)",
+            builder.addStatement("var __pageResult = $L", delegateCall);
+            builder.addStatement("return $T.ok().header(\"X-Total-Count\", String.valueOf(__pageResult.$L())).body(__pageResult)",
                     RESPONSE_ENTITY, op.totalCountMethod());
         } else {
             builder.addCode(generateResponseCode(op.returnTypeStr(), delegateCall, isMutation,

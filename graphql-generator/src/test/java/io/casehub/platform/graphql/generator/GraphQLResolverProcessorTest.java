@@ -596,7 +596,7 @@ class GraphQLResolverProcessorTest {
                 "io.casehub.platform.rest.generated.GeneratedListsResource")
                 .get().getCharContent(true).toString();
         assertThat(content).contains("X-Total-Count");
-        assertThat(content).contains("page.totalCount()");
+        assertThat(content).contains("__pageResult.totalCount()");
     }
 
     @Test

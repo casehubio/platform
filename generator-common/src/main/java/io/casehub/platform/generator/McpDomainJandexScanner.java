@@ -31,6 +31,8 @@ public class McpDomainJandexScanner {
     private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
     private static final DotName PAGINATED_ANN = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
+    private static final DotName VALID_ANN = DotName.createSimple("jakarta.validation.Valid");
+    private static final DotName DEFAULT_VALUE_ANN = DotName.createSimple("io.casehub.platform.api.mcp.DefaultValue");
 
     public List<DomainScanResult> scan(IndexView index) {
         Map<String, DomainScanResult> domains = new LinkedHashMap<>();
@@ -116,8 +118,13 @@ public class McpDomainJandexScanner {
                     boolean isContextParam = cpAnn != null;
                     String contextParamKey = (cpAnn != null && cpAnn.value() != null) ? cpAnn.value().asString() : null;
 
+                    boolean hasValid = findParameterAnnotation(method, i, VALID_ANN) != null;
+
+                    AnnotationInstance dvAnn = findParameterAnnotation(method, i, DEFAULT_VALUE_ANN);
+                    String defaultValue = (dvAnn != null && dvAnn.value() != null) ? dvAnn.value().asString() : null;
+
                     boolean simple = GeneratorUtils.isSimpleType(typeFqcn, index);
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue));
                 }
 
                 typeImports.add(classInfo.name().toString());

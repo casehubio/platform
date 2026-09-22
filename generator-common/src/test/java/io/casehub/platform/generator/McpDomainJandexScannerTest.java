@@ -80,6 +80,36 @@ class McpDomainJandexScannerTest {
     }
 
     @Test
+    void scansDefaultValueOnParams() {
+        var              scanner = new McpDomainJandexScanner();
+        DomainScanResult domain  = scanner.scan(index).get(0);
+
+        ResolvedOperation query = domain.operations().stream()
+                                        .filter(o -> o.methodName().equals("listItems")).findFirst().orElseThrow();
+        ResolvedParam pageSize = query.params().stream()
+                                      .filter(p -> p.name().equals("pageSize")).findFirst().orElseThrow();
+        assertThat(pageSize.defaultValue()).isEqualTo("20");
+    }
+
+    @Test
+    void scansValidOnParams() {
+        var              scanner = new McpDomainJandexScanner();
+        DomainScanResult domain  = scanner.scan(index).get(0);
+
+        ResolvedOperation mutation = domain.operations().stream()
+                                           .filter(o -> o.methodName().equals("createItem")).findFirst().orElseThrow();
+        ResolvedParam name = mutation.params().get(0);
+        assertThat(name.hasValid()).isTrue();
+
+        ResolvedOperation query = domain.operations().stream()
+                                        .filter(o -> o.methodName().equals("listItems")).findFirst().orElseThrow();
+        ResolvedParam tenancyId = query.params().stream()
+                                       .filter(p -> p.name().equals("tenancyId")).findFirst().orElseThrow();
+        assertThat(tenancyId.hasValid()).isFalse();
+    }
+
+
+    @Test
     void scansPathParam() {
         var scanner = new McpDomainJandexScanner();
         DomainScanResult domain = scanner.scan(index).get(0);

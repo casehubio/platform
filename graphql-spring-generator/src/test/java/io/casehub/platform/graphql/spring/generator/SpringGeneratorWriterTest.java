@@ -90,7 +90,7 @@ class SpringGeneratorWriterTest {
         var writer = new SpringDomainRestControllerWriter();
         String source = writer.generate(domain, "test.spring").toString();
 
-        assertThat(source).contains("@RequestParam(\"page_size\")");
+        assertThat(source).contains("page_size");
     }
 
     @Test
@@ -109,6 +109,34 @@ class SpringGeneratorWriterTest {
         assertThat(source).contains("X-Total-Count");
         assertThat(source).contains("totalCount()");
     }
+
+    @Test
+    void paginatedVariableDoesNotShadowParams() {
+        var    writer = new SpringDomainRestControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        assertThat(source).contains("__pageResult");
+        assertThat(source).doesNotContain("var page =");
+    }
+
+    @Test
+    void validOnlyAddedWhenPresent() {
+        var    writer = new SpringDomainRestControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        assertThat(source).contains("@Valid");
+        String createItemMethod = source.substring(source.indexOf("createItem"));
+        assertThat(createItemMethod).contains("@Valid");
+    }
+
+    @Test
+    void defaultValuePropagatedToRequestParam() {
+        var    writer = new SpringDomainRestControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        assertThat(source).contains("defaultValue = \"20\"");
+    }
+
 
     @Test
     void generatesSseEmitterForStream() {

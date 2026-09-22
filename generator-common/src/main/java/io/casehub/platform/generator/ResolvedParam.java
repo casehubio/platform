@@ -12,5 +12,7 @@ public record ResolvedParam(
         boolean isSimpleType,
         String restName,
         boolean isContextParam,
-        String contextParamKey
+        String contextParamKey,
+        boolean hasValid,
+        String defaultValue
 ) {}

@@ -3,9 +3,6 @@ package io.casehub.platform.spring.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.PreferenceStore;
-import io.casehub.platform.callback.spring.CallbackSpringAutoConfiguration;
-import io.casehub.platform.mcp.spring.McpSpringAutoConfiguration;
-import io.casehub.platform.spring.rest.RestControllersAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,12 +14,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import org.springframework.context.annotation.Import;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(TestStubConfiguration.class)
 class SpringBootCompositionTest {
 
     @Autowired
@@ -36,6 +30,17 @@ class SpringBootCompositionTest {
 
     @Test
     void contextLoads() {
+    }
+
+    @Test
+    void noOpFallbackBeansRegistered() {
+        assertThat(context.getBean(io.casehub.platform.api.identity.GroupMembershipProvider.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.preferences.PreferenceSchemaRegistry.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.mcp.McpResourceRegistry.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.acl.AccessControlProvider.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.endpoints.EndpointRegistry.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.expression.ExpressionEngineRegistry.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.governance.PolicyEnforcer.class)).isNotNull();
     }
 
     @Test

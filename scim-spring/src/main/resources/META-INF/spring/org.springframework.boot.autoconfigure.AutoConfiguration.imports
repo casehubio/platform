@@ -1,1 +1,2 @@
 io.casehub.platform.scim.spring.ScimSpringManualConfig
+io.casehub.platform.scim.spring.ScimAutoConfiguration

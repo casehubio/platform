@@ -212,7 +212,7 @@ public class RestControllerWriter {
                             .beginControlFlow("$T.ofVirtual().start(() ->", Thread.class)
                             .beginControlFlow("$L.$L($L).subscribe(new $T<$T>()", delegateFieldName, method.methodName(), finalArgs, FLOW_SUBSCRIBER, eventType)
                             .add("@Override\n")
-                            .beginControlFlow("public void onSubscribe($T<? super $T> subscription)", FLOW_SUBSCRIPTION, eventType)
+                            .beginControlFlow("public void onSubscribe($T subscription)", FLOW_SUBSCRIPTION)
                             .addStatement("subscription.request($T.MAX_VALUE)", Long.class)
                             .endControlFlow()
                             .add("@Override\n")

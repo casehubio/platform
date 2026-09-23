@@ -3,7 +3,7 @@ package io.casehub.yaml.core.orchestration;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-public interface OrcMap<K, V> {
+public interface OrcMap<K, V> extends OrcPrimitive {
     V get(K key);
     V put(K key, V value);
     V putIfAbsent(K key, V value);

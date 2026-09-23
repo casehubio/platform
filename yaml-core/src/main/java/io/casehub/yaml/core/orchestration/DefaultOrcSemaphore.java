@@ -96,4 +96,9 @@ public final class DefaultOrcSemaphore implements OrcSemaphore {
     private static String stepContext() {
         return Thread.currentThread().getName();
     }
+
+    @Override
+    public void releaseForClose() {
+        shutdown();
+    }
 }

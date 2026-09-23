@@ -2,7 +2,7 @@ package io.casehub.yaml.core.orchestration;
 
 import java.util.concurrent.TimeUnit;
 
-public interface OrcChannel<T> {
+public interface OrcChannel<T> extends OrcPrimitive {
     void send(T value) throws InterruptedException;
     boolean send(T value, long timeout, TimeUnit unit) throws InterruptedException;
     T receive() throws InterruptedException;

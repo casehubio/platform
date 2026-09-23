@@ -156,4 +156,180 @@ class BlockingOrcStateMachineTest {
     void speedMultiplier_identity_returnsOnePointZero() {
         assertThat(SpeedMultiplier.identity().currentSpeed()).isEqualTo(1.0);
     }
+
+    @Test
+    void awaitAnyState_currentStateInTargets_returnsImmediately() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+        State result = machine.awaitAnyState(java.util.EnumSet.of(State.RUNNING, State.STOPPED));
+        assertThat(result).isEqualTo(State.RUNNING);
+    }
+
+    @Test
+    void awaitAnyState_waitsUntilTargetReached() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+        machine.transition(State.RUNNING, State.PAUSED);
+
+        var reached = new java.util.concurrent.atomic.AtomicReference<State>();
+        var started = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                reached.set(machine.awaitAnyState(java.util.EnumSet.of(State.RUNNING, State.STOPPED)));
+            } catch (InterruptedException e) {Thread.currentThread().interrupt();}
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+        assertThat(reached.get()).isNull();
+
+        machine.transition(State.PAUSED, State.RUNNING);
+        Thread.sleep(50);
+        assertThat(reached.get()).isEqualTo(State.RUNNING);
+    }
+
+    @Test
+    void awaitAnyState_timeout_returnsCurrentState() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+        machine.transition(State.RUNNING, State.PAUSED);
+        State result = machine.awaitAnyState(
+                java.util.EnumSet.of(State.RUNNING, State.STOPPED),
+                Duration.ofMillis(50));
+        assertThat(result).isEqualTo(State.PAUSED);
+    }
+
+    @Test
+    void releaseForClose_awaitState_throwsInterruptedException() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+        machine.transition(State.RUNNING, State.PAUSED);
+
+        var interrupted = new AtomicBoolean(false);
+        var started     = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                machine.awaitState(State.RUNNING);
+            } catch (InterruptedException e) {
+                interrupted.set(true);
+            }
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+
+        machine.releaseForClose();
+        Thread.sleep(50);
+        assertThat(interrupted.get()).isTrue();
+    }
+
+    @Test
+    void releaseForClose_awaitAnyState_throwsInterruptedException() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+        machine.transition(State.RUNNING, State.PAUSED);
+
+        var interrupted = new AtomicBoolean(false);
+        var started     = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                machine.awaitAnyState(java.util.EnumSet.of(State.COMPLETED));
+            } catch (InterruptedException e) {
+                interrupted.set(true);
+            }
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+
+        machine.releaseForClose();
+        Thread.sleep(50);
+        assertThat(interrupted.get()).isTrue();
+    }
+
+    @Test
+    void releaseForClose_awaitTransition_throwsInterruptedException() throws InterruptedException {
+        var interrupted = new AtomicBoolean(false);
+        var started     = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                machine.awaitTransition(State.RUNNING, State.COMPLETED);
+            } catch (InterruptedException e) {
+                interrupted.set(true);
+            }
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+
+        machine.releaseForClose();
+        Thread.sleep(50);
+        assertThat(interrupted.get()).isTrue();
+    }
+
+
+    @Test
+    void awaitAnyState_timeout_respectsSpeedMultiplier() throws InterruptedException {
+        var delegate = DefaultOrcStateMachine.<State>builder("test", State.class, State.IDLE)
+                                             .transition(State.IDLE, State.RUNNING)
+                                             .build();
+        var fast = new DefaultBlockingOrcStateMachine<>(delegate, () -> 2.0);
+
+        long start = System.nanoTime();
+        State result = fast.awaitAnyState(
+                java.util.EnumSet.of(State.RUNNING),
+                Duration.ofMillis(200));
+        long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+        assertThat(result).isEqualTo(State.IDLE);
+        assertThat(elapsed).isLessThan(150);
+    }
+
+    @Test
+    void awaitAnyState_stateTransitionsToNonTarget_continuesWaiting() throws InterruptedException {
+        machine.transition(State.IDLE, State.RUNNING);
+
+        var reached = new java.util.concurrent.atomic.AtomicReference<State>();
+        var started = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                reached.set(machine.awaitAnyState(java.util.EnumSet.of(State.STOPPED, State.COMPLETED)));
+            } catch (InterruptedException e) {Thread.currentThread().interrupt();}
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+
+        machine.transition(State.RUNNING, State.PAUSED);
+        Thread.sleep(50);
+        assertThat(reached.get()).isNull();
+
+        machine.transition(State.PAUSED, State.RUNNING);
+        machine.transition(State.RUNNING, State.STOPPED);
+        Thread.sleep(50);
+        assertThat(reached.get()).isEqualTo(State.STOPPED);
+    }
+
+    @Test
+    void releaseForClose_awaitStateTimeout_returnsFalse() throws InterruptedException {
+        var released = new java.util.concurrent.atomic.AtomicReference<Boolean>();
+        var started  = new CountDownLatch(1);
+        Thread.ofVirtual().start(() -> {
+            try {
+                started.countDown();
+                released.set(machine.awaitState(State.RUNNING, Duration.ofSeconds(10)));
+            } catch (InterruptedException e) {
+                released.set(null);
+            }
+        });
+        started.await(1, TimeUnit.SECONDS);
+        Thread.sleep(50);
+
+        machine.releaseForClose();
+        Thread.sleep(50);
+        assertThat(released.get()).isFalse();
+    }
+
+    @Test
+    void scenarioScope_stateMachine_returnsBlockingVariant() {
+        var scope = new DefaultScenarioScope();
+        var sm    = scope.stateMachine("lifecycle", State.class, State.IDLE);
+        assertThat(sm).isInstanceOf(BlockingOrcStateMachine.class);
+        scope.close();
+    }
 }

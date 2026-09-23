@@ -15,6 +15,7 @@ public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements 
     private final Condition stateChanged = lock.newCondition();
     private volatile S lastFrom;
     private volatile S lastTo;
+    private volatile boolean released = false;
 
     public DefaultBlockingOrcStateMachine(OrcStateMachine<S> delegate, SpeedMultiplier speedMultiplier) {
         this.delegate = delegate;
@@ -71,6 +72,7 @@ public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements 
         lock.lock();
         try {
             while (currentState() != target) {
+                if (released) throw new InterruptedException("state machine released");
                 stateChanged.await();
             }
         } finally {
@@ -85,6 +87,7 @@ public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements 
         lock.lock();
         try {
             while (currentState() != target) {
+                if (released) return false;
                 long remaining = deadline - System.nanoTime();
                 if (remaining <= 0) return false;
                 stateChanged.await(remaining, TimeUnit.NANOSECONDS);
@@ -100,6 +103,7 @@ public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements 
         lock.lock();
         try {
             while (!(lastFrom == from && lastTo == to)) {
+                if (released) throw new InterruptedException("state machine released");
                 stateChanged.await();
             }
         } finally {
@@ -107,9 +111,54 @@ public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements 
         }
     }
 
+    @Override
+    public S awaitAnyState(java.util.Set<S> targets) throws InterruptedException {
+        lock.lock();
+        try {
+            while (!targets.contains(currentState())) {
+                if (released) {throw new InterruptedException("state machine released");}
+                stateChanged.await();
+            }
+            return currentState();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public S awaitAnyState(java.util.Set<S> targets, Duration timeout) throws InterruptedException {
+        long adjustedNanos = adjustForSpeed(timeout);
+        long deadline      = System.nanoTime() + adjustedNanos;
+        lock.lock();
+        try {
+            while (!targets.contains(currentState())) {
+                if (released) {return currentState();}
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {return currentState();}
+                stateChanged.await(remaining, TimeUnit.NANOSECONDS);
+            }
+            return currentState();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+
     private long adjustForSpeed(Duration timeout) {
         double speed = speedMultiplier.currentSpeed();
         if (speed <= 0) speed = 1.0;
         return (long) (timeout.toNanos() / speed);
     }
+
+    @Override
+    public void releaseForClose() {
+        released = true;
+        lock.lock();
+        try {
+            stateChanged.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
 }

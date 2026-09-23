@@ -107,4 +107,9 @@ public final class DefaultOrcChannel<T> implements OrcChannel<T> {
     public Throwable closeError() {
         return closeError.get();
     }
+
+    @Override
+    public void releaseForClose() {
+        close();
+    }
 }

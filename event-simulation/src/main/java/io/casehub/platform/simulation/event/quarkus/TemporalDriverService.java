@@ -55,7 +55,7 @@ public class TemporalDriverService {
 
         activeDrivers.compute(name, (key, existing) -> {
             if (existing != null) {
-                var state = existing.driver().state();
+                var state = existing.driver().lifecycle().currentState();
                 if (state == TemporalSimulationDriver.State.RUNNING
                         || state == TemporalSimulationDriver.State.PAUSED) {
                     throw new IllegalStateException(
@@ -172,7 +172,7 @@ public class TemporalDriverService {
         return new TemporalDriverStatus(
                 name,
                 active.profileName(),
-                driver.state().name(),
+                driver.lifecycle().currentState().name(),
                 driver.speed(),
                 result != null ? result.emittedCount() : 0,
                 result != null ? result.failureCount() : 0,

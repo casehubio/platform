@@ -191,6 +191,7 @@
         <module>streams-amqp-spring</module>
         <module>streams-kafka-spring</module>
         <module>streams-poll-spring</module>
+        <module>streams-spring</module>
         <module>spring-boot-starter</module>
         <module>spring-integration-test</module>
     </modules>

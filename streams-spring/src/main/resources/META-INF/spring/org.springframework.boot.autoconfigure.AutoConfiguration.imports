@@ -1,0 +1,4 @@
+io.casehub.platform.streams.kafka.spring.KafkaStreamSpringAutoConfiguration
+io.casehub.platform.streams.amqp.spring.AmqpStreamSpringAutoConfiguration
+io.casehub.platform.streams.camel.spring.CamelStreamSpringAutoConfiguration
+io.casehub.platform.streams.poll.spring.PollStreamSpringAutoConfiguration

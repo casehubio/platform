@@ -22,25 +22,86 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
- * Builds a full-scale DomainModelRegistry by scanning casehub JARs
- * from the Maven local repository via Jandex.
+ * Builds a full-scale DomainModelRegistry by scanning casehub class files
+ * from slot target/classes directories and/or Maven local repository JARs.
  */
 final class FullScaleCatalogBuilder {
 
     private FullScaleCatalogBuilder() {}
 
-    static DomainModelRegistry buildFromLocalRepo(Path m2CasehubRoot) throws IOException {
-        List<Path> jars = discoverJars(m2CasehubRoot);
-        Index index = buildCompositeIndex(jars);
+    static DomainModelRegistry buildFromSlotAndLocalRepo(Path slotRoot, Path m2CasehubRoot) throws IOException {
+        Indexer indexer = new Indexer();
+        int slotClasses = indexSlotTargetClasses(indexer, slotRoot);
+        int jarClasses = indexM2Jars(indexer, m2CasehubRoot);
+        System.out.printf("Indexed %d classes from slot target/classes, %d from .m2 JARs%n",
+                slotClasses, jarClasses);
+        Index index = indexer.complete();
         List<DomainScanResult> scanResults = new McpDomainJandexScanner().scan(index);
         return toRegistry(scanResults);
     }
 
+    static DomainModelRegistry buildFromLocalRepo(Path m2CasehubRoot) throws IOException {
+        Indexer indexer = new Indexer();
+        indexM2Jars(indexer, m2CasehubRoot);
+        Index index = indexer.complete();
+        List<DomainScanResult> scanResults = new McpDomainJandexScanner().scan(index);
+        return toRegistry(scanResults);
+    }
+
+    private static int indexSlotTargetClasses(Indexer indexer, Path slotRoot) throws IOException {
+        if (!Files.isDirectory(slotRoot)) return 0;
+        int[] count = {0};
+        Files.walkFileTree(slotRoot, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                String name = dir.getFileName().toString();
+                if (name.equals(".git") || name.equals(".idea") || name.equals("node_modules")
+                        || name.startsWith("wsp-")) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                String path = file.toString();
+                if (path.contains("/target/classes/") && path.endsWith(".class")
+                        && !path.contains("module-info") && !path.contains("/test-classes/")) {
+                    try (InputStream is = Files.newInputStream(file)) {
+                        indexer.index(is);
+                        count[0]++;
+                    } catch (Exception ignored) {}
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return count[0];
+    }
+
+    private static int indexM2Jars(Indexer indexer, Path m2Root) throws IOException {
+        if (!Files.isDirectory(m2Root)) return 0;
+        List<Path> jars = discoverJars(m2Root);
+        int count = 0;
+        for (Path jar : jars) {
+            try (JarFile jf = new JarFile(jar.toFile())) {
+                Enumeration<JarEntry> entries = jf.entries();
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+                    if (entry.getName().endsWith(".class") && !entry.getName().contains("module-info")) {
+                        try (InputStream is = jf.getInputStream(entry)) {
+                            indexer.index(is);
+                            count++;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return count;
+    }
+
     static List<Path> discoverJars(Path root) throws IOException {
         List<Path> jars = new ArrayList<>();
-        if (!Files.isDirectory(root)) {
-            return jars;
-        }
+        if (!Files.isDirectory(root)) return jars;
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
@@ -58,28 +119,6 @@ final class FullScaleCatalogBuilder {
             }
         });
         return jars;
-    }
-
-    static Index buildCompositeIndex(List<Path> jars) throws IOException {
-        Indexer indexer = new Indexer();
-        for (Path jar : jars) {
-            try (JarFile jf = new JarFile(jar.toFile())) {
-                Enumeration<JarEntry> entries = jf.entries();
-                while (entries.hasMoreElements()) {
-                    JarEntry entry = entries.nextElement();
-                    if (entry.getName().endsWith(".class") && !entry.getName().contains("module-info")) {
-                        try (InputStream is = jf.getInputStream(entry)) {
-                            indexer.index(is);
-                        } catch (Exception ignored) {
-                            // Skip classes that can't be indexed (e.g., broken bytecode)
-                        }
-                    }
-                }
-            } catch (Exception ignored) {
-                // Skip JARs that can't be opened
-            }
-        }
-        return indexer.complete();
     }
 
     static DomainModelRegistry toRegistry(List<DomainScanResult> scanResults) {

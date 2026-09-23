@@ -35,6 +35,10 @@ class FullScaleComprehensionIT {
             + "Respond with ONLY the requested JSON — no markdown fences, "
             + "no explanation, no commentary. Raw JSON only.";
 
+    private static final Path SLOT_ROOT = Path.of(
+            System.getProperty("casehub.slot.root",
+                    System.getProperty("user.home") + "/claude/casehub/slots/194"));
+
     private static final Path M2_CASEHUB = Path.of(
             System.getProperty("user.home"), ".m2", "repository", "io", "casehub");
 
@@ -58,7 +62,7 @@ class FullScaleComprehensionIT {
 
     @BeforeAll
     void buildCatalog() throws Exception {
-        fullRegistry = FullScaleCatalogBuilder.buildFromLocalRepo(M2_CASEHUB);
+        fullRegistry = FullScaleCatalogBuilder.buildFromSlotAndLocalRepo(SLOT_ROOT, M2_CASEHUB);
 
         List<String> apps = fullRegistry.getApps();
         List<DomainModel> domains = fullRegistry.getDomains();

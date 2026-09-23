@@ -176,6 +176,7 @@
         <module>oidc-spring</module>
         <module>scim-spring</module>
         <module>streams-spring</module>
+        <module>platform-spring-actuator</module>
         <module>spring-boot-starter</module>
         <module>spring-boot-starter-agent</module>
         <module>spring-boot-starter-streams</module>

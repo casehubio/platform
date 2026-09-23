@@ -97,6 +97,9 @@ streams-amqp
 streams-camel
 streams-poll
 
+# Spring parity via platform-spring-actuator (different name, same capability)
+platform-observability
+
 # YAML build-time/runtime modules — no CDI beans
 yaml-codegen
 # YAML Jackson mixins — no CDI beans

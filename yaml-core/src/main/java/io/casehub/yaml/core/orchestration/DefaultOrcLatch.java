@@ -30,4 +30,11 @@ public final class DefaultOrcLatch implements OrcLatch {
     public long getCount() {
         return latch.getCount();
     }
+
+    @Override
+    public void releaseForClose() {
+        while (getCount() > 0) {
+            countDown();
+        }
+    }
 }

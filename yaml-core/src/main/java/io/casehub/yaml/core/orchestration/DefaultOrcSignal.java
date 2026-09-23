@@ -4,8 +4,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class DefaultOrcSignal implements OrcSignal {
 
@@ -106,5 +106,12 @@ public final class DefaultOrcSignal implements OrcSignal {
     @Override
     public boolean isSignalled() {
         return signalled;
+    }
+
+    @Override
+    public void releaseForClose() {
+        if (!isSignalled()) {
+            signal();
+        }
     }
 }

@@ -146,18 +146,8 @@ public class DefaultScenarioScope implements ScenarioScope {
         spawnedTasks.clear();
 
         for (Object p : primitives.values()) {
-            if (p instanceof DefaultOrcChannel<?> ch) {
-                ch.close();
-            } else if (p instanceof DefaultOrcLatch latch) {
-                while (latch.getCount() > 0) {
-                    latch.countDown();
-                }
-            } else if (p instanceof DefaultOrcSignal signal) {
-                if (!signal.isSignalled()) {
-                    signal.signal();
-                }
-            } else if (p instanceof DefaultOrcSemaphore sem) {
-                sem.shutdown();
+            if (p instanceof OrcPrimitive orc) {
+                orc.releaseForClose();
             }
         }
         primitives.clear();

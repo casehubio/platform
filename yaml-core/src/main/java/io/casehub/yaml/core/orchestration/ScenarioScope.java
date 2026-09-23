@@ -13,7 +13,7 @@ public interface ScenarioScope extends AutoCloseable {
 
     <T> OrcChannel<T> channel(String name, int capacity);
 
-    <S extends Enum<S>> OrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState);
+    <S extends Enum<S>> BlockingOrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState);
 
     <T> T primitive(String name, Class<T> type);
 

@@ -13,6 +13,8 @@ public class ManualBeanScanner {
 
     private static final Pattern BEAN_RETURN_TYPE = Pattern.compile(
             "@Bean[^}]*?public\\s+([A-Za-z][A-Za-z0-9_.]+(?:<[^>]+>)?)\\s+\\w+\\s*\\(");
+    private static final Pattern CONDITIONAL_ON_MISSING_BEAN_TYPE = Pattern.compile(
+            "@ConditionalOnMissingBean\\((?:value\\s*=\\s*)?([A-Za-z][A-Za-z0-9_.]+)\\.class\\)");
 
     public Set<String> scan(Path sourceRoot) throws IOException {
         Set<String> types = new HashSet<>();
@@ -20,7 +22,7 @@ public class ManualBeanScanner {
             return types;
         }
         try (Stream<Path> walk = Files.walk(sourceRoot)) {
-            walk.filter(p -> p.getFileName().toString().endsWith("ManualConfig.java"))
+            walk.filter(p -> p.getFileName().toString().endsWith(".java"))
                 .forEach(p -> {
                     try {
                         collectReturnTypes(p, types);
@@ -43,6 +45,14 @@ public class ManualBeanScanner {
                 simpleType = simpleType.substring(0, angleIdx);
             }
             String resolved = resolveType(simpleType, packageName, imports);
+            if (resolved != null) {
+                types.add(resolved);
+            }
+        }
+        Matcher cm = CONDITIONAL_ON_MISSING_BEAN_TYPE.matcher(content);
+        while (cm.find()) {
+            String cmType = cm.group(1);
+            String resolved = resolveType(cmType, packageName, imports);
             if (resolved != null) {
                 types.add(resolved);
             }

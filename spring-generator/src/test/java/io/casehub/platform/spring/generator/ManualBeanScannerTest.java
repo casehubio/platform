@@ -39,9 +39,11 @@ class ManualBeanScannerTest {
                 }
                 """);
 
-        Set<String> types = ManualBeanScanner.scan(tempDir);
+        Set<String> types = new ManualBeanScanner().scan(tempDir);
 
-        assertThat(types).containsExactlyInAnyOrder("BridgeResolver", "JudgmentNodeExecutor");
+        assertThat(types).containsExactlyInAnyOrder(
+                "io.casehub.engine.common.spring.BridgeResolver",
+                "io.casehub.engine.common.spring.JudgmentNodeExecutor");
     }
 
     @Test
@@ -55,7 +57,7 @@ class ManualBeanScannerTest {
                 }
                 """);
 
-        Set<String> types = ManualBeanScanner.scan(tempDir);
+        Set<String> types = new ManualBeanScanner().scan(tempDir);
 
         assertThat(types).isEmpty();
     }
@@ -64,7 +66,7 @@ class ManualBeanScannerTest {
     void handlesNonExistentDirectory() throws IOException {
         Path missing = tempDir.resolve("nonexistent");
 
-        Set<String> types = ManualBeanScanner.scan(missing);
+        Set<String> types = new ManualBeanScanner().scan(missing);
 
         assertThat(types).isEmpty();
     }
@@ -87,8 +89,8 @@ class ManualBeanScannerTest {
                 }
                 """);
 
-        Set<String> types = ManualBeanScanner.scan(tempDir);
+        Set<String> types = new ManualBeanScanner().scan(tempDir);
 
-        assertThat(types).containsExactly("DataRefRegistry");
+        assertThat(types).containsExactly("io.casehub.engine.common.spring.sub.DataRefRegistry");
     }
 }

@@ -297,7 +297,14 @@ public class AutoConfigurationWriter {
         if (lastDot < 0) {
             return ClassName.get("", fqn);
         }
-        return ClassName.get(fqn.substring(0, lastDot), fqn.substring(lastDot + 1));
+        String packageName = fqn.substring(0, lastDot);
+        String simpleName = fqn.substring(lastDot + 1);
+        if (simpleName.contains("$")) {
+            String[] parts = simpleName.split("\\$");
+            return ClassName.get(packageName, parts[0],
+                    java.util.Arrays.copyOfRange(parts, 1, parts.length));
+        }
+        return ClassName.get(packageName, simpleName);
     }
 
     private String simpleClassName(String fqn) {

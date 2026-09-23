@@ -41,7 +41,7 @@ public class SpringVerifyMojo extends AbstractVerifyMojo {
         List<ProducerDescriptor> quarkusProducers = scanner.scan(scanIndex, compositeIndex);
         Set<String> types = new HashSet<>();
         for (ProducerDescriptor d : quarkusProducers) {
-            types.add(d.returnTypeSimpleName());
+            types.add(d.returnType());
         }
         return types;
     }
@@ -50,8 +50,9 @@ public class SpringVerifyMojo extends AbstractVerifyMojo {
     protected Set<String> collectTargetTypes() {
         Set<String> types = new HashSet<>();
         try {
-            types.addAll(ManualBeanScanner.scan(sourceDir.toPath()));
-            types.addAll(ManualBeanScanner.scan(outputDirectory.toPath()));
+            var scanner = new ManualBeanScanner();
+            types.addAll(scanner.scan(sourceDir.toPath()));
+            types.addAll(scanner.scan(outputDirectory.toPath()));
         } catch (IOException e) {
             getLog().warn("Failed to scan Spring sources: " + e.getMessage());
         }

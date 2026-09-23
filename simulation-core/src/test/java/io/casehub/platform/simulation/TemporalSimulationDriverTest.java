@@ -37,8 +37,7 @@ class TemporalSimulationDriverTest {
         Thread.sleep(50);
 
         assertThat(delivered).containsExactly("A", "B", "C");
-        assertThat(driver.state()).isEqualTo(TemporalSimulationDriver.State.COMPLETED);
-        assertThat(driver.isRunning()).isFalse();
+        assertThat(driver.lifecycle().currentState()).isEqualTo(TemporalSimulationDriver.State.COMPLETED);
 
         var result = driver.lastResult();
         assertThat(result.emittedCount()).isEqualTo(3);
@@ -89,14 +88,14 @@ class TemporalSimulationDriverTest {
         driver.start(profile);
         Thread.sleep(50);
         driver.pause();
-        assertThat(driver.state()).isEqualTo(TemporalSimulationDriver.State.PAUSED);
+        assertThat(driver.lifecycle().currentState()).isEqualTo(TemporalSimulationDriver.State.PAUSED);
         int countAtPause = delivered.size();
         Thread.sleep(100);
         assertThat(delivered.size()).isEqualTo(countAtPause);
 
         driver.resume();
         Thread.sleep(500);
-        assertThat(driver.state()).isEqualTo(TemporalSimulationDriver.State.COMPLETED);
+        assertThat(driver.lifecycle().currentState()).isEqualTo(TemporalSimulationDriver.State.COMPLETED);
         assertThat(delivered).containsExactly("A", "B", "C");
     }
 
@@ -118,7 +117,7 @@ class TemporalSimulationDriverTest {
         driver.stop();
         Thread.sleep(100);
 
-        assertThat(driver.state()).isEqualTo(TemporalSimulationDriver.State.STOPPED);
+        assertThat(driver.lifecycle().currentState()).isEqualTo(TemporalSimulationDriver.State.STOPPED);
         assertThat(delivered).containsExactly("A");
     }
 

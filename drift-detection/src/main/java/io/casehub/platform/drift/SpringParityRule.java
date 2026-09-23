@@ -243,8 +243,12 @@ public class SpringParityRule extends AbstractEnforcerRule {
     }
 
     private String stripPrefix(String artifactId) {
-        return artifactId.startsWith("casehub-platform-")
-                ? artifactId.substring("casehub-platform-".length())
-                : artifactId;
+        if (artifactId.startsWith("casehub-platform-")) {
+            return artifactId.substring("casehub-platform-".length());
+        }
+        if (artifactId.startsWith("casehub-")) {
+            return artifactId.substring("casehub-".length());
+        }
+        return artifactId;
     }
 }

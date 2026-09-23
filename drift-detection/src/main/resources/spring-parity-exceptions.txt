@@ -1,0 +1,95 @@
+# Quarkus-only credentials bridge — Spring uses EnvironmentCredentialResolver
+credentials-quarkus
+
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+acl-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+callback-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+datasource-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+delivery-channel-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+delivery-tracking-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+digest-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+endpoints-memory
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+notification-settings-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+notifications-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+view-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+subscriptions-inmem
+
+# Simulation framework — Quarkus-only by design
+simulation-inmem
+# Simulation framework — Quarkus-only by design
+simulation-config
+# Simulation framework — Quarkus-only by design
+event-simulation
+
+# YAML config reader — displaces mock, Quarkus-specific ConfigMapping
+config
+
+# Optional module — activated by classpath, no CDI beans requiring Spring translation
+pdf
+# Optional module — activated by classpath, no CDI beans requiring Spring translation
+signing
+
+# Test fixtures — not deployed to Spring
+testing
+# Build infrastructure — Maven Enforcer rule, not deployed
+drift-detection
+# Build infrastructure — shared generator base classes
+generator-common
+# Integration test module — IS the composition gate itself
+spring-integration-test
+
+# GraphQL infrastructure — Quarkus SmallRye-specific
+graphql
+# GraphQL client — Quarkus SmallRye-specific
+graphql-client
+
+# Quarkus-specific admin — @RolesAllowed REST endpoints
+acl-admin
+# Quarkus-specific worker auth filter — @Provider JAX-RS filter
+acl-worker
+# Quarkus-specific NoSQL persistence
+persistence-mongodb
+
+# LLM config — Quarkus-specific SmallRye config
+llm-config
+# LLM config vendor — Bedrock credential integration
+llm-config-bedrock
+# LLM config vendor — Vertex credential integration
+llm-config-vertex
+
+# CDI wiring generated into platform-spring via -core deps
+endpoints-config
+# CDI wiring generated into platform-spring via -core deps
+preferences-editor
+# CDI wiring generated into platform-spring via -core deps
+notifications
+# CDI wiring generated into platform-spring via -core deps
+subscriptions
+# CDI wiring generated into platform-spring via -core deps
+notification-dispatch
+# CDI wiring generated into platform-spring via -core deps
+callback-client
+
+# Hand-written callback-spring handles this (BeanPostProcessor pattern)
+callback
+
+# Agent — no Spring counterpart yet
+agent-ollama
+
+# Streams webhook — covered by rest-spring-generator in platform-spring
+streams-webhook
+
+# YAML build-time/runtime modules — no CDI beans
+yaml-codegen
+# YAML Jackson mixins — no CDI beans
+yaml-jackson

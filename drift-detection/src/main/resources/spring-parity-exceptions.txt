@@ -98,7 +98,9 @@ streams-camel
 streams-poll
 
 # Spring parity via platform-spring-actuator (different name, same capability)
-platform-observability
+observability
+# Hand-written Spring Boot Actuator integration (no generator equivalent, IS the Spring module)
+spring-actuator
 
 # YAML build-time/runtime modules — no CDI beans
 yaml-codegen

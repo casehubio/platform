@@ -537,4 +537,63 @@ class VariableResolverTest {
         assertThat(resolver.resolveString("Bearer ${step.login.token}", "test"))
                 .isEqualTo("Bearer abc123");
     }
+
+// --- Runtime: ObjectVariableSource typed resolution ---
+
+    @Test
+    void withObjectScope_soleReference_returnsObject() {
+        Map<String, Object>  data      = Map.of("count", 42, "items", List.of("a", "b"));
+        ObjectVariableSource objSource = name -> "step".equals(name) ? data : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("result", objSource);
+
+        Object resolved = resolver.resolve("${result.step}");
+        assertThat(resolved).isEqualTo(data);
+        assertThat(resolved).isInstanceOf(Map.class);
+    }
+
+    @Test
+    void withObjectScope_interpolation_usesStringFallback() {
+        ObjectVariableSource objSource = name -> "step".equals(name) ? Map.of("val", 99) : null;
+        VariableSource       strSource = name -> "step.val".equals(name) ? "99" : null;
+        var resolver = new VariableResolver(Map.of("result", strSource), Set.of())
+                               .withObjectScope("result", objSource);
+
+        Object resolved = resolver.resolve("value is ${result.step.val} ok");
+        assertThat(resolved).isEqualTo("value is 99 ok");
+    }
+
+    @Test
+    void withObjectScope_andStringScope_objectTakesPrecedence() {
+        ObjectVariableSource objSource = name -> "step".equals(name) ? Map.of("k", "from-obj") : null;
+        VariableSource       strSource = name -> "step".equals(name) ? "from-string" : null;
+        var resolver = new VariableResolver(Map.of("result", strSource), Set.of())
+                               .withObjectScope("result", objSource);
+
+        Object resolved = resolver.resolve("${result.step}");
+        assertThat(resolved).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) resolved).get("k")).isEqualTo("from-obj");
+    }
+
+    @Test
+    void withObjectScope_drillsIntoNestedResult() {
+        Map<String, Object>  nested    = Map.of("data", Map.of("score", 0.95));
+        ObjectVariableSource objSource = name -> "analysis".equals(name) ? nested : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("result", objSource);
+
+        Object resolved = resolver.resolve("${result.analysis.data.score}");
+        assertThat(resolved).isEqualTo(0.95);
+    }
+
+    @Test
+    void withObjectScope_runtimePrefixes_coexistWithStringPrefixes() {
+        ObjectVariableSource objSource = name -> "step1".equals(name) ? Map.of("output", "typed") : null;
+        VariableSource       varSource = name -> "setting".equals(name) ? "static" : null;
+        var resolver = new VariableResolver(Map.of("var", varSource), Set.of())
+                               .withObjectScope("result", objSource);
+
+        assertThat(resolver.resolve("${result.step1}")).isInstanceOf(Map.class);
+        assertThat(resolver.resolve("${var.setting}")).isEqualTo("static");
+    }
 }

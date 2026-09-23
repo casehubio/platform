@@ -12,21 +12,25 @@ public class VariableResolver {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-    private final Map<String, VariableSource> prefixSources;
-    private final Set<String>                 deferredPrefixes;
-    private final DeferredPrefixHandler       deferredPrefixHandler;
+    private final Map<String, VariableSource>       prefixSources;
+    private final Map<String, ObjectVariableSource> objectPrefixSources;
+    private final Set<String>                       deferredPrefixes;
+    private final DeferredPrefixHandler             deferredPrefixHandler;
 
     public VariableResolver(Map<String, VariableSource> prefixSources,
                             Set<String> deferredPrefixes) {
         this.prefixSources         = Map.copyOf(prefixSources);
+        this.objectPrefixSources   = Map.of();
         this.deferredPrefixes      = Set.copyOf(deferredPrefixes);
         this.deferredPrefixHandler = null;
     }
 
     private VariableResolver(Map<String, VariableSource> prefixSources,
+                             Map<String, ObjectVariableSource> objectPrefixSources,
                              Set<String> deferredPrefixes,
                              DeferredPrefixHandler deferredPrefixHandler) {
         this.prefixSources         = prefixSources;
+        this.objectPrefixSources   = objectPrefixSources;
         this.deferredPrefixes      = deferredPrefixes;
         this.deferredPrefixHandler = deferredPrefixHandler;
     }
@@ -34,12 +38,19 @@ public class VariableResolver {
     public VariableResolver withScope(String prefix, VariableSource source) {
         var newSources = new LinkedHashMap<>(prefixSources);
         newSources.put(prefix, source);
-        return new VariableResolver(Map.copyOf(newSources), deferredPrefixes, deferredPrefixHandler);
+        return new VariableResolver(Map.copyOf(newSources), objectPrefixSources, deferredPrefixes, deferredPrefixHandler);
     }
 
     public VariableResolver withDeferredPrefixHandler(DeferredPrefixHandler handler) {
-        return new VariableResolver(prefixSources, deferredPrefixes, handler);
+        return new VariableResolver(prefixSources, objectPrefixSources, deferredPrefixes, handler);
     }
+
+    public VariableResolver withObjectScope(String prefix, ObjectVariableSource source) {
+        var newObjectSources = new LinkedHashMap<>(objectPrefixSources);
+        newObjectSources.put(prefix, source);
+        return new VariableResolver(prefixSources, Map.copyOf(newObjectSources), deferredPrefixes, deferredPrefixHandler);
+    }
+
 
     public static VariableResolver forParams(
             java.util.Map<String, io.casehub.yaml.core.module.YamlModuleParameter> declared,
@@ -70,12 +81,63 @@ public class VariableResolver {
 
     public Object resolve(Object value) {
         if (value instanceof String s) {
-            return s.contains("${") ? resolveString(s, "<root>") : s;
+            if (!s.contains("${")) {return s;}
+            if (isSoleReference(s)) {
+                Object typed = resolveTyped(s);
+                if (typed != null) {return typed;}
+            }
+            return resolveString(s, "<root>");
         }
         if (value instanceof Map<?, ?> map) {return resolveMap(map, "<root>");}
         if (value instanceof List<?> list) {return resolveList(list, "<root>");}
         return value;
     }
+
+    private static boolean isSoleReference(String s) {
+        return s.startsWith("${") && s.endsWith("}") && s.indexOf('}') == s.length() - 1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object resolveTyped(String s) {
+        String key = s.substring(2, s.length() - 1);
+        int    dot = key.indexOf('.');
+        if (dot < 0) {return null;}
+
+        String prefix = key.substring(0, dot);
+        String name   = key.substring(dot + 1);
+
+        if (deferredPrefixes.contains(prefix)) {return null;}
+
+        ObjectVariableSource objSource = objectPrefixSources.get(prefix);
+        if (objSource == null) {return null;}
+
+        int    nextDot  = name.indexOf('.');
+        String rootName = nextDot >= 0 ? name.substring(0, nextDot) : name;
+        Object root     = objSource.resolve(rootName);
+        if (root == null) {return null;}
+
+        if (nextDot < 0) {return root;}
+
+        String fieldPath = name.substring(nextDot + 1);
+        if (root instanceof Map<?, ?> map) {
+            return drillFields((Map<String, Object>) map, fieldPath);
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object drillFields(Map<String, Object> map, String dotPath) {
+        Object current = map;
+        for (String part : dotPath.split("\\.")) {
+            if (current instanceof Map<?, ?> m) {
+                current = m.get(part);
+            } else {
+                return null;
+            }
+        }
+        return current;
+    }
+
 
     public String resolveString(String template, String elementContext) {
         Matcher       matcher = VAR_PATTERN.matcher(template);

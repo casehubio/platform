@@ -89,6 +89,14 @@ agent-ollama
 # Streams webhook — covered by rest-spring-generator in platform-spring
 streams-webhook
 
+# Hand-written in consolidated agent-spring (BeanPostProcessor pattern)
+agent-gate
+# Hand-written in consolidated streams-spring
+streams-kafka
+streams-amqp
+streams-camel
+streams-poll
+
 # YAML build-time/runtime modules — no CDI beans
 yaml-codegen
 # YAML Jackson mixins — no CDI beans

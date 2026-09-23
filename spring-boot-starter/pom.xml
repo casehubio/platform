@@ -72,13 +72,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- View orchestration -->
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-view-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- MCP / tool support -->
         <dependency>
             <groupId>io.casehub</groupId>
@@ -93,55 +86,10 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Agent infrastructure -->
+        <!-- Agent infrastructure (consolidated) -->
         <dependency>
             <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-runtime-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-claude-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-openai-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-codex-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-gemini-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-gemini-cli-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-langchain4j-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-router-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-config-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-gate-spring</artifactId>
+            <artifactId>casehub-platform-agent-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -149,20 +97,6 @@
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-identity-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <!-- Governance -->
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-governance-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <!-- Expression engines -->
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-expression-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -186,27 +120,11 @@
             <artifactId>casehub-platform-scim-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- Stream adapters (consolidated, optional) -->
         <dependency>
             <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-streams-camel-spring</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-streams-amqp-spring</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-streams-kafka-spring</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-streams-poll-spring</artifactId>
+            <artifactId>casehub-platform-streams-spring</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>

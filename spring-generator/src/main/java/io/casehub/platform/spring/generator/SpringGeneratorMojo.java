@@ -34,26 +34,50 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        IndexView scanIndex = loadJandexIndex();
+        List<File> modules = resolveModules();
         IndexView resolveIndex = loadCompositeIndex();
 
-        var scanner = new JandexProducerScanner();
-        List<ProducerDescriptor> descriptors = scanner.scan(scanIndex, resolveIndex);
-
-        if (descriptors.isEmpty()) {
-            getLog().info("No @Produces methods found — skipping generation.");
-            return;
+        Set<String> manualBeanTypes;
+        try {
+            manualBeanTypes = new ManualBeanScanner().scan(sourceDir.toPath());
+        } catch (IOException e) {
+            throw new MojoExecutionException("Failed to scan manual beans", e);
         }
 
-        try {
-            Set<String> manualBeanTypes = new ManualBeanScanner().scan(sourceDir.toPath());
+        var allImports = new java.util.LinkedHashSet<String>();
+
+        Path handWrittenImports = sourceDir.toPath().getParent().getParent()
+                .resolve("resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports");
+        if (Files.exists(handWrittenImports)) {
+            try {
+                Files.readAllLines(handWrittenImports).stream()
+                        .map(String::trim)
+                        .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                        .forEach(allImports::add);
+            } catch (IOException e) {
+                throw new MojoExecutionException("Failed to read hand-written imports", e);
+            }
+        }
+
+        var scanner = new JandexProducerScanner();
+        boolean anyGenerated = false;
+
+        for (File module : modules) {
+            IndexView scanIndex = loadSingleIndex(module);
+            List<ProducerDescriptor> descriptors = scanner.scan(scanIndex, resolveIndex);
+
+            if (descriptors.isEmpty()) {
+                getLog().info("No @Produces methods found in " + module.getName() + " — skipping.");
+                continue;
+            }
+
             if (!manualBeanTypes.isEmpty()) {
                 descriptors = descriptors.stream()
                         .filter(d -> {
-                            boolean excluded = manualBeanTypes.contains(d.effectiveReturnType())
-                                    || manualBeanTypes.contains(d.returnType());
+                            boolean excluded = manualBeanTypes.contains(d.returnTypeSimpleName())
+                                    || manualBeanTypes.contains(d.effectiveReturnTypeSimpleName());
                             if (excluded) {
-                                getLog().info("Skipping " + d.effectiveReturnType()
+                                getLog().info("Skipping " + d.effectiveReturnTypeSimpleName()
                                         + " — already defined in manual config");
                             }
                             return !excluded;
@@ -62,35 +86,48 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
             }
 
             if (descriptors.isEmpty()) {
-                getLog().info("All @Produces methods covered by manual config — skipping generation.");
-                return;
+                getLog().info("All @Produces in " + module.getName() + " covered by manual config — skipping.");
+                continue;
             }
 
-            String sourcePackage = deriveSpringPackage(descriptors.get(0).producerClassName());
-            String configClassName = deriveConfigClassName(quarkusModule.getName());
+            try {
+                String sourcePackage = deriveSpringPackage(descriptors.get(0).producerClassName());
+                String configClassName = deriveConfigClassName(module.getName());
 
-            var writer = new AutoConfigurationWriter();
-            List<JavaFile> javaFiles = writer.generate(sourcePackage, configClassName, descriptors);
+                var writer = new AutoConfigurationWriter();
+                List<JavaFile> javaFiles = writer.generate(sourcePackage, configClassName, descriptors);
 
-            for (JavaFile javaFile : javaFiles) {
-                javaFile.writeTo(outputDirectory.toPath());
+                for (JavaFile javaFile : javaFiles) {
+                    javaFile.writeTo(outputDirectory.toPath());
+                }
+
+                allImports.add(sourcePackage + "." + configClassName);
+                anyGenerated = true;
+
+                getLog().info("Generated " + configClassName + " with " + javaFiles.size()
+                        + " file(s) from " + descriptors.size() + " @Produces method(s) in " + module.getName());
+
+            } catch (IOException e) {
+                throw new MojoExecutionException("Failed to generate for module " + module.getName(), e);
             }
+        }
 
-            Path metaInf = outputDirectory.toPath()
-                    .resolve("META-INF/spring");
+        if (!anyGenerated && allImports.isEmpty()) {
+            getLog().info("No @Produces methods found in any module — skipping generation.");
+            return;
+        }
+
+        try {
+            Path metaInf = outputDirectory.toPath().resolve("META-INF/spring");
             Files.createDirectories(metaInf);
             Files.writeString(
                     metaInf.resolve("org.springframework.boot.autoconfigure.AutoConfiguration.imports"),
-                    writer.generateImportsFile(sourcePackage, configClassName));
-
-            registerSourceRoot();
-
-            getLog().info("Generated " + configClassName + " with " + javaFiles.size()
-                    + " file(s) from " + descriptors.size() + " @Produces method(s)");
-
+                    String.join("\n", allImports) + "\n");
         } catch (IOException e) {
-            throw new MojoExecutionException("Failed to generate Spring auto-configuration", e);
+            throw new MojoExecutionException("Failed to write imports file", e);
         }
+
+        registerSourceRoot();
     }
 
     private String deriveSpringPackage(String quarkusClassName) {

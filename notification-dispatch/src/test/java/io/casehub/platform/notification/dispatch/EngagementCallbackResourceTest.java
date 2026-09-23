@@ -78,7 +78,7 @@ class EngagementCallbackResourceTest {
         var handler = new TestCallbackHandler(attempt.id());
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider());
 
-        var response = resource.handleCallback("email", "{\"event\":\"open\"}");
+        var response = resource.handleCallback("email", "{\"event\":\"open\"}", Map.of());
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(store.findEngagementsByAttemptId(attempt.id(), "tenant-1")).hasSize(1);
     }
@@ -87,7 +87,7 @@ class EngagementCallbackResourceTest {
     void callbackPathReturns404ForUnknownChannel() {
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of(), enabledProvider());
 
-        var response = resource.handleCallback("unknown", "{}");
+        var response = resource.handleCallback("unknown", "{}", Map.of());
         assertThat(response.getStatus()).isEqualTo(404);
     }
 
@@ -96,7 +96,7 @@ class EngagementCallbackResourceTest {
         var handler = new TestCallbackHandler("nonexistent-attempt");
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider());
 
-        var response = resource.handleCallback("email", "{}");
+        var response = resource.handleCallback("email", "{}", Map.of());
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
     }
@@ -111,7 +111,7 @@ class EngagementCallbackResourceTest {
                 new DirectEngagementRequest(EngagementType.OPENED, null));
         assertThat(directResponse.getStatus()).isEqualTo(404);
 
-        var callbackResponse = resource.handleCallback("email", "{}");
+        var callbackResponse = resource.handleCallback("email", "{}", Map.of());
         assertThat(callbackResponse.getStatus()).isEqualTo(404);
     }
 
@@ -124,7 +124,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider());
-        var response = resource.handleCallback("email", "bad-payload");
+        var response = resource.handleCallback("email", "bad-payload", Map.of());
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
     }
@@ -138,7 +138,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider());
-        var response = resource.handleCallback("email", "{}");
+        var response = resource.handleCallback("email", "{}", Map.of());
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(firedEvents).isEmpty();
     }
@@ -155,7 +155,7 @@ class EngagementCallbackResourceTest {
             }
         };
         var resource = createResource(fixedPrincipal("tenant-1"), Map.of("email", handler), enabledProvider());
-        var response = resource.handleCallback("email", "forged-payload");
+        var response = resource.handleCallback("email", "forged-payload", Map.of());
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(firedEvents).isEmpty();
     }
@@ -205,7 +205,7 @@ class EngagementCallbackResourceTest {
                                                          Map<String, EngagementCallbackHandler> handlers,
                                                          PreferenceProvider prefs) {
         var service = new EngagementCallbackService(store, recorder, principal, handlers, prefs);
-        return new EngagementCallbackResource(service, null);
+        return new EngagementCallbackResource(service);
     }
 
     private static class TestCallbackHandler implements EngagementCallbackHandler {

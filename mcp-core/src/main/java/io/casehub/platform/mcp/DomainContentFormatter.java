@@ -9,6 +9,33 @@ public final class DomainContentFormatter {
 
     private DomainContentFormatter() {}
 
+
+    public static Map<String, Object> formatAppIndex(List<String> apps, List<DomainModel> allDomains) {
+        List<Map<String, Object>> appList = apps.stream()
+                                                .map(app -> {
+                                                    Map<String, Object> entry = new LinkedHashMap<>();
+                                                    entry.put("name", app);
+                                                    List<DomainModel> appDomains = allDomains.stream()
+                                                                                             .filter(d -> app.equals(d.app())).toList();
+                                                    entry.put("domainCount", appDomains.size());
+                                                    long totalOps = appDomains.stream().mapToLong(d -> d.operations().size()).sum();
+                                                    entry.put("operationCount", (int) totalOps);
+                                                    return entry;
+                                                })
+                                                .collect(Collectors.toList());
+        return Map.of("apps", appList);
+    }
+
+    public static Map<String, Object> formatAppDomains(String app, List<DomainModel> domains) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("app", app);
+        List<Map<String, Object>> domainList = domains.stream()
+                                                      .map(DomainContentFormatter::domainSummary)
+                                                      .collect(Collectors.toList());
+        result.put("domains", domainList);
+        return result;
+    }
+
     public static Map<String, Object> formatIndex(List<DomainModel> domains) {
         List<Map<String, Object>> domainList = domains.stream()
                 .map(DomainContentFormatter::domainSummary)
@@ -34,6 +61,12 @@ public final class DomainContentFormatter {
                 .collect(Collectors.toList());
         if (!mutations.isEmpty()) result.put("mutations", mutations);
 
+        List<Map<String, Object>> streams = domain.operations().stream()
+                .filter(op -> op.type() == OperationDescriptor.OperationType.STREAM)
+                .map(DomainContentFormatter::operationToMap)
+                .collect(Collectors.toList());
+        if (!streams.isEmpty()) result.put("streams", streams);
+
         List<Map<String, Object>> events = domain.events().stream()
                 .map(DomainContentFormatter::eventToMap)
                 .collect(Collectors.toList());
@@ -42,11 +75,40 @@ public final class DomainContentFormatter {
         return result;
     }
 
+    public static Map<String, Object> formatSearchResults(String query, List<SearchResult> results) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("query", query);
+        response.put("resultCount", results.size());
+        List<Map<String, Object>> items = results.stream()
+                                                 .map(r -> {
+                                                     Map<String, Object> entry = new LinkedHashMap<>();
+                                                     entry.put("domain", r.domain());
+                                                     entry.put("operation", r.operation().name());
+                                                     entry.put("type", r.operation().type().name());
+                                                     if (!r.operation().summary().isEmpty()) {
+                                                         entry.put("summary", r.operation().summary());
+                                                     }
+                                                     if (!r.operation().params().isEmpty()) {
+                                                         entry.put("params", r.operation().params().stream()
+                                                                              .map(DomainContentFormatter::paramToMap).collect(Collectors.toList()));
+                                                     }
+                                                     entry.put("returns", r.operation().returnTypeName());
+                                                     return entry;
+                                                 })
+                                                 .collect(Collectors.toList());
+        response.put("results", items);
+        return response;
+    }
+
+
     private static Map<String, Object> domainSummary(DomainModel d) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("name", d.name());
         if (!d.summary().isEmpty()) entry.put("summary", d.summary());
         entry.put("operationCount", d.operations().size());
+        long streamCount = d.operations().stream()
+                .filter(op -> op.type() == OperationDescriptor.OperationType.STREAM).count();
+        if (streamCount > 0) entry.put("streamCount", streamCount);
         if (!d.events().isEmpty()) entry.put("eventCount", d.events().size());
         if (!d.state().isEmpty()) entry.put("state", d.state());
         return entry;

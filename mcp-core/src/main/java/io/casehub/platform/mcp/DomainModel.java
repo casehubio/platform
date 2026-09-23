@@ -5,6 +5,7 @@ import java.util.Map;
 
 public record DomainModel(
         String name,
+        String app,
         String summary,
         List<OperationDescriptor> operations,
         List<EventDescriptor> events,
@@ -12,13 +13,13 @@ public record DomainModel(
 
     public long queryCount() {
         return operations.stream()
-                .filter(op -> op.type() == OperationDescriptor.OperationType.QUERY)
-                .count();
+                         .filter(op -> op.type() == OperationDescriptor.OperationType.QUERY)
+                         .count();
     }
 
     public long mutationCount() {
         return operations.stream()
-                .filter(op -> op.type() == OperationDescriptor.OperationType.MUTATION)
-                .count();
+                         .filter(op -> op.type() == OperationDescriptor.OperationType.MUTATION)
+                         .count();
     }
 }

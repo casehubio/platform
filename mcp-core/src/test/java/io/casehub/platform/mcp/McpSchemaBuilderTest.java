@@ -11,7 +11,7 @@ class McpSchemaBuilderTest {
 
     private final McpSchemaBuilder builder = new McpSchemaBuilder();
 
-    private static final DomainModel ENGINE = new DomainModel("engine", "Engine domain",
+    private static final DomainModel ENGINE = new DomainModel("engine", "engine", "Engine domain",
             List.of(
                     new OperationDescriptor("cases", OperationDescriptor.OperationType.QUERY,
                             "List cases", List.of(), "CaseList", null, null),
@@ -20,7 +20,7 @@ class McpSchemaBuilderTest {
                             "Case", null, null)),
             List.of(), Map.of());
 
-    private static final DomainModel WORK = new DomainModel("work", "",
+    private static final DomainModel WORK = new DomainModel("work", "work", "",
             List.of(
                     new OperationDescriptor("workItems", OperationDescriptor.OperationType.QUERY,
                             "", List.of(), "WorkItemList", null, null)),

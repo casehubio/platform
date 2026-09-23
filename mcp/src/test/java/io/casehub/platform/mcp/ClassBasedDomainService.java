@@ -14,6 +14,12 @@ public class ClassBasedDomainService {
         return "ok";
     }
 
+    @PlatformQuery("List all items")
+    public java.util.List<String> listItems() {
+        return java.util.List.of();
+    }
+
+
     @PlatformMutation("Update status")
     public String updateStatus(String newStatus) {
         return newStatus;

@@ -18,7 +18,7 @@ class DomainModelTest {
                 OperationDescriptor.OperationType.MUTATION, "Start case",
                 List.of(), "CaseInstance", null, null);
 
-        var model = new DomainModel("engine", "Engine",
+        var model = new DomainModel("engine", "engine", "Engine",
                 List.of(query, mutation), List.of(), Map.of());
 
         assertThat(model.queryCount()).isEqualTo(1);
@@ -28,7 +28,7 @@ class DomainModelTest {
 
     @Test
     void emptyModel() {
-        var model = new DomainModel("empty", "", List.of(), List.of(), Map.of());
+        var model = new DomainModel("empty", "empty", "", List.of(), List.of(), Map.of());
         assertThat(model.queryCount()).isZero();
         assertThat(model.mutationCount()).isZero();
         assertThat(model.events()).isEmpty();

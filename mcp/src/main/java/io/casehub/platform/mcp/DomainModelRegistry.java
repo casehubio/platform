@@ -24,10 +24,54 @@ public class DomainModelRegistry {
         return Optional.ofNullable(domains.get(name));
     }
 
+    public List<String> getApps() {
+        return domains.values().stream()
+                      .map(DomainModel::app)
+                      .distinct()
+                      .sorted()
+                      .toList();
+    }
+
+    public List<DomainModel> getDomainsByApp(String app) {
+        return domains.values().stream()
+                      .filter(d -> app.equals(d.app()))
+                      .toList();
+    }
+
+
     public Optional<OperationDescriptor> getOperation(String domain, String operation) {
         return getDomain(domain)
                 .flatMap(d -> d.operations().stream()
                         .filter(op -> op.name().equals(operation))
                         .findFirst());
     }
+
+    public List<SearchResult> search(String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        String             lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
+        List<SearchResult> results    = new java.util.ArrayList<>();
+        for (DomainModel domain : domains.values()) {
+            for (OperationDescriptor op : domain.operations()) {
+                if (matches(op, lowerQuery)) {
+                    results.add(new SearchResult(domain.name(), op));
+                }
+            }
+        }
+        return List.copyOf(results);
+    }
+
+    private static boolean matches(OperationDescriptor op, String lowerQuery) {
+        if (op.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
+        if (op.summary() != null && op.summary().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
+        if (op.returnTypeName() != null && op.returnTypeName().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {
+            return true;
+        }
+        for (ParameterDescriptor param : op.params()) {
+            if (param.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
+        }
+        return false;
+    }
+
 }

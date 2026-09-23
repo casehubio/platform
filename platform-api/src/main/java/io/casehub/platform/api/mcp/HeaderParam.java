@@ -1,17 +1,12 @@
 package io.casehub.platform.api.mcp;
 
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.TYPE;
-
+@Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
-@Target(TYPE)
-public @interface McpDomain {
+public @interface HeaderParam {
     String value();
-
-    String basePath() default "";
-
-    String app() default "";
 }

@@ -100,6 +100,7 @@ public class DynamicToolRegistrar {
         List<String> registered = new ArrayList<>();
         try {
             for (OperationDescriptor op : model.operations()) {
+                if (op.type() == OperationDescriptor.OperationType.STREAM) continue;
                 String toolName = domain + "_" + op.name();
                 registerOperationTool(domain, op, toolName);
                 registered.add(toolName);

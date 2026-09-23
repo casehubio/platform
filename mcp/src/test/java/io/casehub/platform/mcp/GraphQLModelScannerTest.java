@@ -182,7 +182,7 @@ class GraphQLModelScannerTest {
     @Test
     void classBasedDomainHasQueryOperations() {
         var domain = registry.getDomain("class-based").orElseThrow();
-        assertThat(domain.queryCount()).isEqualTo(1);
+        assertThat(domain.queryCount()).isEqualTo(2);
     }
 
     @Test
@@ -208,6 +208,13 @@ class GraphQLModelScannerTest {
         var getStatus = registry.getOperation("class-based", "getStatus").orElseThrow();
         assertThat(getStatus.resolverClass()).isEqualTo(ClassBasedDomainService.class);
     }
+
+    @Test
+    void genericReturnTypeIncludesTypeParameter() {
+        var listItems = registry.getOperation("class-based", "listItems").orElseThrow();
+        assertThat(listItems.returnTypeName()).isEqualTo("List<String>");
+    }
+
 
     @Test
     void complexTypeFieldExpansion() {

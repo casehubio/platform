@@ -850,4 +850,708 @@ class GraphQLResolverProcessorTest {
         if (s == null || s.isEmpty()) return s;
         return Character.toLowerCase(s.charAt(0)) + s.substring(1);
     }
+
+    @Test
+    void webhookEndpointGeneratesPostWithRawBody() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.WebhookApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("hooks")
+                @ApplicationScoped
+                public class WebhookApi {
+                    @PlatformWebhook("Receive webhook event")
+                    public void receive(String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=hooks", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        var restSource = compilation.generatedSourceFile("test.rest.HooksResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("@POST");
+        assertThat(content).contains("@Consumes(MediaType.APPLICATION_JSON)");
+        assertThat(content).contains("public Response receive(String body)");
+        assertThat(content).contains("Response.ok().build()");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+        assertThat(content).contains("@jakarta.annotation.security.PermitAll");
+    }
+
+    @Test
+    void webhookWithHeaderParam() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GhWebhookApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("gh-hooks")
+                @ApplicationScoped
+                public class GhWebhookApi {
+                    @PlatformWebhook("Receive GitHub webhook")
+                    public void handleGitHub(
+                            @PathParam String tenancyId,
+                            @HeaderParam("X-Hub-Signature-256") String signature,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=gh-hooks", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.GhHooksResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@POST");
+        assertThat(content).contains("@jakarta.ws.rs.PathParam(\"tenancyId\")");
+        assertThat(content).contains("@jakarta.ws.rs.HeaderParam(\"X-Hub-Signature-256\")");
+        assertThat(content).contains("String body)");
+        assertThat(content).doesNotContain("@QueryParam");
+    }
+
+    @Test
+    void webhookWithQueryParam() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.JiraWebhookApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("jira-hooks")
+                @ApplicationScoped
+                public class JiraWebhookApi {
+                    @PlatformWebhook("Receive Jira webhook")
+                    public void handleJira(
+                            @PathParam String tenancyId,
+                            @QueryParam("secret") String secret,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=jira-hooks", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.JiraHooksResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@jakarta.ws.rs.QueryParam(\"secret\")");
+        assertThat(content).contains("String body)");
+    }
+
+    @Test
+    void webhookSkipsGraphQL() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.HookOnlyApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("hook-only")
+                @ApplicationScoped
+                public class HookOnlyApi {
+                    @PlatformWebhook("Inbound event")
+                    public void onEvent(String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=hook-only")
+                                                             .compile(spi);
+
+        assertThat(compilation.generatedSourceFile("test.rest.HookOnlyResource")).isPresent();
+        assertThat(compilation.generatedSourceFile("test.graphql.HookOnlyResolver")).isEmpty();
+    }
+
+    @Test
+    void webhookCustomConsumes() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.FedApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("federation")
+                @ApplicationScoped
+                public class FedApi {
+                    @PlatformWebhook(value = "CloudEvents inbound", consumes = "application/cloudevents+json")
+                    public void receiveEvent(
+                            @HeaderParam("X-Federation-Signature") String signature,
+                            @HeaderParam("X-Federation-Peer-Id") String peerId,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=federation", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.FederationResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@Consumes(\"application/cloudevents+json\")");
+        assertThat(content).contains("@jakarta.ws.rs.HeaderParam(\"X-Federation-Signature\")");
+        assertThat(content).contains("@jakarta.ws.rs.HeaderParam(\"X-Federation-Peer-Id\")");
+    }
+
+    @Test
+    void headerParamOnMutation() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.IdempotentApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("idempotent")
+                @ApplicationScoped
+                public class IdempotentApi {
+                    @PlatformMutation("Create with idempotency key")
+                    public String create(
+                            @HeaderParam("X-Idempotency-Key") String idempotencyKey,
+                            String name) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=idempotent", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.IdempotentResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@jakarta.ws.rs.HeaderParam(\"X-Idempotency-Key\")");
+        assertThat(content).contains("@QueryParam(\"name\")");
+    }
+
+    @Test
+    void responseReturnTypePassesThrough() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.RawApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import jakarta.ws.rs.core.Response;
+                
+                @McpDomain("raw")
+                @ApplicationScoped
+                public class RawApi {
+                    @PlatformMutation("Custom response")
+                    public Response customAction(String input) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=raw", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.RawResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("return rawApi.customAction(input);");
+        assertThat(content).doesNotContain("Response.ok(rawApi");
+    }
+
+    @Test
+    void uniReturnTypeSkipsVirtualThread() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.ReactiveApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Uni;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("reactive")
+                @ApplicationScoped
+                public class ReactiveApi {
+                    @PlatformMutation("Async create")
+                    public Uni<String> createAsync(String name) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=reactive", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.ReactiveResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+        assertThat(content).contains("return reactiveApi.createAsync(name);");
+        assertThat(content).doesNotContain("Response.ok(");
+    }
+
+    @Test
+    void contextParamHttpHeaders() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.FullHeaderApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.Map;
+                import java.util.List;
+                
+                @McpDomain("full-header")
+                @ApplicationScoped
+                public class FullHeaderApi {
+                    @PlatformWebhook("Receive with all headers")
+                    public void onEvent(
+                            @ContextParam("httpHeaders") Map<String, List<String>> headers,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=full-header", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.FullHeaderResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@jakarta.ws.rs.core.Context");
+        assertThat(content).contains("HttpHeaders");
+        assertThat(content).contains("httpHeaders.getRequestHeaders()");
+    }
+
+    @Test
+    void permitAllPassesThroughFromDomain() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.OpenApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.annotation.security.PermitAll;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("open")
+                @ApplicationScoped
+                public class OpenApi {
+                    @PlatformQuery("Public data")
+                    @PermitAll
+                    public String getPublicData() { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=open", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.OpenResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@jakarta.annotation.security.PermitAll");
+    }
+
+    @Test
+    void beanParamExpandsComplexQueryType() throws Exception {
+        var filterType = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.CaseFilter",
+                """
+                package test;
+                public record CaseFilter(String query, java.util.UUID assigneeId, Integer offset, Integer limit) {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SearchApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+                
+                @McpDomain("search")
+                @ApplicationScoped
+                public class SearchApi {
+                    @PlatformQuery("Search cases")
+                    public List<String> search(CaseFilter filter) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=search", "-AgenerateGraphQL=false")
+                                                             .compile(spi, filterType);
+
+        String content = compilation.generatedSourceFile("test.rest.SearchResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@QueryParam(\"query\")");
+        assertThat(content).contains("@QueryParam(\"assigneeId\")");
+        assertThat(content).contains("@QueryParam(\"offset\")");
+        assertThat(content).contains("@QueryParam(\"limit\")");
+        assertThat(content).contains("new test.CaseFilter(query, assigneeId, offset, limit)");
+    }
+
+    @Test
+    void webhookWithRolesAllowedSuppressesPermitAll() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SecureHookApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.annotation.security.RolesAllowed;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("secure-hooks")
+                @ApplicationScoped
+                public class SecureHookApi {
+                    @PlatformWebhook("Internal webhook")
+                    @RolesAllowed("webhook-sender")
+                    public void onInternalEvent(String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=secure-hooks", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.SecureHooksResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("RolesAllowed");
+        assertThat(content).contains("\"webhook-sender\"");
+        assertThat(content).doesNotContain("PermitAll");
+    }
+
+    @Test
+    void httpVerbMapping_webhook_isPOST() {
+        assertThat(GraphQLResolverProcessor.resolveHttpVerb(GraphQLResolverProcessor.OperationType.WEBHOOK, null)).isEqualTo("POST");
+    }
+
+    @Test
+    void responseReturnTypeSkipsGraphQL() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MixedReturnApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import jakarta.ws.rs.core.Response;
+                
+                @McpDomain("mixed-return")
+                @ApplicationScoped
+                public class MixedReturnApi {
+                    @PlatformQuery("Normal query")
+                    public String normalQuery() { return null; }
+                
+                    @PlatformMutation("Response action")
+                    public Response responseAction(String input) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=mixed-return")
+                                                             .compile(spi);
+
+        var resolver = compilation.generatedSourceFile("test.graphql.MixedReturnResolver");
+        assertThat(resolver).isPresent();
+        String graphqlContent = resolver.get().getCharContent(true).toString();
+        assertThat(graphqlContent).contains("normalQuery");
+        assertThat(graphqlContent).doesNotContain("responseAction");
+
+        var rest = compilation.generatedSourceFile("test.rest.MixedReturnResource");
+        assertThat(rest).isPresent();
+        String restContent = rest.get().getCharContent(true).toString();
+        assertThat(restContent).contains("responseAction");
+    }
+
+    @Test
+    void httpOnlyContextParamDoesNotInjectCurrentPrincipal() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.HttpOnlyApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.Map;
+                import java.util.List;
+                
+                @McpDomain("http-only")
+                @ApplicationScoped
+                public class HttpOnlyApi {
+                    @PlatformQuery("Query with headers")
+                    public String queryWithHeaders(
+                            @ContextParam("httpHeaders") Map<String, List<String>> headers) {
+                        return null;
+                    }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=http-only")
+                                                             .compile(spi);
+
+        String restContent = compilation.generatedSourceFile("test.rest.HttpOnlyResource")
+                                        .get().getCharContent(true).toString();
+        assertThat(restContent).contains("HttpHeaders httpHeaders");
+        assertThat(restContent).doesNotContain("CurrentPrincipal");
+    }
+
+    @Test
+    void mixedContextParamsInjectsBothPrincipalAndHttpHeaders() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MixedCtxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.Map;
+                import java.util.List;
+                
+                @McpDomain("mixed-ctx")
+                @ApplicationScoped
+                public class MixedCtxApi {
+                    @PlatformQuery("Tenant-only query")
+                    public String tenantQuery(@ContextParam("tenancyId") String tenancyId) {
+                        return null;
+                    }
+                
+                    @PlatformQuery("Query with both")
+                    public String queryWithBoth(
+                            @ContextParam("tenancyId") String tenancyId,
+                            @ContextParam("httpHeaders") Map<String, List<String>> headers) {
+                        return null;
+                    }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=mixed-ctx")
+                                                             .compile(spi);
+
+        String restContent = compilation.generatedSourceFile("test.rest.MixedCtxResource")
+                                        .get().getCharContent(true).toString();
+        assertThat(restContent).contains("CurrentPrincipal currentPrincipal");
+        assertThat(restContent).contains("HttpHeaders httpHeaders");
+        assertThat(restContent).contains("queryWithBoth");
+
+        String graphqlContent = compilation.generatedSourceFile("test.graphql.MixedCtxResolver")
+                                           .get().getCharContent(true).toString();
+        assertThat(graphqlContent).contains("CurrentPrincipal currentPrincipal");
+        assertThat(graphqlContent).contains("tenantQuery");
+        assertThat(graphqlContent).doesNotContain("queryWithBoth");
+        assertThat(graphqlContent).doesNotContain("httpHeaders");
+    }
+
+    @Test
+    void nameBindingAnnotationPassesThrough() throws Exception {
+        var binding = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.Authenticated",
+                """
+                package test;
+                import jakarta.ws.rs.NameBinding;
+                import java.lang.annotation.*;
+                
+                @NameBinding
+                @Target({ElementType.METHOD, ElementType.TYPE})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Authenticated {}
+                """);
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SecureApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("secure")
+                @ApplicationScoped
+                public class SecureApi {
+                    @PlatformQuery("Secured data")
+                    @Authenticated
+                    public String getData() { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=secure", "-AgenerateGraphQL=false")
+                                                             .compile(binding, spi);
+
+        String content = compilation.generatedSourceFile("test.rest.SecureResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@test.Authenticated");
+    }
+
+    @Test
+    void contextParamQueryParams() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.QueryParamApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.Map;
+                
+                @McpDomain("qp")
+                @ApplicationScoped
+                public class QueryParamApi {
+                    @PlatformWebhook("Receive with query params")
+                    public void onEvent(
+                            @ContextParam("queryParams") Map<String, String> params,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=qp", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.QpResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("UriInfo uriInfo");
+        assertThat(content).contains("flatQueryParams(uriInfo)");
+        assertThat(content).doesNotContain("CurrentPrincipal");
+    }
+
+    @Test
+    void contextParamRequestUrl() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.UrlApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("url")
+                @ApplicationScoped
+                public class UrlApi {
+                    @PlatformWebhook("Receive with request URL")
+                    public void onEvent(
+                            @ContextParam("requestUrl") String url,
+                            String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=url", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.UrlResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("UriInfo uriInfo");
+        assertThat(content).contains("uriInfo.getRequestUri().toString()");
+        assertThat(content).doesNotContain("CurrentPrincipal");
+    }
+
+    @Test
+    void webhookMultiValueConsumes() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MultiConsumeApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("multi-consume")
+                @ApplicationScoped
+                public class MultiConsumeApi {
+                    @PlatformWebhook(value = "Accept multiple types",
+                                     consumes = {"application/json", "application/x-www-form-urlencoded"})
+                    public void onEvent(String body) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=multi-consume", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.MultiConsumeResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("@Consumes({\"application/json\", \"application/x-www-form-urlencoded\"})");
+    }
+
+    @Test
+    void beanParamNonRecordEmitsError() throws Exception {
+        var dto = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SearchFilter",
+                """
+                package test;
+                public class SearchFilter {
+                    private String query;
+                    private int limit;
+                    public SearchFilter() {}
+                    public String getQuery() { return query; }
+                    public int getLimit() { return limit; }
+                }
+                """);
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SearchApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+                
+                @McpDomain("search")
+                @ApplicationScoped
+                public class SearchApi {
+                    @PlatformQuery("Search items")
+                    public List<String> search(SearchFilter filter) { return List.of(); }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=search", "-AgenerateGraphQL=false")
+                                                             .compile(dto, spi);
+
+        assertThat(compilation.errors()).isNotEmpty();
+        assertThat(compilation.errors().get(0).getMessage(null))
+                .contains("@BeanParam expansion requires a Java record");
+    }
+
+    @Test
+    void emptyDescriptionEmitsError() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.EmptyDescApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("empty-desc")
+                @ApplicationScoped
+                public class EmptyDescApi {
+                    @PlatformQuery("")
+                    public String blankQuery() { return null; }
+                
+                    @PlatformMutation
+                    public void noDescMutation(String input) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=empty-desc")
+                                                             .compile(spi);
+
+        assertThat(compilation.errors()).hasSize(2);
+        assertThat(compilation.errors().get(0).getMessage(null))
+                .contains("empty description");
+    }
+
+
 }

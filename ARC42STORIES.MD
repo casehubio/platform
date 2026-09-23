@@ -232,11 +232,16 @@ C4Container
     Container(digestJpa, "casehub-platform-digest-jpa", "Hibernate ORM + Flyway", "@ApplicationScoped JpaDigestBuffer — Flyway V2000, JSON payload")
   }
 
+  Container_Boundary(l14, "L14: @McpDomain Generator") {
+    Container(graphqlGen, "casehub-platform-graphql-generator", "Java 21 APT", "GraphQLResolverProcessor — dual-output REST+GraphQL from @McpDomain classes")
+  }
+
   Container_Boundary(l_decl, "Declaration Primitives") {
     Container(yamlCore, "casehub-platform-yaml-core", "Java 21", "VariableResolver, ForEachExpander, Truthiness, CsvParser — zero deps")
     Container(tsCore, "casehub-platform-ts-core", "Java 21", "TsExecutor SPI, NodeTsExecutor (Node.js subprocess) — zero deps")
   }
 
+  Rel(graphqlGen, api, "reads @McpDomain annotations from")
   Rel(platform, api, "implements SPIs from")
   Rel(testing, api, "implements SPIs from")
   Rel(config, api, "implements PreferenceProvider from")
@@ -455,6 +460,7 @@ flowchart LR
   C18 --> C20["C20: Stream Ingestion\nL10"]
   C12 --> C21["C21: ACL Phase 1\nL1+L2+L11"]
   C14 --> C23["C23: Simulation Framework\nL1+L16"]
+  C21 --> C24["C24: @McpDomain Generator\nL1+L14"]
 
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
@@ -478,6 +484,7 @@ flowchart LR
   style C20 fill:#90EE90,color:#000
   style C21 fill:#90EE90,color:#000
   style C23 fill:#90EE90,color:#000
+  style C24 fill:#90EE90,color:#000
 ```
 
 | # | Chapter | Journey | Layers touched | Status |
@@ -505,6 +512,7 @@ flowchart LR
 | 21 | ACL Phase 1 | J6 | L1, L2, L11 | ✅ |
 | 22 | Subject View Toolkit | J7 | L1, L2, L13 | ✅ |
 | 23 | Simulation Framework | J8 | L1, L16 | ✅ |
+| 24 | @McpDomain Generator | J9 | L1, L14 | ✅ |
 
 **Layer × Chapter matrix**
 
@@ -984,6 +992,32 @@ SPI-level simulation without Mockito — a complete replacement for `when/thenRe
 |---|---|
 | L1: API Tier | Low — `@SimulationEligible` annotation, `DataRealism` enum added to platform-api |
 | L16: Simulation Framework | High — 18 new modules: complete simulation infrastructure from SPI to verification |
+
+---
+
+#### C24 — @McpDomain Generator
+
+**Journey:** J9 | **Sequence:** 24 of 24 | **Status:** ✅
+**Delivered:** 2026-09-23 | **Issues:** platform#300 (epic), platform#341, #377–#382, #400, #401, #403, #404, #414–#418
+**Blog:** —
+
+**What this delivers**
+Dual-output code generation from annotated domain classes — a single `@McpDomain` class with `@PlatformQuery`, `@PlatformMutation`, `@PlatformStream`, and `@PlatformWebhook` methods produces both a JAX-RS REST resource and a MicroProfile GraphQL resolver at compile time. Domain classes contain zero framework imports; the generator owns all transport wiring (HTTP verbs, path params, query params, context injection, response wrapping, SSE streaming, webhook routing).
+
+The `GraphQLResolverProcessor` APT annotation processor uses dual scanning: Jandex index for classpath dependencies and `RoundEnvironment` for same-compilation-unit classes. 14 annotations control operation type, parameter binding, HTTP overrides, security, and pagination. The generator handles `@BeanParam` expansion (records only), `Uni<T>` detection (skip `@RunOnVirtualThread`), `Response` pass-through (REST only, skipped in GraphQL), `@ContextParam` resolution (principal vs HTTP context), and `@NameBinding`/`@PermitAll` annotation pass-through.
+
+**Accountability gaps closed**
+- Hand-written REST+GraphQL boilerplate per domain → L14 (generated from single domain class)
+- Framework coupling in domain code → L14 (domain classes import only `@McpDomain` annotations, no JAX-RS/GraphQL)
+- REST/GraphQL API drift → L14 (both generated from same source, always in sync)
+- Inconsistent HTTP semantics across domains → L14 (generator enforces platform conventions: status codes, `@RunOnVirtualThread`, response wrapping)
+- Unsafe non-record @BeanParam → L14 (compile-time error for non-record complex query types)
+
+**Layer Impact**
+| Layer | Delta |
+|---|---|
+| L1: API Tier | Med — 14 annotations in `io.casehub.platform.api.mcp` package |
+| L14: @McpDomain Generator | High — new module: APT code generator with dual REST+GraphQL output |
 
 ---
 
@@ -1720,6 +1754,70 @@ Flat-grant ACL with parent-resource hierarchy — grant propagates from parent t
 **Symptom:** `canAccess()` returns `true` despite no grant having been issued.
 **Cause:** `NoOpAccessControlProvider @DefaultBean` is active — no `acl-inmem` or `acl-jpa` on the classpath.
 **Fix:** Add `acl-inmem` (test) or `acl-jpa` (production) to the consumer's classpath. Verify with `mvn dependency:tree`.
+
+---
+
+#### Layer — L14: @McpDomain Generator
+
+**Participates in chapters:** C24
+**Architectural patterns:** APT annotation processing (dual-scan: Jandex + RoundEnvironment), dual-output code generation (REST + GraphQL from single source), annotation-driven transport abstraction, compile-time type safety enforcement
+**Issues:** platform#300 (epic), platform#341, #377–#382, #400, #401, #403, #404, #414–#418
+**Blog:** —
+**Completed:** 2026-09-23
+
+#### What it adds
+
+**Before:** Every domain SPI needed hand-written REST resources and GraphQL resolvers — separate classes duplicating method signatures, parameter binding, response wrapping, and security annotations. Domain classes imported JAX-RS and MicroProfile GraphQL types directly. REST and GraphQL endpoints drifted as one was updated without the other. Each repo followed slightly different HTTP conventions (status codes, virtual threads, path structures).
+**After:** A single `@McpDomain` class declares operations with platform annotations. The `GraphQLResolverProcessor` APT generates both a REST resource and a GraphQL resolver at compile time. Domain code imports only `io.casehub.platform.api.mcp.*` annotations — zero JAX-RS, zero GraphQL. The generator enforces platform conventions uniformly across all consumer repos.
+
+What this layer adds:
+
+**API tier (platform-api) — 14 annotations in `io.casehub.platform.api.mcp`:**
+- **Operation types:** `@PlatformQuery` (→ GET + @Query), `@PlatformMutation` (→ POST + @Mutation), `@PlatformStream` (→ GET + SSE + @Subscription), `@PlatformWebhook` (→ POST + @PermitAll, REST only)
+- **Parameter binding:** `@PathParam`, `@HeaderParam`, `@QueryParam`, `@ContextParam` (tenancyId/actorId → CurrentPrincipal; httpHeaders/queryParams/requestUrl → JAX-RS context)
+- **HTTP overrides:** `@RestMethod` (HttpMethod enum), `@RestPath`, `@RestStatus`, `@RestName`, `@DefaultValue`
+- **Control:** `@PaginatedResponse` (X-Total-Count header), `@HandWrittenEndpoint` (suppress generation), `HttpMethod` enum
+
+**Generator tier (graphql-generator):**
+- **`GraphQLResolverProcessor`** — APT: dual-scan Jandex index (classpath) + RoundEnvironment (same compilation unit). Generates `*Resource.java` (REST) and `*Resolver.java` (GraphQL) per domain. Smart features: `@BeanParam` record expansion to individual `@QueryParam`, `Uni<T>` detection (skips `@RunOnVirtualThread`), `Response` return pass-through (REST only), `@NameBinding` annotation pass-through, smart imports (only used JAX-RS verbs), compile-time error for non-record `@BeanParam` types.
+- **GraphQL filtering:** methods returning `Response` and methods using HTTP context params (`httpHeaders`, `queryParams`, `requestUrl`) are excluded from GraphQL resolver generation — these are REST-specific concerns with no GraphQL equivalent.
+- **CurrentPrincipal injection:** `hasPrincipalContextParams()` — only injected when principal context params (tenancyId, actorId, or custom) are present. HTTP-only context params do not trigger injection.
+
+#### Key files
+
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — domain marker annotation (class-level)
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformQuery.java` — QUERY operation binding
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformMutation.java` — MUTATION operation binding
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformStream.java` — STREAM (SSE) operation binding
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformWebhook.java` — WEBHOOK operation binding (REST only, custom consumes)
+- `platform-api/src/main/java/io/casehub/platform/api/mcp/ContextParam.java` — context parameter injection
+- `graphql-generator/src/main/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessor.java` — APT annotation processor
+
+#### Key wiring
+
+**Domain class → generated output:** A class annotated `@McpDomain("foo")` produces `FooResource.java` (REST, package `*.rest`) and `FooResolver.java` (GraphQL, package `*.graphql`). Both inject the domain class and delegate all calls. Package derivation: replace `.api.` with `.rest.` or `.graphql.` in the domain class package; override with `-ArestPackage=` / `-AgraphqlPackage=`.
+
+**Dual-scan architecture:** Jandex scan finds `@McpDomain` classes on the compile classpath (dependencies). `RoundEnvironment` scan finds `@McpDomain` classes in the current compilation unit (same module). Both paths produce identical `ResolvedOperation` records merged into a single `DomainOperations` list. `-AdomainFilter=` restricts generation to specific domains.
+
+**`@HandWrittenEndpoint` suppression:** Methods annotated `@HandWrittenEndpoint` (on the generated REST/GraphQL class) are collected by scanning the RoundEnvironment. When a hand-written method matches `domain:methodName`, the generator skips it with a diagnostic NOTE.
+
+#### Pattern introduced
+
+Annotation-driven dual-output code generation — a single domain class annotated with platform-specific operation types produces both REST and GraphQL endpoints at compile time. Domain code is transport-agnostic; the generator owns all framework integration. This pattern eliminates the SPI + impl split (abolished in #341) and the manual REST/GraphQL boilerplate that previously existed in every consumer repo.
+
+#### Gotchas
+
+**Symptom:** Generated REST resource injects `CurrentPrincipal` but no `@ContextParam("tenancyId")` or `@ContextParam("actorId")` exists.
+**Cause:** Pre-#414 bug — `hasContextParams()` triggered on HTTP context params. Fixed: `hasPrincipalContextParams()` only triggers on principal context params.
+**Fix:** Update to generator version with #414 fix. Clean and rebuild.
+
+**Symptom:** `@BeanParam expansion requires a Java record` compile-time error.
+**Cause:** A non-record class is used as a complex query parameter on a GET endpoint. The generator uses `recordComponents()` which returns nothing for regular classes.
+**Fix:** Convert the DTO to a Java record. This is by design (#416) — platform convention is records for DTOs.
+
+**Symptom:** GraphQL resolver has no method for a domain method that returns `Response`.
+**Cause:** By design — `Response` is a JAX-RS type that GraphQL can't serialize. The generator skips these methods in GraphQL output (#414).
+**Fix:** If the method needs a GraphQL equivalent, change the return type to a domain type and let the generator handle response wrapping.
 
 ---
 

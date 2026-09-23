@@ -9,7 +9,7 @@ import org.eclipse.microprofile.graphql.GraphQLApi;
 import org.eclipse.microprofile.graphql.Name;
 import org.eclipse.microprofile.graphql.Query;
 
-@McpDomain("test")
+@McpDomain(value = "test", app = "test-app")
 @GraphQLApi
 @ApplicationScoped
 public class TestQueryResolver {

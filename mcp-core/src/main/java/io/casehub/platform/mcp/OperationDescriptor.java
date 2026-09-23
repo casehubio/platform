@@ -12,5 +12,5 @@ public record OperationDescriptor(
         Method method,
         Class<?> resolverClass) {
 
-    public enum OperationType { QUERY, MUTATION }
+    public enum OperationType {QUERY, MUTATION, STREAM}
 }

@@ -72,6 +72,7 @@ public class McpSchemaBuilder {
         List<Map<String, Object>> allOf = new ArrayList<>();
         for (DomainModel domain : sorted) {
             List<String> operationNames = domain.operations().stream()
+                    .filter(op -> op.type() != OperationDescriptor.OperationType.STREAM)
                     .map(OperationDescriptor::name)
                     .toList();
 

@@ -7,7 +7,7 @@ import org.eclipse.microprofile.graphql.GraphQLApi;
 import org.eclipse.microprofile.graphql.Mutation;
 import org.eclipse.microprofile.graphql.Name;
 
-@McpDomain("test")
+@McpDomain(value = "test", app = "test-app")
 @GraphQLApi
 @ApplicationScoped
 public class TestMutationResolver {

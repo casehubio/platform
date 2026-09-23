@@ -61,7 +61,7 @@ class McpModelComprehensionIT {
 
     @Test
     void selectsCorrectDomainFromTier0() throws Exception {
-        String tier0 = tools.casehub_model(null);
+        String tier0 = tools.casehub_model(null, null);
 
         String response = askClaude(
                 "Here is the CaseHub operation catalog:\n" + tier0
@@ -74,7 +74,7 @@ class McpModelComprehensionIT {
 
     @Test
     void constructsCorrectActionFromTier1() throws Exception {
-        String tier1 = tools.casehub_model("test");
+        String tier1 = tools.casehub_model("test", null);
 
         String response = askClaude(
                 "Here are the operations for the 'test' domain:\n" + tier1
@@ -93,7 +93,7 @@ class McpModelComprehensionIT {
 
     @Test
     void constructsParamsForComplexInputType() throws Exception {
-        String tier1 = tools.casehub_model("test");
+        String tier1 = tools.casehub_model("test", null);
 
         String response = askClaude(
                 "Here are the operations for the 'test' domain:\n" + tier1
@@ -117,7 +117,7 @@ class McpModelComprehensionIT {
 
     @Test
     void endToEndDispatchWithLlmConstructedParams() throws Exception {
-        String tier1 = tools.casehub_model("test");
+        String tier1 = tools.casehub_model("test", null);
 
         String response = askClaude(
                 "Here are the operations for the 'test' domain:\n" + tier1

@@ -4,6 +4,7 @@ import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.ModelEnricher;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
+import io.casehub.platform.api.mcp.PlatformStream;
 import io.quarkus.arc.Arc;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -49,6 +50,7 @@ public class GraphQLModelScanner {
     void scan() {
         Map<String, List<OperationDescriptor>> domainOps    = new LinkedHashMap<>();
         Map<String, List<EventDescriptor>>     domainEvents = new LinkedHashMap<>();
+        Map<String, String>                    domainApps   = new LinkedHashMap<>();
 
         var beans = Arc.container().beanManager()
                        .getBeans(Object.class, Any.Literal.INSTANCE);
@@ -59,6 +61,8 @@ public class GraphQLModelScanner {
             if (mcpDomain == null) {continue;}
 
             String domain = mcpDomain.value();
+            String app    = mcpDomain.app().isEmpty() ? domain : mcpDomain.app();
+            domainApps.putIfAbsent(domain, app);
 
             if (!hasGraphQLApi(beanClass)) {
                 if (ModelEnricher.class.isAssignableFrom(beanClass)) {
@@ -67,17 +71,22 @@ public class GraphQLModelScanner {
                 domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
                 domainEvents.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : beanClass.getDeclaredMethods()) {
-                    if (Modifier.isStatic(method.getModifiers())) { continue; }
+                    if (Modifier.isStatic(method.getModifiers())) {continue;}
                     if (method.isAnnotationPresent(PlatformQuery.class)) {
                         String desc = method.getAnnotation(PlatformQuery.class).value();
                         domainOps.get(domain).add(
                                 buildOperationFromMethod(method, beanClass,
-                                        OperationDescriptor.OperationType.QUERY, desc));
+                                                         OperationDescriptor.OperationType.QUERY, desc));
                     } else if (method.isAnnotationPresent(PlatformMutation.class)) {
                         String desc = method.getAnnotation(PlatformMutation.class).value();
                         domainOps.get(domain).add(
                                 buildOperationFromMethod(method, beanClass,
-                                        OperationDescriptor.OperationType.MUTATION, desc));
+                                                         OperationDescriptor.OperationType.MUTATION, desc));
+                    } else if (method.isAnnotationPresent(PlatformStream.class)) {
+                        String desc = method.getAnnotation(PlatformStream.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                                         OperationDescriptor.OperationType.STREAM, desc));
                     }
                 }
                 continue;
@@ -114,6 +123,9 @@ public class GraphQLModelScanner {
                     continue;
                 }
 
+                String app = mcpDomain.app().isEmpty() ? domain : mcpDomain.app();
+                domainApps.putIfAbsent(domain, app);
+
                 domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : iface.getDeclaredMethods()) {
                     if (method.isAnnotationPresent(PlatformQuery.class)) {
@@ -126,6 +138,11 @@ public class GraphQLModelScanner {
                         domainOps.get(domain).add(
                                 buildOperationFromMethod(method, beanClass,
                                                          OperationDescriptor.OperationType.MUTATION, desc));
+                    } else if (method.isAnnotationPresent(PlatformStream.class)) {
+                        String desc = method.getAnnotation(PlatformStream.class).value();
+                        domainOps.get(domain).add(
+                                buildOperationFromMethod(method, beanClass,
+                                                         OperationDescriptor.OperationType.STREAM, desc));
                     }
                 }
             }
@@ -137,14 +154,15 @@ public class GraphQLModelScanner {
             ModelEnricher       enricher = enricherMap.get(domain);
             String              summary  = enricher != null ? enricher.summary() : "";
             Map<String, Object> state    = enricher != null ? enricher.state() : Map.of();
+            String              app      = domainApps.getOrDefault(domain, domain);
 
-            DomainModel model = new DomainModel(domain, summary,
+            DomainModel model = new DomainModel(domain, app, summary,
                                                 List.copyOf(domainOps.get(domain)),
                                                 List.copyOf(domainEvents.getOrDefault(domain, List.of())),
                                                 state);
             registry.register(model);
-            LOG.infof("MCP domain '%s': %d operations, %d events",
-                      domain, model.operations().size(), model.events().size());
+            LOG.infof("MCP domain '%s' (app=%s): %d operations, %d events",
+                      domain, app, model.operations().size(), model.events().size());
         }
 
         for (String enricherDomain : enricherMap.keySet()) {
@@ -208,7 +226,7 @@ public class GraphQLModelScanner {
                                                          String description) {
         List<ParameterDescriptor> params = buildParams(method);
         return new OperationDescriptor(method.getName(), type, description, params,
-                                       method.getReturnType().getSimpleName(), method, resolverClass);
+                                       mapGenericTypeName(method.getGenericReturnType()), method, resolverClass);
     }
 
     private EventDescriptor buildEvent(Method method, String domain) {
@@ -307,6 +325,27 @@ public class GraphQLModelScanner {
         if (List.class.isAssignableFrom(type)) return "List";
         return type.getSimpleName();
     }
+
+    String mapGenericTypeName(java.lang.reflect.Type type) {
+        if (type instanceof java.lang.reflect.ParameterizedType pt) {
+            Class<?> raw      = (Class<?>) pt.getRawType();
+            String   baseName = mapTypeName(raw);
+            if ("JSON".equals(baseName)) {return baseName;}
+            java.lang.reflect.Type[] args = pt.getActualTypeArguments();
+            if (args.length > 0) {
+                String params = java.util.Arrays.stream(args)
+                                                .map(a -> a instanceof Class<?> c ? mapTypeName(c) : a.getTypeName())
+                                                .collect(java.util.stream.Collectors.joining(", "));
+                return baseName + "<" + params + ">";
+            }
+            return baseName;
+        }
+        if (type instanceof Class<?> c) {
+            return mapTypeName(c);
+        }
+        return type.getTypeName();
+    }
+
 
     static String toKebabCase(String camelCase) {
         return camelCase.replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase();

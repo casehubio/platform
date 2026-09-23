@@ -1,20 +1,20 @@
 package io.casehub.platform.notification.dispatch;
 
+import io.casehub.platform.api.mcp.ContextParam;
+import io.casehub.platform.api.mcp.McpDomain;
+import io.casehub.platform.api.mcp.PathParam;
+import io.casehub.platform.api.mcp.PlatformMutation;
+import io.casehub.platform.api.mcp.PlatformWebhook;
+import io.casehub.platform.api.mcp.RestPath;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-@Path("/delivery/engagement")
+@McpDomain(value = "delivery/engagement", basePath = "/delivery/engagement")
 @ApplicationScoped
 public class EngagementCallbackResource {
 
@@ -22,25 +22,22 @@ public class EngagementCallbackResource {
 
     private final EngagementCallbackService service;
 
-    @Context
-    HttpHeaders httpHeaders;
-
     @Inject
     public EngagementCallbackResource(EngagementCallbackService service) {
         this.service = service;
     }
 
-    EngagementCallbackResource(EngagementCallbackService service, HttpHeaders httpHeaders) {
-        this.service = service;
-        this.httpHeaders = httpHeaders;
-    }
-
-    @POST
-    @Path("/callback/{channelId}")
-    @Consumes({"application/json", "application/x-www-form-urlencoded"})
-    public Response handleCallback(@PathParam("channelId") String channelId, String rawPayload) {
+    @PlatformWebhook(value = "Delivery channel callback", consumes = {"application/json", "application/x-www-form-urlencoded"})
+    @RestPath("/callback/{channelId}")
+    public Response handleCallback(@PathParam String channelId, String rawPayload,
+                                   @ContextParam("httpHeaders") Map<String, List<String>> headers) {
+        Map<String, String> flatHeaders = headers != null
+                                          ? headers.entrySet().stream().collect(java.util.stream.Collectors.toMap(
+                Map.Entry::getKey,
+                e -> e.getValue() != null && !e.getValue().isEmpty() ? e.getValue().getFirst() : ""))
+                                          : Map.of();
         try {
-            service.handleCallback(channelId, rawPayload, extractHeaders());
+            service.handleCallback(channelId, rawPayload, flatHeaders);
             return Response.ok().build();
         } catch (IllegalStateException e) {
             return Response.status(404).build();
@@ -55,10 +52,9 @@ public class EngagementCallbackResource {
         }
     }
 
-    @POST
-    @Path("/{attemptId}")
-    @Consumes("application/json")
-    public Response recordDirect(@PathParam("attemptId") String attemptId,
+    @PlatformMutation("Record direct engagement")
+    @RestPath("/{attemptId}")
+    public Response recordDirect(@PathParam String attemptId,
                                  DirectEngagementRequest request) {
         try {
             service.recordDirect(attemptId, request);
@@ -68,14 +64,5 @@ public class EngagementCallbackResource {
         } catch (IllegalArgumentException e) {
             return Response.status(e.getMessage().contains("not found") ? 404 : 400).build();
         }
-    }
-
-    private Map<String, String> extractHeaders() {
-        if (httpHeaders == null) { return Map.of(); }
-        Map<String, String> result = new HashMap<>();
-        for (var key : httpHeaders.getRequestHeaders().keySet()) {
-            result.put(key, httpHeaders.getHeaderString(key));
-        }
-        return result;
     }
 }

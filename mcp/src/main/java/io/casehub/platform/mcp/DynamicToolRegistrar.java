@@ -50,7 +50,7 @@ public class DynamicToolRegistrar {
 
         toolManager.newTool("casehub_action")
                    .setDescription("Execute a CaseHub operation. "
-                                   + "Use casehub_model first to discover available operations.")
+                                   + "Use casehub_model to browse or casehub_search to find operations by keyword.")
                    .setInputSchema(schema)
                    .setHandler(args -> {
                        try {

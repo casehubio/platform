@@ -833,6 +833,18 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 out.println("import org.eclipse.microprofile.graphql.Description;");
                 out.println("import io.casehub.platform.api.mcp.McpDomain;");
 
+                boolean needsVirtualThread = false;
+                for (ResolvedOperation genOp : toGenerate) {
+                    boolean isUni = genOp.returnTypeStr().startsWith("Uni<");
+                    if (genOp.type() != OperationType.STREAM && !isUni) {
+                        needsVirtualThread = true;
+                    }
+                }
+                if (needsVirtualThread) {
+                    out.println("import io.smallrye.common.annotation.RunOnVirtualThread;");
+                    out.println("import jakarta.transaction.Transactional;");
+                }
+
                 Set<String> typeImports = collectTypeImports(toGenerate);
                 for (ResolvedOperation genOp : toGenerate) {
                     for (ResolvedParam genP : genOp.params()) {
@@ -987,6 +999,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
                 if (needsVirtualThread) {
                     out.println("import io.smallrye.common.annotation.RunOnVirtualThread;");
+                    out.println("import jakarta.transaction.Transactional;");
                 }
 
                 Set<String> typeImports = collectTypeImports(toGenerate);
@@ -1148,6 +1161,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
         }
         if (!isUniReturn) {
+            out.println("    @Transactional");
             out.println("    @RunOnVirtualThread");
         }
         out.println("    @" + httpVerb);
@@ -1517,6 +1531,11 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         out.println("    " + annotation);
         if (!op.description().isEmpty()) {
             out.println("    @Description(\"" + escapeJavaString(op.description()) + "\")");
+        }
+        boolean isUniReturn = op.returnTypeStr().startsWith("Uni<");
+        if (!isUniReturn) {
+            out.println("    @Transactional");
+            out.println("    @RunOnVirtualThread");
         }
 
         StringBuilder params = new StringBuilder();

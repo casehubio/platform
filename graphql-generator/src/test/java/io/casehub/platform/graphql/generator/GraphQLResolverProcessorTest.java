@@ -565,6 +565,159 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
+    void restQueryHasTransactionalAnnotation() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.TxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("tx")
+                public interface TxApi {
+                    @PlatformQuery("Get item")
+                    String getItem(@PathParam java.util.UUID id);
+                
+                    @PlatformMutation("Create item")
+                    String createItem(String name);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=tx", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                                            "test.rest.TxResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("import jakarta.transaction.Transactional;");
+        assertThat(content).contains("@Transactional");
+        // Both query and mutation methods should have @Transactional
+        assertThat(content.split("@Transactional")).hasSize(3); // import + 2 methods
+    }
+
+    @Test
+    void graphQLQueryHasVirtualThreadAndTransactional() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GqlTxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("gql-tx")
+                @ApplicationScoped
+                public class GqlTxApi {
+                    @PlatformQuery("Get data")
+                    public String getData() { return null; }
+                
+                    @PlatformMutation("Save data")
+                    public String saveData(String value) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=gql-tx", "-AgenerateRest=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                                            "test.graphql.GqlTxResolver")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).contains("import io.smallrye.common.annotation.RunOnVirtualThread;");
+        assertThat(content).contains("import jakarta.transaction.Transactional;");
+        assertThat(content).contains("@RunOnVirtualThread");
+        assertThat(content).contains("@Transactional");
+    }
+
+    @Test
+    void streamingRestSkipsTransactional() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamTxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+                
+                @McpDomain("stream-tx")
+                public interface StreamTxApi {
+                    @PlatformStream("Real-time events")
+                    Multi<String> eventStream(@PathParam java.util.UUID scopeId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=stream-tx", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                                            "test.rest.StreamTxResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).doesNotContain("@Transactional");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+    }
+
+    @Test
+    void uniReturnTypeSkipsTransactional() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.UniTxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Uni;
+                import jakarta.enterprise.context.ApplicationScoped;
+                
+                @McpDomain("uni-tx")
+                @ApplicationScoped
+                public class UniTxApi {
+                    @PlatformMutation("Async create")
+                    public Uni<String> createAsync(String name) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=uni-tx", "-AgenerateGraphQL=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                                            "test.rest.UniTxResource")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).doesNotContain("@Transactional");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+    }
+
+    @Test
+    void graphQLStreamSkipsVirtualThreadAndTransactional() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GqlStreamTxApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+                
+                @McpDomain("gql-stream-tx")
+                public interface GqlStreamTxApi {
+                    @PlatformStream("Live updates")
+                    Multi<String> updates(java.util.UUID id);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=gql-stream-tx", "-AgenerateRest=false")
+                                                             .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                                            "test.graphql.GqlStreamTxResolver")
+                                    .get().getCharContent(true).toString();
+        assertThat(content).doesNotContain("@Transactional");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+    }
+
+
+    @Test
     void paginatedResponseAddsXTotalCountHeader() throws Exception {
         var pageType = com.google.testing.compile.JavaFileObjects.forSourceString(
                 "test.ItemPage",

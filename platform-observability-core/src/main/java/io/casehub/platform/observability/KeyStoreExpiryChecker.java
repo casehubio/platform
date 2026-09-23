@@ -55,7 +55,7 @@ public class KeyStoreExpiryChecker {
             }
             return new CertificateExpiryResult(healthy, List.copyOf(statuses));
         } catch (Exception e) {
-            return new CertificateExpiryResult(false, List.of());
+            return CertificateExpiryResult.error(e.getMessage());
         }
     }
 }

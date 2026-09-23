@@ -18,6 +18,9 @@ class CertificateExpiryHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         var result = checker.check();
+        if (result.error() != null) {
+            return Health.down().withDetail("error", result.error()).build();
+        }
         if (result.certificates().isEmpty()) {
             return Health.unknown().withDetail("reason", "no certificates found").build();
         }

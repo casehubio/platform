@@ -23,6 +23,12 @@ public class CertificateExpiryHealthCheck implements HealthCheck {
             return HealthCheckResponse.up("certificateExpiry");
         }
         var result = checker.get().check();
+        if (result.error() != null) {
+            return HealthCheckResponse.named("certificateExpiry")
+                    .down()
+                    .withData("error", result.error())
+                    .build();
+        }
         if (result.certificates().isEmpty()) {
             return HealthCheckResponse.named("certificateExpiry").up().build();
         }

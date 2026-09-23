@@ -46,7 +46,7 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
         var allImports = new java.util.LinkedHashSet<String>();
 
-        Path handWrittenImports = sourceDir.toPath().getParent().getParent()
+        Path handWrittenImports = sourceDir.toPath().getParent()
                 .resolve("resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports");
         if (Files.exists(handWrittenImports)) {
             try {

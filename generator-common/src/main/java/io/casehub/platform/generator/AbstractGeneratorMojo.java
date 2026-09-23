@@ -95,6 +95,6 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
         org.apache.maven.model.Resource resource = new org.apache.maven.model.Resource();
         resource.setDirectory(getOutputDirectory().getAbsolutePath());
         resource.addInclude("META-INF/**");
-        project.getResources().add(0, resource);
+        project.getResources().add(resource);
     }
 }

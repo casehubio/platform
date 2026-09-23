@@ -88,4 +88,61 @@ class EventRouterTest {
         assertThat(router.fire("cancel")).isTrue();
         assertThat(sm.currentState()).isEqualTo(OrderState.CANCELLED);
     }
+
+    @Test
+    void fire_multipleGuards_firstMatchWins() {
+        var guardedBuilder = DefaultOrcStateMachine.builder("multi", OrderState.class, OrderState.IDLE)
+                                                   .transition(OrderState.IDLE, OrderState.PENDING)
+                                                   .on("process", OrderState.PENDING, OrderState.APPROVED,
+                                                       ctx -> ctx instanceof java.util.Map m && Boolean.TRUE.equals(m.get("approved")))
+                                                   .on("process", OrderState.PENDING, OrderState.CANCELLED,
+                                                       ctx -> ctx instanceof java.util.Map m && Boolean.TRUE.equals(m.get("cancelled")))
+                                                   .terminal(OrderState.APPROVED, OrderState.CANCELLED);
+        var sm     = guardedBuilder.build();
+        var router = guardedBuilder.buildRouter(sm);
+
+        sm.transition(OrderState.IDLE, OrderState.PENDING);
+        assertThat(router.fire("process", java.util.Map.of("approved", true))).isTrue();
+        assertThat(sm.currentState()).isEqualTo(OrderState.APPROVED);
+    }
+
+    @Test
+    void fire_multipleGuards_secondMatchWhenFirstFails() {
+        var guardedBuilder = DefaultOrcStateMachine.builder("multi", OrderState.class, OrderState.IDLE)
+                                                   .transition(OrderState.IDLE, OrderState.PENDING)
+                                                   .on("process", OrderState.PENDING, OrderState.APPROVED,
+                                                       ctx -> ctx instanceof java.util.Map m && Boolean.TRUE.equals(m.get("approved")))
+                                                   .on("process", OrderState.PENDING, OrderState.CANCELLED,
+                                                       ctx -> ctx instanceof java.util.Map m && Boolean.TRUE.equals(m.get("cancelled")))
+                                                   .terminal(OrderState.APPROVED, OrderState.CANCELLED);
+        var sm     = guardedBuilder.build();
+        var router = guardedBuilder.buildRouter(sm);
+
+        sm.transition(OrderState.IDLE, OrderState.PENDING);
+        assertThat(router.fire("process", java.util.Map.of("cancelled", true))).isTrue();
+        assertThat(sm.currentState()).isEqualTo(OrderState.CANCELLED);
+    }
+
+    @Test
+    void showcase_buildBlockRouteAwait() throws InterruptedException {
+        var b = DefaultOrcStateMachine.builder("workflow", OrderState.class, OrderState.IDLE)
+                                      .on("submit", OrderState.IDLE, OrderState.PENDING)
+                                      .on("approve", OrderState.PENDING, OrderState.APPROVED)
+                                      .terminal(OrderState.APPROVED, OrderState.CANCELLED);
+        var sm       = b.build();
+        var blocking = new DefaultBlockingOrcStateMachine<>(sm);
+        var router   = b.buildRouter(blocking);
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(50);
+                router.fire("submit");
+                Thread.sleep(50);
+                router.fire("approve");
+            } catch (InterruptedException e) {Thread.currentThread().interrupt();}
+        });
+
+        blocking.awaitState(OrderState.APPROVED, java.time.Duration.ofSeconds(2));
+        assertThat(blocking.currentState()).isEqualTo(OrderState.APPROVED);
+    }
 }

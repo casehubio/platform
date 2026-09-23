@@ -226,6 +226,15 @@ public class VariableResolver {
                                                   "Variable '" + name + "' not found in prefix '" + prefix + "'.");
         }
 
+        ObjectVariableSource objSource = objectPrefixSources.get(prefix);
+        if (objSource != null) {
+            Object value = objSource.resolve(name);
+            if (value != null) {return value.toString();}
+            if (defaultValue != null) {return defaultValue;}
+            throw new UnresolvedVariableException(key, elementContext,
+                                                  "Variable '" + name + "' not found in prefix '" + prefix + "'.");
+        }
+
         throw new UnresolvedVariableException(key, elementContext,
                                               "Unknown prefix '" + prefix + "'. "
                                               + "Available prefixes: " + availablePrefixes() + ".");
@@ -233,6 +242,7 @@ public class VariableResolver {
 
     private String availablePrefixes() {
         var all = new TreeSet<>(prefixSources.keySet());
+        all.addAll(objectPrefixSources.keySet());
         all.addAll(deferredPrefixes);
         return all.toString();
     }

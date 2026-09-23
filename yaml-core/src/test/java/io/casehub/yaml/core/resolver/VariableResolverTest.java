@@ -596,4 +596,47 @@ class VariableResolverTest {
         assertThat(resolver.resolve("${result.step1}")).isInstanceOf(Map.class);
         assertThat(resolver.resolve("${var.setting}")).isEqualTo("static");
     }
+
+    @org.junit.jupiter.api.Test
+    void objectSourceOnly_resolveString_fallsThroughToObjectSource() {
+        var resolver = new VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("data", name -> switch (name) {
+                                   case "count" -> 42;
+                                   case "label" -> "hello";
+                                   default -> null;
+                               });
+        String result = resolver.resolveString("count=${data.count}, label=${data.label}", "<test>");
+        org.assertj.core.api.Assertions.assertThat(result).isEqualTo("count=42, label=hello");
+    }
+
+    @org.junit.jupiter.api.Test
+    void objectSourceOnly_unresolved_throwsWithDefaultValue() {
+        var resolver = new VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("data", name -> null);
+        String result = resolver.resolveString("${data.missing:-fallback}", "<test>");
+        org.assertj.core.api.Assertions.assertThat(result).isEqualTo("fallback");
+    }
+
+    @org.junit.jupiter.api.Test
+    void objectSourceOnly_unresolved_noDefault_throws() {
+        var resolver = new VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("data", name -> null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                   () -> resolver.resolveString("${data.missing}", "<test>"))
+                                       .isInstanceOf(UnresolvedVariableException.class)
+                                       .hasMessageContaining("missing");
+    }
+
+    @org.junit.jupiter.api.Test
+    void availablePrefixes_includesObjectSources() {
+        var resolver = new VariableResolver(java.util.Map.of("str", (VariableSource) k -> k), java.util.Set.of())
+                               .withObjectScope("obj", name -> null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                   () -> resolver.resolveString("${unknown.x}", "<test>"))
+                                       .isInstanceOf(UnresolvedVariableException.class)
+                                       .hasMessageContaining("obj")
+                                       .hasMessageContaining("str");
+    }
+
+
 }

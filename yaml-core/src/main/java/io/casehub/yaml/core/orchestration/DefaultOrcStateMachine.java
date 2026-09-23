@@ -122,6 +122,7 @@ public final class DefaultOrcStateMachine<S extends Enum<S>> implements OrcState
         private final S initialState;
         private final Map<S, Map<S, Predicate<Object>>> transitions = new java.util.HashMap<>();
         private final Set<S> terminalStates;
+        private final Map<String, java.util.List<EventRouter.EventMapping<S>>> eventMappings = new java.util.HashMap<>();
 
         private Builder(String name, Class<S> stateType, S initialState) {
             this.name = name;
@@ -150,5 +151,24 @@ public final class DefaultOrcStateMachine<S extends Enum<S>> implements OrcState
         public DefaultOrcStateMachine<S> build() {
             return new DefaultOrcStateMachine<>(name, initialState, Map.copyOf(transitions), Set.copyOf(terminalStates));
         }
+
+        public Builder<S> on(String event, S from, S to) {
+            transition(from, to);
+            eventMappings.computeIfAbsent(event, k -> new java.util.ArrayList<>())
+                         .add(new EventRouter.EventMapping<>(from, to, null));
+            return this;
+        }
+
+        public Builder<S> on(String event, S from, S to, Predicate<Object> guard) {
+            transition(from, to, guard);
+            eventMappings.computeIfAbsent(event, k -> new java.util.ArrayList<>())
+                         .add(new EventRouter.EventMapping<>(from, to, guard));
+            return this;
+        }
+
+        public EventRouter<S> buildRouter(OrcStateMachine<S> target) {
+            return new EventRouter<>(target, Map.copyOf(eventMappings));
+        }
+
     }
 }

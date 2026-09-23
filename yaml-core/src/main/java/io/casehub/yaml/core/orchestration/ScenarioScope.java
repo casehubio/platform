@@ -1,16 +1,40 @@
 package io.casehub.yaml.core.orchestration;
 
-import java.time.Duration;
-
 public interface ScenarioScope extends AutoCloseable {
     OrcSemaphore semaphore(String name, int permits);
-    OrcSemaphore semaphore(String name, int permits, Duration window);
+
+    OrcSemaphore semaphore(String name, int permits, java.time.Duration window);
+
     OrcLatch latch(String name, int count);
+
     OrcSignal signal(String name);
+
     <T> OrcChannel<T> channel(String name);
+
     <T> OrcChannel<T> channel(String name, int capacity);
+
     <S extends Enum<S>> OrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState);
+
     <T> T primitive(String name, Class<T> type);
+
     StepResultStore resultStore();
-    @Override void close();
+
+    OrcCounter counter(String name);
+
+    <T> OrcGauge<T> gauge(String name);
+
+    OrcFlag flag(String name);
+
+    OrcAccumulator accumulator(String name, java.util.function.DoubleBinaryOperator op, double identity);
+
+    <K, V> OrcMap<K, V> map(String name);
+
+
+    SpawnedTask spawn(String name, Runnable task);
+
+    ScenarioScope childScope(String name);
+
+
+    @Override
+    void close();
 }

@@ -4,12 +4,12 @@ import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.config.CompositeCorpusLoader;
-import io.casehub.platform.simulation.config.TemporalProfileRegistry;
 import io.casehub.platform.simulation.config.CsvCorpusLoader;
 import io.casehub.platform.simulation.config.DeclarativeExtractorFactory;
 import io.casehub.platform.simulation.config.DeclarativeScorerFactory;
 import io.casehub.platform.simulation.config.JsonCorpusLoader;
 import io.casehub.platform.simulation.config.ParameterRegistry;
+import io.casehub.platform.simulation.config.TemporalProfileRegistry;
 import io.casehub.platform.simulation.config.YamlCorpusLoader;
 import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
@@ -81,6 +81,12 @@ public class SimulationConfigBeans {
             config.resolveTemporalProfile(name).ifPresent(p -> resolved.put(name, p));
         }
         return new TemporalProfileRegistry(resolved);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public io.casehub.yaml.core.runtime.SpeedMultiplier speedMultiplier(SimulationRuntime runtime) {
+        return runtime::globalSpeed;
     }
 
 

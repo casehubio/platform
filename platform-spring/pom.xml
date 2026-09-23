@@ -62,6 +62,21 @@
             <artifactId>casehub-platform-streams-webhook-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-expression-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-governance-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-view-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Quarkus modules referenced by rest-spring-generator plugin (filesystem Jandex paths).
              Provided-scope creates reactor ordering edge without polluting runtime classpath. -->
         <dependency>
@@ -79,6 +94,24 @@
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-notification-dispatch</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-expression</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-governance</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-view</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -123,7 +156,12 @@
                         <id>generate</id>
                         <goals><goal>generate</goal></goals>
                         <configuration>
-                            <quarkusModule>${project.basedir}/../platform</quarkusModule>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../platform</quarkusModule>
+                                <quarkusModule>${project.basedir}/../expression</quarkusModule>
+                                <quarkusModule>${project.basedir}/../governance</quarkusModule>
+                                <quarkusModule>${project.basedir}/../platform-view</quarkusModule>
+                            </quarkusModules>
                         </configuration>
                     </execution>
                     <execution>
@@ -131,7 +169,12 @@
                         <goals><goal>verify</goal></goals>
                         <phase>verify</phase>
                         <configuration>
-                            <quarkusModule>${project.basedir}/../platform</quarkusModule>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../platform</quarkusModule>
+                                <quarkusModule>${project.basedir}/../expression</quarkusModule>
+                                <quarkusModule>${project.basedir}/../governance</quarkusModule>
+                                <quarkusModule>${project.basedir}/../platform-view</quarkusModule>
+                            </quarkusModules>
                         </configuration>
                     </execution>
                 </executions>

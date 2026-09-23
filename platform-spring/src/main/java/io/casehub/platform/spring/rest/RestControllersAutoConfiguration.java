@@ -52,7 +52,7 @@ public class RestControllersAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnBean(DeliveryAttemptStore.class)
+    @ConditionalOnBean({DeliveryAttemptStore.class, EngagementRecorder.class})
     public EngagementCallbackService engagementCallbackService(
             DeliveryAttemptStore store,
             EngagementRecorder recorder,

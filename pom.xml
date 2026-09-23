@@ -26,6 +26,8 @@
         <module>event-simulation-core</module>
         <module>event-simulation</module>
         <module>agent-api</module>
+        <module>platform-observability-core</module>
+        <module>platform-observability</module>
         <module>platform-core</module>
         <module>platform</module>
         <module>platform-spring</module>
@@ -128,7 +130,6 @@
         <module>platform-view-jpa-common</module>
         <module>platform-view-jpa</module>
         <module>platform-view-spring-jpa</module>
-        <module>platform-view-spring</module>
         <module>preferences-editor-core</module>
         <module>preferences-editor</module>
         <module>agent-config-core</module>
@@ -170,27 +171,16 @@
         <module>rest-spring-generator</module>
         <module>graphql-spring-generator</module>
         <module>mcp-spring-generator</module>
-        <module>agent-runtime-spring</module>
-        <module>agent-claude-spring</module>
-        <module>agent-openai-spring</module>
-        <module>agent-codex-spring</module>
-        <module>agent-gemini-spring</module>
-        <module>agent-gemini-cli-spring</module>
-        <module>agent-langchain4j-spring</module>
-        <module>agent-config-spring</module>
-        <module>agent-router-spring</module>
-        <module>agent-gate-spring</module>
-        <module>governance-spring</module>
-        <module>expression-spring</module>
+        <module>agent-spring</module>
         <module>identity-spring</module>
         <module>credentials-spring</module>
         <module>oidc-spring</module>
         <module>scim-spring</module>
-        <module>streams-camel-spring</module>
-        <module>streams-amqp-spring</module>
-        <module>streams-kafka-spring</module>
-        <module>streams-poll-spring</module>
+        <module>streams-spring</module>
+        <module>platform-spring-actuator</module>
         <module>spring-boot-starter</module>
+        <module>spring-boot-starter-agent</module>
+        <module>spring-boot-starter-streams</module>
         <module>spring-integration-test</module>
     </modules>
 

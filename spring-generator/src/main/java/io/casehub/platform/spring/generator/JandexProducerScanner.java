@@ -175,12 +175,14 @@ public class JandexProducerScanner {
                 }
             }
 
-            // Detect @PostConstruct init method on declaring class
+            // Detect @PostConstruct init method on the return type (not the declaring producer class)
             String initMethod = null;
-            for (MethodInfo m : declaringClass.methods()) {
-                if (m.hasAnnotation(POST_CONSTRUCT)) {
-                    initMethod = m.name();
-                    break;
+            if (effectiveType != null) {
+                for (MethodInfo m : effectiveType.methods()) {
+                    if (m.hasAnnotation(POST_CONSTRUCT)) {
+                        initMethod = m.name();
+                        break;
+                    }
                 }
             }
 
@@ -192,6 +194,18 @@ public class JandexProducerScanner {
 
             // Order value from @Priority on the method
             int orderValue = priorityVal;
+
+            // Resolve SPI interface for @DefaultBean beans
+            String spiInterface = null;
+            if (isDefaultBean && concreteReturnType == null && effectiveType != null) {
+                for (DotName iface : effectiveType.interfaceNames()) {
+                    String ifaceName = iface.toString();
+                    if (!ifaceName.startsWith("java.") && !ifaceName.startsWith("jakarta.")) {
+                        spiInterface = ifaceName;
+                        break;
+                    }
+                }
+            }
 
             result.add(new ProducerDescriptor(
                     declaringClass.name().toString(),
@@ -212,7 +226,8 @@ public class JandexProducerScanner {
                     orderValue,
                     hasFactory,
                     factoryName,
-                    configMethods));
+                    configMethods,
+                    spiInterface));
         }
 
         return result;

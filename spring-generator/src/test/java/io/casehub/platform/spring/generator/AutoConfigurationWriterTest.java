@@ -193,7 +193,7 @@ class AutoConfigurationWriterTest {
                         "io.casehub.MyProperties", "config",
                         ProducerDescriptor.ParamKind.CONFIG_PROPERTIES)),
                 "my.prefix", "io.casehub.MyProperties",
-                List.of(), null, false, 0, false, null, configMethods);
+                List.of(), null, false, 0, false, null, configMethods, null);
 
         var files = writer.generate("io.casehub.spring", "TestAutoConfiguration", List.of(desc));
         assertThat(files).hasSize(2);
@@ -220,7 +220,7 @@ class AutoConfigurationWriterTest {
                 false, false, 0, false,
                 List.of(new ProducerDescriptor.ConstructorParam(
                         "io.casehub.MyDep", "dep", ProducerDescriptor.ParamKind.PLAIN)),
-                null, null, List.of(), null, false, 0, true, "create", List.of());
+                null, null, List.of(), null, false, 0, true, "create", List.of(), null);
 
         String source = autoConfigSource(writer.generate("io.casehub.spring",
                 "TestAutoConfiguration", List.of(desc)));
@@ -239,7 +239,7 @@ class AutoConfigurationWriterTest {
                         ProducerDescriptor.ParamKind.LIST)),
                 null, null,
                 List.of("io.casehub.DIDMethod"),
-                null, true, 0, false, null, List.of());
+                null, true, 0, false, null, List.of(), null);
 
         String source = autoConfigSource(writer.generate("io.casehub.spring",
                 "TestAutoConfiguration", List.of(desc)));
@@ -255,7 +255,7 @@ class AutoConfigurationWriterTest {
                 "io.casehub.KeyResolver", null, List.of(),
                 false, false, 100, false,
                 List.of(), null, null, List.of(), null, false, 100,
-                false, null, List.of());
+                false, null, List.of(), null);
 
         String source = autoConfigSource(writer.generate("io.casehub.spring",
                 "TestAutoConfiguration", List.of(desc)));
@@ -270,7 +270,7 @@ class AutoConfigurationWriterTest {
                 "io.casehub.Client", null, List.of(),
                 false, false, 0, false,
                 List.of(), null, null, List.of(), "validateBinary", false, 0,
-                false, null, List.of());
+                false, null, List.of(), null);
 
         String source = autoConfigSource(writer.generate("io.casehub.spring",
                 "TestAutoConfiguration", List.of(desc)));
@@ -377,6 +377,6 @@ void enhancedPath_supplierDepParam_emitsObjectProviderSupplier() {
         return new ProducerDescriptor(
                 "io.casehub.quarkus.Beans", methodName, returnType, null, List.of(),
                 defaultBean, alternative, 0, false,
-                params, null, null, List.of(), null, false, 0, false, null, List.of());
+                params, null, null, List.of(), null, false, 0, false, null, List.of(), null);
     }
 }

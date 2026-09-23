@@ -27,6 +27,8 @@ public class AutoConfigurationWriter {
             "org.springframework.context.annotation", "Primary");
     private static final ClassName ORDER = ClassName.get(
             "org.springframework.core.annotation", "Order");
+    private static final ClassName AUTO_CONFIGURE_ORDER = ClassName.get(
+            "org.springframework.boot.autoconfigure", "AutoConfigureOrder");
     private static final ClassName ENABLE_CONFIG_PROPERTIES = ClassName.get(
             "org.springframework.boot.context.properties", "EnableConfigurationProperties");
     private static final ClassName CONFIG_PROPERTIES = ClassName.get(
@@ -59,9 +61,18 @@ public class AutoConfigurationWriter {
             }
         }
 
+        boolean hasDefaultBeans = descriptors.stream().anyMatch(ProducerDescriptor::defaultBean);
+
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(className)
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(AUTO_CONFIGURATION);
+
+        if (hasDefaultBeans) {
+            classBuilder.addAnnotation(AnnotationSpec.builder(AUTO_CONFIGURE_ORDER)
+                    .addMember("value", "$T.LOWEST_PRECEDENCE",
+                            ClassName.get("org.springframework.core", "Ordered"))
+                    .build());
+        }
 
         if (anchorType != null) {
             classBuilder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_CLASS)
@@ -109,6 +120,10 @@ public class AutoConfigurationWriter {
             if (d.hasConcreteOverride()) {
                 builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
                         .addMember("value", "$T.class", toClassName(d.returnType()))
+                        .build());
+            } else if (d.spiInterface() != null) {
+                builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
+                        .addMember("value", "$T.class", toClassName(d.spiInterface()))
                         .build());
             } else {
                 builder.addAnnotation(CONDITIONAL_ON_MISSING_BEAN);
@@ -190,6 +205,10 @@ public class AutoConfigurationWriter {
             if (d.hasConcreteOverride()) {
                 builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
                         .addMember("value", "$T.class", returnType)
+                        .build());
+            } else if (d.spiInterface() != null) {
+                builder.addAnnotation(AnnotationSpec.builder(CONDITIONAL_ON_MISSING_BEAN)
+                        .addMember("value", "$T.class", toClassName(d.spiInterface()))
                         .build());
             } else {
                 builder.addAnnotation(CONDITIONAL_ON_MISSING_BEAN);

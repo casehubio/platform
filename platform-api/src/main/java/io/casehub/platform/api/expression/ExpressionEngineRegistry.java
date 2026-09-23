@@ -27,4 +27,10 @@ public interface ExpressionEngineRegistry {
             Map<String, Object> variables);
 
     void validate(String type, String expression);
+
+    default void registerDefault(ExpressionContext context, String engineType) {}
+
+    default String resolveDefault(ExpressionContext context)                   {return null;}
+
+
 }

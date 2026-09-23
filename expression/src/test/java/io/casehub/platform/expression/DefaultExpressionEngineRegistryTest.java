@@ -69,6 +69,30 @@ class DefaultExpressionEngineRegistryTest {
         registry.validate("test", "expr");
     }
 
+    @Test
+    void registerDefault_andResolveDefault() {
+        registry.registerDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION, "mvel");
+        registry.registerDefault(io.casehub.platform.api.expression.ExpressionContext.TRANSFORM, "jq");
+        registry.registerDefault(io.casehub.platform.api.expression.ExpressionContext.FILTER, "jq");
+
+        assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION)).isEqualTo("mvel");
+        assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.TRANSFORM)).isEqualTo("jq");
+        assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.FILTER)).isEqualTo("jq");
+    }
+
+    @Test
+    void resolveDefault_unregisteredContext_returnsNull() {
+        assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION)).isNull();
+    }
+
+    @Test
+    void registerDefault_overwritesPrevious() {
+        registry.registerDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION, "mvel");
+        registry.registerDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION, "jexl");
+        assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION)).isEqualTo("jexl");
+    }
+
+
     private static class StubExpressionEngine implements ExpressionEngine {
         private final String type;
         StubExpressionEngine(String type) { this.type = type; }

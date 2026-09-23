@@ -12,6 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultExpressionEngineRegistry implements ExpressionEngineRegistry {
 
     private final ConcurrentHashMap<String, ExpressionEngine> engineMap = new ConcurrentHashMap<>();
+    private final java.util.EnumMap<io.casehub.platform.api.expression.ExpressionContext, String> defaults = new java.util.EnumMap<>(io.casehub.platform.api.expression.ExpressionContext.class);
+
 
     public DefaultExpressionEngineRegistry(List<ExpressionEngine> engines) {
         for (ExpressionEngine engine : engines) {
@@ -48,6 +50,17 @@ public class DefaultExpressionEngineRegistry implements ExpressionEngineRegistry
     public void validate(String type, String expression) {
         resolveEngine(type).validate(expression);
     }
+
+    @Override
+    public void registerDefault(io.casehub.platform.api.expression.ExpressionContext context, String engineType) {
+        defaults.put(context, engineType);
+    }
+
+    @Override
+    public String resolveDefault(io.casehub.platform.api.expression.ExpressionContext context) {
+        return defaults.get(context);
+    }
+
 
     private ExpressionEngine resolveEngine(String type) {
         ExpressionEngine engine = engineMap.get(type);

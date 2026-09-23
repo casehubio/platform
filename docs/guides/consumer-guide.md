@@ -825,6 +825,7 @@ spring.flyway.locations=classpath:db/migration,classpath:db/platform/migration,c
 | `casehub-platform-callback-spring` | `casehub-platform-callback` | `BeanPostProcessor` that wraps `@CallbackEligible` SPIs |
 | `casehub-platform-mcp-spring` | `casehub-platform-mcp` | MCP tool infrastructure |
 | `casehub-platform-agent-*-spring` | `casehub-platform-agent-*` | Agent backend auto-configs (Claude, OpenAI, Codex, Gemini, Gemini CLI, LangChain4j, Router, Config, Gate) |
+| `casehub-platform-spring-actuator` | `casehub-platform-observability` | Health indicators (model registry, agent backends, delivery channels, SCIM, certificate expiry), metrics BPP (wraps AgentBackend + AccessControlProvider), info contributor |
 
 ### Auto-configuration behaviour
 
@@ -1004,6 +1005,153 @@ Naming convention: `FooResource` → `FooController`. If the class name doesn't 
 ### Jackson 2 bridge
 
 Spring Boot 4 defaults to Jackson 3 (`tools.jackson`). casehub core modules use Jackson 2 (`com.fasterxml`). The starter includes `spring-boot-jackson2` to auto-configure a Jackson 2 `ObjectMapper` so both frameworks inject the same type. This bridge will be removed when Quarkus 4 GA aligns on Jackson 3 (~Nov 2026).
+
+### Observability (Actuator)
+
+When `spring-boot-starter-actuator` is on the classpath, the platform automatically contributes:
+
+**Health indicators** (each activates only when the relevant SPI bean exists):
+- Model registry — UP when models are registered
+- Agent backends — UP when ≥1 backend discovered
+- Delivery channels — UP when channels registered
+- SCIM endpoint — readiness check, pings the SCIM server
+- Certificate expiry — WARNING when certs near expiry, DOWN when expired
+
+**Metrics** (via Micrometer):
+- `casehub.platform.agent.invocations` — counter per backend
+- `casehub.platform.agent.invocation.duration` — timer per backend
+- `casehub.platform.agent.sessions.opened` — counter per backend
+- `casehub.platform.acl.can_access` — counter per action
+- `casehub.platform.acl.can_access.duration` — timer per action
+- `casehub.platform.model.registry.size` — gauge
+- `casehub.platform.delivery.channels.registered` — gauge
+- `casehub.platform.agent.backends.discovered` — gauge
+
+**Info contributor:** Platform version, discovered agent backends, model registry size.
+
+No additional configuration needed — add `spring-boot-starter-actuator` and metrics/health appear automatically.
+
+### DevTools restart excludes
+
+`platform-spring` includes `META-INF/spring-devtools.properties` that excludes `io.casehub.platform.*` from DevTools restart class scanning. Platform library classes don't change during development — excluding them reduces restart latency.
+
+### Complete `pom.xml` template
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-casehub-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <casehub.version>0.2-SNAPSHOT</casehub.version>
+    </properties>
+
+    <dependencies>
+        <!-- CaseHub platform — core starter -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-spring-boot-starter</artifactId>
+            <version>${casehub.version}</version>
+            <type>pom</type>
+        </dependency>
+
+        <!-- Add for LLM agent support -->
+        <!-- <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-spring-boot-starter-agent</artifactId>
+            <version>${casehub.version}</version>
+            <type>pom</type>
+        </dependency> -->
+
+        <!-- Spring Boot starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Database -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-spring-testing</artifactId>
+            <version>${casehub.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>casehub</id>
+            <url>https://maven.pkg.github.com/casehubio/*</url>
+        </repository>
+    </repositories>
+</project>
+```
+
+### Starter selection guide
+
+| Need | Starter | Adds |
+|------|---------|------|
+| Core platform SPIs, JPA persistence, mock fallbacks | `casehub-spring-boot-starter` | persistence, ACL, notifications, subscriptions, callbacks, identity, credentials, OIDC, SCIM, actuator health/metrics |
+| AI agent invocation (Claude, OpenAI, Gemini, etc.) | `casehub-spring-boot-starter-agent` | all agent backends + gate rate limiter (pulls in core transitively) |
+| External event streams (Kafka, AMQP, webhooks, polling) | `casehub-spring-boot-starter-streams` | Kafka, AMQP, Camel, Poll adapters (pulls in core transitively) |
+
+For fine-grained control, skip starters and add individual modules from the Spring modules table.
+
+### Troubleshooting
+
+**Jackson 2/3 type conflicts:** Spring Boot 4 defaults to Jackson 3. If you see `ClassNotFoundException` for `com.fasterxml.jackson.*` types, ensure `spring-boot-jackson2` is on the classpath — the core starter includes it automatically. If you use a custom parent POM (not `spring-boot-starter-parent`), add it explicitly.
+
+**`@EntityScan` required:** Hibernate doesn't scan JARs for entities by default. Add `@EntityScan("io.casehub.platform")` to your application class — without it, JPA modules fail with "unknown entity" errors.
+
+**Flyway migration locations:** Each JPA module ships its own migrations under `classpath:db/<module>/migration`. Add all locations to `spring.flyway.locations`:
+```properties
+spring.flyway.locations=classpath:db/migration,classpath:db/platform/migration,classpath:db/acl/migration
+```
+Missing a location means missing tables — check the Flyway locations table in the Configuration section.
+
+**H2 test mode:** Use `MODE=PostgreSQL` in the JDBC URL for integration tests: `jdbc:h2:mem:testdb;MODE=PostgreSQL`. This handles PostgreSQL-specific syntax (recursive CTEs, JSON operators). Disable Flyway (`spring.flyway.enabled=false`) and use `spring.jpa.hibernate.ddl-auto=create-drop` for H2.
+
+**Health indicators not appearing:** Platform health indicators require `spring-boot-starter-actuator` on the classpath AND the relevant SPI bean to be present. If a health check doesn't appear at `/actuator/health`, verify the backing bean exists (e.g., `MutableModelRegistry` for model registry health).
+
+**Bean ordering with agent-gate:** If you see `AgentProvider` calls not rate-limited, check that `agent-gate-core` is on the classpath. The `MetricsBeanPostProcessor` (order 1900) and `AgentGateBeanPostProcessor` (order 2000) compose — metrics wraps first, then gate wraps the result.
 
 ---
 

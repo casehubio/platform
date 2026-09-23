@@ -27,6 +27,7 @@
         <module>event-simulation</module>
         <module>agent-api</module>
         <module>platform-observability-core</module>
+        <module>platform-observability</module>
         <module>platform-core</module>
         <module>platform</module>
         <module>platform-spring</module>

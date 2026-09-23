@@ -34,6 +34,13 @@ public interface ScenarioScope extends AutoCloseable {
 
     ScenarioScope childScope(String name);
 
+    ScenarioScope withDeadline(java.time.Duration deadline);
+
+    ScenarioScope withDeadline(java.time.Duration deadline, Runnable onDeadline);
+
+    boolean isDeadlineExpired();
+
+    java.util.Optional<java.time.Duration> remainingTime();
 
     @Override
     void close();

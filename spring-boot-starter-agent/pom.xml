@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-parent</artifactId>
+        <version>0.2-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>casehub-spring-boot-starter-agent</artifactId>
+    <packaging>pom</packaging>
+    <name>CaseHub Spring Boot Starter :: Agent</name>
+    <description>Agent infrastructure for CaseHub Spring Boot apps.
+        Adds all agent backends (Claude, OpenAI, Gemini, Codex, LangChain4j,
+        Ollama) + router, config, gate, and runtime. Requires the core
+        casehub-spring-boot-starter.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+</project>

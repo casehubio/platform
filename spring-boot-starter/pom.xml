@@ -13,9 +13,10 @@
     <artifactId>casehub-spring-boot-starter</artifactId>
     <packaging>pom</packaging>
     <name>CaseHub Spring Boot Starter</name>
-    <description>Single dependency for all CaseHub platform Spring Boot modules.
-        Add this starter to get auto-configured persistence, MCP, callbacks,
-        and mock fallbacks out of the box.</description>
+    <description>Core CaseHub platform Spring Boot starter — auto-configured
+        persistence, MCP, callbacks, identity, and mock fallbacks.
+        Add casehub-spring-boot-starter-agent for agent backends,
+        casehub-spring-boot-starter-streams for stream adapters.</description>
 
     <dependencies>
         <!-- Core auto-configuration + mock fallbacks -->
@@ -86,13 +87,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Agent infrastructure (consolidated) -->
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-agent-spring</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Identity -->
         <dependency>
             <groupId>io.casehub</groupId>
@@ -119,14 +113,6 @@
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-scim-spring</artifactId>
             <version>${project.version}</version>
-        </dependency>
-
-        <!-- Stream adapters (consolidated, optional) -->
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-streams-spring</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
         </dependency>
 
         <!-- Jackson 2 bridge — Spring Boot 4 defaults to Jackson 3.

@@ -746,19 +746,34 @@ casehub-platform ships dual-framework support. Every Quarkus CDI module has a Sp
 
 ### Quick Start
 
-Add the starter to your `pom.xml`:
+Three starters are available — add only what your app needs:
 
 ```xml
+<!-- Core — persistence, MCP, callbacks, identity, mock fallbacks -->
 <dependency>
     <groupId>io.casehub</groupId>
     <artifactId>casehub-spring-boot-starter</artifactId>
     <version>${casehub.version}</version>
 </dependency>
+
+<!-- Agent — add if your app invokes LLMs (Claude, OpenAI, Gemini, etc.) -->
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-spring-boot-starter-agent</artifactId>
+    <version>${casehub.version}</version>
+</dependency>
+
+<!-- Streams — add if your app consumes external events (Kafka, AMQP, Camel, Poll) -->
+<dependency>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-spring-boot-starter-streams</artifactId>
+    <version>${casehub.version}</version>
+</dependency>
 ```
 
-This pulls in all platform Spring modules: persistence (JPA), MCP, callbacks, agent infrastructure, identity, governance, expression engines, and mock fallbacks.
+The agent and streams starters each pull in the core starter transitively. Most apps need only the core starter; add agent or streams when those capabilities are required.
 
-For selective dependencies, add individual modules instead (see table below).
+For selective dependencies below the starter level, add individual modules instead (see table below).
 
 ### Application setup
 

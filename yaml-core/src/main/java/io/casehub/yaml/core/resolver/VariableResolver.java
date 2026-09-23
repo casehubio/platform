@@ -74,6 +74,15 @@ public class VariableResolver {
 
     public VariableResolver withChainedScope(String prefix, VariableSource source) {
         VariableSource existing = prefixSources.get(prefix);
+        if (existing == null) {
+            ObjectVariableSource objExisting = objectPrefixSources.get(prefix);
+            if (objExisting != null) {
+                existing = name -> {
+                    Object v = objExisting.resolve(name);
+                    return v != null ? v.toString() : null;
+                };
+            }
+        }
         VariableSource chained = existing != null
                                  ? VariableSource.chain(source, existing) : source;
         return withScope(prefix, chained);
@@ -161,6 +170,13 @@ public class VariableResolver {
             String key = entry.getKey().toString();
             Object val = entry.getValue();
             if (val instanceof String s && s.contains("${")) {
+                if (isSoleReference(s)) {
+                    Object typed = resolveTyped(s);
+                    if (typed != null) {
+                        result.put(key, typed);
+                        continue;
+                    }
+                }
                 result.put(key, resolveString(s, elementContext));
             } else if (val instanceof Map<?, ?> nested) {
                 result.put(key, resolveMap(nested, elementContext));
@@ -177,6 +193,10 @@ public class VariableResolver {
         return input.stream()
                     .map(item -> {
                         if (item instanceof String s && s.contains("${")) {
+                            if (isSoleReference(s)) {
+                                Object typed = resolveTyped(s);
+                                if (typed != null) {return typed;}
+                            }
                             return (Object) resolveString(s, elementContext);
                         }
                         if (item instanceof Map<?, ?> map) {
@@ -221,15 +241,15 @@ public class VariableResolver {
         if (source != null) {
             String value = source.resolve(name);
             if (value != null) {return value;}
-            if (defaultValue != null) {return defaultValue;}
-            throw new UnresolvedVariableException(key, elementContext,
-                                                  "Variable '" + name + "' not found in prefix '" + prefix + "'.");
         }
 
         ObjectVariableSource objSource = objectPrefixSources.get(prefix);
         if (objSource != null) {
             Object value = objSource.resolve(name);
             if (value != null) {return value.toString();}
+        }
+
+        if (source != null || objSource != null) {
             if (defaultValue != null) {return defaultValue;}
             throw new UnresolvedVariableException(key, elementContext,
                                                   "Variable '" + name + "' not found in prefix '" + prefix + "'.");

@@ -627,6 +627,95 @@ class VariableResolverTest {
                                        .hasMessageContaining("missing");
     }
 
+
+// --- objectPrefixSources full integration (#426) ---
+
+    @Test
+    void lookupVariable_samePrefixNull_fallsThroughToObjectSource() {
+        VariableSource       strSource = name -> null;
+        ObjectVariableSource objSource = name -> "count".equals(name) ? 42 : null;
+        var resolver = new VariableResolver(Map.of("data", strSource), Set.of())
+                               .withObjectScope("data", objSource);
+        String result = resolver.resolveString("${data.count}", "test");
+        assertThat(result).isEqualTo("42");
+    }
+
+    @Test
+    void lookupVariable_samePrefixNull_usesDefaultBeforeFallthrough() {
+        VariableSource       strSource = name -> null;
+        ObjectVariableSource objSource = name -> null;
+        var resolver = new VariableResolver(Map.of("data", strSource), Set.of())
+                               .withObjectScope("data", objSource);
+        String result = resolver.resolveString("${data.missing:-fallback}", "test");
+        assertThat(result).isEqualTo("fallback");
+    }
+
+    @Test
+    void lookupVariable_samePrefixNull_bothNull_throws() {
+        VariableSource       strSource = name -> null;
+        ObjectVariableSource objSource = name -> null;
+        var resolver = new VariableResolver(Map.of("data", strSource), Set.of())
+                               .withObjectScope("data", objSource);
+        assertThatThrownBy(() -> resolver.resolveString("${data.missing}", "test"))
+                .isInstanceOf(UnresolvedVariableException.class)
+                .hasMessageContaining("missing");
+    }
+
+    @Test
+    void withChainedScope_derivesFromObjectPrefixSources() {
+        ObjectVariableSource objSource = name -> "count".equals(name) ? 42 : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("data", objSource);
+        VariableSource newSource = name -> "label".equals(name) ? "hello" : null;
+        var            chained   = resolver.withChainedScope("data", newSource);
+        assertThat(chained.resolveString("${data.label}", "test")).isEqualTo("hello");
+        assertThat(chained.resolveString("${data.count}", "test")).isEqualTo("42");
+    }
+
+    @Test
+    void resolveMap_soleReference_returnsTypedValue() {
+        ObjectVariableSource objSource = name -> "batch_size".equals(name) ? 500 : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("var", objSource);
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("batch_size", "${var.batch_size}");
+        var resolved = resolver.resolveMap(input, "node");
+        assertThat(resolved.get("batch_size")).isEqualTo(500);
+        assertThat(resolved.get("batch_size")).isInstanceOf(Integer.class);
+    }
+
+    @Test
+    void resolveMap_embeddedReference_returnsString() {
+        ObjectVariableSource objSource = name -> "bucket".equals(name) ? "prod-data" : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("var", objSource);
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("path", "s3://${var.bucket}/data");
+        var resolved = resolver.resolveMap(input, "node");
+        assertThat(resolved.get("path")).isEqualTo("s3://prod-data/data");
+        assertThat(resolved.get("path")).isInstanceOf(String.class);
+    }
+
+    @Test
+    void resolveList_soleReference_returnsTypedValue() {
+        ObjectVariableSource objSource = name -> "count".equals(name) ? 42 : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("var", objSource);
+        var resolved = resolver.resolveList(List.of("${var.count}"), "node");
+        assertThat(resolved.get(0)).isEqualTo(42);
+        assertThat(resolved.get(0)).isInstanceOf(Integer.class);
+    }
+
+    @Test
+    void resolveList_embeddedReference_returnsString() {
+        ObjectVariableSource objSource = name -> "region".equals(name) ? "us-east" : null;
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                               .withObjectScope("var", objSource);
+        var resolved = resolver.resolveList(List.of("region-${var.region}-cluster"), "node");
+        assertThat(resolved.get(0)).isEqualTo("region-us-east-cluster");
+        assertThat(resolved.get(0)).isInstanceOf(String.class);
+    }
+
     @org.junit.jupiter.api.Test
     void availablePrefixes_includesObjectSources() {
         var resolver = new VariableResolver(java.util.Map.of("str", (VariableSource) k -> k), java.util.Set.of())

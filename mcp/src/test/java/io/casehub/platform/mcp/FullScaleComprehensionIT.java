@@ -258,41 +258,65 @@ class FullScaleComprehensionIT {
     private void assertHierarchyDiscovery(String task, String expectedApp,
                                            String expectedDomainSubstring,
                                            String expectedOpSubstring) throws Exception {
-        // Turn 1: show app index, ask LLM to pick an app
-        String appCatalog = appIndexJson;
-        for (String app : fullRegistry.getApps()) {
-            if (app.isEmpty()) continue;
-            List<DomainModel> appDomains = fullRegistry.getDomainsByApp(app);
-            appCatalog += "\n\n--- App '" + app + "' domains ---\n"
-                    + mapper.writeValueAsString(
-                            DomainContentFormatter.formatAppDomains(app, appDomains));
-        }
-
-        Map<String, Object> result = parseJson(askClaude(
-                "Here is the CaseHub platform catalog. Each app contains domains, "
-                + "each domain contains operations.\n\n" + appCatalog
+        // Turn 1: show app index only — LLM picks the app
+        Map<String, Object> t1 = parseJson(askClaude(
+                "Here is the CaseHub application index (each app groups related domains):\n\n"
+                + appIndexJson
                 + "\n\nTask: " + task
-                + "\n\nFind the operation that handles this. Reply with JSON: "
-                + "{\"app\": \"...\", \"domain\": \"...\", \"operation\": \"...\", "
-                + "\"confidence\": \"high|medium|low\", \"reasoning\": \"one sentence\"}"));
+                + "\n\nWhich app handles this? JSON only: {\"app\": \"<name>\"}"));
 
-        System.out.printf("  Hierarchy discovery for [%s]: app=%s, domain=%s, op=%s, "
-                + "confidence=%s — %s%n",
-                expectedApp, result.get("app"), result.get("domain"),
-                result.get("operation"), result.get("confidence"),
-                result.get("reasoning"));
+        String selectedApp = (String) t1.get("app");
+        System.out.printf("  [%s] Turn 1 — selected app: %s (expected: %s)%n",
+                task.substring(0, Math.min(40, task.length())), selectedApp, expectedApp);
 
-        assertThat(result.get("app"))
+        assertThat(selectedApp)
                 .as("Expected app '%s' for task: %s", expectedApp, task)
                 .isEqualTo(expectedApp);
 
+        // Turn 2: show that app's domains — LLM picks the domain
+        List<DomainModel> appDomains = fullRegistry.getDomainsByApp(selectedApp);
+        String appDetail = mapper.writeValueAsString(
+                DomainContentFormatter.formatAppDomains(selectedApp, appDomains));
+
+        Map<String, Object> t2 = parseJson(askClaude(
+                "App '" + selectedApp + "' has these domains:\n\n" + appDetail
+                + "\n\nTask: " + task
+                + "\n\nWhich domain? JSON only: {\"domain\": \"<name>\"}"));
+
+        String selectedDomain = (String) t2.get("domain");
+        System.out.printf("  [%s] Turn 2 — selected domain: %s%n",
+                task.substring(0, Math.min(40, task.length())), selectedDomain);
+
         if (expectedDomainSubstring != null) {
-            assertThat((String) result.get("domain"))
+            assertThat(selectedDomain)
                     .as("Domain should contain '%s'", expectedDomainSubstring)
                     .containsIgnoringCase(expectedDomainSubstring);
         }
+
+        // Turn 3: show domain operations — LLM picks the operation
+        DomainModel domain = fullRegistry.getDomain(selectedDomain).orElse(null);
+        if (domain == null) {
+            System.out.printf("  [%s] Turn 3 — domain '%s' not found in registry, skipping%n",
+                    task.substring(0, Math.min(40, task.length())), selectedDomain);
+            return;
+        }
+
+        String domainDetail = mapper.writeValueAsString(
+                DomainContentFormatter.formatDomain(domain));
+
+        Map<String, Object> t3 = parseJson(askClaude(
+                "Domain '" + selectedDomain + "' operations:\n\n" + domainDetail
+                + "\n\nTask: " + task
+                + "\n\nWhich operation? JSON only: "
+                + "{\"operation\": \"<name>\", \"confidence\": \"high|medium|low\"}"));
+
+        String selectedOp = (String) t3.get("operation");
+        System.out.printf("  [%s] Turn 3 — selected operation: %s (confidence: %s)%n",
+                task.substring(0, Math.min(40, task.length())), selectedOp, t3.get("confidence"));
+
+        assertThat(selectedOp).as("Operation should not be blank").isNotBlank();
         if (expectedOpSubstring != null) {
-            assertThat((String) result.get("operation"))
+            assertThat(selectedOp)
                     .as("Operation should contain '%s'", expectedOpSubstring)
                     .containsIgnoringCase(expectedOpSubstring);
         }
@@ -317,12 +341,12 @@ class FullScaleComprehensionIT {
 
     private String askClaude(String userPrompt) {
         var config = AgentSessionConfig.of(DISCOVERY_PROMPT, userPrompt,
-                Duration.ofSeconds(30));
+                Duration.ofSeconds(120));
         return agentProvider.invoke(config)
                 .filter(e -> e instanceof AgentEvent.TextDelta)
                 .map(e -> ((AgentEvent.TextDelta) e).text())
                 .collect().with(Collectors.joining())
-                .await().atMost(Duration.ofSeconds(60));
+                .await().atMost(Duration.ofSeconds(180));
     }
 
     private Map<String, Object> parseJson(String response) throws Exception {

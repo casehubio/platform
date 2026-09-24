@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -77,7 +78,14 @@ class FullScaleComprehensionIT {
 
     @BeforeAll
     void buildCatalog() throws Exception {
-        fullRegistry = FullScaleCatalogBuilder.buildFromSlotAndLocalRepo(SLOT_ROOT, M2_CASEHUB);
+        Path catalogJson = SLOT_ROOT.resolve("wsp-casehub-ledger/catalog.json");
+        if (Files.exists(catalogJson)) {
+            System.out.println("Loading catalog from source-parsed JSON: " + catalogJson);
+            fullRegistry = FullScaleCatalogBuilder.buildFromCatalogJson(catalogJson);
+        } else {
+            System.out.println("No catalog.json found — falling back to Jandex scan");
+            fullRegistry = FullScaleCatalogBuilder.buildFromSlotAndLocalRepo(SLOT_ROOT, M2_CASEHUB);
+        }
 
         List<String> apps = fullRegistry.getApps();
         List<DomainModel> domains = fullRegistry.getDomains();

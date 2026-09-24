@@ -7,6 +7,9 @@ import io.casehub.platform.generator.ResolvedParam;
 import org.jboss.jandex.Index;
 import org.jboss.jandex.Indexer;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -38,6 +41,38 @@ final class FullScaleCatalogBuilder {
         Index index = indexer.complete();
         List<DomainScanResult> scanResults = new McpDomainJandexScanner().scan(index);
         return toRegistry(scanResults);
+    }
+
+    static DomainModelRegistry buildFromCatalogJson(Path catalogJson) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        List<Map<String, Object>> domains = mapper.readValue(
+                Files.readString(catalogJson), new TypeReference<>() {});
+        DomainModelRegistry registry = new DomainModelRegistry();
+        for (Map<String, Object> d : domains) {
+            String name = (String) d.get("name");
+            String app = (String) d.getOrDefault("app", "");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> ops = (List<Map<String, Object>>) d.getOrDefault("operations", List.of());
+            List<OperationDescriptor> operations = ops.stream().map(op -> {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> params = (List<Map<String, Object>>) op.getOrDefault("params", List.of());
+                return new OperationDescriptor(
+                        (String) op.get("name"),
+                        switch ((String) op.getOrDefault("type", "QUERY")) {
+                            case "MUTATION" -> OperationDescriptor.OperationType.MUTATION;
+                            case "STREAM" -> OperationDescriptor.OperationType.STREAM;
+                            default -> OperationDescriptor.OperationType.QUERY;
+                        },
+                        (String) op.getOrDefault("summary", ""),
+                        params.stream().map(p -> new ParameterDescriptor(
+                                (String) p.get("name"), (String) p.getOrDefault("type", "Object"),
+                                true, "", Map.of())).toList(),
+                        (String) op.getOrDefault("returns", "void"),
+                        null, null);
+            }).toList();
+            registry.register(new DomainModel(name, app, "", operations, List.of(), Map.of()));
+        }
+        return registry;
     }
 
     static DomainModelRegistry buildFromLocalRepo(Path m2CasehubRoot) throws IOException {

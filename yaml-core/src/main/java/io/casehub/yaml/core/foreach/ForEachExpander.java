@@ -262,7 +262,9 @@ public final class ForEachExpander {
                     VariableResolver rowResolver = resolver.withScope("each",
                             io.casehub.yaml.core.resolver.VariableSource.forEachContext(
                                     Map.of(as, rowKey, "index", String.valueOf(i)),
-                                    Map.of(as, row)));
+                                    Map.of(as, row)))
+                            .withObjectScope("each", io.casehub.yaml.core.resolver.ObjectVariableSource.drillOnly(
+                                    name -> name.equals(as) ? row : null));
 
                     String when = adapter.getWhen(element);
                     if (when != null) {

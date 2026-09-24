@@ -43,6 +43,8 @@ public class SpringModelScanner {
 
     void scan() {
         Map<String, List<OperationDescriptor>> domainOps = new LinkedHashMap<>();
+        Map<String, String> appForDomain = new HashMap<>();
+        Map<String, String> summaryForDomain = new HashMap<>();
 
         // Pass 1: class-level @McpDomain (matches GraphQLModelScanner behavior)
         for (String beanName : context.getBeanDefinitionNames()) {
@@ -59,6 +61,10 @@ public class SpringModelScanner {
             if (ModelEnricher.class.isAssignableFrom(beanType)) {continue;}
 
             String domain = mcpDomain.value();
+            appForDomain.putIfAbsent(domain, mcpDomain.app());
+            if (!mcpDomain.summary().isEmpty()) {
+                summaryForDomain.putIfAbsent(domain, mcpDomain.summary());
+            }
             domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
             for (Method method : beanType.getDeclaredMethods()) {
                 if (Modifier.isStatic(method.getModifiers())) {continue;}
@@ -93,6 +99,10 @@ public class SpringModelScanner {
                 String domain = mcpDomain.value();
                 if (domainOps.containsKey(domain)) {continue;}
 
+                appForDomain.putIfAbsent(domain, mcpDomain.app());
+                if (!mcpDomain.summary().isEmpty()) {
+                    summaryForDomain.putIfAbsent(domain, mcpDomain.summary());
+                }
                 domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : iface.getDeclaredMethods()) {
                     if (Modifier.isStatic(method.getModifiers())) {continue;}
@@ -119,7 +129,11 @@ public class SpringModelScanner {
             String              summary  = enricher != null ? enricher.summary() : "";
             Map<String, Object> state    = enricher != null ? enricher.state() : Map.of();
 
-            DomainModel model = new DomainModel(domain, summary,
+            String app = appForDomain.getOrDefault(domain, "");
+            String annSummary = summaryForDomain.getOrDefault(domain, "");
+            String finalSummary = !annSummary.isEmpty() ? annSummary : summary;
+
+            DomainModel model = new DomainModel(domain, app, finalSummary,
                                                 List.copyOf(entry.getValue()), List.of(), state);
             registry.register(model);
             LOG.log(System.Logger.Level.INFO, "MCP domain ''{0}'': {1} operations", domain, model.operations().size());

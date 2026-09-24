@@ -39,6 +39,7 @@ public class CaseHubToolCallbackProvider implements ToolCallbackProvider {
         List<ToolCallback> tools = new ArrayList<>();
 
         tools.add(buildModelTool());
+        tools.add(buildSearchTool());
         tools.add(buildActionTool());
 
         for (DomainModel domain : registry.getDomains()) {
@@ -51,17 +52,56 @@ public class CaseHubToolCallbackProvider implements ToolCallbackProvider {
     }
 
     private ToolCallback buildModelTool() {
-        String catalog;
-        try {
-            catalog = mapper.writeValueAsString(DomainContentFormatter.formatIndex(registry.getDomains()));
-        } catch (Exception e) {
-            catalog = "{\"error\": \"Failed to format catalog\"}";
-        }
-        String finalCatalog = catalog;
+        List<String> apps = registry.getApps();
+        boolean hasApps = apps.stream().anyMatch(a -> !a.isEmpty());
 
-        return FunctionToolCallback.builder("casehub_model", (String input) -> finalCatalog)
-                .description("List all CaseHub domains and their operations. "
-                        + "Call this first to discover what operations are available.")
+        return FunctionToolCallback.builder("casehub_model", (String input) -> {
+                    try {
+                        if (input != null && !input.isBlank()) {
+                            String app = input.strip().replace("\"", "");
+                            var appDomains = registry.getDomainsByApp(app);
+                            if (!appDomains.isEmpty()) {
+                                return mapper.writeValueAsString(
+                                        DomainContentFormatter.formatAppDomains(app, appDomains));
+                            }
+                            var domain = registry.getDomain(app);
+                            if (domain.isPresent()) {
+                                return mapper.writeValueAsString(
+                                        DomainContentFormatter.formatDomain(domain.get()));
+                            }
+                        }
+                        if (hasApps) {
+                            return mapper.writeValueAsString(
+                                    DomainContentFormatter.formatAppIndex(apps, registry.getDomains(),
+                                            registry.getAppCapabilities()));
+                        }
+                        return mapper.writeValueAsString(
+                                DomainContentFormatter.formatIndex(registry.getDomains()));
+                    } catch (Exception e) {
+                        return "{\"error\": \"" + e.getMessage() + "\"}";
+                    }
+                })
+                .description("Browse the CaseHub operation catalog. "
+                        + "Call with no args for the app index, an app name for its domains, "
+                        + "or a domain name for its operations.")
+                .inputType(String.class)
+                .build();
+    }
+
+    private ToolCallback buildSearchTool() {
+        return FunctionToolCallback.builder("casehub_search", (String input) -> {
+                    try {
+                        String query = input != null ? input.strip().replace("\"", "") : "";
+                        var results = registry.search(query);
+                        return mapper.writeValueAsString(
+                                DomainContentFormatter.formatSearchResults(query, results));
+                    } catch (Exception e) {
+                        return "{\"error\": \"" + e.getMessage() + "\"}";
+                    }
+                })
+                .description("Search CaseHub operations by keyword. "
+                        + "Matches operation names, summaries, parameter names, return types, "
+                        + "app names, capabilities, and tags.")
                 .inputType(String.class)
                 .build();
     }
@@ -88,7 +128,7 @@ public class CaseHubToolCallbackProvider implements ToolCallbackProvider {
                     }
                 })
                 .description("Execute a CaseHub operation. "
-                        + "Use casehub_model first to discover available operations. "
+                        + "Use casehub_model to browse or casehub_search to find operations by keyword. "
                         + "Input: JSON with 'domain', 'operation', and optional 'params'.")
                 .inputType(String.class)
                 .build();

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 public final class CsvParser {
@@ -33,28 +32,23 @@ public final class CsvParser {
     }
 
     private static List<CsvColumn> parseHeader(String headerLine) {
-        String[] parts = headerLine.split(",");
-        List<CsvColumn> columns = new ArrayList<>();
+        String[]              parts   = headerLine.split(",");
+        List<CsvColumn>       columns = new ArrayList<>();
+        java.util.Set<String> seen    = new java.util.HashSet<>();
         for (String part : parts) {
             String trimmed = part.trim();
-            int colon = trimmed.indexOf(':');
+            int    colon   = trimmed.indexOf(':');
             if (colon < 0) {
                 throw new IllegalArgumentException(
                         "Header column '" + trimmed
                         + "' must use format columnName:TYPE (e.g. name:STRING).");
             }
-            String colName = trimmed.substring(0, colon).trim();
-            String typeName = trimmed.substring(colon + 1).trim().toUpperCase(Locale.ROOT);
-            CsvColumnType type;
-            try {
-                type = CsvColumnType.valueOf(typeName);
-            } catch (IllegalArgumentException e) {
+            io.casehub.yaml.core.type.TypedName tn = io.casehub.yaml.core.type.TypedName.parse(trimmed);
+            if (!seen.add(tn.name())) {
                 throw new IllegalArgumentException(
-                        "Unknown column type '" + typeName
-                        + "' for column '" + colName
-                        + "'. Expected: STRING, INTEGER, BOOLEAN, NUMBER.");
+                        "Duplicate column name '" + tn.name() + "' in CSV header.");
             }
-            columns.add(new CsvColumn(colName, type));
+            columns.add(new CsvColumn(tn.name(), tn.type()));
         }
         return columns;
     }
@@ -68,9 +62,15 @@ public final class CsvParser {
         }
         Map<String, Object> row = new LinkedHashMap<>();
         for (int i = 0; i < columns.size(); i++) {
-            CsvColumn col = columns.get(i);
-            String value = values[i].trim();
-            row.put(col.name(), col.type().parse(value, rowIndex, col.name()));
+            CsvColumn col   = columns.get(i);
+            String    value = values[i].trim();
+            try {
+                row.put(col.name(), col.type().parse(value));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                        "CSV row " + rowIndex + ", column '" + col.name()
+                        + "': expected " + col.type() + ", got '" + value + "'", e);
+            }
         }
         return Collections.unmodifiableMap(row);
     }

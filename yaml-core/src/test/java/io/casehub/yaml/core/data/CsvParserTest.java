@@ -19,8 +19,8 @@ class CsvParserTest {
         CsvDataSource ds = CsvParser.parse("envs", csv);
         assertThat(ds.name()).isEqualTo("envs");
         assertThat(ds.columns()).containsExactly(
-                new CsvColumn("name", CsvColumnType.STRING),
-                new CsvColumn("region", CsvColumnType.STRING));
+                new CsvColumn("name", io.casehub.yaml.core.type.ValueType.STRING),
+                new CsvColumn("region", io.casehub.yaml.core.type.ValueType.STRING));
         assertThat(ds.rows()).hasSize(2);
         assertThat(ds.rows().get(0)).containsEntry("name", "alpha")
                 .containsEntry("region", "us-east");
@@ -95,7 +95,7 @@ class CsvParserTest {
                  alpha , 8080
                 """;
         CsvDataSource ds = CsvParser.parse("trimmed", csv);
-        assertThat(ds.columns().get(0)).isEqualTo(new CsvColumn("name", CsvColumnType.STRING));
+        assertThat(ds.columns().get(0)).isEqualTo(new CsvColumn("name", io.casehub.yaml.core.type.ValueType.STRING));
         assertThat(ds.rows().get(0)).containsEntry("name", "alpha")
                 .containsEntry("port", 8080);
     }
@@ -201,7 +201,7 @@ class CsvParserTest {
                 web,8080
                 """;
         CsvDataSource ds = CsvParser.parse("lower", csv);
-        assertThat(ds.columns().get(0).type()).isEqualTo(CsvColumnType.STRING);
+        assertThat(ds.columns().get(0).type()).isEqualTo(io.casehub.yaml.core.type.ValueType.STRING);
         assertThat(ds.rows().get(0)).containsEntry("port", 8080);
     }
 
@@ -241,5 +241,32 @@ class CsvParserTest {
                 "lookup", java.util.Map.of("source", "external.csv"));
         var result = io.casehub.yaml.core.data.CsvDataSource.fromDataBlock(data);
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void typeOf_returns_declared_type() {
+        String        csv = "name:STRING,port:INTEGER,enabled:BOOLEAN\nweb,8080,true\n";
+        CsvDataSource ds  = CsvParser.parse("svc", csv);
+        assertThat(ds.typeOf("port")).isEqualTo(io.casehub.yaml.core.type.ValueType.INTEGER);
+        assertThat(ds.typeOf("enabled")).isEqualTo(io.casehub.yaml.core.type.ValueType.BOOLEAN);
+        assertThat(ds.typeOf("name")).isEqualTo(io.casehub.yaml.core.type.ValueType.STRING);
+        assertThat(ds.typeOf("missing")).isNull();
+    }
+
+    @Test
+    void schema_returns_column_type_map() {
+        String        csv = "name:STRING,port:INTEGER\nweb,8080\n";
+        CsvDataSource ds  = CsvParser.parse("svc", csv);
+        assertThat(ds.schema()).containsEntry("name", io.casehub.yaml.core.type.ValueType.STRING)
+                               .containsEntry("port", io.casehub.yaml.core.type.ValueType.INTEGER);
+    }
+
+    @Test
+    void duplicate_column_name_throws() {
+        String csv = "name:STRING,name:INTEGER\nweb,8080\n";
+        assertThatThrownBy(() -> CsvParser.parse("dup", csv))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate column name")
+                .hasMessageContaining("name");
     }
 }

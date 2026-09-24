@@ -125,26 +125,24 @@ public class VariableResolver {
         Object root     = objSource.resolve(rootName);
         if (root == null) {return null;}
 
-        if (nextDot < 0) {return root;}
+        if (nextDot < 0) {
+            if (!objSource.allowContainerReturn()
+                && (root instanceof Map || root instanceof List)) {
+                return null;
+            }
+            return root;
+        }
 
         String fieldPath = name.substring(nextDot + 1);
         if (root instanceof Map<?, ?> map) {
-            return drillFields((Map<String, Object>) map, fieldPath);
+            return FieldDriller.drill((Map<String, Object>) map, fieldPath);
         }
         return null;
     }
 
     @SuppressWarnings("unchecked")
     private static Object drillFields(Map<String, Object> map, String dotPath) {
-        Object current = map;
-        for (String part : dotPath.split("\\.")) {
-            if (current instanceof Map<?, ?> m) {
-                current = m.get(part);
-            } else {
-                return null;
-            }
-        }
-        return current;
+        return FieldDriller.drill(map, dotPath);
     }
 
 

@@ -74,14 +74,6 @@ public interface VariableSource {
 
     @SuppressWarnings("unchecked")
     private static Object drillFields(java.util.Map<String, Object> map, String dotPath) {
-        Object current = map;
-        for (String part : dotPath.split("\\.")) {
-            if (current instanceof java.util.Map<?, ?> m) {
-                current = m.get(part);
-            } else {
-                return null;
-            }
-        }
-        return current;
+        return FieldDriller.drill(map, dotPath);
     }
 }

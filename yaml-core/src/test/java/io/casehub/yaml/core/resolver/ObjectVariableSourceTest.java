@@ -116,4 +116,41 @@ class ObjectVariableSourceTest {
         Object message = resolver.resolve("${result.step.error.message}");
         assertThat(message).isEqualTo("Connection refused");
     }
+
+    @Test
+    void drillOnly_bareMapReference_fallsThroughToString() {
+        Map<String, Object> row = Map.of("name", "Alice", "port", 8080);
+        ObjectVariableSource objSource = ObjectVariableSource.drillOnly(
+                name -> "member".equals(name) ? row : null);
+        VariableSource strSource = name -> "member".equals(name) ? "Alice" : null;
+        VariableResolver resolver = new VariableResolver(Map.of("each", strSource), Set.of())
+                                            .withObjectScope("each", objSource);
+
+        Object bare = resolver.resolve("${each.member}");
+        assertThat(bare).isEqualTo("Alice");
+    }
+
+    @Test
+    void drillOnly_fieldAccess_returnsTypedValue() {
+        Map<String, Object> row = Map.of("name", "Alice", "port", 8080);
+        ObjectVariableSource objSource = ObjectVariableSource.drillOnly(
+                name -> "member".equals(name) ? row : null);
+        VariableResolver resolver = new VariableResolver(Map.of(), Set.of())
+                                            .withObjectScope("each", objSource);
+
+        Object port = resolver.resolve("${each.member.port}");
+        assertThat(port).isEqualTo(8080);
+        assertThat(port).isInstanceOf(Integer.class);
+    }
+
+    @Test
+    void defaultSource_bareMapReference_returnsMap() {
+        Map<String, Object>  stepResult = Map.of("price", 42.5);
+        ObjectVariableSource source     = name -> "step".equals(name) ? stepResult : null;
+        VariableResolver resolver = new VariableResolver(Map.of(), Set.of())
+                                            .withObjectScope("result", source);
+
+        Object resolved = resolver.resolve("${result.step}");
+        assertThat(resolved).isEqualTo(stepResult);
+    }
 }

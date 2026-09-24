@@ -37,5 +37,15 @@ public enum ParameterType {
         };
     }
 
+    public io.casehub.yaml.core.type.ValueType scalarType() {
+        return switch (this) {
+            case STRING -> io.casehub.yaml.core.type.ValueType.STRING;
+            case INTEGER -> io.casehub.yaml.core.type.ValueType.INTEGER;
+            case NUMBER -> io.casehub.yaml.core.type.ValueType.NUMBER;
+            case BOOLEAN -> io.casehub.yaml.core.type.ValueType.BOOLEAN;
+            case LIST -> null;
+        };
+    }
+
 
 }

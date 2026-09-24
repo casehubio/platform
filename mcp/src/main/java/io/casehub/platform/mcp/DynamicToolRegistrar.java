@@ -45,6 +45,8 @@ public class DynamicToolRegistrar {
     }
 
     void onScanComplete(@Observes ModelScanComplete event) {
+        registry.discoverAppCapabilities();
+
         Map<String, Object> schema = new McpSchemaBuilder()
                                              .build(schemaMode, registry.getDomains());
 

@@ -2,11 +2,17 @@ package io.casehub.platform.mcp;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
@@ -25,6 +31,31 @@ public class DomainModelRegistry {
 
     public Map<String, DomainContentFormatter.AppCapability> getAppCapabilities() {
         return Map.copyOf(appCapabilities);
+    }
+
+    public void discoverAppCapabilities() {
+        discoverAppCapabilities(Thread.currentThread().getContextClassLoader());
+    }
+
+    public void discoverAppCapabilities(ClassLoader classLoader) {
+        try {
+            Enumeration<URL> resources = classLoader.getResources("META-INF/casehub-mcp-app.properties");
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                try (InputStream is = url.openStream()) {
+                    Properties props = new Properties();
+                    props.load(is);
+                    String app = props.getProperty("app", "").trim();
+                    String capability = props.getProperty("capability", "").trim();
+                    String tagsStr = props.getProperty("tags", "").trim();
+                    if (!app.isEmpty() && !capability.isEmpty()) {
+                        List<String> tags = tagsStr.isEmpty() ? List.of()
+                                : Arrays.stream(tagsStr.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                        registerAppCapability(app, new DomainContentFormatter.AppCapability(capability, tags));
+                    }
+                }
+            }
+        } catch (IOException ignored) {}
     }
 
     public List<DomainModel> getDomains() {

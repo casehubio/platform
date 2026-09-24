@@ -139,8 +139,10 @@ public class SpringModelScanner {
             LOG.log(System.Logger.Level.INFO, "MCP domain ''{0}'': {1} operations", domain, model.operations().size());
         }
 
+        registry.discoverAppCapabilities();
         eventPublisher.publishEvent(new ModelScanComplete());
-        LOG.log(System.Logger.Level.INFO, "MCP scan complete: {0} domains", domainOps.size());
+        LOG.log(System.Logger.Level.INFO, "MCP scan complete: {0} domains, {1} app capabilities",
+                domainOps.size(), registry.getAppCapabilities().size());
     }
 
     private Map<String, ModelEnricher> resolveEnrichers() {

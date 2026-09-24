@@ -14,4 +14,6 @@ public @interface McpDomain {
     String basePath() default "";
 
     String app() default "";
+
+    String summary() default "";
 }

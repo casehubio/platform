@@ -19,6 +19,12 @@ import java.util.Set;
 
 public class McpDomainJandexScanner {
 
+    private static final System.Logger LOG = System.getLogger(McpDomainJandexScanner.class.getName());
+
+    private static void log(String format, Object... args) {
+        LOG.log(System.Logger.Level.WARNING, String.format(format, args));
+    }
+
     private static final DotName MCP_DOMAIN = DotName.createSimple("io.casehub.platform.api.mcp.McpDomain");
     private static final DotName PLATFORM_QUERY = DotName.createSimple("io.casehub.platform.api.mcp.PlatformQuery");
     private static final DotName PLATFORM_MUTATION = DotName.createSimple("io.casehub.platform.api.mcp.PlatformMutation");
@@ -55,6 +61,19 @@ public class McpDomainJandexScanner {
             String basePath = null;
             if (ann.value("basePath") != null && !ann.value("basePath").asString().isEmpty()) {
                 basePath = ann.value("basePath").asString();
+            }
+
+            if (app.isEmpty()) {
+                log("WARN: @McpDomain(\"%s\") on %s — missing app(). Set app = \"<repo-name>\" for hierarchy discovery.",
+                        domainName, classInfo.name());
+            }
+            if (summary.isEmpty()) {
+                log("WARN: @McpDomain(\"%s\") on %s — missing summary(). Set summary for LLM domain discovery.",
+                        domainName, classInfo.name());
+            }
+            if (!domainName.contains("/")) {
+                log("WARN: @McpDomain(\"%s\") on %s — domain name should be prefixed (app/topic) to avoid cross-app collisions.",
+                        domainName, classInfo.name());
             }
 
             String finalApp = app;

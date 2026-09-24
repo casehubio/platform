@@ -107,8 +107,45 @@ class FullScaleComprehensionIT {
                            .hasSizeGreaterThanOrEqualTo(20);
 
         appIndexJson = mapper.writeValueAsString(
-                DomainContentFormatter.formatAppIndex(apps, domains));
+                DomainContentFormatter.formatAppIndex(apps, domains, APP_CAPABILITIES));
     }
+
+    private static final Map<String, DomainContentFormatter.AppCapability> APP_CAPABILITIES = Map.ofEntries(
+            Map.entry("aml", new DomainContentFormatter.AppCapability(
+                    "Anti-money laundering", "compliance", "investigations", "financial-crime", "risk")),
+            Map.entry("chat-app", new DomainContentFormatter.AppCapability(
+                    "Real-time messaging", "chat", "presence", "channels")),
+            Map.entry("claudony", new DomainContentFormatter.AppCapability(
+                    "Agent fleet management", "multi-session", "orchestration", "peer-mesh", "cases")),
+            Map.entry("clinical", new DomainContentFormatter.AppCapability(
+                    "Clinical trial management", "patients", "adverse-events", "medications", "sites", "regulatory")),
+            Map.entry("connectors", new DomainContentFormatter.AppCapability(
+                    "External system connectors", "email", "calendar", "banking", "webhooks")),
+            Map.entry("devtown", new DomainContentFormatter.AppCapability(
+                    "Developer operations", "code-review", "governance", "incident-feedback", "reasoning")),
+            Map.entry("engine", new DomainContentFormatter.AppCapability(
+                    "CMMN case engine", "cases", "plans", "goals", "events", "case-definitions")),
+            Map.entry("fsitrading", new DomainContentFormatter.AppCapability(
+                    "Financial trading", "orders", "strategies", "positions", "market-data", "compliance")),
+            Map.entry("iot", new DomainContentFormatter.AppCapability(
+                    "IoT device management", "sensors", "alerts", "situations", "suppressions", "kpi")),
+            Map.entry("ledger", new DomainContentFormatter.AppCapability(
+                    "Immutable audit ledger", "audit-trail", "merkle-verification", "trust-scores", "attestations")),
+            Map.entry("life", new DomainContentFormatter.AppCapability(
+                    "Life case management", "tasks", "cases", "dashboards", "external-actors", "analytics")),
+            Map.entry("neocortex", new DomainContentFormatter.AppCapability(
+                    "Cognitive observability", "reasoning-traces", "decision-transparency")),
+            Map.entry("openclaw", new DomainContentFormatter.AppCapability(
+                    "Contract & commitment lifecycle", "obligations", "scenarios", "dispute-resolution")),
+            Map.entry("ops", new DomainContentFormatter.AppCapability(
+                    "Platform operations", "deployments", "approvals", "clusters", "security", "reconciliation")),
+            Map.entry("qhorus", new DomainContentFormatter.AppCapability(
+                    "Agentic channel mesh", "messaging", "channels", "agents", "governance", "compliance")),
+            Map.entry("soc", new DomainContentFormatter.AppCapability(
+                    "Security operations center", "incidents", "alerts", "threat-intel", "cbr", "trust")),
+            Map.entry("work", new DomainContentFormatter.AppCapability(
+                    "Work item management", "tasks", "queues", "lifecycle", "assignments", "federation"))
+    );
 
     // ── Hierarchy discovery: app index → app detail → domain operations ─────
 
@@ -354,6 +391,14 @@ class FullScaleComprehensionIT {
         if (cleaned.startsWith("```")) {
             cleaned = cleaned.replaceAll("^```[a-z]*\\n?", "").replaceAll("\\n?```$", "");
         }
-        return mapper.readValue(cleaned.strip(), new TypeReference<>() {});
+        cleaned = cleaned.strip();
+        if (!cleaned.startsWith("{")) {
+            int braceStart = cleaned.indexOf('{');
+            int braceEnd = cleaned.lastIndexOf('}');
+            if (braceStart >= 0 && braceEnd > braceStart) {
+                cleaned = cleaned.substring(braceStart, braceEnd + 1);
+            }
+        }
+        return mapper.readValue(cleaned, new TypeReference<>() {});
     }
 }

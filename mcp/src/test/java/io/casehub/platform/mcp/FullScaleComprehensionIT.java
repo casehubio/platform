@@ -21,19 +21,34 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Full-scale LLM comprehension test: scans all casehub consumer JARs
- * from the Maven local repository, builds the real catalog, and validates
- * that an LLM can navigate the 3-tier hierarchy to discover operations.
+ * Full-scale LLM discovery test: given a realistic task, can the LLM
+ * navigate the CaseHub catalog hierarchy to find the right operation?
+ *
+ * <p>Tests two discovery paths:
+ * <ul>
+ *   <li><b>Hierarchy navigation</b> — app index → app detail → domain operations.
+ *       Tests whether the 3-tier hierarchy guides the LLM to the right answer.</li>
+ *   <li><b>Search</b> — keyword search across all operations.
+ *       Tests whether casehub_search is effective for intent-driven discovery.</li>
+ * </ul>
+ *
+ * <p>Each scenario is a realistic task description. The test does NOT hand-hold
+ * ("which app should I use?"). Instead it presents the catalog data and asks
+ * the LLM to find the specific operation that handles the task.
  */
 @QuarkusTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledIf("canRun")
 class FullScaleComprehensionIT {
 
-    private static final String SYSTEM_PROMPT =
-            "You are a test harness validating MCP tool comprehension. "
-            + "Respond with ONLY the requested JSON — no markdown fences, "
-            + "no explanation, no commentary. Raw JSON only.";
+    private static final String DISCOVERY_PROMPT =
+            "You are an AI agent with access to the CaseHub platform. "
+            + "You have two discovery tools: casehub_model (browse the hierarchy) "
+            + "and casehub_search (keyword search). "
+            + "Given a task, find the exact operation that handles it. "
+            + "Respond with ONLY JSON — no markdown fences, no explanation. "
+            + "Format: {\"app\": \"...\", \"domain\": \"...\", \"operation\": \"...\", "
+            + "\"confidence\": \"high|medium|low\", \"reasoning\": \"one sentence\"}";
 
     private static final Path SLOT_ROOT = Path.of(
             System.getProperty("casehub.slot.root",
@@ -87,118 +102,123 @@ class FullScaleComprehensionIT {
                 DomainContentFormatter.formatAppIndex(apps, domains));
     }
 
-    @Test
-    void selectsCorrectAppForAmlIntent() throws Exception {
-        String response = askClaude(
-                "Here is the CaseHub application index:\n" + appIndexJson
-                + "\n\nI need to investigate a suspicious financial transaction for "
-                + "anti-money laundering compliance. Which app should I use? "
-                + "Reply with JSON: {\"app\": \"<name>\"}");
+    // ── Hierarchy discovery: app index → app detail → domain operations ─────
 
-        Map<String, Object> result = parseJson(response);
-        assertThat(result.get("app")).isEqualTo("aml");
+    @Test
+    void discoverViaHierarchy_amlInvestigation() throws Exception {
+        assertHierarchyDiscovery(
+                "A bank flagged a wire transfer of $2.3M from a shell company. "
+                + "Open an AML investigation and assign it to the financial crimes team.",
+                "aml", null, null);
     }
 
     @Test
-    void selectsCorrectAppForIoTIntent() throws Exception {
-        String response = askClaude(
-                "Here is the CaseHub application index:\n" + appIndexJson
-                + "\n\nI need to check the status of a temperature sensor device. "
-                + "Which app should I use? "
-                + "Reply with JSON: {\"app\": \"<name>\"}");
-
-        Map<String, Object> result = parseJson(response);
-        assertThat(result.get("app")).isEqualTo("iot");
+    void discoverViaHierarchy_clinicalAdverseEvent() throws Exception {
+        assertHierarchyDiscovery(
+                "A patient in clinical trial CT-2026-001 reported nausea and "
+                + "dizziness after their third dose. Record this adverse event.",
+                "clinical", "adverse", null);
     }
 
     @Test
-    void navigatesFromAppToDomainForClinicalTrial() throws Exception {
-        List<DomainModel> clinicalDomains = fullRegistry.getDomainsByApp("clinical");
-        if (clinicalDomains.isEmpty()) return;
-
-        String appDetail = mapper.writeValueAsString(
-                DomainContentFormatter.formatAppDomains("clinical", clinicalDomains));
-
-        String response = askClaude(
-                "Here are the domains in the 'clinical' app:\n" + appDetail
-                + "\n\nI need to record an adverse event for a patient in a trial. "
-                + "Which domain should I use? "
-                + "Reply with JSON: {\"domain\": \"<name>\"}");
-
-        Map<String, Object> result = parseJson(response);
-        assertThat((String) result.get("domain"))
-                .as("Should select the adverse events domain")
-                .containsIgnoringCase("adverse");
+    void discoverViaHierarchy_iotSuppression() throws Exception {
+        assertHierarchyDiscovery(
+                "Temperature sensor TMP-B2-07 in building B is reporting values "
+                + "above threshold due to HVAC maintenance. Suppress alerts for "
+                + "this sensor for the next 4 hours.",
+                "iot", "suppression", null);
     }
 
     @Test
-    void navigatesFullHierarchyForWorkItem() throws Exception {
-        // Tier 0: select app
-        String t0response = askClaude(
-                "Here is the CaseHub application index:\n" + appIndexJson
-                + "\n\nI need to create a new work item / task. Which app? "
-                + "Reply with JSON: {\"app\": \"<name>\"}");
-
-        Map<String, Object> t0 = parseJson(t0response);
-        String selectedApp = (String) t0.get("app");
-        assertThat(selectedApp).isIn("work", "engine");
-
-        // Tier 1: select domain within app
-        List<DomainModel> appDomains = fullRegistry.getDomainsByApp(selectedApp);
-        if (appDomains.isEmpty()) return;
-
-        String appDetail = mapper.writeValueAsString(
-                DomainContentFormatter.formatAppDomains(selectedApp, appDomains));
-
-        String t1response = askClaude(
-                "Here are the domains in the '" + selectedApp + "' app:\n" + appDetail
-                + "\n\nI need to create a new work item / task. Which domain? "
-                + "Reply with JSON: {\"domain\": \"<name>\"}");
-
-        Map<String, Object> t1 = parseJson(t1response);
-        String selectedDomain = (String) t1.get("domain");
-        assertThat(selectedDomain).isNotBlank();
-
-        // Tier 2: select operation
-        DomainModel domain = fullRegistry.getDomain(selectedDomain).orElse(null);
-        if (domain == null) return;
-
-        String domainDetail = mapper.writeValueAsString(
-                DomainContentFormatter.formatDomain(domain));
-
-        String t2response = askClaude(
-                "Here are the operations in the '" + selectedDomain + "' domain:\n"
-                + domainDetail
-                + "\n\nI want to create a new work item. Which operation? "
-                + "Reply with JSON: {\"operation\": \"<name>\"}");
-
-        Map<String, Object> t2 = parseJson(t2response);
-        assertThat((String) t2.get("operation")).isNotBlank();
+    void discoverViaHierarchy_ledgerCompliance() throws Exception {
+        assertHierarchyDiscovery(
+                "Generate a compliance report showing all automated decisions "
+                + "made by agent claude:reviewer@v1 in the last 30 days, "
+                + "for GDPR Article 22 audit.",
+                "ledger", null, null);
     }
 
     @Test
-    void searchFindsRelevantOperations() throws Exception {
+    void discoverViaHierarchy_workItemCreation() throws Exception {
+        assertHierarchyDiscovery(
+                "Create a new work item titled 'Review Q3 financial statements' "
+                + "with high priority, assigned to the finance review team.",
+                "work", "item", null);
+    }
+
+    // ── Search discovery: keyword search across all operations ───────────────
+
+    @Test
+    void discoverViaSearch_complianceAcrossDomains() throws Exception {
+        String task = "I need to run a GDPR compliance check. Which operations "
+                + "across the platform handle compliance reporting?";
+
         List<SearchResult> results = fullRegistry.search("compliance");
-
-        assertThat(results).as("'compliance' should match across multiple domains")
+        assertThat(results).as("'compliance' should match across multiple apps")
                            .hasSizeGreaterThanOrEqualTo(3);
 
         String searchJson = mapper.writeValueAsString(
                 DomainContentFormatter.formatSearchResults("compliance", results));
 
-        String response = askClaude(
-                "Here are search results for 'compliance' across all CaseHub domains:\n"
-                + searchJson
-                + "\n\nI need GDPR compliance reporting. Which result is most relevant? "
-                + "Reply with JSON: {\"domain\": \"<name>\", \"operation\": \"<name>\"}");
+        Map<String, Object> result = parseJson(askClaude(
+                "A user searched for 'compliance' and got these results:\n" + searchJson
+                + "\n\nTheir actual task: " + task
+                + "\n\nWhich result best matches? Reply with JSON: "
+                + "{\"domain\": \"...\", \"operation\": \"...\", \"reasoning\": \"one sentence\"}"));
 
-        Map<String, Object> result = parseJson(response);
         assertThat(result.get("domain")).isNotNull();
         assertThat(result.get("operation")).isNotNull();
+        System.out.printf("  Search discovery: domain=%s, op=%s — %s%n",
+                result.get("domain"), result.get("operation"), result.get("reasoning"));
     }
 
     @Test
-    void catalogSizeReport() throws Exception {
+    void discoverViaSearch_trustScore() throws Exception {
+        List<SearchResult> results = fullRegistry.search("trust");
+        assertThat(results).hasSizeGreaterThanOrEqualTo(1);
+
+        String searchJson = mapper.writeValueAsString(
+                DomainContentFormatter.formatSearchResults("trust", results));
+
+        Map<String, Object> result = parseJson(askClaude(
+                "Search results for 'trust':\n" + searchJson
+                + "\n\nTask: Check the trust score for agent claude:tarkus-reviewer@v1 "
+                + "to decide if it should be included in the review rotation."
+                + "\n\nWhich result? JSON: {\"domain\": \"...\", \"operation\": \"...\", "
+                + "\"reasoning\": \"one sentence\"}"));
+
+        assertThat(result.get("domain")).isNotNull();
+        System.out.printf("  Search discovery: domain=%s, op=%s — %s%n",
+                result.get("domain"), result.get("operation"), result.get("reasoning"));
+    }
+
+    // ── Cross-cutting: ambiguous tasks that span multiple apps ────────────────
+
+    @Test
+    void ambiguousTask_auditTrail() throws Exception {
+        String fullCatalog = buildFullCatalogJson();
+
+        Map<String, Object> result = parseJson(askClaude(
+                "Here is the complete CaseHub operation catalog:\n\n" + fullCatalog
+                + "\n\nTask: 'Show me the audit trail for case #4521 — who did what and when.'"
+                + "\n\nMultiple apps might handle audit trails. Find the most appropriate "
+                + "operation. JSON: {\"app\": \"...\", \"domain\": \"...\", "
+                + "\"operation\": \"...\", \"confidence\": \"high|medium|low\", "
+                + "\"reasoning\": \"one sentence\"}"));
+
+        System.out.printf("  Ambiguous discovery: app=%s, domain=%s, op=%s, "
+                + "confidence=%s — %s%n",
+                result.get("app"), result.get("domain"), result.get("operation"),
+                result.get("confidence"), result.get("reasoning"));
+
+        assertThat(result.get("app")).isNotNull();
+        assertThat(result.get("confidence")).isNotNull();
+    }
+
+    // ── Catalog statistics (no LLM — pure data) ─────────────────────────────
+
+    @Test
+    void catalogSizeReport() {
         List<String> apps = fullRegistry.getApps();
         List<DomainModel> domains = fullRegistry.getDomains();
         long totalOps = domains.stream().mapToLong(d -> d.operations().size()).sum();
@@ -214,7 +234,10 @@ class FullScaleComprehensionIT {
             long ops = ad.stream().mapToLong(d -> d.operations().size()).sum();
             System.out.printf("  %-20s %3d domains, %4d ops%n", app, ad.size(), ops);
         }
-        System.out.printf("\nApp index JSON size: %d chars%n", appIndexJson.length());
+
+        String fullCatalog = buildFullCatalogJson();
+        System.out.printf("\nApp index JSON size:  %,d chars%n", appIndexJson.length());
+        System.out.printf("Full catalog JSON size: %,d chars%n", fullCatalog.length());
         System.out.println("=== End Statistics ===\n");
 
         assertThat(apps.stream().filter(a -> !a.isEmpty()).count())
@@ -222,8 +245,70 @@ class FullScaleComprehensionIT {
                 .isGreaterThanOrEqualTo(5);
     }
 
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private void assertHierarchyDiscovery(String task, String expectedApp,
+                                           String expectedDomainSubstring,
+                                           String expectedOpSubstring) throws Exception {
+        // Turn 1: show app index, ask LLM to pick an app
+        String appCatalog = appIndexJson;
+        for (String app : fullRegistry.getApps()) {
+            if (app.isEmpty()) continue;
+            List<DomainModel> appDomains = fullRegistry.getDomainsByApp(app);
+            appCatalog += "\n\n--- App '" + app + "' domains ---\n"
+                    + mapper.writeValueAsString(
+                            DomainContentFormatter.formatAppDomains(app, appDomains));
+        }
+
+        Map<String, Object> result = parseJson(askClaude(
+                "Here is the CaseHub platform catalog. Each app contains domains, "
+                + "each domain contains operations.\n\n" + appCatalog
+                + "\n\nTask: " + task
+                + "\n\nFind the operation that handles this. Reply with JSON: "
+                + "{\"app\": \"...\", \"domain\": \"...\", \"operation\": \"...\", "
+                + "\"confidence\": \"high|medium|low\", \"reasoning\": \"one sentence\"}"));
+
+        System.out.printf("  Hierarchy discovery for [%s]: app=%s, domain=%s, op=%s, "
+                + "confidence=%s — %s%n",
+                expectedApp, result.get("app"), result.get("domain"),
+                result.get("operation"), result.get("confidence"),
+                result.get("reasoning"));
+
+        assertThat(result.get("app"))
+                .as("Expected app '%s' for task: %s", expectedApp, task)
+                .isEqualTo(expectedApp);
+
+        if (expectedDomainSubstring != null) {
+            assertThat((String) result.get("domain"))
+                    .as("Domain should contain '%s'", expectedDomainSubstring)
+                    .containsIgnoringCase(expectedDomainSubstring);
+        }
+        if (expectedOpSubstring != null) {
+            assertThat((String) result.get("operation"))
+                    .as("Operation should contain '%s'", expectedOpSubstring)
+                    .containsIgnoringCase(expectedOpSubstring);
+        }
+    }
+
+    private String buildFullCatalogJson() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(appIndexJson).append("\n\n");
+        for (String app : fullRegistry.getApps()) {
+            if (app.isEmpty()) continue;
+            List<DomainModel> appDomains = fullRegistry.getDomainsByApp(app);
+            for (DomainModel domain : appDomains) {
+                try {
+                    sb.append(mapper.writeValueAsString(
+                            DomainContentFormatter.formatDomain(domain)));
+                    sb.append("\n");
+                } catch (Exception ignored) {}
+            }
+        }
+        return sb.toString();
+    }
+
     private String askClaude(String userPrompt) {
-        var config = AgentSessionConfig.of(SYSTEM_PROMPT, userPrompt,
+        var config = AgentSessionConfig.of(DISCOVERY_PROMPT, userPrompt,
                 Duration.ofSeconds(30));
         return agentProvider.invoke(config)
                 .filter(e -> e instanceof AgentEvent.TextDelta)

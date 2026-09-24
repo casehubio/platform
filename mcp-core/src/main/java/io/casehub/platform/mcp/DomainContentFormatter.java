@@ -44,6 +44,30 @@ public final class DomainContentFormatter {
         }
     }
 
+    public static Map<String, Object> formatTreeNodes(String path, List<DomainModelRegistry.TreeNode> nodes) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (path != null && !path.isEmpty()) {
+            result.put("path", path);
+        }
+        List<Map<String, Object>> children = nodes.stream()
+                .map(node -> {
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("name", node.segment());
+                    entry.put("path", node.fullPath());
+                    if (!node.summary().isEmpty()) entry.put("summary", node.summary());
+                    if (node.isLeaf()) {
+                        entry.put("operationCount", node.operationCount());
+                    } else {
+                        entry.put("children", node.childCount());
+                        entry.put("totalOperations", node.operationCount());
+                    }
+                    return entry;
+                })
+                .collect(Collectors.toList());
+        result.put("nodes", children);
+        return result;
+    }
+
     public static Map<String, Object> formatAppDomains(String app, List<DomainModel> domains) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("app", app);

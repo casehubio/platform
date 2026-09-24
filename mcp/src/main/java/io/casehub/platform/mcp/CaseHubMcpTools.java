@@ -27,29 +27,32 @@ public class CaseHubMcpTools {
         this.mapper.registerModule(new JavaTimeModule());
     }
 
-    @Tool(description = "Navigate the CaseHub operation catalog. "
-                        + "Call without arguments for an app list. "
-                        + "Call with app for that app's domains. "
-                        + "Call with domain for operation details.")
+    @Tool(description = "Navigate the CaseHub operation catalog as a tree. "
+                        + "Call with no path for root nodes. "
+                        + "Call with a path to explore deeper — returns child nodes or operations at leaves.")
     public String casehub_model(
-            @ToolArg(description = "Domain name to drill into (omit for app/domain list)")
-            String domain,
-            @ToolArg(description = "App name to list domains for (omit for app list)")
-            String app) throws JsonProcessingException {
-        if (domain != null && !domain.isBlank()) {
-            DomainModel domainModel = registry.getDomain(domain)
-                                              .orElseThrow(() -> new IllegalArgumentException("Unknown domain: " + domain));
-            return mapper.writeValueAsString(DomainContentFormatter.formatDomain(domainModel));
-        }
-        if (app != null && !app.isBlank()) {
-            List<DomainModel> appDomains = registry.getDomainsByApp(app);
-            if (appDomains.isEmpty()) {
-                throw new IllegalArgumentException("Unknown app: " + app);
+            @ToolArg(description = "Path to navigate (e.g. 'clinical', 'clinical/trials'). Omit for root.", required = false)
+            String path) throws JsonProcessingException {
+        if (path != null && !path.isBlank()) {
+            DomainModel exact = registry.getDomain(path).orElse(null);
+            if (exact != null) {
+                var children = registry.listChildren(path);
+                if (children.size() <= 1) {
+                    return mapper.writeValueAsString(DomainContentFormatter.formatDomain(exact));
+                }
             }
-            return mapper.writeValueAsString(DomainContentFormatter.formatAppDomains(app, appDomains));
+
+            var children = registry.listChildren(path);
+            if (!children.isEmpty()) {
+                return mapper.writeValueAsString(DomainContentFormatter.formatTreeNodes(path, children));
+            }
+
+            throw new IllegalArgumentException("Unknown path: " + path
+                    + ". Use casehub_model() to see available paths or casehub_search() to find by keyword.");
         }
-        return mapper.writeValueAsString(
-                DomainContentFormatter.formatAppIndex(registry.getApps(), registry.getDomains()));
+
+        var roots = registry.listChildren("");
+        return mapper.writeValueAsString(DomainContentFormatter.formatTreeNodes(null, roots));
     }
 
     @Tool(description = "Search CaseHub operations by keyword. "

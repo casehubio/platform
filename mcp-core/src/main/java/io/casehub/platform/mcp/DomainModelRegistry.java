@@ -77,6 +77,47 @@ public class DomainModelRegistry {
                       .toList();
     }
 
+    public record TreeNode(String segment, String fullPath, String summary,
+                           int childCount, int operationCount, boolean isLeaf) {}
+
+    public List<TreeNode> listChildren(String prefix) {
+        String normalised = (prefix == null || prefix.isEmpty()) ? "" : prefix.endsWith("/") ? prefix : prefix + "/";
+        Map<String, List<DomainModel>> grouped = new java.util.LinkedHashMap<>();
+
+        for (DomainModel domain : domains.values()) {
+            String name = domain.name();
+            if (normalised.isEmpty() || name.startsWith(normalised)) {
+                String remainder = normalised.isEmpty() ? name : name.substring(normalised.length());
+                int slash = remainder.indexOf('/');
+                String segment = slash >= 0 ? remainder.substring(0, slash) : remainder;
+                String fullPath = normalised + segment;
+                grouped.computeIfAbsent(fullPath, k -> new ArrayList<>()).add(domain);
+            }
+        }
+
+        List<TreeNode> nodes = new ArrayList<>();
+        for (var entry : grouped.entrySet()) {
+            String path = entry.getKey();
+            List<DomainModel> children = entry.getValue();
+            String segment = path.contains("/") ? path.substring(path.lastIndexOf('/') + 1) : path;
+
+            boolean isLeaf = children.size() == 1 && children.getFirst().name().equals(path);
+            long totalOps = children.stream().mapToLong(d -> d.operations().size()).sum();
+
+            String summary = "";
+            if (isLeaf) {
+                summary = children.getFirst().summary();
+            } else {
+                DomainContentFormatter.AppCapability cap = appCapabilities.get(path);
+                if (cap != null) summary = cap.heading();
+            }
+
+            nodes.add(new TreeNode(segment, path, summary,
+                    isLeaf ? 0 : children.size(), (int) totalOps, isLeaf));
+        }
+        return nodes;
+    }
+
     public Optional<OperationDescriptor> getOperation(String domain, String operation) {
         return getDomain(domain)
                 .flatMap(d -> d.operations().stream()

@@ -23,7 +23,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier0p5AppReturnsDomainListWithEnricherState() throws Exception {
-        String              json   = tools.casehub_model(null, "test-app");
+        String              json   = tools.casehub_model("test-app");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
         assertThat(result).containsKey("domains");
@@ -37,14 +37,14 @@ class CaseHubMcpToolsTest {
 
     @Test
     void tier0WithBlankDomainReturnsApps() throws Exception {
-        String              json   = tools.casehub_model("", null);
+        String              json   = tools.casehub_model("");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         assertThat(result).containsKey("apps");
     }
 
     @Test
     void tier1ReturnsOperationDetail() throws Exception {
-        String              json   = tools.casehub_model("test", null);
+        String              json   = tools.casehub_model("test");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
         assertThat(result).containsEntry("domain", "test");
@@ -55,7 +55,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier1QueriesHaveDescriptions() throws Exception {
-        String              json   = tools.casehub_model("test", null);
+        String              json   = tools.casehub_model("test");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         List<Map<String, Object>> queries =
                 (List<Map<String, Object>>) result.get("queries");
@@ -68,7 +68,7 @@ class CaseHubMcpToolsTest {
 
     @Test
     void tier1UnknownDomainThrows() {
-        assertThatThrownBy(() -> tools.casehub_model("nonexistent", null))
+        assertThatThrownBy(() -> tools.casehub_model("nonexistent"))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
@@ -168,7 +168,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier0ReturnsAppList() throws Exception {
-        String              json   = tools.casehub_model(null, null);
+        String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
         assertThat(result).containsKey("apps");
@@ -180,7 +180,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier0AppSummaryIncludesDomainCount() throws Exception {
-        String              json   = tools.casehub_model(null, null);
+        String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         List<Map<String, Object>> apps =
                 (List<Map<String, Object>>) result.get("apps");
@@ -193,7 +193,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier0p5AppReturnsDomainList() throws Exception {
-        String              json   = tools.casehub_model(null, "test-app");
+        String              json   = tools.casehub_model("test-app");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
         assertThat(result).containsEntry("app", "test-app");
@@ -205,14 +205,14 @@ class CaseHubMcpToolsTest {
 
     @Test
     void tier0p5UnknownAppThrows() {
-        assertThatThrownBy(() -> tools.casehub_model(null, "nonexistent"))
+        assertThatThrownBy(() -> tools.casehub_model("nonexistent"))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void domainsWithoutAppGroupedByDomainName() throws Exception {
-        String              json   = tools.casehub_model(null, null);
+        String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         List<Map<String, Object>> apps =
                 (List<Map<String, Object>>) result.get("apps");
@@ -223,7 +223,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier1IncludesEvents() throws Exception {
-        String              json   = tools.casehub_model("test", null);
+        String              json   = tools.casehub_model("test");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         List<Map<String, Object>> events =
                 (List<Map<String, Object>>) result.get("events");
@@ -237,7 +237,7 @@ class CaseHubMcpToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void tier1MutationParamsIncludeFieldExpansion() throws Exception {
-        String              json   = tools.casehub_model("test", null);
+        String              json   = tools.casehub_model("test");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
         List<Map<String, Object>> mutations =
                 (List<Map<String, Object>>) result.get("mutations");

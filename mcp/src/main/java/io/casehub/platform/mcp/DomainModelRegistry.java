@@ -46,6 +46,16 @@ public class DomainModelRegistry {
                         .findFirst());
     }
 
+    private final Map<String, DomainContentFormatter.AppCapability> appCapabilities = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void registerAppCapability(String app, DomainContentFormatter.AppCapability capability) {
+        appCapabilities.put(app, capability);
+    }
+
+    public Map<String, DomainContentFormatter.AppCapability> getAppCapabilities() {
+        return Map.copyOf(appCapabilities);
+    }
+
     public List<SearchResult> search(String query) {
         if (query == null || query.isBlank()) {
             return List.of();
@@ -53,8 +63,9 @@ public class DomainModelRegistry {
         String             lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
         List<SearchResult> results    = new java.util.ArrayList<>();
         for (DomainModel domain : domains.values()) {
+            boolean domainMatch = matchesDomain(domain, lowerQuery);
             for (OperationDescriptor op : domain.operations()) {
-                if (matches(op, lowerQuery)) {
+                if (domainMatch || matchesOperation(op, lowerQuery)) {
                     results.add(new SearchResult(domain.name(), op));
                 }
             }
@@ -62,14 +73,26 @@ public class DomainModelRegistry {
         return List.copyOf(results);
     }
 
-    private static boolean matches(OperationDescriptor op, String lowerQuery) {
-        if (op.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
-        if (op.summary() != null && op.summary().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
-        if (op.returnTypeName() != null && op.returnTypeName().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {
-            return true;
+    private boolean matchesDomain(DomainModel domain, String lowerQuery) {
+        if (domain.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+        if (domain.app() != null && domain.app().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+        if (!domain.summary().isEmpty() && domain.summary().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+        DomainContentFormatter.AppCapability cap = appCapabilities.get(domain.app());
+        if (cap != null) {
+            if (cap.heading().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+            for (String tag : cap.tags()) {
+                if (tag.toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+            }
         }
+        return false;
+    }
+
+    private static boolean matchesOperation(OperationDescriptor op, String lowerQuery) {
+        if (op.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+        if (op.summary() != null && op.summary().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
+        if (op.returnTypeName() != null && op.returnTypeName().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
         for (ParameterDescriptor param : op.params()) {
-            if (param.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) {return true;}
+            if (param.name().toLowerCase(java.util.Locale.ROOT).contains(lowerQuery)) return true;
         }
         return false;
     }

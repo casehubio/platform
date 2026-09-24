@@ -11,10 +11,22 @@ public final class DomainContentFormatter {
 
 
     public static Map<String, Object> formatAppIndex(List<String> apps, List<DomainModel> allDomains) {
+        return formatAppIndex(apps, allDomains, Map.of());
+    }
+
+    public static Map<String, Object> formatAppIndex(List<String> apps, List<DomainModel> allDomains,
+                                                      Map<String, AppCapability> appCapabilities) {
         List<Map<String, Object>> appList = apps.stream()
                                                 .map(app -> {
                                                     Map<String, Object> entry = new LinkedHashMap<>();
                                                     entry.put("name", app);
+                                                    AppCapability cap = appCapabilities.get(app);
+                                                    if (cap != null) {
+                                                        entry.put("capability", cap.heading());
+                                                        if (!cap.tags().isEmpty()) {
+                                                            entry.put("tags", cap.tags());
+                                                        }
+                                                    }
                                                     List<DomainModel> appDomains = allDomains.stream()
                                                                                              .filter(d -> app.equals(d.app())).toList();
                                                     entry.put("domainCount", appDomains.size());
@@ -24,6 +36,12 @@ public final class DomainContentFormatter {
                                                 })
                                                 .collect(Collectors.toList());
         return Map.of("apps", appList);
+    }
+
+    public record AppCapability(String heading, List<String> tags) {
+        public AppCapability(String heading, String... tags) {
+            this(heading, List.of(tags));
+        }
     }
 
     public static Map<String, Object> formatAppDomains(String app, List<DomainModel> domains) {

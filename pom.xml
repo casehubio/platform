@@ -155,7 +155,9 @@
         <module>yaml-core</module>
         <module>yaml-codegen</module>
         <module>yaml-jackson</module>
+        <module>yaml-plugin-api</module>
         <module>schema-generator</module>
+        <module>yaml-plugin-processor</module>
         <module>drift-detection</module>
         <!-- ts-core excluded — dev.tsj:compiler-backend-jvm not in any public/CI repository -->
         <module>platform-pdf</module>

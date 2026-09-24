@@ -666,7 +666,8 @@ class ForEachExpanderTest {
         var groups      = Map.of("envs", new IterationGroup("env", List.of()));
         var elements    = new LinkedHashMap<String, TestElement>();
         elements.put("deploy", new TestElement("deploy",
-                                               Map.of("host", "${each.env.name}", "p", "${each.env.port}"),
+                                               Map.of("host", "${each.env.name}", "p", "${each.env.port}",
+                                                      "isProd", "${each.env.production}"),
                                                new ForEachDirective.GroupRef("envs"), null));
 
         var result = ForEachExpander.expand(elements, groups, dataSources,
@@ -675,8 +676,32 @@ class ForEachExpanderTest {
         assertThat(result.elements()).hasSize(2);
         assertThat(result.elements().get("deploy.staging").spec())
                 .containsEntry("host", "staging")
-                .containsEntry("p", "8080");
+                .containsEntry("p", 8080)
+                .containsEntry("isProd", false);
+        assertThat(result.elements().get("deploy.prod").spec())
+                .containsEntry("host", "prod")
+                .containsEntry("p", 443)
+                .containsEntry("isProd", true);
     }
+
+    @Test
+    void csvDataSource_bareAlias_resolvesToStringKey() {
+        var csv = io.casehub.yaml.core.data.CsvParser.parse("members",
+                                                            "name:STRING,role:STRING\nAlice,Developer\nBob,Viewer");
+        var dataSources = Map.of("members", csv);
+        var groups      = Map.of("members", new IterationGroup("member", List.of()));
+        var elements    = new LinkedHashMap<String, TestElement>();
+        elements.put("greet", new TestElement("greet",
+                                              Map.of("label", "${each.member}"),
+                                              new ForEachDirective.GroupRef("members"), null));
+
+        var result = ForEachExpander.expand(elements, groups, dataSources,
+                                            resolver, adapter, 1000);
+
+        assertThat(result.elements().get("greet.Alice").spec())
+                .containsEntry("label", "Alice");
+    }
+
 
 // --- ForEachDirective.parse ---
 

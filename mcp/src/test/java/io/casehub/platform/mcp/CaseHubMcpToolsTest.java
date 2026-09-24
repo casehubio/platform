@@ -22,24 +22,22 @@ class CaseHubMcpToolsTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void tier0p5AppReturnsDomainListWithEnricherState() throws Exception {
-        String              json   = tools.casehub_model("test-app");
+    void tier0NodeIncludesSummaryFromEnricher() throws Exception {
+        String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
-        assertThat(result).containsKey("domains");
-        List<Map<String, Object>> domains =
-                (List<Map<String, Object>>) result.get("domains");
-        Map<String, Object> testDomain = domains.stream()
-                                                .filter(d -> "test".equals(d.get("name"))).findFirst().orElseThrow();
-        assertThat(testDomain).containsEntry("summary", "Test domain — echo messages, store values, create items");
-        assertThat(testDomain).containsKey("state");
+        List<Map<String, Object>> nodes =
+                (List<Map<String, Object>>) result.get("nodes");
+        Map<String, Object> testNode = nodes.stream()
+                                            .filter(n -> "test".equals(n.get("name"))).findFirst().orElseThrow();
+        assertThat(testNode).containsEntry("summary", "Test domain — echo messages, store values, create items");
     }
 
     @Test
-    void tier0WithBlankDomainReturnsApps() throws Exception {
+    void tier0WithBlankPathReturnsNodes() throws Exception {
         String              json   = tools.casehub_model("");
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
-        assertThat(result).containsKey("apps");
+        assertThat(result).containsKey("nodes");
     }
 
     @Test
@@ -167,56 +165,57 @@ class CaseHubMcpToolsTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void tier0ReturnsAppList() throws Exception {
+    void tier0ReturnsNodeList() throws Exception {
         String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
-        assertThat(result).containsKey("apps");
-        List<Map<String, Object>> apps =
-                (List<Map<String, Object>>) result.get("apps");
-        assertThat(apps).anyMatch(a -> "test-app".equals(a.get("name")));
+        assertThat(result).containsKey("nodes");
+        List<Map<String, Object>> nodes =
+                (List<Map<String, Object>>) result.get("nodes");
+        assertThat(nodes).anyMatch(n -> "test".equals(n.get("name")));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void tier0AppSummaryIncludesDomainCount() throws Exception {
+    void tier0NodeIncludesOperationCount() throws Exception {
         String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
-        List<Map<String, Object>> apps =
-                (List<Map<String, Object>>) result.get("apps");
-        Map<String, Object> testApp = apps.stream()
-                                          .filter(a -> "test-app".equals(a.get("name"))).findFirst().orElseThrow();
-        assertThat(testApp).containsKey("domainCount");
-        assertThat((int) testApp.get("domainCount")).isEqualTo(1);
+        List<Map<String, Object>> nodes =
+                (List<Map<String, Object>>) result.get("nodes");
+        Map<String, Object> testNode = nodes.stream()
+                                            .filter(n -> "test".equals(n.get("name"))).findFirst().orElseThrow();
+        assertThat(testNode).containsKey("operationCount");
+        assertThat((int) testNode.get("operationCount")).isGreaterThan(0);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void tier0p5AppReturnsDomainList() throws Exception {
-        String              json   = tools.casehub_model("test-app");
+    void tier0NodeIncludesPath() throws Exception {
+        String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
 
-        assertThat(result).containsEntry("app", "test-app");
-        assertThat(result).containsKey("domains");
-        List<Map<String, Object>> domains =
-                (List<Map<String, Object>>) result.get("domains");
-        assertThat(domains).anyMatch(d -> "test".equals(d.get("name")));
+        List<Map<String, Object>> nodes =
+                (List<Map<String, Object>>) result.get("nodes");
+        Map<String, Object> testNode = nodes.stream()
+                                            .filter(n -> "test".equals(n.get("name"))).findFirst().orElseThrow();
+        assertThat(testNode).containsKey("path");
+        assertThat(testNode.get("path")).isEqualTo("test");
     }
 
     @Test
-    void tier0p5UnknownAppThrows() {
+    void unknownPathThrows() {
         assertThatThrownBy(() -> tools.casehub_model("nonexistent"))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void domainsWithoutAppGroupedByDomainName() throws Exception {
+    void allDomainsVisibleAsNodes() throws Exception {
         String              json   = tools.casehub_model(null);
         Map<String, Object> result = mapper.readValue(json, new TypeReference<>() {});
-        List<Map<String, Object>> apps =
-                (List<Map<String, Object>>) result.get("apps");
-        assertThat(apps).anyMatch(a -> "class-based".equals(a.get("name")));
+        List<Map<String, Object>> nodes =
+                (List<Map<String, Object>>) result.get("nodes");
+        assertThat(nodes).anyMatch(n -> "class-based".equals(n.get("name")));
     }
 
 

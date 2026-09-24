@@ -48,16 +48,21 @@ public class McpDomainJandexScanner {
             if (ann.value("app") != null && !ann.value("app").asString().isEmpty()) {
                 app = ann.value("app").asString();
             }
+            String summary = "";
+            if (ann.value("summary") != null && !ann.value("summary").asString().isEmpty()) {
+                summary = ann.value("summary").asString();
+            }
             String basePath = null;
             if (ann.value("basePath") != null && !ann.value("basePath").asString().isEmpty()) {
                 basePath = ann.value("basePath").asString();
             }
 
             String finalApp = app;
+            String finalSummary = summary;
             String finalBasePath = basePath;
             boolean finalIsIface = isIface;
             DomainScanResult domain = domains.computeIfAbsent(domainName,
-                    d -> DomainScanResult.of(d, finalApp, classInfo.name().toString(), classInfo.simpleName(), finalIsIface, finalBasePath));
+                    d -> DomainScanResult.of(d, finalApp, finalSummary, classInfo.name().toString(), classInfo.simpleName(), finalIsIface, finalBasePath));
 
             for (MethodInfo method : classInfo.methods()) {
                 AnnotationInstance queryAnn = method.annotation(PLATFORM_QUERY);

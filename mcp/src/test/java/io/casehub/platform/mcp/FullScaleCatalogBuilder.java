@@ -179,10 +179,12 @@ final class FullScaleCatalogBuilder {
                 app = inferAppFromPackage(scan.sourceFqcn());
             }
 
+            String summary = scan.summary() != null ? scan.summary() : "";
+
             DomainModel model = new DomainModel(
                     scan.domainName(),
                     app,
-                    "",
+                    summary,
                     operations,
                     List.of(),
                     Map.of());

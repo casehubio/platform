@@ -1,6 +1,5 @@
 package io.casehub.yaml.core.module;
 
-import io.casehub.yaml.core.data.CsvDataSource;
 import io.casehub.yaml.core.data.CsvParser;
 import io.casehub.yaml.core.foreach.IterationGroup;
 import io.casehub.yaml.core.resolver.VariableResolver;
@@ -155,5 +154,17 @@ class ImportExpanderTest {
                 List.of(imp), Map.of(), Map.of(), resolver))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Duplicate");
+    }
+
+    @Test
+    void stepImportsAreFilteredOut() {
+        var moduleImport = new YamlImport("my-module", null, "mod", null, Map.of(), null, null);
+        var stepImport   = new YamlImport(null, "trading-steps.yaml", null, null, null, null, null);
+
+        List<YamlImport> result = ImportExpander.expand(
+                List.of(moduleImport, stepImport), Map.of(), Map.of(), resolver);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).module()).isEqualTo("my-module");
     }
 }

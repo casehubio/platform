@@ -33,20 +33,23 @@ public final class ModuleExpander {
             Map<String, YamlModule> availableModules,
             Map<String, Map<String, Object>> existingSections,
             ExpansionOptions options) {
+        List<YamlImport> moduleImports = imports.stream()
+                                                .filter(imp -> imp.steps() == null)
+                                                .toList();
 
-        validateImports(imports, availableModules);
-        validateModuleRefs(imports, availableModules);
+        validateImports(moduleImports, availableModules);
+        validateModuleRefs(moduleImports, availableModules);
 
-        Map<String, Map<String, Object>> mergedSections = new LinkedHashMap<>();
-        Map<String, Map<String, String>> moduleScopes = new LinkedHashMap<>();
-        Map<String, String> importConditions = new LinkedHashMap<>();
-        Map<String, Map<String, String>> allOutputs = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> mergedSections   = new LinkedHashMap<>();
+        Map<String, Map<String, String>> moduleScopes     = new LinkedHashMap<>();
+        Map<String, String>              importConditions = new LinkedHashMap<>();
+        Map<String, Map<String, String>> allOutputs       = new LinkedHashMap<>();
 
         for (Map.Entry<String, Map<String, Object>> entry : existingSections.entrySet()) {
             mergedSections.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
         }
 
-        for (YamlImport imp : imports) {
+        for (YamlImport imp : moduleImports) {
             YamlModule module = availableModules.get(imp.module());
             Map<String, String> resolvedParams = resolveModuleRefsInParams(
                     imp.parameters(), allOutputs, imp.as());
@@ -60,15 +63,15 @@ public final class ModuleExpander {
             allOutputs.put(imp.as(), resolvedOutputs);
 
             for (Map.Entry<String, Map<String, Object>> sectionEntry : module.sections().entrySet()) {
-                String sectionName = sectionEntry.getKey();
+                String              sectionName    = sectionEntry.getKey();
                 Map<String, Object> sectionContent = sectionEntry.getValue();
 
                 Map<String, Object> targetSection = mergedSections
-                        .computeIfAbsent(sectionName, k -> new LinkedHashMap<>());
+                                                            .computeIfAbsent(sectionName, k -> new LinkedHashMap<>());
 
                 for (Map.Entry<String, Object> contentEntry : sectionContent.entrySet()) {
                     String prefixedKey = imp.as() + "." + contentEntry.getKey();
-                    Object value = contentEntry.getValue();
+                    Object value       = contentEntry.getValue();
                     if (options.deserializer() != null && value instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> rawMap = (Map<String, Object>) value;
@@ -76,7 +79,7 @@ public final class ModuleExpander {
                     }
                     if (options.rewriter() != null) {
                         value = options.rewriter().rewrite(sectionName, contentEntry.getKey(), value,
-                                imp.as(), sectionContent.keySet());
+                                                           imp.as(), sectionContent.keySet());
                     }
                     targetSection.put(prefixedKey, value);
                 }

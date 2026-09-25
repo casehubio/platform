@@ -19,6 +19,8 @@ public class YamlCoreJacksonModule extends SimpleModule {
                                         p.getText().toUpperCase(java.util.Locale.ROOT));
                             }
                         });
+        addDeserializer(io.casehub.yaml.core.step.InvokeBinding.class,
+                        new InvokeBindingDeserializer());
     }
 
     @Override
@@ -28,5 +30,8 @@ public class YamlCoreJacksonModule extends SimpleModule {
         context.setMixInAnnotations(YamlModuleFile.YamlModuleHeader.class,
                                     YamlModuleHeaderMixin.class);
         context.setMixInAnnotations(io.casehub.yaml.core.module.YamlModuleParameter.class,
-                                    YamlModuleParameterMixin.class);}
+                                    YamlModuleParameterMixin.class);
+        context.setMixInAnnotations(io.casehub.yaml.core.step.StepDefinitionFile.class,
+                                    StepDefinitionFileMixin.class);
+    }
 }

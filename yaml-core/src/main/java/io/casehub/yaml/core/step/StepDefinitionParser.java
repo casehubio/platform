@@ -25,7 +25,7 @@ public final class StepDefinitionParser {
     }
 
     @SuppressWarnings("unchecked")
-    static StepDefinition parseAction(String name, Map<String, Object> raw) {
+    public static StepDefinition parseAction(String name, Map<String, Object> raw) {
         String description = (String) raw.get("description");
 
         Map<String, StepParameter> inputs = Map.of();
@@ -70,7 +70,7 @@ public final class StepDefinitionParser {
     }
 
     @SuppressWarnings("unchecked")
-    static InvokeBinding parseInvoke(Object raw) {
+    public static InvokeBinding parseInvoke(Object raw) {
         if (!(raw instanceof Map)) {
             throw new IllegalArgumentException(
                     "Invoke binding must be a map, got: " + (raw != null ? raw.getClass().getSimpleName() : "null"));

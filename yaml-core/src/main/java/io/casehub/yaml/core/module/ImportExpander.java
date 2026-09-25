@@ -24,11 +24,14 @@ public final class ImportExpander {
             Map<String, IterationGroup> iterationGroups,
             Map<String, CsvDataSource> dataSources,
             VariableResolver resolver) {
+        List<YamlImport> moduleImports = imports.stream()
+                                                .filter(imp -> imp.steps() == null)
+                                                .toList();
 
-        List<YamlImport> result = new ArrayList<>();
-        Set<String> seenAliases = new HashSet<>();
+        List<YamlImport> result      = new ArrayList<>();
+        Set<String>      seenAliases = new HashSet<>();
 
-        for (YamlImport imp : imports) {
+        for (YamlImport imp : moduleImports) {
             if (imp.forEach() == null) {
                 result.add(imp);
                 seenAliases.add(imp.as());
@@ -36,7 +39,7 @@ public final class ImportExpander {
             }
 
             ForEachDirective directive = ForEachDirective.parse(imp.forEach());
-            String as = resolveAs(directive, iterationGroups);
+            String           as        = resolveAs(directive, iterationGroups);
 
             if (directive instanceof ForEachDirective.GroupRef ref) {
                 CsvDataSource csv = dataSources.get(ref.groupName());

@@ -34,6 +34,27 @@ class StepResultTest {
         assertThat(result.output()).isEmpty();
     }
 
+
+    @Test
+    void successWithMetadata() {
+        var result = StepResult.of(Map.of("key", "value"), Map.of("cost", 0.05));
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("key", "value");
+        assertThat(result.executionMetadata()).containsEntry("cost", 0.05);
+    }
+
+    @Test
+    void successWithoutMetadataDefaultsToEmpty() {
+        var result = StepResult.of(Map.of("key", "value"));
+        assertThat(result.executionMetadata()).isEmpty();
+    }
+
+    @Test
+    void failureMetadataIsEmpty() {
+        var result = StepResult.failed("error");
+        assertThat(result.executionMetadata()).isEmpty();
+    }
+
     @Test
     void outputIsImmutable() {
         var mutable = new HashMap<String, Object>();

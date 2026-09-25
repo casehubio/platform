@@ -6,14 +6,17 @@ import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.plugin.api.StepAction;
 import io.casehub.yaml.plugin.api.StepResult;
 import io.casehub.yaml.step.InvokeHandler;
+import io.casehub.platform.api.process.ProcessCommand;
+import io.casehub.platform.api.process.ProcessExecutionException;
+import io.casehub.platform.api.process.ProcessExecutor;
+import io.casehub.platform.api.process.ProcessResult;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,10 +24,12 @@ public class ProcessInvokeHandler implements InvokeHandler {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper    objectMapper;
+    private final ProcessExecutor processExecutor;
 
-    public ProcessInvokeHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public ProcessInvokeHandler(ObjectMapper objectMapper, ProcessExecutor processExecutor) {
+        this.objectMapper    = objectMapper;
+        this.processExecutor = processExecutor;
     }
 
     @Override
@@ -46,38 +51,31 @@ public class ProcessInvokeHandler implements InvokeHandler {
             command.add(interpolate(arg, params));
         }
 
-        Process process = null;
         try {
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
-            if (!proc.env().isEmpty()) {
-                pb.environment().putAll(proc.env());
-            }
+            ProcessCommand cmd = ProcessCommand.of(command.toArray(String[]::new));
             if (proc.workingDir() != null) {
-                pb.directory(new java.io.File(proc.workingDir()));
+                cmd = cmd.workingDir(proc.workingDir());
             }
-
-            long start = System.nanoTime();
-            process = pb.start();
-
-            String stdout = new String(process.getInputStream().readAllBytes());
-
-            long    timeoutMs  = parseTimeout(proc.timeout());
-            boolean finished   = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
-            long    durationMs = (System.nanoTime() - start) / 1_000_000;
-
-            if (!finished) {
-                process.destroyForcibly();
-                return StepResult.failed("Process timed out after " + timeoutMs + "ms");
+            Duration timeout = parseTimeout(proc.timeout());
+            if (timeout != null) {
+                cmd = cmd.timeout(timeout);
             }
+            cmd = cmd.mergeStderr(true);
 
-            int                 exitCode = process.exitValue();
-            Map<String, Object> metadata = Map.of("exitCode", exitCode, "durationMs", durationMs);
+            long          start      = System.nanoTime();
+            ProcessResult result     = processExecutor.execute(cmd);
+            long          durationMs = (System.nanoTime() - start) / 1_000_000;
 
-            if (exitCode != 0) {
-                String error = stdout.trim().isEmpty() ? "Process exited with code " + exitCode : stdout.trim();
+            Map<String, Object> metadata = Map.of("exitCode", result.exitCode(), "durationMs", durationMs);
+
+            if (!result.isSuccess()) {
+                String error = result.stdout() != null && !result.stdout().isBlank()
+                               ? result.stdout().trim()
+                               : "Process exited with code " + result.exitCode();
                 return StepResult.failed(error);
             }
+
+            String stdout = result.stdout() != null ? result.stdout() : "";
 
             Map<String, Object> output = switch (proc.output()) {
                 case "json" -> objectMapper.readValue(stdout.trim(), LinkedHashMap.class);
@@ -87,23 +85,18 @@ public class ProcessInvokeHandler implements InvokeHandler {
             };
 
             return StepResult.of(output, metadata);
-        } catch (IOException e) {
+        } catch (ProcessExecutionException e) {
             return StepResult.failed("Process execution failed: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return StepResult.failed("Process interrupted");
-        } finally {
-            if (process != null) {
-                process.destroyForcibly();
-            }
+        } catch (Exception e) {
+            return StepResult.failed("Process execution failed: " + e.getMessage());
         }
     }
 
     private static String interpolate(String template, Map<String, Object> params) {
-        Matcher matcher = VAR_PATTERN.matcher(template);
-        StringBuilder sb = new StringBuilder();
+        Matcher       matcher = VAR_PATTERN.matcher(template);
+        StringBuilder sb      = new StringBuilder();
         while (matcher.find()) {
-            String key = matcher.group(1);
+            String key   = matcher.group(1);
             Object value = params.get(key);
             matcher.appendReplacement(sb, Matcher.quoteReplacement(value != null ? value.toString() : ""));
         }
@@ -111,11 +104,11 @@ public class ProcessInvokeHandler implements InvokeHandler {
         return sb.toString();
     }
 
-    private static long parseTimeout(String timeout) {
-        if (timeout == null) return 30_000;
-        if (timeout.endsWith("ms")) return Long.parseLong(timeout.replace("ms", ""));
-        if (timeout.endsWith("s")) return Long.parseLong(timeout.replace("s", "")) * 1000;
-        if (timeout.endsWith("m")) return Long.parseLong(timeout.replace("m", "")) * 60_000;
-        return 30_000;
+    private static Duration parseTimeout(String timeout) {
+        if (timeout == null) {return null;}
+        if (timeout.endsWith("ms")) {return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));}
+        if (timeout.endsWith("s")) {return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));}
+        if (timeout.endsWith("m")) {return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));}
+        return null;
     }
 }

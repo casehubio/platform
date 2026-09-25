@@ -52,13 +52,16 @@ public class YamlStepDefinitionSource implements CatalogSource {
     @SuppressWarnings("unchecked")
     private void loadFile(String path, Map<String, CatalogEntry> entries) throws IOException {
         InputStream is = Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream(path);
+                               .getResourceAsStream(path);
         if (is == null) {
             throw new IOException("Step definition file not found on classpath: " + path);
         }
 
-        ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
-        Map<String, Object> raw = yamlMapper.readValue(is, Map.class);
+        Map<String, Object> raw;
+        try (is) {
+            ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
+            raw = yamlMapper.readValue(is, Map.class);
+        }
 
         Map<String, Object> actionsRaw = (Map<String, Object>) raw.get("actions");
         if (actionsRaw == null) {
@@ -77,10 +80,10 @@ public class YamlStepDefinitionSource implements CatalogSource {
         StepDefinitionFile defFile = StepDefinitionParser.parse(raw);
 
         for (Map.Entry<String, StepDefinition> entry : defFile.actions().entrySet()) {
-            StepDefinition def = entry.getValue();
-            InvokeBinding binding = def.invoke();
+            StepDefinition def     = entry.getValue();
+            InvokeBinding  binding = def.invoke();
 
-            StepAction action = resolveHandler(binding).create(def, binding);
+            StepAction action    = resolveHandler(binding).create(def, binding);
             StepAction validated = new ValidatingStepAction(def, action, eventSink);
 
             String qualifiedName = def.qualifiedName(defFile.namespace());

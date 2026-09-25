@@ -46,8 +46,10 @@ public class ProcessInvokeHandler implements InvokeHandler {
             command.add(interpolate(arg, params));
         }
 
+        Process process = null;
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(true);
             if (!proc.env().isEmpty()) {
                 pb.environment().putAll(proc.env());
             }
@@ -56,25 +58,24 @@ public class ProcessInvokeHandler implements InvokeHandler {
             }
 
             long start = System.nanoTime();
-            Process process = pb.start();
+            process = pb.start();
 
             String stdout = new String(process.getInputStream().readAllBytes());
-            String stderr = new String(process.getErrorStream().readAllBytes());
 
-            long timeoutMs = parseTimeout(proc.timeout());
-            boolean finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
-            long durationMs = (System.nanoTime() - start) / 1_000_000;
+            long    timeoutMs  = parseTimeout(proc.timeout());
+            boolean finished   = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
+            long    durationMs = (System.nanoTime() - start) / 1_000_000;
 
             if (!finished) {
                 process.destroyForcibly();
                 return StepResult.failed("Process timed out after " + timeoutMs + "ms");
             }
 
-            int exitCode = process.exitValue();
+            int                 exitCode = process.exitValue();
             Map<String, Object> metadata = Map.of("exitCode", exitCode, "durationMs", durationMs);
 
             if (exitCode != 0) {
-                String error = stderr.isEmpty() ? "Process exited with code " + exitCode : stderr.trim();
+                String error = stdout.trim().isEmpty() ? "Process exited with code " + exitCode : stdout.trim();
                 return StepResult.failed(error);
             }
 
@@ -91,6 +92,10 @@ public class ProcessInvokeHandler implements InvokeHandler {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return StepResult.failed("Process interrupted");
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
         }
     }
 

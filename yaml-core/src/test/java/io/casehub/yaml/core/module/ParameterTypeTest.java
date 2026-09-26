@@ -140,4 +140,12 @@ class ParameterTypeTest {
                 .hasMessageContaining("blob")
                 .hasMessageContaining("STRING");
     }
+
+    @Test
+    void fromValueType_maps_all_scalars() {
+        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.STRING)).isEqualTo(ParameterType.STRING);
+        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.INTEGER)).isEqualTo(ParameterType.INTEGER);
+        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.NUMBER)).isEqualTo(ParameterType.NUMBER);
+        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.BOOLEAN)).isEqualTo(ParameterType.BOOLEAN);
+    }
 }

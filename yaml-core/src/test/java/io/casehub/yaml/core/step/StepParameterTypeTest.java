@@ -74,4 +74,26 @@ class StepParameterTypeTest {
                 .isThrownBy(() -> StepParameterType.OBJECT.parseScalar("{}"))
                 .withMessageContaining("Cannot parse");
     }
+
+    @Test
+    void scalarType_returns_value_type_for_scalars() {
+        assertThat(StepParameterType.STRING.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.STRING);
+        assertThat(StepParameterType.INTEGER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.INTEGER);
+        assertThat(StepParameterType.NUMBER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.NUMBER);
+        assertThat(StepParameterType.BOOLEAN.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.BOOLEAN);
+    }
+
+    @Test
+    void scalarType_returns_null_for_complex() {
+        assertThat(StepParameterType.ARRAY.scalarType()).isNull();
+        assertThat(StepParameterType.OBJECT.scalarType()).isNull();
+    }
+
+    @Test
+    void fromValueType_maps_all_scalars() {
+        assertThat(StepParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.STRING)).isEqualTo(StepParameterType.STRING);
+        assertThat(StepParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.INTEGER)).isEqualTo(StepParameterType.INTEGER);
+        assertThat(StepParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.NUMBER)).isEqualTo(StepParameterType.NUMBER);
+        assertThat(StepParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.BOOLEAN)).isEqualTo(StepParameterType.BOOLEAN);
+    }
 }

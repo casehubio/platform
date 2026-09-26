@@ -28,4 +28,25 @@ public enum ValueType {
     }
 
     public boolean accepts(String javaTypeName) { return javaTypes().contains(javaTypeName); }
+
+    public static ValueType fromString(String name) {
+        return switch (name.toUpperCase(java.util.Locale.ROOT)) {
+            case "STRING" -> STRING;
+            case "INTEGER" -> INTEGER;
+            case "NUMBER", "DECIMAL" -> NUMBER;
+            case "BOOLEAN" -> BOOLEAN;
+            default -> null;
+        };
+    }
+
+    public boolean validate(Object value) {
+        if (value == null) {return false;}
+        return switch (this) {
+            case STRING -> value instanceof String;
+            case INTEGER -> value instanceof Integer || value instanceof Long;
+            case NUMBER -> value instanceof Number;
+            case BOOLEAN -> value instanceof Boolean;
+        };
+    }
+
 }

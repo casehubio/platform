@@ -78,4 +78,64 @@ class ValueTypeTest {
         assertThat(ValueType.NUMBER.accepts("java.math.BigDecimal")).isTrue();
         assertThat(ValueType.NUMBER.accepts("java.lang.Number")).isTrue();
     }
+
+    @Test
+    void fromString_resolves_all_scalar_types() {
+        assertThat(ValueType.fromString("STRING")).isEqualTo(ValueType.STRING);
+        assertThat(ValueType.fromString("INTEGER")).isEqualTo(ValueType.INTEGER);
+        assertThat(ValueType.fromString("NUMBER")).isEqualTo(ValueType.NUMBER);
+        assertThat(ValueType.fromString("BOOLEAN")).isEqualTo(ValueType.BOOLEAN);
+    }
+
+    @Test
+    void fromString_is_case_insensitive() {
+        assertThat(ValueType.fromString("string")).isEqualTo(ValueType.STRING);
+        assertThat(ValueType.fromString("Integer")).isEqualTo(ValueType.INTEGER);
+        assertThat(ValueType.fromString("boolean")).isEqualTo(ValueType.BOOLEAN);
+    }
+
+    @Test
+    void fromString_accepts_decimal_alias() {
+        assertThat(ValueType.fromString("DECIMAL")).isEqualTo(ValueType.NUMBER);
+        assertThat(ValueType.fromString("decimal")).isEqualTo(ValueType.NUMBER);
+    }
+
+    @Test
+    void fromString_returns_null_for_unknown() {
+        assertThat(ValueType.fromString("ARRAY")).isNull();
+        assertThat(ValueType.fromString("LIST")).isNull();
+        assertThat(ValueType.fromString("OBJECT")).isNull();
+        assertThat(ValueType.fromString("map")).isNull();
+    }
+
+    @Test
+    void validate_string() {
+        assertThat(ValueType.STRING.validate("hello")).isTrue();
+        assertThat(ValueType.STRING.validate(42)).isFalse();
+        assertThat(ValueType.STRING.validate(null)).isFalse();
+    }
+
+    @Test
+    void validate_integer() {
+        assertThat(ValueType.INTEGER.validate(42)).isTrue();
+        assertThat(ValueType.INTEGER.validate(42L)).isTrue();
+        assertThat(ValueType.INTEGER.validate(3.14)).isFalse();
+        assertThat(ValueType.INTEGER.validate("42")).isFalse();
+    }
+
+    @Test
+    void validate_number() {
+        assertThat(ValueType.NUMBER.validate(3.14)).isTrue();
+        assertThat(ValueType.NUMBER.validate(42)).isTrue();
+        assertThat(ValueType.NUMBER.validate(42L)).isTrue();
+        assertThat(ValueType.NUMBER.validate("3.14")).isFalse();
+    }
+
+    @Test
+    void validate_boolean() {
+        assertThat(ValueType.BOOLEAN.validate(true)).isTrue();
+        assertThat(ValueType.BOOLEAN.validate(false)).isTrue();
+        assertThat(ValueType.BOOLEAN.validate("true")).isFalse();
+        assertThat(ValueType.BOOLEAN.validate(1)).isFalse();
+    }
 }

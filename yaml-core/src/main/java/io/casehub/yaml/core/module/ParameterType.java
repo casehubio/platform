@@ -25,16 +25,24 @@ public enum ParameterType {
         return false;
     }
 
-    public static ParameterType fromString(String name) {
-        return switch (name.toUpperCase(java.util.Locale.ROOT)) {
-            case "STRING" -> STRING;
-            case "LIST" -> LIST;
-            case "INTEGER" -> INTEGER;
-            case "NUMBER", "DECIMAL" -> NUMBER;
-            case "BOOLEAN" -> BOOLEAN;
-            default -> throw new IllegalArgumentException(
-                    "Unknown parameter type '" + name + "'. Expected: STRING, INTEGER, NUMBER, BOOLEAN, LIST, DECIMAL.");
+    public static ParameterType fromValueType(io.casehub.yaml.core.type.ValueType vt) {
+        return switch (vt) {
+            case STRING  -> STRING;
+            case INTEGER -> INTEGER;
+            case NUMBER  -> NUMBER;
+            case BOOLEAN -> BOOLEAN;
         };
+    }
+
+    public static ParameterType fromString(String name) {
+        if ("LIST".equalsIgnoreCase(name)) return LIST;
+        io.casehub.yaml.core.type.ValueType vt = io.casehub.yaml.core.type.ValueType.fromString(name);
+        if (vt == null) {
+            throw new IllegalArgumentException(
+                    "Unknown parameter type '" + name
+                    + "'. Expected: STRING, INTEGER, NUMBER, BOOLEAN, LIST, DECIMAL.");
+        }
+        return fromValueType(vt);
     }
 
     public io.casehub.yaml.core.type.ValueType scalarType() {

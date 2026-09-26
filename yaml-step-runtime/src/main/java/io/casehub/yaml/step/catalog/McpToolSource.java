@@ -1,40 +1,41 @@
 package io.casehub.yaml.step.catalog;
 
-import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.plugin.api.StepResult;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.CatalogSource;
+import io.casehub.yaml.core.step.StepDefinition;
 
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 public class McpToolSource implements CatalogSource {
 
-    private final Set<String> toolNames;
-    private final Function<String, Map<String, Object>> toolInvoker;
+    private final Map<String, StepDefinition> definitions;
+    private final BiFunction<String, Map<String, Object>, Map<String, Object>> toolInvoker;
 
-    public McpToolSource(Set<String> toolNames,
-                          Function<String, Map<String, Object>> toolInvoker) {
-        this.toolNames = toolNames;
+    public McpToolSource(
+            Map<String, StepDefinition> definitions,
+            BiFunction<String, Map<String, Object>, Map<String, Object>> toolInvoker) {
+        this.definitions = Map.copyOf(definitions);
         this.toolInvoker = toolInvoker;
     }
 
     @Override
     public void populate(Map<String, CatalogEntry> entries) {
-        for (String toolName : toolNames) {
-            StepDefinition def = new StepDefinition(toolName, null,
-                    Map.of(), Map.of(), new InvokeBinding.Mcp(toolName));
+        for (var e : definitions.entrySet()) {
+            String toolName = e.getKey();
+            StepDefinition def = e.getValue();
 
             entries.putIfAbsent(toolName, new CatalogEntry(toolName, def,
                     (params, services) -> {
                         try {
-                            Map<String, Object> result = toolInvoker.apply(toolName);
-                            return StepResult.of(result != null ? result : Map.of(),
+                            Map<String, Object> result = toolInvoker.apply(toolName, params);
+                            return StepResult.of(
+                                    result != null ? result : Map.of(),
                                     Map.of("tool", toolName));
-                        } catch (Exception e) {
-                            return StepResult.failed("MCP tool '" + toolName + "' failed: " + e.getMessage());
+                        } catch (Exception ex) {
+                            return StepResult.failed(
+                                    "MCP tool '" + toolName + "' failed: " + ex.getMessage());
                         }
                     }));
         }

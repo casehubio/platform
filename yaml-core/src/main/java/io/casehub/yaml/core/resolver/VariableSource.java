@@ -65,6 +65,23 @@ public interface VariableSource {
         };
     }
 
+    @SuppressWarnings("unchecked")
+    static VariableSource matchContext(Object scrutinee) {
+        return name -> {
+            if ("match".equals(name)) {
+                return String.valueOf(scrutinee);
+            }
+            if (name.startsWith("match.")) {
+                if (!(scrutinee instanceof java.util.Map<?, ?> map)) {return null;}
+                String fieldPath = name.substring("match.".length());
+                Object value     = FieldDriller.drill((java.util.Map<String, Object>) map, fieldPath);
+                return value != null ? value.toString() : null;
+            }
+            return null;
+        };
+    }
+
+
     static VariableSource lenient(VariableSource delegate) {
         return name -> {
             String result = delegate.resolve(name);

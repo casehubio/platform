@@ -87,10 +87,10 @@ public final class ForEachExpander {
             String groupKey = elementToGroup.get(elementId);
 
             if (groupKey == null) {
-                String when = adapter.getWhen(element);
-                if (when != null) {
-                    String resolvedWhen = resolver.resolveString(when, elementId);
-                    if (!Truthiness.isTruthy(resolvedWhen)) {
+                String condition = adapter.getCondition(element);
+                if (condition != null) {
+                    String resolved = resolver.resolveString(condition, elementId);
+                    if (!Truthiness.isTruthy(resolved)) {
                         excludedIds.add(elementId);
                         continue;
                     }
@@ -106,10 +106,10 @@ public final class ForEachExpander {
                 String stampedId = elementId + "." + value;
                 VariableResolver eachResolver = resolver.withScope("each", io.casehub.yaml.core.resolver.VariableSource.forEachContext(Map.of(as, value), null));
 
-                String when = adapter.getWhen(element);
-                if (when != null) {
-                    String resolvedWhen = eachResolver.resolveString(when, stampedId);
-                    if (!Truthiness.isTruthy(resolvedWhen)) {
+                String condition = adapter.getCondition(element);
+                if (condition != null) {
+                    String resolved = eachResolver.resolveString(condition, stampedId);
+                    if (!Truthiness.isTruthy(resolved)) {
                         excludedIds.add(stampedId);
                         continue;
                     }
@@ -236,10 +236,10 @@ public final class ForEachExpander {
             String groupKey  = elementToGroup.get(elementId);
 
             if (groupKey == null) {
-                String when = adapter.getWhen(element);
-                if (when != null) {
-                    String resolvedWhen = resolver.resolveString(when, elementId);
-                    if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolvedWhen)) {
+                String condition = adapter.getCondition(element);
+                if (condition != null) {
+                    String resolved = resolver.resolveString(condition, elementId);
+                    if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
                         excludedIds.add(elementId);
                         continue;
                     }
@@ -266,10 +266,10 @@ public final class ForEachExpander {
                             .withObjectScope("each", io.casehub.yaml.core.resolver.ObjectVariableSource.drillOnly(
                                     name -> name.equals(as) ? row : null));
 
-                    String when = adapter.getWhen(element);
-                    if (when != null) {
-                        String resolvedWhen = rowResolver.resolveString(when, stampedId);
-                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolvedWhen)) {
+                    String condition = adapter.getCondition(element);
+                    if (condition != null) {
+                        String resolved = rowResolver.resolveString(condition, stampedId);
+                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
                             excludedIds.add(stampedId);
                             continue;
                         }
@@ -286,10 +286,10 @@ public final class ForEachExpander {
                     String           stampedId    = elementId + "." + value;
                     VariableResolver eachResolver = resolver.withScope("each", io.casehub.yaml.core.resolver.VariableSource.forEachContext(Map.of(as, value), null));
 
-                    String when = adapter.getWhen(element);
-                    if (when != null) {
-                        String resolvedWhen = eachResolver.resolveString(when, stampedId);
-                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolvedWhen)) {
+                    String condition = adapter.getCondition(element);
+                    if (condition != null) {
+                        String resolved = eachResolver.resolveString(condition, stampedId);
+                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
                             excludedIds.add(stampedId);
                             continue;
                         }

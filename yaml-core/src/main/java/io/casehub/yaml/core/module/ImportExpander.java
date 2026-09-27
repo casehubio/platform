@@ -75,9 +75,9 @@ public final class ImportExpander {
             VariableResolver eachResolver = resolver.withScope("each",
                     VariableSource.forEachContext(Map.of(as, value), null));
 
-            if (imp.when() != null) {
-                String resolvedWhen = eachResolver.resolveString(imp.when(), stampedAlias);
-                if (!Truthiness.isTruthy(resolvedWhen)) continue;
+            if (imp.condition() != null) {
+                String resolved = eachResolver.resolveString(imp.condition(), stampedAlias);
+                if (!Truthiness.isTruthy(resolved)) continue;
             }
 
             Map<String, String> resolvedParams = resolveParams(
@@ -105,9 +105,9 @@ public final class ImportExpander {
                     .withObjectScope("each", ObjectVariableSource.drillOnly(
                             name -> name.equals(as) ? row : null));
 
-            if (imp.when() != null) {
-                String resolvedWhen = eachResolver.resolveString(imp.when(), stampedAlias);
-                if (!Truthiness.isTruthy(resolvedWhen)) continue;
+            if (imp.condition() != null) {
+                String resolved = eachResolver.resolveString(imp.condition(), stampedAlias);
+                if (!Truthiness.isTruthy(resolved)) continue;
             }
 
             Map<String, String> resolvedParams = resolveParams(

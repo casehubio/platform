@@ -6,7 +6,7 @@ public record YamlImport(
         String module,
         String steps,
         String as,
-        String when,
+        String condition,
         Map<String, String> parameters,
         Object forEach,
         Object loop) {
@@ -23,12 +23,12 @@ public record YamlImport(
         if (parameters == null) {parameters = Map.of();}
     }
 
-    public YamlImport(String module, String as, String when, Map<String, String> parameters,
+    public YamlImport(String module, String as, String condition, Map<String, String> parameters,
                       Object forEach, Object loop) {
-        this(module, null, as, when, parameters, forEach, loop);
+        this(module, null, as, condition, parameters, forEach, loop);
     }
 
-    public YamlImport(String module, String as, String when, Map<String, String> parameters) {
-        this(module, null, as, when, parameters, null, null);
+    public YamlImport(String module, String as, String condition, Map<String, String> parameters) {
+        this(module, null, as, condition, parameters, null, null);
     }
 }

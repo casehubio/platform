@@ -55,8 +55,8 @@ public final class ModuleExpander {
                     imp.parameters(), allOutputs, imp.as());
             Map<String, String> paramScope = resolveParameters(module, imp, resolvedParams);
             moduleScopes.put(imp.as(), paramScope);
-            if (imp.when() != null) {
-                importConditions.put(imp.as(), imp.when());
+            if (imp.condition() != null) {
+                importConditions.put(imp.as(), imp.condition());
             }
 
             Map<String, String> resolvedOutputs = resolveOutputs(module, paramScope);

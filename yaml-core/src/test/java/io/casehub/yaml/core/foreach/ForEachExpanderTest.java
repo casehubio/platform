@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ForEachExpanderTest {
 
     record TestElement(String id, Map<String, Object> spec,
-                       ForEachDirective forEach, String when) {}
+                       ForEachDirective forEach, String condition) {}
 
     static class TestAdapter implements ForEachAdapter<TestElement> {
         @Override
@@ -31,7 +31,7 @@ class ForEachExpanderTest {
         public ForEachDirective getForEach(TestElement element) { return element.forEach(); }
 
         @Override
-        public String getWhen(TestElement element) { return element.when(); }
+        public String getCondition(TestElement element) { return element.condition(); }
     }
 
     private final ForEachAdapter<TestElement> adapter = new TestAdapter();
@@ -378,7 +378,7 @@ class ForEachExpanderTest {
 // --- Reference rewriting ---
 
     record RefElement(String id, Map<String, Object> spec,
-                      ForEachDirective forEach, String when,
+                      ForEachDirective forEach, String condition,
                       List<ForEachAdapter.Reference> refs) {}
 
     static class RefAdapter implements ForEachAdapter<RefElement> {
@@ -394,7 +394,7 @@ class ForEachExpanderTest {
         public ForEachDirective getForEach(RefElement element) {return element.forEach();}
 
         @Override
-        public String getWhen(RefElement element) {return element.when();}
+        public String getCondition(RefElement element) {return element.condition();}
 
         @Override
         public List<ForEachAdapter.Reference> getReferences(RefElement element) {return element.refs();}
@@ -402,7 +402,7 @@ class ForEachExpanderTest {
         @Override
         public RefElement withReferences(RefElement element, List<ForEachAdapter.Reference> rewritten) {
             return new RefElement(element.id(), element.spec(), element.forEach(),
-                                  element.when(), rewritten);
+                                  element.condition(), rewritten);
         }
     }
 

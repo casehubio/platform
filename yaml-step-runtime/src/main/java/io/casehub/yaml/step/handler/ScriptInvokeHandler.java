@@ -46,7 +46,7 @@ public class ScriptInvokeHandler implements InvokeHandler {
                     .stdin(jsonInput)
                     .mergeStderr(false);
 
-            Duration timeout = parseTimeout(script.timeout());
+            Duration timeout = io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(script.timeout());
             if (timeout != null) {
                 cmd = cmd.timeout(timeout);
             }
@@ -79,11 +79,4 @@ public class ScriptInvokeHandler implements InvokeHandler {
         }
     }
 
-    private static Duration parseTimeout(String timeout) {
-        if (timeout == null) return null;
-        if (timeout.endsWith("ms")) return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));
-        if (timeout.endsWith("s")) return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));
-        if (timeout.endsWith("m")) return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));
-        return null;
-    }
 }

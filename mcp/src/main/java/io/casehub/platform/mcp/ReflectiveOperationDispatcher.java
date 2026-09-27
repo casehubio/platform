@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
-public class ReflectiveOperationDispatcher {
+public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mcp.ToolDispatcher {
 
     @Inject
     DomainModelRegistry registry;

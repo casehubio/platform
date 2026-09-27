@@ -41,7 +41,7 @@ public record ProcessPlugin(
                 cmd = cmd.workingDir(workingDir);
             }
             if (timeout != null) {
-                cmd = cmd.timeout(parseTimeout(timeout));
+                cmd = cmd.timeout(io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeout));
             }
             cmd = cmd.mergeStderr(mergeStderr);
 
@@ -68,10 +68,4 @@ public record ProcessPlugin(
         }
     }
 
-    private static Duration parseTimeout(String timeout) {
-        if (timeout.endsWith("ms")) return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));
-        if (timeout.endsWith("s")) return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));
-        if (timeout.endsWith("m")) return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));
-        return Duration.ofMillis(Long.parseLong(timeout));
-    }
 }

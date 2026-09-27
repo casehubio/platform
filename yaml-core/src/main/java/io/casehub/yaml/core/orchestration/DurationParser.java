@@ -25,4 +25,10 @@ public final class DurationParser {
             default -> throw new IllegalArgumentException("Unknown suffix: " + matcher.group(2));
         };
     }
+
+    public static Duration parseOrNull(String input) {
+        if (input == null) {return null;}
+        return parse(input);
+    }
+
 }

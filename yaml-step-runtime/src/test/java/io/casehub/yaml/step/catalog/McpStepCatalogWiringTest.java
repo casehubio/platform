@@ -33,7 +33,7 @@ class McpStepCatalogWiringTest {
         when(registryInstance.isResolvable()).thenReturn(true);
         when(registryInstance.get()).thenReturn(registry);
 
-        Instance<Object> dispatcherInstance = mock(Instance.class);
+        Instance<io.casehub.platform.api.mcp.ToolDispatcher> dispatcherInstance = mock(Instance.class);
         when(dispatcherInstance.isResolvable()).thenReturn(false);
 
         wiring = new McpStepCatalogWiring();

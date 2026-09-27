@@ -56,7 +56,7 @@ public class ProcessInvokeHandler implements InvokeHandler {
             if (proc.workingDir() != null) {
                 cmd = cmd.workingDir(proc.workingDir());
             }
-            Duration timeout = parseTimeout(proc.timeout());
+            Duration timeout = io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(proc.timeout());
             if (timeout != null) {
                 cmd = cmd.timeout(timeout);
             }
@@ -104,11 +104,4 @@ public class ProcessInvokeHandler implements InvokeHandler {
         return sb.toString();
     }
 
-    private static Duration parseTimeout(String timeout) {
-        if (timeout == null) {return null;}
-        if (timeout.endsWith("ms")) {return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));}
-        if (timeout.endsWith("s")) {return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));}
-        if (timeout.endsWith("m")) {return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));}
-        return null;
-    }
 }

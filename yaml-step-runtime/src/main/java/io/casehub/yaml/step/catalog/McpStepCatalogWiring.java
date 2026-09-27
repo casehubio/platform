@@ -27,7 +27,7 @@ public class McpStepCatalogWiring implements CatalogSource {
     Instance<DomainModelRegistry> registryInstance;
 
     @Inject
-    Instance<Object> dispatcherInstance;
+    Instance<io.casehub.platform.api.mcp.ToolDispatcher> dispatcherInstance;
 
     private McpToolSource delegate;
 
@@ -51,16 +51,14 @@ public class McpStepCatalogWiring implements CatalogSource {
             return;
         }
 
-        Object dispatcher = resolveDispatcher();
+        io.casehub.platform.api.mcp.ToolDispatcher dispatcher = resolveDispatcher();
         delegate = new McpToolSource(definitions, (toolName, params) -> {
             if (dispatcher == null) {
-                return Map.of("error", "ReflectiveOperationDispatcher not available");
+                return Map.of("error", "ToolDispatcher not available");
             }
             try {
                 String[] parts = toolName.split("_", 2);
-                Object result = dispatcher.getClass()
-                        .getMethod("dispatch", String.class, String.class, Map.class)
-                        .invoke(dispatcher, parts[0], parts[1], params);
+                Object result = dispatcher.dispatch(parts[0], parts[1], params);
                 if (result instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> map = (Map<String, Object>) result;
@@ -74,15 +72,8 @@ public class McpStepCatalogWiring implements CatalogSource {
         });
     }
 
-    private Object resolveDispatcher() {
-        try {
-            Class<?> dispatcherClass = Class.forName(
-                    "io.casehub.platform.mcp.ReflectiveOperationDispatcher");
-            Instance<?> typed = dispatcherInstance.select(dispatcherClass);
-            return typed.isResolvable() ? typed.get() : null;
-        } catch (ClassNotFoundException e) {
-            return null;
-        }
+    private io.casehub.platform.api.mcp.ToolDispatcher resolveDispatcher() {
+        return dispatcherInstance.isResolvable() ? dispatcherInstance.get() : null;
     }
 
     @Override

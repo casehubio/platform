@@ -35,7 +35,7 @@ public record RestCallPlugin(
                     .uri(URI.create(url));
 
             if (timeout != null) {
-                reqBuilder.timeout(parseTimeout(timeout));
+                reqBuilder.timeout(io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeout));
             }
 
             if (headers != null) {
@@ -85,10 +85,4 @@ public record RestCallPlugin(
         return sb.toString();
     }
 
-    private static Duration parseTimeout(String timeout) {
-        if (timeout.endsWith("ms")) return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));
-        if (timeout.endsWith("s")) return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));
-        if (timeout.endsWith("m")) return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));
-        return Duration.ofMillis(Long.parseLong(timeout));
-    }
 }

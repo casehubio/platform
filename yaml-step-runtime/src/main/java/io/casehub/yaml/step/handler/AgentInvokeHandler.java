@@ -22,13 +22,22 @@ public class AgentInvokeHandler implements InvokeHandler {
     private final ObjectMapper                   objectMapper;
     private final AgentProvider                  agentProvider;
     private final List<AgentDescriptorRegistrar> registrars;
+    private final Duration                       defaultTimeout;
 
     public AgentInvokeHandler(ObjectMapper objectMapper,
                               AgentProvider agentProvider,
                               List<AgentDescriptorRegistrar> registrars) {
-        this.objectMapper  = objectMapper;
-        this.agentProvider = agentProvider;
-        this.registrars    = registrars != null ? registrars : List.of();
+        this(objectMapper, agentProvider, registrars, Duration.ofSeconds(60));
+    }
+
+    public AgentInvokeHandler(ObjectMapper objectMapper,
+                              AgentProvider agentProvider,
+                              List<AgentDescriptorRegistrar> registrars,
+                              Duration defaultTimeout) {
+        this.objectMapper   = objectMapper;
+        this.agentProvider  = agentProvider;
+        this.registrars     = registrars != null ? registrars : List.of();
+        this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(60);
     }
 
     @Override
@@ -61,14 +70,14 @@ public class AgentInvokeHandler implements InvokeHandler {
                 model = descriptor.modelFamily();
             }
 
-            Duration timeout = parseTimeout(agent.timeout());
+            Duration timeout = io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(agent.timeout());
 
             AgentSessionConfig config = new AgentSessionConfig(
                     systemPrompt, userPrompt, List.of(), timeout, null, model);
 
             List<AgentEvent> events = agentProvider.invoke(config)
                                                    .collect().asList()
-                                                   .await().atMost(timeout != null ? timeout : Duration.ofSeconds(60));
+                                                   .await().atMost(timeout != null ? timeout : defaultTimeout);
 
             StringBuilder       text     = new StringBuilder();
             Map<String, Object> metadata = new LinkedHashMap<>();
@@ -143,11 +152,4 @@ public class AgentInvokeHandler implements InvokeHandler {
         return sb.length() > 0 ? sb.toString() : "You are a helpful assistant.";
     }
 
-    private static Duration parseTimeout(String timeout) {
-        if (timeout == null) {return null;}
-        if (timeout.endsWith("ms")) {return Duration.ofMillis(Long.parseLong(timeout.replace("ms", "")));}
-        if (timeout.endsWith("s")) {return Duration.ofSeconds(Long.parseLong(timeout.replace("s", "")));}
-        if (timeout.endsWith("m")) {return Duration.ofMinutes(Long.parseLong(timeout.replace("m", "")));}
-        return null;
-    }
 }

@@ -185,4 +185,29 @@ public class DefaultBeans {
 
     @Produces @DefaultBean @ApplicationScoped
     public NoOpSessionIsolator noOpSessionIsolator() { return new NoOpSessionIsolator(); }
+// --- Process Execution ---
+
+    @Produces
+    @DefaultBean
+    @ApplicationScoped
+    public io.casehub.platform.api.process.ProcessExecutor processExecutor(
+            @ConfigProperty(name = "casehub.invoke.process.allowed-commands")
+            Optional<List<String>> allowedCommands) {
+        if (allowedCommands.isEmpty() || allowedCommands.get().isEmpty()) {
+            return new io.casehub.platform.api.process.DefaultProcessExecutor();
+        }
+        var patterns = allowedCommands.get().stream()
+                                      .map(DefaultBeans::parseCommandPattern)
+                                      .toList();
+        return new io.casehub.platform.api.process.DefaultProcessExecutor(patterns);
+    }
+
+    private static io.casehub.platform.api.process.CommandPattern parseCommandPattern(String spec) {
+        var     segments = List.of(spec.split("\\s+"));
+        boolean hasGlob  = segments.stream().anyMatch(s -> s.contains("*"));
+        return new io.casehub.platform.api.process.CommandPattern(segments,
+                                                                  hasGlob ? io.casehub.platform.api.process.CommandPattern.MatchMode.GLOB
+                                                                          : io.casehub.platform.api.process.CommandPattern.MatchMode.EXACT);
+    }
+
 }

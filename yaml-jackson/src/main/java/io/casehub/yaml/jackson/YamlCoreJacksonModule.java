@@ -21,6 +21,10 @@ public class YamlCoreJacksonModule extends SimpleModule {
                         });
         addDeserializer(io.casehub.yaml.core.step.InvokeBinding.class,
                         new InvokeBindingDeserializer());
+        addDeserializer(io.casehub.yaml.core.step.MatchPattern.class,
+                        new MatchPatternDeserializer());
+        addDeserializer(io.casehub.yaml.core.step.MatchCase.class,
+                        new MatchCaseDeserializer());
     }
 
     @Override
@@ -33,5 +37,7 @@ public class YamlCoreJacksonModule extends SimpleModule {
                                     YamlModuleParameterMixin.class);
         context.setMixInAnnotations(io.casehub.yaml.core.step.StepDefinitionFile.class,
                                     StepDefinitionFileMixin.class);
+        context.setMixInAnnotations(io.casehub.yaml.core.module.YamlImport.class,
+                                    YamlImportMixin.class);
     }
 }

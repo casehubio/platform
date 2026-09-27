@@ -146,6 +146,100 @@ class StepWalkerTest {
                 .hasMessageContaining("duplicate step name 'eval'");
     }
 
+    @Test
+    void parsesBarrierStep() {
+        Map<String, Object> evalA = new LinkedHashMap<>();
+        evalA.put("step", "eval-a");
+        evalA.put("process", Map.of("command", "a.sh"));
+        Map<String, Object> evalB = new LinkedHashMap<>();
+        evalB.put("step", "eval-b");
+        evalB.put("process", Map.of("command", "b.sh"));
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "await-all");
+        step.put("barrier", Map.of("await", List.of("eval-a", "eval-b"), "timeout", "30s"));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(evalA, evalB, step), catalog);
+
+        assertThat(resolved).hasSize(3);
+        assertThat(resolved.get(2)).isInstanceOf(ResolvedStep.BarrierStep.class);
+        var barrier = (ResolvedStep.BarrierStep) resolved.get(2);
+        assertThat(barrier.name()).isEqualTo("await-all");
+        assertThat(barrier.awaitSteps()).containsExactly("eval-a", "eval-b");
+        assertThat(barrier.timeout()).isEqualTo(java.time.Duration.ofSeconds(30));
+    }
+
+    @Test
+    void parsesQuorumStep() {
+        Map<String, Object> a = new LinkedHashMap<>();
+        a.put("step", "strat-a");
+        a.put("process", Map.of("command", "a.sh"));
+        Map<String, Object> b = new LinkedHashMap<>();
+        b.put("step", "strat-b");
+        b.put("process", Map.of("command", "b.sh"));
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("step", "strat-c");
+        c.put("process", Map.of("command", "c.sh"));
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "consensus");
+        step.put("quorum", Map.of("required", 2, "of", List.of("strat-a", "strat-b", "strat-c"), "timeout", "15s"));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(a, b, c, step), catalog);
+
+        assertThat(resolved.get(3)).isInstanceOf(ResolvedStep.QuorumStep.class);
+        var quorum = (ResolvedStep.QuorumStep) resolved.get(3);
+        assertThat(quorum.name()).isEqualTo("consensus");
+        assertThat(quorum.required()).isEqualTo(2);
+        assertThat(quorum.ofSteps()).containsExactly("strat-a", "strat-b", "strat-c");
+        assertThat(quorum.timeout()).isEqualTo(java.time.Duration.ofSeconds(15));
+    }
+
+    @Test
+    void barrierWithoutAwait_throwsAtParseTime() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "wait");
+        step.put("barrier", Map.of());
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("await");
+    }
+
+    @Test
+    void quorumRequiredExceedsOf_throwsAtParseTime() {
+        Map<String, Object> evalA = new LinkedHashMap<>();
+        evalA.put("step", "a");
+        evalA.put("process", Map.of("command", "a.sh"));
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "q");
+        step.put("quorum", Map.of("required", 5, "of", List.of("a")));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(evalA, step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("required");
+    }
+
+    @Test
+    void barrierAwaitsUnknownStep_throws() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "wait");
+        step.put("barrier", Map.of("await", List.of("nonexistent")));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown step 'nonexistent'");
+    }
+
+    @Test
+    void quorumReferencesUnknownStep_throws() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "q");
+        step.put("quorum", Map.of("required", 1, "of", List.of("ghost")));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown step 'ghost'");
+    }
+
 
     @Test
     void throwsOnUnknownAction() {

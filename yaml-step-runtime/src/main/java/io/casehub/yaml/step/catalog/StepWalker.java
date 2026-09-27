@@ -31,8 +31,10 @@ public final class StepWalker {
 
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, StepCatalog catalog) {
-        Set<String> seenNames = new java.util.HashSet<>();
-        return resolve(steps, catalog, 0, "root", seenNames);
+        Set<String>        seenNames = new java.util.HashSet<>();
+        List<ResolvedStep> result    = resolve(steps, catalog, 0, "root", seenNames);
+        validateBarrierQuorumReferences(result, seenNames);
+        return result;
     }
 
     private static List<ResolvedStep> resolve(
@@ -80,7 +82,7 @@ public final class StepWalker {
                 stepName = (String) e.getValue();
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
-            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key)) {
+            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key) || "barrier".equals(key) || "quorum".equals(key)) {
                 structuralType  = key;
                 structuralValue = e.getValue();
             } else if ("if".equals(key)) {
@@ -223,6 +225,33 @@ public final class StepWalker {
                     resolveSelectBranches(branchMaps, catalog, depth, stepPath, seenNames),
                     decorators);
         }
+        if ("barrier".equals(structuralType)) {
+            @SuppressWarnings("unchecked")
+            var barrierMap = (Map<String, Object>) structuralValue;
+            @SuppressWarnings("unchecked")
+            var awaitList = (List<String>) barrierMap.get("await");
+            if (awaitList == null || awaitList.isEmpty()) {
+                throw new IllegalArgumentException(
+                        stepPath + ": barrier 'await' must be a non-empty list of step names");
+            }
+            var timeoutStr = (String) barrierMap.get("timeout");
+            return new ResolvedStep.BarrierStep(stepName, awaitList,
+                    io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
+        }
+        if ("quorum".equals(structuralType)) {
+            @SuppressWarnings("unchecked")
+            var quorumMap = (Map<String, Object>) structuralValue;
+            var required = ((Number) quorumMap.get("required")).intValue();
+            @SuppressWarnings("unchecked")
+            var ofList = (List<String>) quorumMap.get("of");
+            if (ofList == null || ofList.isEmpty()) {
+                throw new IllegalArgumentException(
+                        stepPath + ": quorum 'of' must be a non-empty list of step names");
+            }
+            var timeoutStr = (String) quorumMap.get("timeout");
+            return new ResolvedStep.QuorumStep(stepName, required, ofList,
+                    io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
+        }
         if (matchedEntry != null) {
             return new ResolvedStep.PluginStep(stepName, matchedEntry, actionParams, decorators);
         }
@@ -332,5 +361,38 @@ public final class StepWalker {
         }
         return result;
     }
+
+    private static void validateBarrierQuorumReferences(
+            List<ResolvedStep> steps, Set<String> knownNames) {
+        for (ResolvedStep step : steps) {
+            switch (step) {
+                case ResolvedStep.BarrierStep b -> {
+                    for (String name : b.awaitSteps()) {
+                        if (!knownNames.contains(name)) {
+                            throw new IllegalArgumentException(
+                                    "barrier '" + b.name() + "' awaits unknown step '" + name + "'");
+                        }
+                    }
+                }
+                case ResolvedStep.QuorumStep q -> {
+                    for (String name : q.ofSteps()) {
+                        if (!knownNames.contains(name)) {
+                            throw new IllegalArgumentException(
+                                    "quorum '" + q.name() + "' references unknown step '" + name + "'");
+                        }
+                    }
+                }
+                case ResolvedStep.BlockStep b -> validateBarrierQuorumReferences(b.steps(), knownNames);
+                case ResolvedStep.ParallelStep p -> validateBarrierQuorumReferences(p.steps(), knownNames);
+                case ResolvedStep.TryCatchFinallyStep t -> {
+                    validateBarrierQuorumReferences(t.trySteps(), knownNames);
+                    validateBarrierQuorumReferences(t.catchSteps(), knownNames);
+                    validateBarrierQuorumReferences(t.finallySteps(), knownNames);
+                }
+                default -> {}
+            }
+        }
+    }
+
 
 }

@@ -60,6 +60,8 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.ParallelStep p -> evaluateParallel(p, resolver, runner);
             case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, resolver, runner);
             case ResolvedStep.SelectStep s -> evaluateSelect(s, resolver, runner);
+            case ResolvedStep.BarrierStep b -> StepResult.failed("barrier evaluation not yet wired");
+            case ResolvedStep.QuorumStep q -> StepResult.failed("quorum evaluation not yet wired");
             case ResolvedStep.PluginStep ps -> runner.run(ps, resolver);
             case ResolvedStep.InvokeStep is -> runner.run(is, resolver);
         };

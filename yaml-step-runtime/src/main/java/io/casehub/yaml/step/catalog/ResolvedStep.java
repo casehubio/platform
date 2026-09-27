@@ -13,12 +13,13 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.MatchStep,
                                      ResolvedStep.ParallelStep,
                                      ResolvedStep.TryCatchFinallyStep,
-                                     ResolvedStep.SelectStep {
+                                     ResolvedStep.SelectStep,
+                                     ResolvedStep.BarrierStep,
+                                     ResolvedStep.QuorumStep {
 
     Map<String, Object> decorators();
 
     default String name() {return null;}
-
 
     record PluginStep(
             String name,
@@ -106,7 +107,6 @@ public sealed interface ResolvedStep permits
         }
     }
 
-
     enum SelectBranchType {SUBSCRIBE, WAIT}
 
     record SelectBranch(
@@ -133,5 +133,36 @@ public sealed interface ResolvedStep permits
         }
     }
 
+    record BarrierStep(
+            String name,
+            List<String> awaitSteps,
+            java.time.Duration timeout,
+            Map<String, Object> decorators) implements ResolvedStep {
 
+        public BarrierStep {
+            if (awaitSteps == null || awaitSteps.isEmpty()) {
+                throw new IllegalArgumentException("barrier 'await' must be non-empty");
+            }
+            awaitSteps = List.copyOf(awaitSteps);
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record QuorumStep(
+            String name,
+            int required,
+            List<String> ofSteps,
+            java.time.Duration timeout,
+            Map<String, Object> decorators) implements ResolvedStep {
+
+        public QuorumStep {
+            if (required <= 0) {throw new IllegalArgumentException("quorum 'required' must be > 0");}
+            if (required > ofSteps.size()) {
+                throw new IllegalArgumentException(
+                        "quorum 'required' (" + required + ") > 'of' (" + ofSteps.size() + ")");
+            }
+            ofSteps    = List.copyOf(ofSteps);
+            decorators = Map.copyOf(decorators);
+        }
+    }
 }

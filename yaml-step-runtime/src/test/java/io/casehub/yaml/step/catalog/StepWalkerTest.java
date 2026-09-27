@@ -517,9 +517,9 @@ class StepWalkerTest {
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.SelectStep.class);
         var sel = (ResolvedStep.SelectStep) resolved.get(0);
         assertThat(sel.branches()).hasSize(2);
-        assertThat(sel.branches().get(0).type()).isEqualTo("subscribe");
+        assertThat(sel.branches().get(0).type()).isEqualTo(ResolvedStep.SelectBranchType.SUBSCRIBE);
         assertThat(sel.branches().get(0).name()).isEqualTo("quotes");
-        assertThat(sel.branches().get(1).type()).isEqualTo("wait");
+        assertThat(sel.branches().get(1).type()).isEqualTo(ResolvedStep.SelectBranchType.WAIT);
         assertThat(sel.branches().get(1).name()).isEqualTo("timeout");
     }
 

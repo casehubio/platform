@@ -61,15 +61,20 @@ public final class DecoratorChain {
         return current;
     }
 
+    private boolean resolveCondition(String condition, VariableResolver resolver, String context) {
+        String resolved = resolver.resolveString(condition, context);
+        return conditionEvaluator.evaluate(resolved);
+    }
+
+
     private DecoratedExecution wrapWhen(DecoratedExecution inner, Map<String, Object> decorators) {
         Object whenVal = decorators.get("when");
-        if (whenVal == null) return inner;
+        if (whenVal == null) {return inner;}
 
         String condition = String.valueOf(whenVal);
         return resolver -> {
             try {
-                String resolved = resolver.resolveString(condition, "when-guard");
-                if (!conditionEvaluator.evaluate(resolved)) {
+                if (!resolveCondition(condition, resolver, "when-guard")) {
                     return StepResult.of(Map.of());
                 }
             } catch (Exception e) {
@@ -81,7 +86,7 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapLoop(DecoratedExecution inner, Map<String, Object> decorators) {
         Object loopVal = decorators.get("loop");
-        if (loopVal == null) return inner;
+        if (loopVal == null) {return inner;}
 
         LoopDirective directive = LoopDirective.parse(loopVal);
         return resolver -> {
@@ -99,12 +104,11 @@ public final class DecoratorChain {
 
             for (int i = 0; i < maxIterations; i++) {
                 last = inner.execute(resolver);
-                if (!last.isSuccess()) return last;
+                if (!last.isSuccess()) {return last;}
 
                 if (untilCondition != null) {
                     try {
-                        String resolved = resolver.resolveString(untilCondition, "loop-until");
-                        if (conditionEvaluator.evaluate(resolved)) {
+                        if (resolveCondition(untilCondition, resolver, "loop-until")) {
                             return last;
                         }
                     } catch (Exception e) {
@@ -118,14 +122,27 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapOnError(DecoratedExecution inner, Map<String, Object> decorators) {
         Object onErrorVal = decorators.get("on-error");
-        if (onErrorVal == null) return inner;
+        if (onErrorVal == null) {return inner;}
 
+        String fallbackStep = String.valueOf(onErrorVal);
         return resolver -> {
+            StepResult result;
             try {
-                return inner.execute(resolver);
+                result = inner.execute(resolver);
             } catch (Exception e) {
-                return StepResult.failed("on-error caught: " + e.getMessage());
+                return StepResult.of(Map.of(
+                                             "on-error.caught", e.getMessage(),
+                                             "on-error.fallback", fallbackStep),
+                                     Map.of("on-error.exception", e.getClass().getSimpleName()));
             }
+            if (!result.isSuccess()) {
+                String message = result instanceof StepResult.Failure f ? f.message() : "unknown";
+                return StepResult.of(Map.of(
+                                             "on-error.caught", message,
+                                             "on-error.fallback", fallbackStep),
+                                     Map.of("on-error.handled", true));
+            }
+            return result;
         };
     }
 
@@ -310,22 +327,15 @@ public final class DecoratorChain {
     }
 
     private VariableResolver pushEachContext(VariableResolver resolver, String as, Object item, int index) {
-        ObjectVariableSource eachSource;
-        if (item instanceof Map<?, ?> map) {
-            eachSource = name -> {
-                if ("index".equals(name)) return index;
-                if (as.equals(name)) return item;
+        ObjectVariableSource eachSource = name -> {
+            if ("index".equals(name)) {return index;}
+            if (as.equals(name)) {return item;}
+            if (item instanceof Map<?, ?> map) {
                 String prefix = as + ".";
-                if (name.startsWith(prefix)) return map.get(name.substring(prefix.length()));
-                return null;
-            };
-        } else {
-            eachSource = name -> {
-                if ("index".equals(name)) return index;
-                if (as.equals(name)) return item;
-                return null;
-            };
-        }
+                if (name.startsWith(prefix)) {return map.get(name.substring(prefix.length()));}
+            }
+            return null;
+        };
         return resolver.withObjectScope("each", eachSource);
     }
 
@@ -343,18 +353,7 @@ public final class DecoratorChain {
                 Thread.currentThread().interrupt();
                 return StepResult.failed("Wait for signal '" + signalName + "' interrupted");
             }
-            VariableResolver scoped = resolver.withObjectScope("signal",
-                    name -> {
-                        if (name.equals(signalName)) return signal.payload();
-                        String prefix = signalName + ".";
-                        if (name.startsWith(prefix)) {
-                            Object payload = signal.payload();
-                            if (payload instanceof Map<?, ?> map) {
-                                return map.get(name.substring(prefix.length()));
-                            }
-                        }
-                        return null;
-                    });
+            VariableResolver scoped = ScopeUtils.pushScope(resolver, "signal", signal.payload());
             return inner.execute(scoped);
         };
     }

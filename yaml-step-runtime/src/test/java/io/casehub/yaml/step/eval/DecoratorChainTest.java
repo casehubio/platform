@@ -167,20 +167,23 @@ class DecoratorChainTest {
         }
 
         @Test
-        void innerFailure_returnsFailureWithErrorInfo() {
+        void innerFailure_returnsSuccessWithFallbackInfo() {
             var decorators = Map.<String, Object>of("on-error", "fallback");
             var result = chain.apply(decorators, failure("boom"))
                     .execute(resolver);
-            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
+            assertThat(result.output()).containsEntry("on-error.caught", "boom");
         }
 
         @Test
-        void innerException_caughtAndWrapped() {
+        void innerException_caughtWithFallbackInfo() {
             var decorators = Map.<String, Object>of("on-error", "fallback");
             var result = chain.apply(decorators, r -> {
                 throw new RuntimeException("unexpected");
             }).execute(resolver);
-            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
         }
     }
 
@@ -358,7 +361,8 @@ class DecoratorChainTest {
                 }
                 return StepResult.of(Map.of());
             }).execute(resolver);
-            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
         }
 
         @Test

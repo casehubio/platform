@@ -96,14 +96,17 @@ public sealed interface ResolvedStep permits
         }
     }
 
+
+    enum SelectBranchType {SUBSCRIBE, WAIT}
+
     record SelectBranch(
-            String type,
+            SelectBranchType type,
             String name,
             List<ResolvedStep> steps) {
 
         public SelectBranch {
-            if (type == null || (!type.equals("subscribe") && !type.equals("wait"))) {
-                throw new IllegalArgumentException("SelectBranch type must be 'subscribe' or 'wait', got: " + type);
+            if (type == null) {
+                throw new IllegalArgumentException("SelectBranch type must not be null");
             }
             steps = List.copyOf(steps);
         }

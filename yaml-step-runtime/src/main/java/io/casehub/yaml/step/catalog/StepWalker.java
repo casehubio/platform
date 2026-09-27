@@ -165,6 +165,10 @@ public final class StepWalker {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": 'finally' requires 'try'");
         }
+        if ("try".equals(structuralType) && !companions.containsKey("catch") && !companions.containsKey("finally")) {
+            LOG.warning(path + " → Step " + index + ": 'try' without 'catch' or 'finally' — "
+                        + "the try block has no error handling or cleanup");
+        }
 
         String stepPath = path + " → Step " + index;
         if ("if".equals(structuralType)) {
@@ -289,12 +293,12 @@ public final class StepWalker {
             List<Map<String, Object>> branches, StepCatalog catalog, int depth, String path) {
         List<ResolvedStep.SelectBranch> result = new ArrayList<>(branches.size());
         for (int i = 0; i < branches.size(); i++) {
-            Map<String, Object> branchMap  = branches.get(i);
-            String              branchPath = path + " → select[" + i + "]";
-            String              type;
-            String              name;
+            Map<String, Object>           branchMap  = branches.get(i);
+            String                        branchPath = path + " → select[" + i + "]";
+            ResolvedStep.SelectBranchType type;
+            String                        name;
             if (branchMap.containsKey("subscribe")) {
-                type = "subscribe";
+                type = ResolvedStep.SelectBranchType.SUBSCRIBE;
                 Object subSpec = branchMap.get("subscribe");
                 if (subSpec instanceof Map<?, ?> subMap) {
                     name = String.valueOf(subMap.get("channel"));
@@ -302,7 +306,7 @@ public final class StepWalker {
                     name = String.valueOf(subSpec);
                 }
             } else if (branchMap.containsKey("wait")) {
-                type = "wait";
+                type = ResolvedStep.SelectBranchType.WAIT;
                 name = String.valueOf(branchMap.get("wait"));
             } else {
                 throw new IllegalArgumentException(

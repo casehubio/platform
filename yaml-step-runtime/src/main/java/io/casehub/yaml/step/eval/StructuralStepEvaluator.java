@@ -4,7 +4,6 @@ import io.casehub.yaml.core.condition.ConditionEvaluator;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.ScenarioScope;
-import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.StepResult;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
@@ -23,6 +22,7 @@ public final class StructuralStepEvaluator {
 
     private final ConditionEvaluator conditionEvaluator;
     private final ScenarioScope scope;
+    private final DecoratorChain decoratorChain;
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
         this(conditionEvaluator, null);
@@ -31,9 +31,20 @@ public final class StructuralStepEvaluator {
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ScenarioScope scope) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope = scope;
+        this.decoratorChain = new DecoratorChain(conditionEvaluator,
+                io.casehub.yaml.core.runtime.SpeedMultiplier.identity(), scope);
     }
 
     public StepResult evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
+        Map<String, Object> decorators = step.decorators();
+        if (decorators.isEmpty()) {
+            return dispatchStep(step, resolver, runner);
+        }
+        return decoratorChain.apply(decorators, r -> dispatchStep(step, r, runner))
+                .execute(resolver);
+    }
+
+    private StepResult dispatchStep(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
         return switch (step) {
             case ResolvedStep.BlockStep b -> evaluateBlock(b, resolver, runner);
             case ResolvedStep.IfElseStep i -> evaluateIfElse(i, resolver, runner);
@@ -171,7 +182,7 @@ public final class StructuralStepEvaluator {
                 futureSlots[i] = executor.submit(() -> {
                     try {
                         Object payload;
-                        if ("wait".equals(branch.type())) {
+                        if (branch.type() == ResolvedStep.SelectBranchType.WAIT) {
                             OrcSignal signal = scope.signal(branch.name());
                             signal.await();
                             payload = signal.payload();
@@ -217,22 +228,11 @@ public final class StructuralStepEvaluator {
             return StepResult.of(Map.of());
         }
 
-        VariableResolver scoped  = resolver;
-        Object           payload = winnerPayload.get();
+        VariableResolver scoped = resolver;
+        Object payload = winnerPayload.get();
         if (payload != null) {
-            String prefix = "wait".equals(winningBranch.type()) ? "signal" : "channel";
-            String name   = winningBranch.name();
-            if (payload instanceof Map<?, ?> map) {
-                scoped = resolver.withObjectScope(prefix, n -> {
-                    if (n.equals(name)) {return payload;}
-                    String pfx = name + ".";
-                    if (n.startsWith(pfx)) {return map.get(n.substring(pfx.length()));}
-                    return null;
-                });
-            } else {
-                scoped = resolver.withObjectScope(prefix,
-                                                  n -> n.equals(name) ? payload : null);
-            }
+            String prefix = winningBranch.type() == ResolvedStep.SelectBranchType.WAIT ? "signal" : "channel";
+            scoped = ScopeUtils.pushScope(resolver, prefix, payload);
         }
 
         return evaluateBlock(
@@ -241,16 +241,7 @@ public final class StructuralStepEvaluator {
 
 
     private VariableResolver pushMatchContext(VariableResolver resolver, Object value) {
-        ObjectVariableSource matchSource;
-        if (value instanceof Map<?, ?> map) {
-            matchSource = name -> {
-                if (name.isEmpty()) return value;
-                return map.get(name);
-            };
-        } else {
-            matchSource = name -> value;
-        }
-        return resolver.withObjectScope("match", matchSource);
+        return ScopeUtils.pushScope(resolver, "match", value);
     }
 
     private StepResult evaluateParallel(ResolvedStep.ParallelStep parallel,
@@ -259,14 +250,18 @@ public final class StructuralStepEvaluator {
             return StepResult.of(Map.of());
         }
 
-        var futures = new ArrayList<Future<StepResult>>();
+        int stepCount = parallel.steps().size();
+        @SuppressWarnings("unchecked")
+        Future<StepResult>[] futures = new Future[stepCount];
+
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (ResolvedStep sub : parallel.steps()) {
-                futures.add(executor.submit(() -> evaluate(sub, resolver, runner)));
+            for (int i = 0; i < stepCount; i++) {
+                ResolvedStep sub = parallel.steps().get(i);
+                futures[i] = executor.submit(() -> evaluate(sub, resolver, runner));
             }
 
-            var results = new ArrayList<StepResult>(futures.size());
-            for (var f : futures) {
+            var results = new ArrayList<StepResult>(stepCount);
+            for (Future<StepResult> f : futures) {
                 try {
                     results.add(f.get());
                 } catch (ExecutionException e) {

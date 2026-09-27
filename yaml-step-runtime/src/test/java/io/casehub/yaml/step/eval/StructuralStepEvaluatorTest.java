@@ -588,7 +588,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void select_withoutScope_returnsFailure() {
-            var branch = new ResolvedStep.SelectBranch("wait", "sig", List.of(leaf("a")));
+            var branch = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "sig", List.of(leaf("a")));
             var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isFalse();
@@ -602,8 +602,8 @@ class StructuralStepEvaluatorTest {
                 var signal = scope.signal("fast");
                 signal.signal("payload");
 
-                var branch1 = new ResolvedStep.SelectBranch("wait", "fast", List.of(leaf("winner")));
-                var branch2 = new ResolvedStep.SelectBranch("wait", "slow", List.of(leaf("loser")));
+                var branch1 = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "fast", List.of(leaf("winner")));
+                var branch2 = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "slow", List.of(leaf("loser")));
                 var step = new ResolvedStep.SelectStep(List.of(branch1, branch2), Map.of());
 
                 var order = new ArrayList<String>();
@@ -620,7 +620,7 @@ class StructuralStepEvaluatorTest {
                 var channel = scope.<Object>channel("quotes");
                 channel.send(Map.of("price", 42));
 
-                var branch = new ResolvedStep.SelectBranch("subscribe", "quotes", List.of(leaf("got-quote")));
+                var branch = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.SUBSCRIBE, "quotes", List.of(leaf("got-quote")));
                 var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
 
                 var order = new ArrayList<String>();
@@ -651,6 +651,70 @@ class StructuralStepEvaluatorTest {
                     (s, r) -> StepResult.of(Map.of("ran", true)));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("ran", true);
+        }
+    }
+
+    // ── Decorator + Structural composition ─────────────────────────
+
+    @Nested
+    class DecoratorCompositionTests {
+
+        @Test
+        void blockWithWhenFalse_skipsExecution() {
+            var block = new ResolvedStep.BlockStep(
+                    List.of(leaf("a")), Map.of("when", "false"));
+            var count = new AtomicInteger(0);
+            var result = evaluator.evaluate(block, resolver, (s, r) -> {
+                count.incrementAndGet();
+                return StepResult.of(Map.of());
+            });
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(count.get()).isZero();
+        }
+
+        @Test
+        void blockWithWhenTrue_executes() {
+            var block = new ResolvedStep.BlockStep(
+                    List.of(leaf("a")), Map.of("when", "true"));
+            var order = new ArrayList<String>();
+            evaluator.evaluate(block, resolver, trackingRunner(order));
+            assertThat(order).containsExactly("a");
+        }
+
+        @Test
+        void parallelWithRetry_retriesOnFailure() {
+            var count = new AtomicInteger(0);
+            var parallel = new ResolvedStep.ParallelStep(
+                    List.of(leaf("a")), Map.of("retry", 3));
+            var result = evaluator.evaluate(parallel, resolver, (s, r) -> {
+                if (count.incrementAndGet() < 3) return StepResult.failed("not yet");
+                return StepResult.of(Map.of("ok", true));
+            });
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(count.get()).isEqualTo(3);
+        }
+
+        @Test
+        void tryCatchWithTimeout_timeoutWrapsEntireBlock() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")), List.of(leaf("catch1")), null,
+                    Map.of("timeout", "5s"));
+            var result = evaluator.evaluate(step, resolver,
+                    (s, r) -> StepResult.of(Map.of("ok", true)));
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void leafStepWithDecorators_decoratorsApplied() {
+            var invoke = new ResolvedStep.InvokeStep(
+                    Map.of("mcp", "tool"), Map.of("when", "false"));
+            var count = new AtomicInteger(0);
+            var result = evaluator.evaluate(invoke, resolver, (s, r) -> {
+                count.incrementAndGet();
+                return StepResult.of(Map.of());
+            });
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(count.get()).isZero();
         }
     }
 }

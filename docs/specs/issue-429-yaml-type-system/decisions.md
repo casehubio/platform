@@ -61,3 +61,72 @@
 **Sources:** User requirement
 **Exploration:** quick
 **Status:** captured
+
+## D6: Step walker placement
+
+**Choice:** yaml-step-runtime. StepWalker is a static utility taking StepCatalog, returning resolved steps. Not in yaml-core.
+**Alternatives:**
+- yaml-core with `Set<String>` knownNames parameter — pure, zero-dep, J2CL-safe. But every caller would immediately need `catalog.resolve()` on the result. No current consumer needs the structural parse without the catalog.
+**Rationale:** The walker is a catalog-integrated operation. The language-definition argument for yaml-core is real but theoretical — if a future consumer needs a catalog-free parse, extracting the key-classification logic is a clean refactor.
+**Trade-offs:** Walker can't be used without yaml-step-runtime on the classpath. Acceptable — step execution inherently requires the runtime.
+**Sources:** StepCatalog.java, StepDefinitionParser.java (yaml-core pattern), ForEachExpander.java (yaml-core pattern), issue #447
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D7: YAML surface — plugin-name-as-key + invoke escape hatch
+
+**Choice:** Plugin-name-as-key is the primary surface. `invoke:` remains as escape hatch. Legacy `action:` + `data:` from #151 spec is dropped entirely.
+**Alternatives:**
+- Keep action: + data: alongside plugin-name-as-key — two surfaces for the same concept, confusing vocabulary
+- Drop invoke: too, require plugins for everything — too rigid, ops teams need ad-hoc endpoint calls
+**Rationale:** action: + data: was never implemented (pre-implementation design from #151 that #447 explicitly supersedes). Plugin-name-as-key is the schema-validated, IDE-completable primary path. invoke: is the flexible escape hatch.
+**Trade-offs:** No migration path from action: + data: needed — it was never built.
+**Sources:** Issue #447 (explicit target syntax), issue #151 spec §YAML surface syntax, dynamic step catalog spec §Playbook integration
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D8: P1 plugin module placement
+
+**Choice:** P1 plugins (process, rest-call, assert) in yaml-step-runtime, package `io.casehub.yaml.step.plugin`. Add yaml-plugin-processor as annotation processor in the POM.
+**Alternatives:**
+- New `yaml-step-plugins/` module — cleaner separation but adds a module for 3 records. Warranted for domain-specific plugins, not foundational vocabulary.
+**Rationale:** P1 plugins are foundational vocabulary — they belong with the catalog infrastructure. yaml-step-runtime already has the right dependencies (platform-api, yaml-plugin-api). APT processor is one `<annotationProcessorPaths>` entry.
+**Trade-offs:** yaml-step-runtime gains APT processing. Acceptable — the module is the integration layer.
+**Sources:** yaml-step-runtime/pom.xml, yaml-plugin-processor APT (BinderEmitter.java, SchemaEmitter.java)
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D9: CdiServiceRegistry
+
+**Choice:** `CdiServiceRegistry @ApplicationScoped` in yaml-step-runtime using `Arc.container().instance(serviceType)`.
+**Alternatives:**
+- Standard CDI BeanManager.getReference() — more portable but more verbose
+- Separate module (yaml-step-cdi/) — unnecessary, yaml-step-runtime already has quarkus-arc as provided scope
+**Rationale:** Arc API is simpler, module already depends on quarkus-arc. Spring counterpart follows the established `-spring` module pattern when needed (not in #447 scope).
+**Trade-offs:** Quarkus-specific rather than CDI-standard. Acceptable — the project is Quarkus-native with Spring as a generated layer.
+**Sources:** MapServiceRegistry.java (test/standalone impl), quarkus-arc dependency in yaml-step-runtime/pom.xml
+**Exploration:** quick
+**Status:** captured
+
+## D10: Reserved keys — fixed set
+
+**Choice:** Fixed set from issue-386 decorator evaluation order (when, on-success, on-failure, forEach, loop, retry, timeout, delay, on-error, trigger, transform, signal, publish, transition, parallel, semaphore, barrier, quorum, race) plus structural keys (step, invoke).
+**Alternatives:**
+- Extensible reserved key set — unnecessary complexity. Decorators are a closed set by design (issue-386 §decorator evaluation order).
+**Rationale:** Decorator keys are the engine's fixed vocabulary. Plugin names are the open set. The walker checks reserved keys first, then matches against the catalog.
+**Trade-offs:** Adding a new decorator key requires a code change. By design — new decorators are language changes, not plugin extensions.
+**Sources:** Issue-386 §Decorator Evaluation Order (13-position stack)
+**Exploration:** quick
+**Status:** captured
+
+## D11: Schema composition
+
+**Choice:** `StepSchemaComposer` utility in yaml-step-runtime. Reads from catalog, produces composed JSON Schema with oneOf per plugin + decorator properties. File output is #437's concern.
+**Alternatives:**
+- Method on CompositeStepCatalog — mixes resolution and schema concerns
+- Separate module — overkill for a utility class
+**Rationale:** Keeps catalog focused on resolution. StepSchemaComposer is a pure function: catalog → schema JSON. The Maven plugin (#437) calls it and writes to disk.
+**Trade-offs:** Requires Jackson for schema JSON construction. yaml-step-runtime already has jackson-databind.
+**Sources:** SchemaEmitter.java (APT schema generation), META-INF/yaml-plugins/<name>.schema.json format
+**Exploration:** quick
+**Status:** captured

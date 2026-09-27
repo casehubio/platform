@@ -1,6 +1,6 @@
 # CaseHub YAML Language Guide
 
-yaml-core is a composable meta-language that layers on top of any YAML structure. It provides six constructs — variables, conditions, iteration, data, modules, and typed expansion — that a host application can adopt individually or together. The host owns the YAML schema; yaml-core owns the dynamic behaviour.
+yaml-core is a composable meta-language that layers on top of any YAML structure. It provides variables, conditions, iteration, data, modules, typed expansion, and inline control flow — constructs that a host application can adopt individually or together. The host owns the YAML schema; yaml-core owns the dynamic behaviour.
 
 Think of it as what Jinja is to HTML, or what HCL is to Terraform — except it works with any YAML structure, not a specific one.
 
@@ -22,10 +22,11 @@ A simple application might use only variables. A full declarative platform uses 
 Your YAML schema (pages, desiredstate, engine, anything)
     │
     ├── Variable resolution     ${prefix.name}
-    ├── Conditional inclusion   when: "${var.enabled}"
+    ├── Conditional inclusion   if: "${var.enabled}"
     ├── ForEach expansion       forEach + stamp N copies
     ├── Typed CSV data          inline tabular data as iteration sources
     ├── Module system           import, parameterise, alias, compose
+    ├── Inline control flow     block, if/then/else, match/cases
     └── Typed expansion         ModuleBridge<T> for domain-specific compilation
 ```
 
@@ -81,8 +82,8 @@ region: ${var.deploy_region:-us-east-1}
 Some variables can't be resolved at compile time — they exist at runtime. Register a prefix as "deferred" and yaml-core passes it through literally:
 
 ```yaml
-# ${match.sink.id} stays as-is in the output — resolved at runtime by the pattern engine
-route: ${match.sink.id}
+# ${result.response.status} stays as-is in the output — resolved at runtime
+route: ${result.response.status}
 ```
 
 ### Variable sources
@@ -96,26 +97,27 @@ Applications register sources per prefix. Built-in sources:
 | `VariableSource.nested(data)` | Dot-path drilling into nested maps |
 | `VariableSource.chain(a, b, c)` | First non-null across multiple sources |
 | `VariableSource.forEachContext(...)` | ForEach iteration values (see §3) |
+| `VariableSource.matchContext(scrutinee)` | Match case variable scoping (see §9) |
 
 Scoping is immutable — `resolver.withScope("myprefix", mySource)` returns a new resolver with the added prefix. This makes it safe to layer sources without mutation.
 
 ---
 
-## 2. Conditional Inclusion (`when`)
+## 2. Conditional Inclusion (`if`)
 
-**Syntax:** `when: "${var.expression}"`
+**Syntax:** `if: "${var.expression}"`
 
 A boolean guard on any element. The expression resolves to a string, then truthiness evaluation decides include or exclude.
 
 ```yaml
 nodes:
   gift-wrapping:
-    when: "${var.gift_wrapping_enabled}"
+    if: "${var.gift_wrapping_enabled}"
     spec:
       style: premium
 
   premium-support:
-    when: "${var.tier:-free}"
+    if: "${var.tier:-free}"
     spec:
       channel: phone
 ```
@@ -132,11 +134,13 @@ Case-insensitive evaluation. These pairs are equivalent:
 | `y` | `n` |
 | `1` | `0` |
 
-Anything else throws `IllegalArgumentException` — no silent coercion, no guessing.
+Anything else delegates to the configured expression engine (MVEL, JQ, or custom) for evaluation. If no expression engine is configured, throws `ConditionEvaluationException`.
+
+Expression engines support operators like `==`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `startsWith`, `endsWith`. The expression receives the resolved variable values and returns a boolean.
 
 ### Interaction with forEach
 
-When `when` appears on an element that also has `forEach`, the condition is evaluated per iteration value. Individual copies can be excluded while others are included:
+When `if` appears on an element that also has `forEach`, the condition is evaluated per iteration value. Individual copies can be excluded while others are included:
 
 ```yaml
 nodes:
@@ -144,7 +148,7 @@ nodes:
     forEach:
       as: region
       in: [us-east, eu-west, ap-south]
-    when: "${var.cache_enabled_${each.region}}"
+    if: "${var.cache_enabled_${each.region}}"
     spec:
       region: ${each.region}
 ```
@@ -231,7 +235,7 @@ nodes:
     forEach:
       as: env
       in: environments
-    when: "${each.env.enabled}"
+    if: "${each.env.enabled}"
     spec:
       name: ${each.env.name}
       port: ${each.env.port}
@@ -337,12 +341,12 @@ Cross-references within the module are rewritten to use the prefixed names — `
 imports:
   - module: order-notifications
     as: payment-alerts
-    when: "${var.payment_notifications_enabled}"
+    if: "${var.payment_notifications_enabled}"
     parameters:
       watched_step: payment
 ```
 
-The entire module is included or excluded based on the `when` condition.
+The entire module is included or excluded based on the `if` condition.
 
 ### Parameter validation
 
@@ -430,6 +434,7 @@ The plugin uses multiple variable prefixes, each resolved by a different source:
 | `${result.*}` | Step outputs (REST responses, command results) | Runtime (deferred) |
 | `${var.*}` | User-defined variables section | Compile time |
 | `${each.*}` | ForEach iteration context | Expansion time |
+| `${match.*}` | Match case scrutinee fields | Runtime (see §9) |
 | `${fault.*}` | Fault context (error details) | Runtime (deferred) |
 
 ---
@@ -444,11 +449,11 @@ Teaches yaml-core how to stamp copies of your domain elements:
 
 ```java
 public interface ForEachAdapter<E> {
-    ForEachDirective getForEach(E element);     // read the forEach field
-    String getWhen(E element);                   // read the when condition
+    ForEachDirective getForEach(E element);      // read the forEach field
+    String getCondition(E element);              // read the if condition
     E stamp(E element, String stampedId, ...);   // create a copy with new ID + resolved vars
-    List<String> getReferences(E element);       // extract cross-references for rewriting
-    E withReferences(E element, List<String>);   // rewrite references after expansion
+    List<Reference> getReferences(E element);    // extract cross-references for rewriting
+    E withReferences(E element, List<Reference>);// rewrite references after expansion
 }
 ```
 
@@ -476,7 +481,7 @@ Pages does not implement either adapter — it uses only variable resolution, wh
 
 ## 8. Composition: Putting It All Together
 
-A complete DesiredState YAML using all six constructs:
+A complete DesiredState YAML using all constructs:
 
 ```yaml
 variables:
@@ -494,7 +499,7 @@ data:
 imports:
   - module: monitoring-stack
     as: infra
-    when: "${var.monitoring_enabled}"
+    if: "${var.monitoring_enabled}"
     parameters:
       alert_threshold: "90"
 
@@ -513,7 +518,7 @@ nodes:
 
   cache:
     forEach: regional
-    when: "${var.cache_enabled}"
+    if: "${var.cache_enabled}"
     spec:
       region: ${each.region.name}
       ttl: 300
@@ -530,10 +535,275 @@ nodes:
 2. **CSV data** parses the `regions` table into typed rows
 3. **Module import** expands `monitoring-stack` with alias `infra`, conditional on `monitoring_enabled`
 4. **ForEach** stamps `api-gateway` and `cache` per region row → `api-gateway.us-east`, `api-gateway.eu-west`, etc.
-5. **When** filters `cache` copies per region — only included where `cache_enabled` is truthy
+5. **Conditions** filter `cache` copies per region — only included where `cache_enabled` is truthy
 6. **Reference rewriting** updates any `dependsOn` between `api-gateway` and `cache` to use stamped IDs
 
 The output is a flat map of fully resolved, stamped nodes with no dynamic constructs remaining — ready for your reconciliation engine, renderer, or deployment pipeline.
+
+---
+
+## 9. Inline Control Flow (Step Types)
+
+Steps in a `steps:` list support structural control flow. Every step has a **type** (what it does) and optional **decorators** (how it does it).
+
+### Step types
+
+| Step type | Key | Purpose |
+|-----------|-----|---------|
+| Plugin action | plugin name | Execute one action |
+| Invoke | `invoke:` | Execute one binding (MCP, script, agent, process) |
+| Block | `block:` | Execute N steps sequentially |
+| If/else | `if:` + `then:` | Branch on condition |
+| Match | `match:` + `cases:` | Branch on pattern |
+| Parallel | `parallel:` | Execute N steps concurrently |
+
+### `block:` — compound step
+
+Groups steps into a single unit that decorators can wrap:
+
+```yaml
+- block:
+    - rest-call: { url: ${endpoint}/status }
+    - assert: { condition: ${result.rest-call.status} == "ok" }
+  loop: { count: 3, until: ${status} == "ok" }
+  timeout: 30s
+```
+
+### `if/then/else` — branching
+
+Two-way branching over step lists. Disambiguated from the `if` decorator guard by presence of `then:`:
+
+```yaml
+- if: ${risk} == 'HIGH'
+  then:
+    - escalate: ...
+    - notify-team: ...
+  else:
+    - proceed: ...
+```
+
+`if` without `then:` is a guard (decorator) — skips the step if false. `if` with `then:` is a structural branch.
+
+### `match/cases` — pattern matching
+
+N-way branching with value matching, structural matching, and guards:
+
+```yaml
+- match: ${event}
+  cases:
+    - pattern: { type: "trade" }
+      guard: ${match.amount} > 1000000
+      steps:
+        - escalate: ...
+        - notify-compliance: ...
+
+    - pattern: { type: "trade" }
+      steps:
+        - process-normal: ...
+
+    - pattern: { type: "settlement" }
+      steps:
+        - settle: ...
+
+    - default:
+        - log: { message: "unhandled event" }
+```
+
+**Matching semantics:** first-match-wins, scalar equality or top-level structural subset match. `${match}` and `${match.*}` expose the matched value inside cases. `default:` must be the last case.
+
+### Decorator evaluation order
+
+All decorators apply uniformly to all step types:
+
+| Order | Decorator | Role |
+|-------|-----------|------|
+| 1 | `if` | Guard — skip if false |
+| 2 | `forEach` | Iteration |
+| 3 | `loop` | Repetition |
+| 4 | `on-error` | Error handler |
+| 5 | `timeout` | Deadline |
+| 6 | `trigger`/`wait`/`subscribe` | Pre-action wait |
+| 7 | `retry` | Resilience |
+| 8 | `semaphore` | Concurrency control |
+| 9 | `delay` | Pre-action pause |
+| 10 | **step type** | action / block / if-else / match / parallel |
+| 11 | `signal`/`publish` | Post-action notification |
+| 12 | `transition` | Post-action state event |
+| 13 | `transform` | Post-action data reshape |
+
+---
+
+## 10. Step Plugins and the Catalog
+
+Steps are not hard-coded — they come from a **step catalog** that discovers actions at startup from multiple sources. Each source contributes step definitions with typed parameters and an execution binding.
+
+### Writing a step plugin
+
+A step plugin is a Java record annotated with `@StepPlugin`. The annotation processor generates JSON Schema, a `StepAction` implementation, and a registry manifest at compile time:
+
+```java
+@StepPlugin(value = "rest-call", description = "Makes an HTTP request")
+public record RestCallPlugin(
+        @Required String url,
+        @Optional String method,
+        @Optional Map<String, Object> body,
+        @Optional Map<String, String> headers,
+        @Optional String timeout) {
+
+    @Execute
+    public StepResult run() {
+        // implementation
+        return StepResult.of(Map.of("status-code", 200, "body", "..."));
+    }
+}
+```
+
+**What the annotation processor generates:**
+- `META-INF/yaml-plugins/rest-call.schema.json` — JSON Schema from the record fields
+- `RestCallPluginAction implements StepAction` — wraps the record instantiation + `@Execute` method
+- `META-INF/yaml-plugins/rest-call.json` — manifest linking name → action class → schema
+
+**Field annotations:**
+- `@Required` — parameter must be provided (schema: `required`)
+- `@Optional` — parameter is optional (nullable in the record)
+- `@Execute` — marks the method that runs the step (must return `StepResult`)
+
+**Return types:** `StepResult` is a sealed interface — `StepResult.of(Map)` for success, `StepResult.failed(message)` for failure.
+
+### Catalog sources
+
+The `CompositeStepCatalog` discovers steps from multiple `CatalogSource` implementations, merged by priority (lower priority number = higher precedence):
+
+| Source | What it discovers | Priority |
+|--------|-------------------|----------|
+| `AptPluginSource` | `@StepPlugin` records via `META-INF/yaml-plugins/` manifests on the classpath | 0 (highest) |
+| `McpToolSource` | MCP tool definitions — each tool becomes an action with a tool invoker binding | 10 |
+| `ScriptSource` | Script files (`.py`, `.js`, `.mjs`) with companion `.schema.yaml` files on the filesystem | 20 |
+| `YamlStepDefinitionSource` | YAML step definition files — declarative step definitions with typed parameters and invoke bindings | 30 |
+
+Higher-precedence sources shadow lower ones — an `AptPluginSource` action named `process` takes priority over an `McpToolSource` action with the same name.
+
+### Script auto-discovery
+
+`ScriptSource` scans configured directories for scripts with companion schema files:
+
+```
+scripts/
+  validate.py           # script file — runtime inferred from extension
+  validate.schema.yaml  # parameter schema
+  transform.js
+  transform.schema.yaml
+```
+
+Schema file format:
+
+```yaml
+description: Validate input data
+inputs:
+  data:
+    type: object
+    required: true
+    description: The data to validate
+  strict:
+    type: boolean
+    description: Enable strict mode
+```
+
+**Runtime detection:** `.py` → `python3`, `.js`/`.mjs` → `node`. The script receives parameters as JSON on stdin and writes results as JSON to stdout.
+
+### YAML step definition files
+
+Steps can also be defined declaratively in YAML. A step definition file declares a namespace, actions with typed parameters, and an invoke binding:
+
+```yaml
+namespace: compliance
+
+actions:
+  check-sanctions:
+    description: Screen entity against sanctions lists
+    inputs:
+      entity-id:
+        type: string
+        required: true
+      lists:
+        type: string
+        enum: [ofac, eu, un, all]
+        default: all
+    outputs:
+      match:
+        type: boolean
+      details:
+        type: object
+    invoke:
+      rest:
+        method: POST
+        url: https://compliance.internal/screen
+
+  validate-kyc:
+    description: Validate KYC documents
+    inputs:
+      document-type:
+        type: string
+        required: true
+        enum: [passport, drivers-license, national-id]
+    invoke:
+      agent:
+        descriptor: kyc-validator
+        model: claude-sonnet-5
+        structured-output: true
+```
+
+Actions are namespaced — `compliance.check-sanctions` in YAML steps. The invoke binding determines how the action executes (see below).
+
+### Invoke bindings
+
+Every step definition has an `InvokeBinding` that determines how it executes:
+
+| Binding | Key | How it runs |
+|---------|-----|-------------|
+| `Mcp` | `tool` | Calls an MCP tool by name |
+| `Script` | `runtime`, `script` | Spawns a process (`python3 script.py`) with JSON stdin/stdout |
+| `Process` | `command`, `args` | Spawns a command with arguments |
+| `Agent` | `descriptor`, `model` | Invokes an AI agent |
+| `Rest` | `method`, `url` | Makes an HTTP request |
+| `Graphql` | `query` | Executes a GraphQL query |
+
+### Schema type safety
+
+The step catalog enforces type safety at two levels:
+
+1. **Parse-time:** `StepWalker` resolves step maps against the catalog. Unknown action keys are rejected with the list of available actions. Parameter types are checked against the `StepParameter` definitions.
+
+2. **Schema composition:** `StepSchemaComposer` generates a composed JSON Schema covering all discovered actions. Each action becomes a `oneOf` variant with its parameters schema. Structural step types (block, if/else, match, parallel) are included as additional variants. This schema can be served to editors for validation and auto-complete.
+
+```java
+// Generate composed schema for all discovered steps
+ObjectNode schema = StepSchemaComposer.compose(catalog, objectMapper);
+```
+
+The composed schema includes:
+- One `oneOf` variant per plugin action (with typed parameter properties)
+- `invoke:` escape hatch variant
+- `block:`, `if/then/else`, `match/cases`, `parallel:` structural variants
+- Shared decorator properties (`if`, `forEach`, `loop`, `timeout`, `retry`, etc.)
+
+### Adding the step runtime dependency
+
+```xml
+<dependency>
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-yaml-step-runtime</artifactId>
+</dependency>
+```
+
+For plugin authoring only (no runtime needed):
+
+```xml
+<dependency>
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-yaml-plugin-api</artifactId>
+</dependency>
+```
 
 ---
 
@@ -546,7 +816,7 @@ yaml-core publishes JSON Schema fragments for each construct in `src/main/resour
 | `variable.schema.json` | `${prefix.name}` string pattern |
 | `foreach.schema.json` | `forEach` field (inline or group reference) |
 | `iterations.schema.json` | Named iteration groups |
-| `when.schema.json` | `when` condition field |
+| `if.schema.json` | `if` condition field |
 | `module.schema.json` | Module declaration + parameters + outputs |
 | `data.schema.json` | Typed CSV data sources |
 
@@ -559,7 +829,7 @@ Host applications compose these into their domain schema via `$ref`:
       "additionalProperties": {
         "properties": {
           "forEach": { "$ref": "classpath:schema/foreach.schema.json" },
-          "when": { "$ref": "classpath:schema/when.schema.json" },
+          "if": { "$ref": "classpath:schema/if.schema.json" },
           "spec": { "type": "object" }
         }
       }
@@ -581,4 +851,5 @@ This gives you IDE validation, auto-complete, and documentation for the yaml-cor
 |----------|------------|
 | `casehub-platform-yaml-core` | Always — the language primitives. Zero external dependencies, J2CL-transpilable |
 | `casehub-platform-yaml-jackson` | When parsing YAML with Jackson — registers mixins for yaml-core types, enables dynamic section capture and case-insensitive enum deserialization |
+| `casehub-platform-yaml-step-runtime` | When using step types — plugin catalog, step resolution, invoke handlers |
 | `casehub-platform-yaml-codegen` | When generating Java records from JSON Schema — a Maven plugin, separate from the language runtime |

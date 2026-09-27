@@ -4,12 +4,15 @@ import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.StepCatalog;
 
 import java.util.ArrayList;
+import java.util.logging.Logger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public final class StepWalker {
+
+    private static final Logger LOG = Logger.getLogger(StepWalker.class.getName());
 
     private static final Set<String> RESERVED_KEYS = Set.of(
             "step", "invoke",
@@ -224,6 +227,14 @@ public final class StepWalker {
                 result.add(new ResolvedMatchCase(pattern, guard, resolve(steps, catalog)));
             }
         }
+
+        boolean hasDefault = result.stream()
+                .anyMatch(c -> c.pattern() instanceof io.casehub.yaml.core.step.MatchPattern.DefaultPattern);
+        if (!hasDefault) {
+            LOG.warning("Step " + stepIndex + ": match/cases has no default case — "
+                    + "unmatched values will be silently skipped");
+        }
+
         return result;
     }
 }

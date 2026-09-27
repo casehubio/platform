@@ -341,6 +341,85 @@ class StepWalkerTest {
         assertThat(inner.decorators()).containsKey("loop");
     }
 
+
+    @Test
+    void warnsWhenMatchHasNoDefault() {
+        Map<String, Object> caseEntry = new LinkedHashMap<>();
+        caseEntry.put("pattern", "ACTIVE");
+        caseEntry.put("steps", List.of(Map.of("process", Map.of("command", "a.sh"))));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", "${status}");
+        step.put("cases", List.of(caseEntry));
+
+        var handler = new java.util.logging.Handler() {
+            final List<String> warnings = new java.util.ArrayList<>();
+
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                if (record.getLevel() == java.util.logging.Level.WARNING) {
+                    warnings.add(record.getMessage());
+                }
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+
+        var logger = java.util.logging.Logger.getLogger(StepWalker.class.getName());
+        logger.addHandler(handler);
+        try {
+            StepWalker.resolve(List.of(step), catalog);
+            assertThat(handler.warnings).hasSize(1);
+            assertThat(handler.warnings.get(0)).contains("default");
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void noWarningWhenMatchHasDefault() {
+        Map<String, Object> caseEntry = new LinkedHashMap<>();
+        caseEntry.put("pattern", "ACTIVE");
+        caseEntry.put("steps", List.of(Map.of("process", Map.of("command", "a.sh"))));
+
+        Map<String, Object> defaultEntry = new LinkedHashMap<>();
+        defaultEntry.put("default", List.of(Map.of("process", Map.of("command", "log.sh"))));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", "${status}");
+        step.put("cases", List.of(caseEntry, defaultEntry));
+
+        var handler = new java.util.logging.Handler() {
+            final List<String> warnings = new java.util.ArrayList<>();
+
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                if (record.getLevel() == java.util.logging.Level.WARNING) {
+                    warnings.add(record.getMessage());
+                }
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+
+        var logger = java.util.logging.Logger.getLogger(StepWalker.class.getName());
+        logger.addHandler(handler);
+        try {
+            StepWalker.resolve(List.of(step), catalog);
+            assertThat(handler.warnings).isEmpty();
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
     private static CatalogEntry entry(String name) {
         var def = new StepDefinition(name, null, Map.of(), Map.of(),
                 new InvokeBinding.Mcp(name));

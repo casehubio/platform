@@ -61,11 +61,12 @@ public class DefaultProcessExecutor implements ProcessExecutor {
                 throw new ProcessExecutionException("Failed to write stdin", e);
             }
         } else {
-            try { process.getOutputStream().close(); } catch (IOException ignored) {}
+            try {process.getOutputStream().close();} catch (IOException ignored) {}
         }
 
-        var stdoutFuture = readAsync(process.getInputStream());
-        var stderrFuture = command.mergeStderr() ? CompletableFuture.completedFuture("") : readAsync(process.getErrorStream());
+        Long maxBytes     = command.maxOutputBytes();
+        var  stdoutFuture = readAsync(process.getInputStream(), maxBytes);
+        var  stderrFuture = command.mergeStderr() ? CompletableFuture.completedFuture("") : readAsync(process.getErrorStream(), maxBytes);
 
         try {
             boolean completed;
@@ -92,18 +93,42 @@ public class DefaultProcessExecutor implements ProcessExecutor {
             process.destroyForcibly();
             throw new ProcessExecutionException("Process interrupted", e);
         } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ProcessExecutionException pex) {
+                throw pex;
+            }
             throw new ProcessExecutionException(
                     "Error reading process output: " + String.join(" ", command.command()), e);
         }
     }
 
-    private static CompletableFuture<String> readAsync(InputStream stream) {
+    private static CompletableFuture<String> readAsync(InputStream stream, Long maxBytes) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return new String(stream.readAllBytes());
+                if (maxBytes == null || maxBytes <= 0) {
+                    return new String(stream.readAllBytes());
+                }
+                return readBounded(stream, maxBytes);
             } catch (IOException e) {
                 return "";
             }
         });
     }
+
+    private static String readBounded(InputStream stream, long maxBytes) throws IOException {
+        var    buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk  = new byte[8192];
+        long   total  = 0;
+        int    read;
+        while ((read = stream.read(chunk)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new ProcessExecutionException(
+                        "Process output exceeded limit of " + maxBytes + " bytes");
+            }
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toString();
+    }
+
 }

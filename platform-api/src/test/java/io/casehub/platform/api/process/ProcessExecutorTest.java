@@ -210,4 +210,29 @@ class ProcessExecutorTest {
         var result       = unrestricted.execute("echo", "anything");
         assertThat(result.isSuccess()).isTrue();
     }
+
+    @Test
+    void maxOutputBytesEnforcedOnStdout() {
+        var cmd = ProcessCommand.of("sh", "-c", "printf 'aaaaaaaaaa'")
+                                .maxOutputBytes(5);
+        assertThatThrownBy(() -> executor.execute(cmd))
+                .isInstanceOf(ProcessExecutionException.class)
+                .hasMessageContaining("exceeded limit of 5 bytes");
+    }
+
+    @Test
+    void maxOutputBytesWithinLimit() {
+        var cmd = ProcessCommand.of("echo", "hi")
+                                .maxOutputBytes(1024);
+        var result = executor.execute(cmd);
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.stdout()).isEqualTo("hi");
+    }
+
+    @Test
+    void maxOutputBytesNullMeansUnlimited() {
+        var result = executor.execute(ProcessCommand.of("echo", "hello"));
+        assertThat(result.stdout()).isEqualTo("hello");
+    }
+
 }

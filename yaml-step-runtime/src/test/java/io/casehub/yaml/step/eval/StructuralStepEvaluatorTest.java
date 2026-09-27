@@ -884,5 +884,262 @@ class StructuralStepEvaluatorTest {
             assertThat(map).containsEntry("score", 85).containsEntry("grade", "A");
         }
     }
+// ── Barrier Evaluation ─────────────────────────────────────────
+
+    @Nested
+    class BarrierTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void barrier_awaitsAllNamedSteps() {
+            var evalA = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var evalB = new ResolvedStep.InvokeStep("eval-b", Map.of("id", "b"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait-all",
+                                                       List.of("eval-a", "eval-b"), null, Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(evalA, evalB, barrier), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var order = new CopyOnWriteArrayList<String>();
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    order.add(id);
+                    try {Thread.sleep(50);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(order).containsExactlyInAnyOrder("a", "b");
+        }
+
+        @Test
+        void barrier_timeout_returnsFailed() {
+            var evalA = new ResolvedStep.InvokeStep("slow", Map.of("id", "a"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("slow"), java.time.Duration.ofMillis(50), Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(evalA, barrier), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                try {Thread.sleep(500);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void barrier_failedStep_stillCountsDown() {
+            var evalA = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("eval-a"), null, Map.of());
+            var steps = List.<ResolvedStep>of(evalA, barrier);
+            var block = new ResolvedStep.BlockStep(null, steps, Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(block));
+
+            scopedEvaluator.evaluate(block, resolver,
+                                     (step, res) -> StepResult.failed("error"));
+
+            assertThat(scope.resultStore().hasCompleted("eval-a")).isTrue();
+        }
+
+        @Test
+        void barrier_stepCompletionOrder_doesNotMatter() {
+            var evalA = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var evalB = new ResolvedStep.InvokeStep("eval-b", Map.of("id", "b"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("eval-a", "eval-b"), null, Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(evalB, evalA, barrier), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var completed = new CopyOnWriteArrayList<String>();
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    if ("b".equals(id)) {
+                        try {Thread.sleep(100);} catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                    completed.add(id);
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(completed).containsExactlyInAnyOrder("a", "b");
+        }
+    }
+
+// ── Quorum Evaluation ──────────────────────────────────────────
+
+    @Nested
+    class QuorumTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void quorum_proceedsOnRequiredCount() {
+            var a = new ResolvedStep.InvokeStep("a", Map.of("id", "a"), Map.of());
+            var b = new ResolvedStep.InvokeStep("b", Map.of("id", "b"), Map.of());
+            var c = new ResolvedStep.InvokeStep("c", Map.of("id", "c"), Map.of());
+            var quorum = new ResolvedStep.QuorumStep("consensus", 2,
+                                                     List.of("a", "b", "c"), null, Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(a, b, c, quorum), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver,
+                                                  (step, res) -> StepResult.of(Map.of("done", true)));
+
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void quorum_unreachable_returnsFailed() {
+            var a = new ResolvedStep.InvokeStep("a", Map.of("id", "a"), Map.of());
+            var b = new ResolvedStep.InvokeStep("b", Map.of("id", "b"), Map.of());
+            var quorum = new ResolvedStep.QuorumStep("consensus", 2,
+                                                     List.of("a", "b"), null, Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(a, b, quorum), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver,
+                                                  (step, res) -> StepResult.failed("all fail"));
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void quorum_timeout_returnsFailed() {
+            var a = new ResolvedStep.InvokeStep("a", Map.of("id", "a"), Map.of());
+            var quorum = new ResolvedStep.QuorumStep("consensus", 1,
+                                                     List.of("a"), java.time.Duration.ofMillis(50), Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(a, quorum), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                try {Thread.sleep(500);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+    }
+
+// ── Composition Tests ──────────────────────────────────────────
+
+    @Nested
+    class CompositionTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void barrier_result_availableViaResultVariable() {
+            var producer = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("producer"), null, Map.of());
+            var consumer = new ResolvedStep.InvokeStep("consumer", Map.of("id", "c"), Map.of());
+
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(producer, barrier, consumer), Map.of());
+
+            scopedEvaluator.preRegisterLatches(List.of(block));
+
+            var capturedValue = new Object[1];
+            var result = scopedEvaluator.evaluate(block, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    if ("p".equals(id)) {
+                        return StepResult.of(Map.of("score", 95));
+                    }
+                    if ("c".equals(id)) {
+                        capturedValue[0] = res.resolve("${result.producer.score}");
+                    }
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(capturedValue[0]).isEqualTo(95);
+        }
+
+        @Test
+        void decorators_applyToBarrierStep() {
+            var evalA = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("eval-a"), null, Map.of("when", "true"));
+
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(evalA, barrier), Map.of());
+            scopedEvaluator.preRegisterLatches(List.of(block));
+
+            var result = scopedEvaluator.evaluate(block, resolver,
+                                                  (step, res) -> StepResult.of(Map.of()));
+
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void decorators_applyToQuorumStep() {
+            var a = new ResolvedStep.InvokeStep("a", Map.of("id", "a"), Map.of());
+            var quorum = new ResolvedStep.QuorumStep("consensus", 1,
+                                                     List.of("a"), null, Map.of("when", "true"));
+
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(a, quorum), Map.of());
+            scopedEvaluator.preRegisterLatches(List.of(block));
+
+            var result = scopedEvaluator.evaluate(block, resolver,
+                                                  (step, res) -> StepResult.of(Map.of()));
+
+            assertThat(result.isSuccess()).isTrue();
+        }
+    }
+
 
 }

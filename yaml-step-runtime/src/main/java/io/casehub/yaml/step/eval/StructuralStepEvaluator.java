@@ -24,6 +24,8 @@ public final class StructuralStepEvaluator {
     private final ScenarioScope scope;
     private final DecoratorChain decoratorChain;
     private final io.casehub.yaml.core.resolver.ObjectVariableSource resultSource;
+    private final java.util.concurrent.ConcurrentHashMap<String, java.util.List<io.casehub.yaml.core.orchestration.OrcLatch>> stepLatches = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
 
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
@@ -52,6 +54,39 @@ public final class StructuralStepEvaluator {
         return result;
     }
 
+    public void preRegisterLatches(java.util.List<ResolvedStep> steps) {
+        if (scope == null) {return;}
+        for (ResolvedStep step : steps) {
+            switch (step) {
+                case ResolvedStep.BarrierStep b -> {
+                    io.casehub.yaml.core.orchestration.OrcLatch latch =
+                            scope.latch("barrier:" + b.name(), b.awaitSteps().size());
+                    for (String name : b.awaitSteps()) {
+                        stepLatches.computeIfAbsent(name, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(latch);
+                    }
+                }
+                case ResolvedStep.QuorumStep q -> {
+                    io.casehub.yaml.core.orchestration.OrcLatch latch =
+                            scope.latch("quorum:" + q.name(), q.required());
+                    var tracker = new QuorumTracker(latch, q.required(), q.ofSteps().size(),
+                                                    new AtomicInteger(), new AtomicInteger(), new java.util.concurrent.atomic.AtomicBoolean(false));
+                    for (String name : q.ofSteps()) {
+                        quorumTrackers.put(name, tracker);
+                    }
+                }
+                case ResolvedStep.BlockStep b -> preRegisterLatches(b.steps());
+                case ResolvedStep.ParallelStep p -> preRegisterLatches(p.steps());
+                case ResolvedStep.TryCatchFinallyStep t -> {
+                    preRegisterLatches(t.trySteps());
+                    preRegisterLatches(t.catchSteps());
+                    preRegisterLatches(t.finallySteps());
+                }
+                default -> {}
+            }
+        }
+    }
+
+
     private StepResult dispatchStep(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
         return switch (step) {
             case ResolvedStep.BlockStep b -> evaluateBlock(b, resolver, runner);
@@ -60,8 +95,8 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.ParallelStep p -> evaluateParallel(p, resolver, runner);
             case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, resolver, runner);
             case ResolvedStep.SelectStep s -> evaluateSelect(s, resolver, runner);
-            case ResolvedStep.BarrierStep b -> StepResult.failed("barrier evaluation not yet wired");
-            case ResolvedStep.QuorumStep q -> StepResult.failed("quorum evaluation not yet wired");
+            case ResolvedStep.BarrierStep b -> evaluateBarrier(b);
+            case ResolvedStep.QuorumStep q -> evaluateQuorum(q);
             case ResolvedStep.PluginStep ps -> runner.run(ps, resolver);
             case ResolvedStep.InvokeStep is -> runner.run(is, resolver);
         };
@@ -291,6 +326,60 @@ public final class StructuralStepEvaluator {
         }
     }
 
+    private StepResult evaluateBarrier(ResolvedStep.BarrierStep barrier) {
+        if (scope == null) {
+            return StepResult.failed("'barrier' requires a ScenarioScope");
+        }
+        io.casehub.yaml.core.orchestration.OrcLatch latch =
+                scope.latch("barrier:" + barrier.name(), barrier.awaitSteps().size());
+        try {
+            if (barrier.timeout() != null) {
+                boolean completed = latch.await(
+                        barrier.timeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (!completed) {
+                    return StepResult.failed("Barrier timed out after " + barrier.timeout());
+                }
+            } else {
+                latch.await();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return StepResult.failed("Barrier interrupted");
+        }
+        return StepResult.of(Map.of());
+    }
+
+    private StepResult evaluateQuorum(ResolvedStep.QuorumStep quorum) {
+        if (scope == null) {
+            return StepResult.failed("'quorum' requires a ScenarioScope");
+        }
+        io.casehub.yaml.core.orchestration.OrcLatch latch =
+                scope.latch("quorum:" + quorum.name(), quorum.required());
+        try {
+            if (quorum.timeout() != null) {
+                boolean completed = latch.await(
+                        quorum.timeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (!completed) {
+                    return StepResult.failed("Quorum timed out — "
+                                             + latch.getCount() + " of " + quorum.required() + " still needed");
+                }
+            } else {
+                latch.await();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return StepResult.failed("Quorum interrupted");
+        }
+        QuorumTracker tracker = quorumTrackers.get(quorum.ofSteps().get(0));
+        if (tracker != null && tracker.isUnreachable()) {
+            return StepResult.failed("Quorum unreachable — "
+                                     + tracker.failureCount().get() + " of " + quorum.ofSteps().size()
+                                     + " steps failed, " + quorum.required() + " successes required");
+        }
+        return StepResult.of(Map.of());
+    }
+
+
     private VariableResolver withResultScope(VariableResolver resolver) {
         return resultSource != null ? resolver.withObjectScope("result", resultSource) : resolver;
     }
@@ -304,6 +393,18 @@ public final class StructuralStepEvaluator {
             String message = result instanceof StepResult.Failure f ? f.message() : "unknown error";
             store.recordFailure(stepName,
                                 new io.casehub.yaml.core.orchestration.StepError(message, null, null));
+        }
+
+        java.util.List<io.casehub.yaml.core.orchestration.OrcLatch> latches = stepLatches.get(stepName);
+        if (latches != null) {
+            for (io.casehub.yaml.core.orchestration.OrcLatch l : latches) {
+                l.countDown();
+            }
+        }
+
+        QuorumTracker tracker = quorumTrackers.get(stepName);
+        if (tracker != null) {
+            tracker.onStepComplete(result.isSuccess());
         }
     }
 

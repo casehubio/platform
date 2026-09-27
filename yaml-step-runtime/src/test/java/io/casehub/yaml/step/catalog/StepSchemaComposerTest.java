@@ -44,7 +44,7 @@ class StepSchemaComposerTest {
         assertThat(schema.has("properties")).isTrue();
         var props = schema.get("properties");
         assertThat(props.has("step")).isTrue();
-        assertThat(props.has("when")).isTrue();
+        assertThat(props.has("if")).isTrue();
         assertThat(props.has("timeout")).isTrue();
     }
 
@@ -76,7 +76,7 @@ class StepSchemaComposerTest {
 
         ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
 
-        assertThat(schema.get("oneOf").size()).isEqualTo(1);
+        assertThat(schema.get("oneOf").size()).isEqualTo(5);
     }
 
     @Test
@@ -100,6 +100,60 @@ class StepSchemaComposerTest {
             }
         }
         org.assertj.core.api.Assertions.fail("process variant not found in oneOf");
+    }
+
+
+    @Test
+    void schemaIncludesBlockVariant() {
+        StepCatalog catalog = catalogWith("process", Map.of());
+        ObjectNode  schema  = StepSchemaComposer.compose(catalog, mapper);
+        assertThat(hasVariantWithKey(schema, "block")).isTrue();
+    }
+
+    @Test
+    void schemaIncludesIfThenElseVariant() {
+        StepCatalog catalog   = catalogWith("process", Map.of());
+        ObjectNode  schema    = StepSchemaComposer.compose(catalog, mapper);
+        boolean     hasIfThen = false;
+        for (var variant : schema.get("oneOf")) {
+            if (variant.has("properties") && variant.get("properties").has("if")
+                && variant.get("properties").has("then")) {
+                hasIfThen = true;
+                break;
+            }
+        }
+        assertThat(hasIfThen).isTrue();
+    }
+
+    @Test
+    void schemaIncludesMatchCasesVariant() {
+        StepCatalog catalog  = catalogWith("process", Map.of());
+        ObjectNode  schema   = StepSchemaComposer.compose(catalog, mapper);
+        boolean     hasMatch = false;
+        for (var variant : schema.get("oneOf")) {
+            if (variant.has("properties") && variant.get("properties").has("match")
+                && variant.get("properties").has("cases")) {
+                hasMatch = true;
+                break;
+            }
+        }
+        assertThat(hasMatch).isTrue();
+    }
+
+    @Test
+    void schemaIncludesParallelVariant() {
+        StepCatalog catalog = catalogWith("process", Map.of());
+        ObjectNode  schema  = StepSchemaComposer.compose(catalog, mapper);
+        assertThat(hasVariantWithKey(schema, "parallel")).isTrue();
+    }
+
+    private boolean hasVariantWithKey(ObjectNode schema, String key) {
+        for (var variant : schema.get("oneOf")) {
+            if (variant.has("properties") && variant.get("properties").has(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private StepCatalog catalogWith(String name, Map<String, StepParameter> inputs) {

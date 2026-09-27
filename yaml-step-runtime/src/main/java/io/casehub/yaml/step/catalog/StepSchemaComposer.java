@@ -12,26 +12,26 @@ import java.util.Set;
 public final class StepSchemaComposer {
 
     private static final Set<String> DECORATOR_KEYS = Set.of(
-            "when", "on-success", "on-failure", "forEach", "loop",
+            "if", "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
-            "parallel", "semaphore", "barrier", "quorum", "race");
+            "semaphore", "barrier", "quorum", "race");
 
     private StepSchemaComposer() {}
 
     public static ObjectNode compose(StepCatalog catalog, ObjectMapper mapper) {
-        ObjectNode root = mapper.createObjectNode();
-        ArrayNode oneOf = root.putArray("oneOf");
+        ObjectNode root  = mapper.createObjectNode();
+        ArrayNode  oneOf = root.putArray("oneOf");
 
         for (String action : catalog.availableActions()) {
             catalog.resolve(action).ifPresent(entry -> {
-                ObjectNode variant = mapper.createObjectNode();
+                ObjectNode variant      = mapper.createObjectNode();
                 ObjectNode variantProps = variant.putObject("properties");
 
                 ObjectNode actionSchema = mapper.createObjectNode();
                 actionSchema.put("type", "object");
                 ObjectNode actionProps = actionSchema.putObject("properties");
-                ArrayNode requiredArr = actionSchema.putArray("required");
+                ArrayNode  requiredArr = actionSchema.putArray("required");
 
                 for (Map.Entry<String, StepParameter> param
                         : entry.definition().inputs().entrySet()) {
@@ -55,6 +55,35 @@ public final class StepSchemaComposer {
         invokeVariant.putObject("properties").putObject("invoke").put("type", "object");
         invokeVariant.putArray("required").add("invoke");
         oneOf.add(invokeVariant);
+
+        ObjectNode blockVariant = mapper.createObjectNode();
+        ObjectNode blockProps   = blockVariant.putObject("properties");
+        ObjectNode blockArray   = blockProps.putObject("block");
+        blockArray.put("type", "array");
+        blockVariant.putArray("required").add("block");
+        oneOf.add(blockVariant);
+
+        ObjectNode ifThenElseVariant = mapper.createObjectNode();
+        ObjectNode ifProps           = ifThenElseVariant.putObject("properties");
+        ifProps.putObject("if").put("type", "string");
+        ObjectNode thenSchema = ifProps.putObject("then");
+        thenSchema.put("type", "array");
+        ifProps.putObject("else").put("type", "array");
+        ifThenElseVariant.putArray("required").add("if").add("then");
+        oneOf.add(ifThenElseVariant);
+
+        ObjectNode matchVariant = mapper.createObjectNode();
+        ObjectNode matchProps   = matchVariant.putObject("properties");
+        matchProps.putObject("match").put("type", "string");
+        matchProps.putObject("cases").put("type", "array");
+        matchVariant.putArray("required").add("match").add("cases");
+        oneOf.add(matchVariant);
+
+        ObjectNode parallelVariant = mapper.createObjectNode();
+        ObjectNode parallelProps   = parallelVariant.putObject("properties");
+        parallelProps.putObject("parallel").put("type", "array");
+        parallelVariant.putArray("required").add("parallel");
+        oneOf.add(parallelVariant);
 
         ObjectNode sharedProps = root.putObject("properties");
         sharedProps.putObject("step").put("type", "string");

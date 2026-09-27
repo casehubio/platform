@@ -116,4 +116,51 @@ class MatchPatternDeserializerTest {
         assertThat(mp).isInstanceOf(MatchPattern.StructuralPattern.class);
         assertThat(((MatchPattern.StructuralPattern) mp).fields()).containsEntry("type", "trade");
     }
+
+    @Test
+    void deserializesAnyOfPatternFromArray() throws Exception {
+        String yaml = """
+                      - "PENDING"
+                      - "ACTIVE"
+                      """;
+        MatchPattern mp = mapper.readValue(yaml, MatchPattern.class);
+        assertThat(mp).isInstanceOf(MatchPattern.AnyOfPattern.class);
+        var aop = (MatchPattern.AnyOfPattern) mp;
+        assertThat(aop.values()).containsExactly("PENDING", "ACTIVE");
+    }
+
+    @Test
+    void deserializesAnyOfPatternWithMixedTypes() throws Exception {
+        String yaml = """
+                      - "text"
+                      - 42
+                      """;
+        MatchPattern mp = mapper.readValue(yaml, MatchPattern.class);
+        assertThat(mp).isInstanceOf(MatchPattern.AnyOfPattern.class);
+        var aop = (MatchPattern.AnyOfPattern) mp;
+        assertThat(aop.values()).containsExactly("text", 42);
+    }
+
+    @Test
+    void deserializesDefaultPatternFromAnyKeyword() throws Exception {
+        String       yaml = "\"any\"";
+        MatchPattern mp   = mapper.readValue(yaml, MatchPattern.class);
+        assertThat(mp).isInstanceOf(MatchPattern.DefaultPattern.class);
+    }
+
+    @Test
+    void deserializesAnyOfPatternInMatchCase() throws Exception {
+        String yaml = """
+                      pattern:
+                        - "PENDING"
+                        - "ACTIVE"
+                      steps:
+                        - action: handle
+                      """;
+        MatchCase mc = mapper.readValue(yaml, MatchCase.class);
+        assertThat(mc.pattern()).isInstanceOf(MatchPattern.AnyOfPattern.class);
+        var aop = (MatchPattern.AnyOfPattern) mc.pattern();
+        assertThat(aop.values()).containsExactly("PENDING", "ACTIVE");
+    }
+
 }

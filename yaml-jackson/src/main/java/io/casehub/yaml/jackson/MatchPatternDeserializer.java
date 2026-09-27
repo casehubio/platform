@@ -22,11 +22,19 @@ public class MatchPatternDeserializer extends StdDeserializer<MatchPattern> {
         if (node == null || node.isNull()) {
             return new MatchPattern.DefaultPattern();
         }
+        if (node.isArray()) {
+            var values = new java.util.ArrayList<>();
+            node.forEach(n -> values.add(nodeToValue(n)));
+            return new MatchPattern.AnyOfPattern(values);
+        }
         if (node.isObject()) {
             Map<String, Object> fields = new LinkedHashMap<>();
             node.fields().forEachRemaining(e ->
-                    fields.put(e.getKey(), nodeToValue(e.getValue())));
+                                                   fields.put(e.getKey(), nodeToValue(e.getValue())));
             return new MatchPattern.StructuralPattern(fields);
+        }
+        if (node.isTextual() && "any".equals(node.textValue())) {
+            return new MatchPattern.DefaultPattern();
         }
         return new MatchPattern.ValuePattern(nodeToValue(node));
     }

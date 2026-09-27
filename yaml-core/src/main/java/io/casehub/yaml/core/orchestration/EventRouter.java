@@ -1,28 +1,30 @@
 package io.casehub.yaml.core.orchestration;
 
+import io.casehub.yaml.core.step.MatchPattern;
+
 import java.util.List;
-import java.util.Map;
 import java.util.function.Predicate;
 
 public class EventRouter<S extends Enum<S>> {
-    private final OrcStateMachine<S> target;
-    private final Map<String, List<EventMapping<S>>> mappings;
+    private final OrcStateMachine<S>    target;
+    private final List<EventMapping<S>> mappings;
 
-    EventRouter(OrcStateMachine<S> target, Map<String, List<EventMapping<S>>> mappings) {
-        this.target = target;
-        this.mappings = Map.copyOf(mappings);
+    EventRouter(OrcStateMachine<S> target, List<EventMapping<S>> mappings) {
+        this.target   = target;
+        this.mappings = List.copyOf(mappings);
     }
 
-    public boolean fire(String event) { return fire(event, null); }
+    public boolean fire(String event)                 {return fire(event, null);}
 
-    public boolean fire(String event, Object context) {
-        var candidates = mappings.get(event);
-        if (candidates == null) return false;
-        S current = target.currentState();
-        for (var m : candidates) {
-            if (m.from() == current) {
+    public boolean fire(String event, Object context) {return fire((Object) event, context);}
+
+    public boolean fire(Object event, Object context) {
+        S      current     = target.currentState();
+        String currentName = current.name();
+        for (var m : mappings) {
+            if (m.onPattern().matches(event) && m.fromPattern().matches(currentName)) {
                 if (m.guard() == null || m.guard().test(context)) {
-                    return target.transition(m.from(), m.to(), context);
+                    return target.transition(current, m.to(), context);
                 }
             }
         }
@@ -33,5 +35,5 @@ public class EventRouter<S extends Enum<S>> {
         return new EventRouter<>(newTarget, this.mappings);
     }
 
-    public record EventMapping<S>(S from, S to, Predicate<Object> guard) {}
+    public record EventMapping<S>(MatchPattern fromPattern, S to, MatchPattern onPattern, Predicate<Object> guard) {}
 }

@@ -117,17 +117,17 @@ public final class DefaultOrcStateMachine<S extends Enum<S>> implements OrcState
     }
 
     public static final class Builder<S extends Enum<S>> {
-        private final String name;
-        private final Class<S> stateType;
-        private final S initialState;
-        private final Map<S, Map<S, Predicate<Object>>> transitions = new java.util.HashMap<>();
-        private final Set<S> terminalStates;
-        private final Map<String, java.util.List<EventRouter.EventMapping<S>>> eventMappings = new java.util.HashMap<>();
+        private final String                                      name;
+        private final Class<S>                                    stateType;
+        private final S                                           initialState;
+        private final Map<S, Map<S, Predicate<Object>>>           transitions   = new java.util.HashMap<>();
+        private final Set<S>                                      terminalStates;
+        private final java.util.List<EventRouter.EventMapping<S>> eventMappings = new java.util.ArrayList<>();
 
         private Builder(String name, Class<S> stateType, S initialState) {
-            this.name = name;
-            this.stateType = stateType;
-            this.initialState = initialState;
+            this.name           = name;
+            this.stateType      = stateType;
+            this.initialState   = initialState;
             this.terminalStates = EnumSet.noneOf(stateType);
         }
 
@@ -154,21 +154,65 @@ public final class DefaultOrcStateMachine<S extends Enum<S>> implements OrcState
 
         public Builder<S> on(String event, S from, S to) {
             transition(from, to);
-            eventMappings.computeIfAbsent(event, k -> new java.util.ArrayList<>())
-                         .add(new EventRouter.EventMapping<>(from, to, null));
+            eventMappings.add(new EventRouter.EventMapping<>(
+                    new io.casehub.yaml.core.step.MatchPattern.ValuePattern(from.name()), to,
+                    new io.casehub.yaml.core.step.MatchPattern.ValuePattern(event), null));
             return this;
         }
 
         public Builder<S> on(String event, S from, S to, Predicate<Object> guard) {
             transition(from, to, guard);
-            eventMappings.computeIfAbsent(event, k -> new java.util.ArrayList<>())
-                         .add(new EventRouter.EventMapping<>(from, to, guard));
+            eventMappings.add(new EventRouter.EventMapping<>(
+                    new io.casehub.yaml.core.step.MatchPattern.ValuePattern(from.name()), to,
+                    new io.casehub.yaml.core.step.MatchPattern.ValuePattern(event), guard));
             return this;
         }
 
-        public EventRouter<S> buildRouter(OrcStateMachine<S> target) {
-            return new EventRouter<>(target, Map.copyOf(eventMappings));
+        public Builder<S> on(io.casehub.yaml.core.step.MatchPattern onPattern,
+                             io.casehub.yaml.core.step.MatchPattern fromPattern, S to) {
+            return on(onPattern, fromPattern, to, null);
         }
 
+        public Builder<S> on(io.casehub.yaml.core.step.MatchPattern onPattern,
+                             io.casehub.yaml.core.step.MatchPattern fromPattern, S to,
+                             Predicate<Object> guard) {
+            registerTransitionsForPattern(fromPattern, to, guard);
+            eventMappings.add(new EventRouter.EventMapping<>(fromPattern, to, onPattern, guard));
+            return this;
+        }
+
+        private void registerTransitionsForPattern(io.casehub.yaml.core.step.MatchPattern fromPattern,
+                                                   S to, Predicate<Object> guard) {
+            switch (fromPattern) {
+                case io.casehub.yaml.core.step.MatchPattern.ValuePattern(var value) -> {
+                    S fromState = Enum.valueOf(stateType, (String) value);
+                    transitions.computeIfAbsent(fromState, k -> new java.util.HashMap<>()).put(to, guard);
+                }
+                case io.casehub.yaml.core.step.MatchPattern.AnyOfPattern(var values) -> {
+                    for (Object v : values) {
+                        S fromState = Enum.valueOf(stateType, (String) v);
+                        transitions.computeIfAbsent(fromState, k -> new java.util.HashMap<>()).put(to, guard);
+                    }
+                }
+                case io.casehub.yaml.core.step.MatchPattern.DefaultPattern() -> {
+                    for (S s : EnumSet.allOf(stateType)) {
+                        if (!terminalStates.contains(s)) {
+                            transitions.computeIfAbsent(s, k -> new java.util.HashMap<>()).put(to, guard);
+                        }
+                    }
+                }
+                case io.casehub.yaml.core.step.MatchPattern.StructuralPattern sp -> {
+                    for (S s : EnumSet.allOf(stateType)) {
+                        if (!terminalStates.contains(s)) {
+                            transitions.computeIfAbsent(s, k -> new java.util.HashMap<>()).put(to, guard);
+                        }
+                    }
+                }
+            }
+        }
+
+        public EventRouter<S> buildRouter(OrcStateMachine<S> target) {
+            return new EventRouter<>(target, java.util.List.copyOf(eventMappings));
+        }
     }
 }

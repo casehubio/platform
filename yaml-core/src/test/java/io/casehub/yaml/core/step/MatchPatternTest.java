@@ -83,6 +83,39 @@ class MatchPatternTest {
     }
 
     @Test
+    void anyOfPatternMatchesAnyListedValue() {
+        var pattern = new MatchPattern.AnyOfPattern(List.of("PENDING", "ACTIVE"));
+        assertThat(pattern.matches("PENDING")).isTrue();
+        assertThat(pattern.matches("ACTIVE")).isTrue();
+        assertThat(pattern.matches("CANCELLED")).isFalse();
+    }
+
+    @Test
+    void anyOfPatternEmptyListMatchesNothing() {
+        var pattern = new MatchPattern.AnyOfPattern(List.of());
+        assertThat(pattern.matches("anything")).isFalse();
+        assertThat(pattern.matches(null)).isFalse();
+    }
+
+    @Test
+    void anyOfPatternMatchesMixedTypes() {
+        var pattern = new MatchPattern.AnyOfPattern(List.of("text", 42, true));
+        assertThat(pattern.matches("text")).isTrue();
+        assertThat(pattern.matches(42)).isTrue();
+        assertThat(pattern.matches(true)).isTrue();
+        assertThat(pattern.matches("other")).isFalse();
+    }
+
+    @Test
+    void anyOfPatternDefensiveCopy() {
+        var values  = new java.util.ArrayList<Object>(List.of("A", "B"));
+        var pattern = new MatchPattern.AnyOfPattern(values);
+        values.clear();
+        assertThat(pattern.values()).hasSize(2);
+    }
+
+
+    @Test
     void matchCaseDefensiveCopy() {
         var steps = new java.util.ArrayList<>(List.of(Map.<String, Object>of("action", "do")));
         var mc = new MatchCase(new MatchPattern.ValuePattern("x"), null, steps);
@@ -94,9 +127,11 @@ class MatchPatternTest {
     void sealedInterfacePermitsAllVariants() {
         MatchPattern v = new MatchPattern.ValuePattern("a");
         MatchPattern s = new MatchPattern.StructuralPattern(Map.of());
+        MatchPattern a = new MatchPattern.AnyOfPattern(List.of("x", "y"));
         MatchPattern d = new MatchPattern.DefaultPattern();
         assertThat(v).isInstanceOf(MatchPattern.class);
         assertThat(s).isInstanceOf(MatchPattern.class);
+        assertThat(a).isInstanceOf(MatchPattern.class);
         assertThat(d).isInstanceOf(MatchPattern.class);
     }
 }

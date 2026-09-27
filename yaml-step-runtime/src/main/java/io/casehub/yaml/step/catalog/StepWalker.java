@@ -4,11 +4,11 @@ import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.StepCatalog;
 
 import java.util.ArrayList;
-import java.util.logging.Logger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 
 public final class StepWalker {
 
@@ -23,6 +23,8 @@ public final class StepWalker {
             "parallel", "semaphore", "barrier", "quorum", "race");
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases");
+    static final         int         MAX_DEPTH             = 32;
+
 
     private StepWalker() {}
 
@@ -30,17 +32,31 @@ public final class StepWalker {
             List<Map<String, Object>> steps, StepCatalog catalog) {
         List<ResolvedStep> result = new ArrayList<>(steps.size());
         for (int i = 0; i < steps.size(); i++) {
-            result.add(resolveOne(steps.get(i), catalog, i));
+            result.add(resolveOne(steps.get(i), catalog, i, 0, "root"));
         }
         return result;
     }
 
+    private static List<ResolvedStep> resolve(
+            List<Map<String, Object>> steps, StepCatalog catalog, int depth, String path) {
+        if (depth > MAX_DEPTH) {
+            throw new IllegalArgumentException(
+                    "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path);
+        }
+        List<ResolvedStep> result = new ArrayList<>(steps.size());
+        for (int i = 0; i < steps.size(); i++) {
+            result.add(resolveOne(steps.get(i), catalog, i, depth, path));
+        }
+        return result;
+    }
+
+
     @SuppressWarnings("unchecked")
     private static ResolvedStep resolveOne(
-            Map<String, Object> step, StepCatalog catalog, int index) {
+            Map<String, Object> step, StepCatalog catalog, int index, int depth, String path) {
         if (step.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": empty step map");
+                    path + " → Step " + index + ": empty step map");
         }
 
         Map<String, Object> decorators    = new LinkedHashMap<>();
@@ -83,7 +99,7 @@ public final class StepWalker {
                 if (entry.isPresent()) {
                     if (matchedAction != null) {
                         throw new IllegalArgumentException(
-                                "Step " + index + ": ambiguous — multiple action keys matched: '"
+                                path + " → Step " + index + ": ambiguous — multiple action keys matched: '"
                                 + matchedAction + "' and '" + key + "'");
                     }
                     matchedAction = key;
@@ -93,7 +109,7 @@ public final class StepWalker {
                                     : Map.of();
                 } else {
                     throw new IllegalArgumentException(
-                            "Step " + index + ": unknown key '" + key
+                            path + " → Step " + index + ": unknown key '" + key
                             + "'. Available actions: " + catalog.availableActions());
                 }
             }
@@ -107,7 +123,7 @@ public final class StepWalker {
         if (hasMatch && companions.containsKey("cases")) {
             if (structuralType != null) {
                 throw new IllegalArgumentException(
-                        "Step " + index + ": ambiguous — structural keyword '" + structuralType
+                        path + " → Step " + index + ": ambiguous — structural keyword '" + structuralType
                         + "' and 'match' both present");
             }
             structuralType = "match";
@@ -115,56 +131,57 @@ public final class StepWalker {
 
         if (structuralType != null && matchedAction != null) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": ambiguous — structural keyword '" + structuralType
+                    path + " → Step " + index + ": ambiguous — structural keyword '" + structuralType
                     + "' and action key '" + matchedAction + "' both present");
         }
         if (structuralType != null && invokeSpec != null) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": ambiguous — structural keyword '" + structuralType
+                    path + " → Step " + index + ": ambiguous — structural keyword '" + structuralType
                     + "' and 'invoke' both present");
         }
 
         if (companions.containsKey("then") && !hasIf) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": 'then' requires an 'if' condition");
+                    path + " → Step " + index + ": 'then' requires an 'if' condition");
         }
         if (companions.containsKey("else") && !companions.containsKey("then")) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": 'else' requires 'then'");
+                    path + " → Step " + index + ": 'else' requires 'then'");
         }
         if (companions.containsKey("cases") && !"match".equals(structuralType)) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": 'cases' requires 'match'");
+                    path + " → Step " + index + ": 'cases' requires 'match'");
         }
         if (hasMatch && !companions.containsKey("cases")) {
             throw new IllegalArgumentException(
-                    "Step " + index + ": 'match' requires 'cases'");
+                    path + " → Step " + index + ": 'match' requires 'cases'");
         }
 
+        String stepPath = path + " → Step " + index;
         if ("if".equals(structuralType)) {
             var thenSteps = (List<Map<String, Object>>) companions.get("then");
             var elseSteps = (List<Map<String, Object>>) companions.get("else");
             return new ResolvedStep.IfElseStep(
                     (String) ifValue,
-                    resolve(thenSteps, catalog),
-                    elseSteps != null ? resolve(elseSteps, catalog) : null,
+                    resolve(thenSteps, catalog, depth + 1, stepPath + " → then"),
+                    elseSteps != null ? resolve(elseSteps, catalog, depth + 1, stepPath + " → else") : null,
                     decorators);
         }
         if ("block".equals(structuralType)) {
             return new ResolvedStep.BlockStep(
-                    resolve((List<Map<String, Object>>) structuralValue, catalog),
+                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → block"),
                     decorators);
         }
         if ("match".equals(structuralType)) {
             var cases = (List<Map<String, Object>>) companions.get("cases");
             return new ResolvedStep.MatchStep(
                     (String) matchValue,
-                    resolveMatchCases(cases, catalog, index),
+                    resolveMatchCases(cases, catalog, index, depth, stepPath),
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
             return new ResolvedStep.ParallelStep(
-                    resolve((List<Map<String, Object>>) structuralValue, catalog),
+                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → parallel"),
                     decorators);
         }
         if (matchedEntry != null) {
@@ -175,13 +192,13 @@ public final class StepWalker {
         }
 
         throw new IllegalArgumentException(
-                "Step " + index + ": no step type identified. Available actions: "
+                stepPath + ": no step type identified. Available actions: "
                 + catalog.availableActions());
     }
 
     @SuppressWarnings("unchecked")
     private static List<ResolvedMatchCase> resolveMatchCases(
-            List<Map<String, Object>> cases, StepCatalog catalog, int stepIndex) {
+            List<Map<String, Object>> cases, StepCatalog catalog, int stepIndex, int depth, String path) {
         List<ResolvedMatchCase> result = new ArrayList<>(cases.size());
         for (int i = 0; i < cases.size(); i++) {
             Map<String, Object> caseMap    = cases.get(i);
@@ -190,32 +207,36 @@ public final class StepWalker {
 
             if (isDefault && hasPattern) {
                 throw new IllegalArgumentException(
-                        "Step " + stepIndex + ", case " + i
+                        path + ", case " + i
                         + ": pattern and default are mutually exclusive in a case entry");
             }
             if (!isDefault && !hasPattern) {
                 throw new IllegalArgumentException(
-                        "Step " + stepIndex + ", case " + i
+                        path + ", case " + i
                         + ": case entry must contain either 'pattern' or 'default'");
             }
 
             if (isDefault && i < cases.size() - 1) {
                 throw new IllegalArgumentException(
-                        "Step " + stepIndex + ": default must be the last case");
+                        path + ": default must be the last case");
             }
 
+            String casePath = path + " → case " + i;
             if (isDefault) {
                 var steps = (List<Map<String, Object>>) caseMap.get("default");
                 result.add(new ResolvedMatchCase(
                         new io.casehub.yaml.core.step.MatchPattern.DefaultPattern(),
                         null,
-                        resolve(steps, catalog)));
+                        resolve(steps, catalog, depth + 1, casePath + " → default")));
             } else {
                 var                                    patternObj = caseMap.get("pattern");
                 io.casehub.yaml.core.step.MatchPattern pattern;
                 if (patternObj instanceof Map) {
                     pattern = new io.casehub.yaml.core.step.MatchPattern.StructuralPattern(
                             (Map<String, Object>) patternObj);
+                } else if (patternObj instanceof List) {
+                    pattern = new io.casehub.yaml.core.step.MatchPattern.AnyOfPattern(
+                            (List<Object>) patternObj);
                 } else {
                     pattern = new io.casehub.yaml.core.step.MatchPattern.ValuePattern(patternObj);
                 }
@@ -224,15 +245,15 @@ public final class StepWalker {
                 var steps = caseMap.containsKey("steps")
                             ? (List<Map<String, Object>>) caseMap.get("steps")
                             : List.<Map<String, Object>>of();
-                result.add(new ResolvedMatchCase(pattern, guard, resolve(steps, catalog)));
+                result.add(new ResolvedMatchCase(pattern, guard, resolve(steps, catalog, depth + 1, casePath)));
             }
         }
 
         boolean hasDefault = result.stream()
-                .anyMatch(c -> c.pattern() instanceof io.casehub.yaml.core.step.MatchPattern.DefaultPattern);
+                                   .anyMatch(c -> c.pattern() instanceof io.casehub.yaml.core.step.MatchPattern.DefaultPattern);
         if (!hasDefault) {
-            LOG.warning("Step " + stepIndex + ": match/cases has no default case — "
-                    + "unmatched values will be silently skipped");
+            LOG.warning(path + ": match/cases has no default case — "
+                        + "unmatched values will be silently skipped");
         }
 
         return result;

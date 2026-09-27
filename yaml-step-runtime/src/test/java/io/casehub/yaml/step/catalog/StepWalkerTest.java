@@ -420,6 +420,31 @@ class StepWalkerTest {
         }
     }
 
+    @Test
+    void exceedsMaxDepth_throwsWithPath() {
+        Map<String, Object> deeplyNested = Map.of("process", Map.of());
+        for (int i = 0; i < StepWalker.MAX_DEPTH + 1; i++) {
+            deeplyNested = new LinkedHashMap<>(Map.of("block", List.of(deeplyNested)));
+        }
+        var steps = List.of(deeplyNested);
+        assertThatThrownBy(() -> StepWalker.resolve(steps, catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Maximum nesting depth")
+                .hasMessageContaining("" + StepWalker.MAX_DEPTH);
+    }
+
+    @Test
+    void atMaxDepth_succeeds() {
+        Map<String, Object> nested = Map.of("process", Map.of());
+        for (int i = 0; i < StepWalker.MAX_DEPTH; i++) {
+            nested = new LinkedHashMap<>(Map.of("block", List.of(nested)));
+        }
+        var steps  = List.of(nested);
+        var result = StepWalker.resolve(steps, catalog);
+        assertThat(result).hasSize(1);
+    }
+
+
     private static CatalogEntry entry(String name) {
         var def = new StepDefinition(name, null, Map.of(), Map.of(),
                 new InvokeBinding.Mcp(name));

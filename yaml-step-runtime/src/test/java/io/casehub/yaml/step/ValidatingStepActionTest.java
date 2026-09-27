@@ -103,4 +103,85 @@ class ValidatingStepActionTest {
         assertThat(events.get(0).success()).isFalse();
         assertThat(events.get(0).metadata()).containsKey("error");
     }
+
+    @Test
+    void eventIncludesBindingType() {
+        List<StepExecutionEvent> events  = new ArrayList<>();
+        var                      binding = new InvokeBinding.Process("/bin/echo", List.of("hi"), "raw", null, null, null, null);
+        var                      def     = new StepDefinition("test-step", null, Map.of(), Map.of(), binding);
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.of(Map.of(), Map.of()),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).bindingType()).isEqualTo("process");
+    }
+
+    @Test
+    void eventClassifiesSuccess() {
+        List<StepExecutionEvent> events = new ArrayList<>();
+        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.of(Map.of(), Map.of()),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events.get(0).resultClassification()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void eventClassifiesFailure() {
+        List<StepExecutionEvent> events = new ArrayList<>();
+        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.failed("something broke"),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events.get(0).resultClassification()).isEqualTo("FAILURE");
+    }
+
+    @Test
+    void eventNullBindingTypeWhenNoBinding() {
+        List<StepExecutionEvent> events = new ArrayList<>();
+        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), null);
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.of(Map.of(), Map.of()),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events.get(0).bindingType()).isNull();
+    }
+
+    @Test
+    void eventBindingTypePython() {
+        List<StepExecutionEvent> events = new ArrayList<>();
+        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Python("s.py"));
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.of(Map.of(), Map.of()),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events.get(0).bindingType()).isEqualTo("python");
+    }
+
+    @Test
+    void eventBindingTypeAgent() {
+        List<StepExecutionEvent> events = new ArrayList<>();
+        var def = new StepDefinition("test", null, Map.of(), Map.of(),
+                                     new InvokeBinding.Agent("analyst", null, null, false));
+        var action = new ValidatingStepAction(def,
+                                              (params, svc) -> StepResult.of(Map.of(), Map.of()),
+                                              events::add);
+
+        action.execute(Map.of(), null);
+
+        assertThat(events.get(0).bindingType()).isEqualTo("agent");
+    }
 }

@@ -19,7 +19,14 @@ public sealed interface InvokeBinding {
 
     record Graphql(String query) implements InvokeBinding {}
 
-    record Python(String script) implements InvokeBinding {}
+    record Python(String script, String timeout) implements InvokeBinding {
+        public Python {
+            if (script == null)
+                throw new IllegalArgumentException("Python binding requires script");
+            if (timeout == null) timeout = "30s";
+        }
+        public Python(String script) { this(script, null); }
+    }
 
     record Agent(String descriptor,
                  String model,

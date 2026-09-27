@@ -83,4 +83,23 @@ class InvokeBindingTest {
     void sealedInterfacePermitsSixTypes() {
         assertThat(InvokeBinding.class.getPermittedSubclasses()).hasSize(6);
     }
+
+    @Test
+    void pythonBindingDefaultTimeout() {
+        var binding = new InvokeBinding.Python("script.py");
+        assertThat(binding.timeout()).isEqualTo("30s");
+    }
+
+    @Test
+    void pythonBindingCustomTimeout() {
+        var binding = new InvokeBinding.Python("script.py", "60s");
+        assertThat(binding.timeout()).isEqualTo("60s");
+    }
+
+    @Test
+    void pythonBindingRequiresScript() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.Python(null))
+                .withMessageContaining("Python binding requires script");
+    }
 }

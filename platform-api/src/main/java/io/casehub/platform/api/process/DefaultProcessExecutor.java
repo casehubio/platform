@@ -3,11 +3,20 @@ package io.casehub.platform.api.process;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /** Default {@link ProcessExecutor} backed by {@link ProcessBuilder}. */
 public class DefaultProcessExecutor implements ProcessExecutor {
+
+    private final List<CommandPattern> allowList;
+
+    public DefaultProcessExecutor() { this(null); }
+
+    public DefaultProcessExecutor(List<CommandPattern> allowList) {
+        this.allowList = allowList != null ? List.copyOf(allowList) : null;
+    }
 
     @Override
     public ProcessResult execute(String... command) {
@@ -16,6 +25,19 @@ public class DefaultProcessExecutor implements ProcessExecutor {
 
     @Override
     public ProcessResult execute(ProcessCommand command) {
+        if (allowList != null) {
+            boolean allowed = false;
+            for (CommandPattern pattern : allowList) {
+                if (pattern.matches(command.command())) {
+                    allowed = true;
+                    break;
+                }
+            }
+            if (!allowed) {
+                throw new CommandNotAllowedException(command.command());
+            }
+        }
+
         var pb = new ProcessBuilder(command.command());
         if (command.workingDir() != null) {
             pb.directory(new File(command.workingDir()));
@@ -28,6 +50,18 @@ public class DefaultProcessExecutor implements ProcessExecutor {
         } catch (IOException e) {
             throw new ProcessExecutionException(
                     "Failed to start process: " + String.join(" ", command.command()), e);
+        }
+
+        if (command.stdin() != null) {
+            try (var os = process.getOutputStream()) {
+                os.write(command.stdin());
+                os.flush();
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new ProcessExecutionException("Failed to write stdin", e);
+            }
+        } else {
+            try { process.getOutputStream().close(); } catch (IOException ignored) {}
         }
 
         var stdoutFuture = readAsync(process.getInputStream());

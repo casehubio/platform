@@ -123,4 +123,91 @@ class ProcessExecutorTest {
                 .isInstanceOf(ProcessExecutionException.class)
                 .hasMessageContaining("fail");
     }
+
+    @Test
+    void processCommandStdinField() {
+        byte[] input = "{\"key\":\"value\"}".getBytes();
+        var    cmd   = ProcessCommand.of("cat").stdin(input);
+        assertThat(cmd.stdin()).isEqualTo(input);
+        assertThat(cmd.command()).containsExactly("cat");
+    }
+
+    @Test
+    void processCommandStdinDefaultsToNull() {
+        var cmd = ProcessCommand.of("echo", "test");
+        assertThat(cmd.stdin()).isNull();
+    }
+
+    @Test
+    void processCommandStdinDefensiveCopy() {
+        byte[] input = "original".getBytes();
+        var    cmd   = ProcessCommand.of("cat").stdin(input);
+        input[0] = 'X';
+        assertThat(cmd.stdin()).isEqualTo("original".getBytes());
+    }
+
+    @Test
+    void processCommandMemoryLimitField() {
+        var cmd = ProcessCommand.of("echo").memoryLimit(256 * 1024 * 1024L);
+        assertThat(cmd.memoryLimitBytes()).isEqualTo(256 * 1024 * 1024L);
+    }
+
+    @Test
+    void processCommandMemoryLimitDefaultsToNull() {
+        var cmd = ProcessCommand.of("echo");
+        assertThat(cmd.memoryLimitBytes()).isNull();
+    }
+
+    @Test
+    void processCommandAllowedPathsField() {
+        var cmd = ProcessCommand.of("python3").allowedPaths(java.util.List.of("/opt/scripts", "/tmp"));
+        assertThat(cmd.allowedPaths()).containsExactly("/opt/scripts", "/tmp");
+    }
+
+    @Test
+    void processCommandAllowedPathsDefaultsToNull() {
+        var cmd = ProcessCommand.of("python3");
+        assertThat(cmd.allowedPaths()).isNull();
+    }
+
+    @Test
+    void executePipesStdinToProcess() {
+        var cmd    = ProcessCommand.of("cat").stdin("hello from stdin".getBytes());
+        var result = executor.execute(cmd);
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.stdout()).isEqualTo("hello from stdin");
+    }
+
+    @Test
+    void executeWithoutStdinWorksNormally() {
+        var cmd    = ProcessCommand.of("echo", "no stdin");
+        var result = executor.execute(cmd);
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.stdout()).isEqualTo("no stdin");
+    }
+
+    @Test
+    void allowListBlocksUnknownCommand() {
+        var restricted = new DefaultProcessExecutor(java.util.List.of(
+                new CommandPattern(java.util.List.of("echo"), CommandPattern.MatchMode.PREFIX)));
+        assertThatThrownBy(() -> restricted.execute("ls"))
+                .isInstanceOf(CommandNotAllowedException.class)
+                .hasMessageContaining("ls");
+    }
+
+    @Test
+    void allowListPermitsMatchingCommand() {
+        var restricted = new DefaultProcessExecutor(java.util.List.of(
+                new CommandPattern(java.util.List.of("echo"), CommandPattern.MatchMode.PREFIX)));
+        var result = restricted.execute("echo", "allowed");
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.stdout()).isEqualTo("allowed");
+    }
+
+    @Test
+    void nullAllowListPermitsEverything() {
+        var unrestricted = new DefaultProcessExecutor(null);
+        var result       = unrestricted.execute("echo", "anything");
+        assertThat(result.isSuccess()).isTrue();
+    }
 }

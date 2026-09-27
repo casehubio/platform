@@ -1,5 +1,6 @@
 package io.casehub.yaml.step;
 
+import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepValidator;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
@@ -55,7 +56,23 @@ public class ValidatingStepAction implements StepAction {
     }
 
     private void fireEvent(long durationMs, boolean success, Map<String, Object> metadata) {
+        String bindingType = extractBindingType(definition.invoke());
+        String classification = success ? "SUCCESS" : "FAILURE";
         eventSink.accept(new StepExecutionEvent(
-                definition.name(), durationMs, success, metadata));
+                definition.name(), durationMs, success, metadata,
+                bindingType, classification,
+                null, null, null, null, null));
+    }
+
+    private static String extractBindingType(InvokeBinding binding) {
+        if (binding == null) return null;
+        return switch (binding) {
+            case InvokeBinding.Process p -> "process";
+            case InvokeBinding.Python p -> "python";
+            case InvokeBinding.Agent a -> "agent";
+            case InvokeBinding.Mcp m -> "mcp";
+            case InvokeBinding.Rest r -> "rest";
+            case InvokeBinding.Graphql g -> "graphql";
+        };
     }
 }

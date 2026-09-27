@@ -86,7 +86,7 @@ public final class StructuralStepEvaluator {
         if (branch.isEmpty()) {
             return StepResult.of(Map.of());
         }
-        return evaluateBlock(new ResolvedStep.BlockStep(branch, Map.of()), resolver, runner);
+        return evaluateBlock(new ResolvedStep.BlockStep(null, branch, Map.of()), resolver, runner);
     }
 
     private StepResult evaluateMatch(ResolvedStep.MatchStep match,
@@ -112,7 +112,7 @@ public final class StructuralStepEvaluator {
                 return StepResult.of(Map.of());
             }
             return evaluateBlock(
-                    new ResolvedStep.BlockStep(mc.steps(), Map.of()), matchResolver, runner);
+                    new ResolvedStep.BlockStep(null, mc.steps(), Map.of()), matchResolver, runner);
         }
         return StepResult.of(Map.of());
     }
@@ -122,7 +122,7 @@ public final class StructuralStepEvaluator {
         StepResult tryResult;
         try {
             tryResult = evaluateBlock(
-                    new ResolvedStep.BlockStep(tcf.trySteps(), Map.of()), resolver, runner);
+                    new ResolvedStep.BlockStep(null, tcf.trySteps(), Map.of()), resolver, runner);
         } catch (Exception e) {
             tryResult = StepResult.failed(e.getMessage());
         }
@@ -138,7 +138,7 @@ public final class StructuralStepEvaluator {
                                                                       });
             try {
                 result = evaluateBlock(
-                        new ResolvedStep.BlockStep(tcf.catchSteps(), Map.of()), errorResolver, runner);
+                        new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), errorResolver, runner);
             } catch (Exception e) {
                 result = StepResult.failed("catch failed: " + e.getMessage());
             }
@@ -148,7 +148,7 @@ public final class StructuralStepEvaluator {
             StepResult finallyResult;
             try {
                 finallyResult = evaluateBlock(
-                        new ResolvedStep.BlockStep(tcf.finallySteps(), Map.of()), resolver, runner);
+                        new ResolvedStep.BlockStep(null, tcf.finallySteps(), Map.of()), resolver, runner);
             } catch (Exception e) {
                 finallyResult = StepResult.failed("finally failed: " + e.getMessage());
             }
@@ -236,7 +236,7 @@ public final class StructuralStepEvaluator {
         }
 
         return evaluateBlock(
-                new ResolvedStep.BlockStep(winningBranch.steps(), Map.of()), scoped, runner);
+                new ResolvedStep.BlockStep(null, winningBranch.steps(), Map.of()), scoped, runner);
     }
 
 

@@ -31,22 +31,19 @@ public final class StepWalker {
 
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, StepCatalog catalog) {
-        List<ResolvedStep> result = new ArrayList<>(steps.size());
-        for (int i = 0; i < steps.size(); i++) {
-            result.add(resolveOne(steps.get(i), catalog, i, 0, "root"));
-        }
-        return result;
+        Set<String> seenNames = new java.util.HashSet<>();
+        return resolve(steps, catalog, 0, "root", seenNames);
     }
 
     private static List<ResolvedStep> resolve(
-            List<Map<String, Object>> steps, StepCatalog catalog, int depth, String path) {
+            List<Map<String, Object>> steps, StepCatalog catalog, int depth, String path, Set<String> seenNames) {
         if (depth > MAX_DEPTH) {
             throw new IllegalArgumentException(
                     "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path);
         }
         List<ResolvedStep> result = new ArrayList<>(steps.size());
         for (int i = 0; i < steps.size(); i++) {
-            result.add(resolveOne(steps.get(i), catalog, i, depth, path));
+            result.add(resolveOne(steps.get(i), catalog, i, depth, path, seenNames));
         }
         return result;
     }
@@ -54,7 +51,8 @@ public final class StepWalker {
 
     @SuppressWarnings("unchecked")
     private static ResolvedStep resolveOne(
-            Map<String, Object> step, StepCatalog catalog, int index, int depth, String path) {
+            Map<String, Object> step, StepCatalog catalog, int index, int depth, String path,
+            Set<String> seenNames) {
         if (step.isEmpty()) {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": empty step map");
@@ -73,12 +71,13 @@ public final class StepWalker {
         boolean hasIf           = false;
         Object  matchValue      = null;
         boolean hasMatch        = false;
+        String  stepName        = null;
 
         for (Map.Entry<String, Object> e : step.entrySet()) {
             String key = e.getKey();
 
             if ("step".equals(key)) {
-                // label — skip
+                stepName = (String) e.getValue();
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
             } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key)) {
@@ -114,6 +113,11 @@ public final class StepWalker {
                             + "'. Available actions: " + catalog.availableActions());
                 }
             }
+        }
+
+        if (stepName != null && !seenNames.add(stepName)) {
+            throw new IllegalArgumentException(
+                    path + " → Step " + index + ": duplicate step name '" + stepName + "'");
         }
 
         if (hasIf && companions.containsKey("then")) {
@@ -175,26 +179,30 @@ public final class StepWalker {
             var thenSteps = (List<Map<String, Object>>) companions.get("then");
             var elseSteps = (List<Map<String, Object>>) companions.get("else");
             return new ResolvedStep.IfElseStep(
+                    stepName,
                     (String) ifValue,
-                    resolve(thenSteps, catalog, depth + 1, stepPath + " → then"),
-                    elseSteps != null ? resolve(elseSteps, catalog, depth + 1, stepPath + " → else") : null,
+                    resolve(thenSteps, catalog, depth + 1, stepPath + " → then", seenNames),
+                    elseSteps != null ? resolve(elseSteps, catalog, depth + 1, stepPath + " → else", seenNames) : null,
                     decorators);
         }
         if ("block".equals(structuralType)) {
             return new ResolvedStep.BlockStep(
-                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → block"),
+                    stepName,
+                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → block", seenNames),
                     decorators);
         }
         if ("match".equals(structuralType)) {
             var cases = (List<Map<String, Object>>) companions.get("cases");
             return new ResolvedStep.MatchStep(
+                    stepName,
                     (String) matchValue,
-                    resolveMatchCases(cases, catalog, index, depth, stepPath),
+                    resolveMatchCases(cases, catalog, index, depth, stepPath, seenNames),
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
             return new ResolvedStep.ParallelStep(
-                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → parallel"),
+                    stepName,
+                    resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → parallel", seenNames),
                     decorators);
         }
         if ("try".equals(structuralType)) {
@@ -202,22 +210,24 @@ public final class StepWalker {
             var catchSteps   = (List<Map<String, Object>>) companions.get("catch");
             var finallySteps = (List<Map<String, Object>>) companions.get("finally");
             return new ResolvedStep.TryCatchFinallyStep(
-                    resolve(trySteps, catalog, depth + 1, stepPath + " → try"),
-                    catchSteps != null ? resolve(catchSteps, catalog, depth + 1, stepPath + " → catch") : null,
-                    finallySteps != null ? resolve(finallySteps, catalog, depth + 1, stepPath + " → finally") : null,
+                    stepName,
+                    resolve(trySteps, catalog, depth + 1, stepPath + " → try", seenNames),
+                    catchSteps != null ? resolve(catchSteps, catalog, depth + 1, stepPath + " → catch", seenNames) : null,
+                    finallySteps != null ? resolve(finallySteps, catalog, depth + 1, stepPath + " → finally", seenNames) : null,
                     decorators);
         }
         if ("select".equals(structuralType)) {
             var branchMaps = (List<Map<String, Object>>) structuralValue;
             return new ResolvedStep.SelectStep(
-                    resolveSelectBranches(branchMaps, catalog, depth, stepPath),
+                    stepName,
+                    resolveSelectBranches(branchMaps, catalog, depth, stepPath, seenNames),
                     decorators);
         }
         if (matchedEntry != null) {
-            return new ResolvedStep.PluginStep(matchedEntry, actionParams, decorators);
+            return new ResolvedStep.PluginStep(stepName, matchedEntry, actionParams, decorators);
         }
         if (invokeSpec != null) {
-            return new ResolvedStep.InvokeStep(invokeSpec, decorators);
+            return new ResolvedStep.InvokeStep(stepName, invokeSpec, decorators);
         }
 
         throw new IllegalArgumentException(
@@ -227,7 +237,8 @@ public final class StepWalker {
 
     @SuppressWarnings("unchecked")
     private static List<ResolvedMatchCase> resolveMatchCases(
-            List<Map<String, Object>> cases, StepCatalog catalog, int stepIndex, int depth, String path) {
+            List<Map<String, Object>> cases, StepCatalog catalog, int stepIndex, int depth, String path,
+            Set<String> seenNames) {
         List<ResolvedMatchCase> result = new ArrayList<>(cases.size());
         for (int i = 0; i < cases.size(); i++) {
             Map<String, Object> caseMap    = cases.get(i);
@@ -256,7 +267,7 @@ public final class StepWalker {
                 result.add(new ResolvedMatchCase(
                         new io.casehub.yaml.core.step.MatchPattern.DefaultPattern(),
                         null,
-                        resolve(steps, catalog, depth + 1, casePath + " → default")));
+                        resolve(steps, catalog, depth + 1, casePath + " → default", seenNames)));
             } else {
                 var                                    patternObj = caseMap.get("pattern");
                 io.casehub.yaml.core.step.MatchPattern pattern;
@@ -274,7 +285,7 @@ public final class StepWalker {
                 var steps = caseMap.containsKey("steps")
                             ? (List<Map<String, Object>>) caseMap.get("steps")
                             : List.<Map<String, Object>>of();
-                result.add(new ResolvedMatchCase(pattern, guard, resolve(steps, catalog, depth + 1, casePath)));
+                result.add(new ResolvedMatchCase(pattern, guard, resolve(steps, catalog, depth + 1, casePath, seenNames)));
             }
         }
 
@@ -290,7 +301,8 @@ public final class StepWalker {
 
     @SuppressWarnings("unchecked")
     private static List<ResolvedStep.SelectBranch> resolveSelectBranches(
-            List<Map<String, Object>> branches, StepCatalog catalog, int depth, String path) {
+            List<Map<String, Object>> branches, StepCatalog catalog, int depth, String path,
+            Set<String> seenNames) {
         List<ResolvedStep.SelectBranch> result = new ArrayList<>(branches.size());
         for (int i = 0; i < branches.size(); i++) {
             Map<String, Object>           branchMap  = branches.get(i);
@@ -316,7 +328,7 @@ public final class StepWalker {
                         ? (List<Map<String, Object>>) branchMap.get("steps")
                         : List.<Map<String, Object>>of();
             result.add(new ResolvedStep.SelectBranch(
-                    type, name, resolve(steps, catalog, depth + 1, branchPath)));
+                    type, name, resolve(steps, catalog, depth + 1, branchPath, seenNames)));
         }
         return result;
     }

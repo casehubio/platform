@@ -17,7 +17,11 @@ public sealed interface ResolvedStep permits
 
     Map<String, Object> decorators();
 
+    default String name() {return null;}
+
+
     record PluginStep(
+            String name,
             CatalogEntry entry,
             Map<String, Object> params,
             Map<String, Object> decorators) implements ResolvedStep {
@@ -29,6 +33,7 @@ public sealed interface ResolvedStep permits
     }
 
     record InvokeStep(
+            String name,
             Map<String, Object> invokeSpec,
             Map<String, Object> decorators) implements ResolvedStep {
 
@@ -39,6 +44,7 @@ public sealed interface ResolvedStep permits
     }
 
     record BlockStep(
+            String name,
             List<ResolvedStep> steps,
             Map<String, Object> decorators) implements ResolvedStep {
 
@@ -49,6 +55,7 @@ public sealed interface ResolvedStep permits
     }
 
     record IfElseStep(
+            String name,
             String condition,
             List<ResolvedStep> thenSteps,
             List<ResolvedStep> elseSteps,
@@ -62,6 +69,7 @@ public sealed interface ResolvedStep permits
     }
 
     record MatchStep(
+            String name,
             String scrutinee,
             List<ResolvedMatchCase> cases,
             Map<String, Object> decorators) implements ResolvedStep {
@@ -73,6 +81,7 @@ public sealed interface ResolvedStep permits
     }
 
     record ParallelStep(
+            String name,
             List<ResolvedStep> steps,
             Map<String, Object> decorators) implements ResolvedStep {
 
@@ -83,6 +92,7 @@ public sealed interface ResolvedStep permits
     }
 
     record TryCatchFinallyStep(
+            String name,
             List<ResolvedStep> trySteps,
             List<ResolvedStep> catchSteps,
             List<ResolvedStep> finallySteps,
@@ -113,6 +123,7 @@ public sealed interface ResolvedStep permits
     }
 
     record SelectStep(
+            String name,
             List<SelectBranch> branches,
             Map<String, Object> decorators) implements ResolvedStep {
 

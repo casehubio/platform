@@ -37,7 +37,7 @@ class StructuralStepEvaluatorTest {
     }
 
     private ResolvedStep leaf(String id) {
-        return new ResolvedStep.InvokeStep(Map.of("id", id), Map.of());
+        return new ResolvedStep.InvokeStep(null, Map.of("id", id), Map.of());
     }
 
     private StepRunner successRunner(Map<String, Object> output) {
@@ -60,14 +60,14 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void emptyBlock_returnsSuccess() {
-            var block = new ResolvedStep.BlockStep(List.of(), Map.of());
+            var block = new ResolvedStep.BlockStep(null, List.of(), Map.of());
             var result = evaluator.evaluate(block, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
         }
 
         @Test
         void singleStep_delegatesToRunner() {
-            var block = new ResolvedStep.BlockStep(List.of(leaf("a")), Map.of());
+            var block = new ResolvedStep.BlockStep(null, List.of(leaf("a")), Map.of());
             var result = evaluator.evaluate(block, resolver,
                     (step, res) -> StepResult.of(Map.of("key", "value")));
             assertThat(result.isSuccess()).isTrue();
@@ -77,7 +77,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void multipleSteps_executesSequentially() {
             var order = new ArrayList<String>();
-            var block = new ResolvedStep.BlockStep(
+            var block = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("first"), leaf("second"), leaf("third")), Map.of());
             evaluator.evaluate(block, resolver, trackingRunner(order));
             assertThat(order).containsExactly("first", "second", "third");
@@ -86,7 +86,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void firstStepFails_shortCircuits() {
             var order = new ArrayList<String>();
-            var block = new ResolvedStep.BlockStep(
+            var block = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("a"), leaf("b")), Map.of());
             var result = evaluator.evaluate(block, resolver, (step, res) -> {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
@@ -103,7 +103,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void returnsLastStepOutput() {
-            var block = new ResolvedStep.BlockStep(
+            var block = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("a"), leaf("b")), Map.of());
             var result = evaluator.evaluate(block, resolver, (step, res) -> {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
@@ -118,9 +118,9 @@ class StructuralStepEvaluatorTest {
         @Test
         void nestedBlocks_executeCorrectly() {
             var order = new ArrayList<String>();
-            var inner = new ResolvedStep.BlockStep(
+            var inner = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("inner1"), leaf("inner2")), Map.of());
-            var outer = new ResolvedStep.BlockStep(
+            var outer = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("outer1"), inner, leaf("outer2")), Map.of());
             evaluator.evaluate(outer, resolver, trackingRunner(order));
             assertThat(order).containsExactly("outer1", "inner1", "inner2", "outer2");
@@ -134,7 +134,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void conditionTrue_executesThenBranch() {
-            var step = new ResolvedStep.IfElseStep("true",
+            var step = new ResolvedStep.IfElseStep(null, "true",
                     List.of(leaf("then")), List.of(leaf("else")), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
@@ -143,7 +143,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void conditionFalse_executesElseBranch() {
-            var step = new ResolvedStep.IfElseStep("false",
+            var step = new ResolvedStep.IfElseStep(null, "false",
                     List.of(leaf("then")), List.of(leaf("else")), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
@@ -152,7 +152,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void conditionFalse_noElseBranch_returnsSuccess() {
-            var step = new ResolvedStep.IfElseStep("false",
+            var step = new ResolvedStep.IfElseStep(null, "false",
                     List.of(leaf("then")), null, Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
@@ -160,7 +160,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void conditionWithVariableInterpolation() {
-            var step = new ResolvedStep.IfElseStep("${var.flag}",
+            var step = new ResolvedStep.IfElseStep(null, "${var.flag}",
                     List.of(leaf("then")), List.of(leaf("else")), Map.of());
             var flagResolver = new VariableResolver(
                     Map.of("var", (VariableSource) name -> "flag".equals(name) ? "true" : null),
@@ -172,7 +172,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void conditionEvaluationThrows_returnsFailure() {
-            var step = new ResolvedStep.IfElseStep("not-a-boolean",
+            var step = new ResolvedStep.IfElseStep(null, "not-a-boolean",
                     List.of(leaf("then")), List.of(leaf("else")), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isFalse();
@@ -180,7 +180,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void thenBranchFails_returnsFailure() {
-            var step = new ResolvedStep.IfElseStep("true",
+            var step = new ResolvedStep.IfElseStep(null, "true",
                     List.of(leaf("then")), null, Map.of());
             var result = evaluator.evaluate(step, resolver,
                     (s, r) -> StepResult.failed("then failed"));
@@ -189,7 +189,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void multipleThenSteps_executesAllSequentially() {
-            var step = new ResolvedStep.IfElseStep("true",
+            var step = new ResolvedStep.IfElseStep(null, "true",
                     List.of(leaf("t1"), leaf("t2"), leaf("t3")), null, Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
@@ -206,7 +206,7 @@ class StructuralStepEvaluatorTest {
         void valuePattern_matches_executesCase() {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.ValuePattern("ACTIVE"), null, List.of(leaf("matched")));
-            var step = new ResolvedStep.MatchStep("ACTIVE", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "ACTIVE", List.of(mc), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("matched");
@@ -216,7 +216,7 @@ class StructuralStepEvaluatorTest {
         void valuePattern_noMatch_returnsEmptySuccess() {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.ValuePattern("ACTIVE"), null, List.of(leaf("matched")));
-            var step = new ResolvedStep.MatchStep("INACTIVE", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "INACTIVE", List.of(mc), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).isEmpty();
@@ -228,7 +228,7 @@ class StructuralStepEvaluatorTest {
                     new MatchPattern.StructuralPattern(Map.of("type", "trade")),
                     null, List.of(leaf("matched")));
             var scrutinee = Map.of("type", "trade", "amount", 100);
-            var step = new ResolvedStep.MatchStep("${var.event}", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "${var.event}", List.of(mc), Map.of());
             var objResolver = resolver.withObjectScope("var",
                     name -> "event".equals(name) ? scrutinee : null);
             var order = new ArrayList<String>();
@@ -241,7 +241,7 @@ class StructuralStepEvaluatorTest {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.AnyOfPattern(List.of("A", "B", "C")),
                     null, List.of(leaf("matched")));
-            var step = new ResolvedStep.MatchStep("B", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "B", List.of(mc), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("matched");
@@ -251,7 +251,7 @@ class StructuralStepEvaluatorTest {
         void defaultPattern_alwaysMatches() {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.DefaultPattern(), null, List.of(leaf("default")));
-            var step = new ResolvedStep.MatchStep("anything", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "anything", List.of(mc), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("default");
@@ -263,7 +263,7 @@ class StructuralStepEvaluatorTest {
                     new MatchPattern.ValuePattern("X"), null, List.of(leaf("first")));
             var c2 = new ResolvedMatchCase(
                     new MatchPattern.DefaultPattern(), null, List.of(leaf("second")));
-            var step = new ResolvedStep.MatchStep("X", List.of(c1, c2), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "X", List.of(c1, c2), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("first");
@@ -275,7 +275,7 @@ class StructuralStepEvaluatorTest {
             evaluator = new StructuralStepEvaluator(condEval);
             var mc = new ResolvedMatchCase(
                     new MatchPattern.DefaultPattern(), "true", List.of(leaf("guarded")));
-            var step = new ResolvedStep.MatchStep("val", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "val", List.of(mc), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("guarded");
@@ -287,7 +287,7 @@ class StructuralStepEvaluatorTest {
                     new MatchPattern.DefaultPattern(), "false", List.of(leaf("skipped")));
             var c2 = new ResolvedMatchCase(
                     new MatchPattern.DefaultPattern(), null, List.of(leaf("fallthrough")));
-            var step = new ResolvedStep.MatchStep("val", List.of(c1, c2), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "val", List.of(c1, c2), Map.of());
             var order = new ArrayList<String>();
             evaluator.evaluate(step, resolver, trackingRunner(order));
             assertThat(order).containsExactly("fallthrough");
@@ -297,7 +297,7 @@ class StructuralStepEvaluatorTest {
         void matchContext_stringScrutinee_accessibleViaMatchPrefix() {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.ValuePattern("hello"), null, List.of(leaf("check")));
-            var step = new ResolvedStep.MatchStep("hello", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "hello", List.of(mc), Map.of());
             var capturedResolver = new VariableResolver[1];
             evaluator.evaluate(step, resolver, (s, r) -> {
                 capturedResolver[0] = r;
@@ -313,7 +313,7 @@ class StructuralStepEvaluatorTest {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.StructuralPattern(Map.of("type", "trade")),
                     null, List.of(leaf("check")));
-            var step = new ResolvedStep.MatchStep("${var.event}", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "${var.event}", List.of(mc), Map.of());
             var objResolver = resolver.withObjectScope("var",
                     name -> "event".equals(name) ? scrutinee : null);
             var capturedResolver = new VariableResolver[1];
@@ -330,7 +330,7 @@ class StructuralStepEvaluatorTest {
             var mc = new ResolvedMatchCase(
                     new MatchPattern.ValuePattern("resolved"),
                     null, List.of(leaf("matched")));
-            var step = new ResolvedStep.MatchStep("${var.val}", List.of(mc), Map.of());
+            var step = new ResolvedStep.MatchStep(null, "${var.val}", List.of(mc), Map.of());
             var varResolver = new VariableResolver(
                     Map.of("var", (VariableSource) name ->
                             "val".equals(name) ? "resolved" : null),
@@ -348,14 +348,14 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void emptyParallel_returnsSuccess() {
-            var step = new ResolvedStep.ParallelStep(List.of(), Map.of());
+            var step = new ResolvedStep.ParallelStep(null, List.of(), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
         }
 
         @Test
         void singleStep_executes() {
-            var step = new ResolvedStep.ParallelStep(List.of(leaf("a")), Map.of());
+            var step = new ResolvedStep.ParallelStep(null, List.of(leaf("a")), Map.of());
             var order = new CopyOnWriteArrayList<String>();
             var result = evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
@@ -371,7 +371,7 @@ class StructuralStepEvaluatorTest {
         void multipleSteps_executesConcurrently() throws InterruptedException {
             var latch = new CountDownLatch(2);
             var threadNames = new CopyOnWriteArrayList<String>();
-            var step = new ResolvedStep.ParallelStep(
+            var step = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a"), leaf("b")), Map.of());
             evaluator.evaluate(step, resolver, (s, r) -> {
                 threadNames.add(Thread.currentThread().getName());
@@ -386,7 +386,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void allSucceed_returnsSuccess() {
-            var step = new ResolvedStep.ParallelStep(
+            var step = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a"), leaf("b"), leaf("c")), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of("ok", true)));
             assertThat(result.isSuccess()).isTrue();
@@ -395,7 +395,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void oneStepFails_waitsForAll_returnsFailure() {
             var completed = new AtomicInteger(0);
-            var step = new ResolvedStep.ParallelStep(
+            var step = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("fail"), leaf("ok")), Map.of());
             var result = evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv
@@ -415,7 +415,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void allFail_returnsFirstFailure() {
-            var step = new ResolvedStep.ParallelStep(
+            var step = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a"), leaf("b")), Map.of());
             var result = evaluator.evaluate(step, resolver,
                     (s, r) -> StepResult.failed("fail"));
@@ -431,7 +431,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void trySucceeds_catchSkipped_finallyRuns() {
             var order = new ArrayList<String>();
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     List.of(leaf("catch1")),
                     List.of(leaf("finally1")),
@@ -443,7 +443,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void tryFails_catchRuns_finallyRuns() {
             var order = new ArrayList<String>();
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     List.of(leaf("catch1")),
                     List.of(leaf("finally1")),
@@ -462,7 +462,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void tryFails_noCatch_finallyStillRuns() {
             var order = new ArrayList<String>();
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     null,
                     List.of(leaf("finally1")),
@@ -480,7 +480,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void tryFails_catchSucceeds_overallSuccess() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     List.of(leaf("catch1")),
                     null,
@@ -498,7 +498,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void tryFails_noCatch_overallFailure() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     null,
                     null,
@@ -510,7 +510,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void finallyFails_overridesTrySuccess() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     null,
                     List.of(leaf("finally1")),
@@ -527,7 +527,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void catchReceivesErrorContext() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")),
                     List.of(leaf("catch1")),
                     null,
@@ -548,7 +548,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void emptyTry_succeeds() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(), null, null, Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
@@ -557,7 +557,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void multipleTrySteps_secondFails_catchRuns() {
             var order = new ArrayList<String>();
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("t1"), leaf("t2"), leaf("t3")),
                     List.of(leaf("c1")),
                     null,
@@ -581,7 +581,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void emptySelect_returnsSuccess() {
-            var step = new ResolvedStep.SelectStep(List.of(), Map.of());
+            var step = new ResolvedStep.SelectStep(null, List.of(), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isTrue();
         }
@@ -589,7 +589,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void select_withoutScope_returnsFailure() {
             var branch = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "sig", List.of(leaf("a")));
-            var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
+            var step = new ResolvedStep.SelectStep(null, List.of(branch), Map.of());
             var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
             assertThat(result.isSuccess()).isFalse();
         }
@@ -604,7 +604,7 @@ class StructuralStepEvaluatorTest {
 
                 var branch1 = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "fast", List.of(leaf("winner")));
                 var branch2 = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.WAIT, "slow", List.of(leaf("loser")));
-                var step = new ResolvedStep.SelectStep(List.of(branch1, branch2), Map.of());
+                var step = new ResolvedStep.SelectStep(null, List.of(branch1, branch2), Map.of());
 
                 var order = new ArrayList<String>();
                 scopedEval.evaluate(step, resolver, trackingRunner(order));
@@ -621,7 +621,7 @@ class StructuralStepEvaluatorTest {
                 channel.send(Map.of("price", 42));
 
                 var branch = new ResolvedStep.SelectBranch(ResolvedStep.SelectBranchType.SUBSCRIBE, "quotes", List.of(leaf("got-quote")));
-                var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
+                var step = new ResolvedStep.SelectStep(null, List.of(branch), Map.of());
 
                 var order = new ArrayList<String>();
                 scopedEval.evaluate(step, resolver, trackingRunner(order));
@@ -637,7 +637,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void pluginStep_delegatesToRunner() {
-            var plugin = new ResolvedStep.PluginStep(null, Map.of("x", 1), Map.of());
+            var plugin = new ResolvedStep.PluginStep(null, null, Map.of("x", 1), Map.of());
             var result = evaluator.evaluate(plugin, resolver,
                     (s, r) -> StepResult.of(Map.of("ran", true)));
             assertThat(result.isSuccess()).isTrue();
@@ -646,7 +646,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void invokeStep_delegatesToRunner() {
-            var invoke = new ResolvedStep.InvokeStep(Map.of("mcp", "tool"), Map.of());
+            var invoke = new ResolvedStep.InvokeStep(null, Map.of("mcp", "tool"), Map.of());
             var result = evaluator.evaluate(invoke, resolver,
                     (s, r) -> StepResult.of(Map.of("ran", true)));
             assertThat(result.isSuccess()).isTrue();
@@ -661,7 +661,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void blockWithWhenFalse_skipsExecution() {
-            var block = new ResolvedStep.BlockStep(
+            var block = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("a")), Map.of("when", "false"));
             var count = new AtomicInteger(0);
             var result = evaluator.evaluate(block, resolver, (s, r) -> {
@@ -674,7 +674,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void blockWithWhenTrue_executes() {
-            var block = new ResolvedStep.BlockStep(
+            var block = new ResolvedStep.BlockStep(null, 
                     List.of(leaf("a")), Map.of("when", "true"));
             var order = new ArrayList<String>();
             evaluator.evaluate(block, resolver, trackingRunner(order));
@@ -684,7 +684,7 @@ class StructuralStepEvaluatorTest {
         @Test
         void parallelWithRetry_retriesOnFailure() {
             var count = new AtomicInteger(0);
-            var parallel = new ResolvedStep.ParallelStep(
+            var parallel = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a")), Map.of("retry", 3));
             var result = evaluator.evaluate(parallel, resolver, (s, r) -> {
                 if (count.incrementAndGet() < 3) return StepResult.failed("not yet");
@@ -696,7 +696,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void tryCatchWithTimeout_timeoutWrapsEntireBlock() {
-            var step = new ResolvedStep.TryCatchFinallyStep(
+            var step = new ResolvedStep.TryCatchFinallyStep(null, 
                     List.of(leaf("try1")), List.of(leaf("catch1")), null,
                     Map.of("timeout", "5s"));
             var result = evaluator.evaluate(step, resolver,
@@ -706,7 +706,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void leafStepWithDecorators_decoratorsApplied() {
-            var invoke = new ResolvedStep.InvokeStep(
+            var invoke = new ResolvedStep.InvokeStep(null, 
                     Map.of("mcp", "tool"), Map.of("when", "false"));
             var count = new AtomicInteger(0);
             var result = evaluator.evaluate(invoke, resolver, (s, r) -> {

@@ -92,6 +92,62 @@ class StepWalkerTest {
     }
 
     @Test
+    void extractsStepLabel_passesToResolvedStep() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "risk-eval");
+        step.put("process", Map.of("command", "evaluate.sh"));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0).name()).isEqualTo("risk-eval");
+    }
+
+    @Test
+    void noStepLabel_nameIsNull() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process", Map.of("command", "deploy.sh"));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+
+        assertThat(resolved.get(0).name()).isNull();
+    }
+
+    @Test
+    void duplicateStepName_throws() {
+        Map<String, Object> step1 = new LinkedHashMap<>();
+        step1.put("step", "eval");
+        step1.put("process", Map.of("command", "a.sh"));
+
+        Map<String, Object> step2 = new LinkedHashMap<>();
+        step2.put("step", "eval");
+        step2.put("process", Map.of("command", "b.sh"));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step1, step2), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate step name 'eval'");
+    }
+
+    @Test
+    void duplicateStepName_acrossNestedBlocks_throws() {
+        Map<String, Object> inner = new LinkedHashMap<>();
+        inner.put("step", "eval");
+        inner.put("process", Map.of("command", "a.sh"));
+
+        Map<String, Object> outer = new LinkedHashMap<>();
+        outer.put("step", "eval");
+        outer.put("process", Map.of("command", "b.sh"));
+
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("block", List.of(inner));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(block, outer), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate step name 'eval'");
+    }
+
+
+    @Test
     void throwsOnUnknownAction() {
         Map<String, Object> step = new LinkedHashMap<>();
         step.put("unknown-action", Map.of("param", "value"));

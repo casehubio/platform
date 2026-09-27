@@ -11,7 +11,8 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.BlockStep,
                                      ResolvedStep.IfElseStep,
                                      ResolvedStep.MatchStep,
-                                     ResolvedStep.ParallelStep {
+                                     ResolvedStep.ParallelStep,
+                                     ResolvedStep.TryCatchFinallyStep {
 
     Map<String, Object> decorators();
 
@@ -77,6 +78,20 @@ public sealed interface ResolvedStep permits
         public ParallelStep {
             steps      = List.copyOf(steps);
             decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record TryCatchFinallyStep(
+            List<ResolvedStep> trySteps,
+            List<ResolvedStep> catchSteps,
+            List<ResolvedStep> finallySteps,
+            Map<String, Object> decorators) implements ResolvedStep {
+
+        public TryCatchFinallyStep {
+            trySteps     = List.copyOf(trySteps);
+            catchSteps   = catchSteps != null ? List.copyOf(catchSteps) : List.of();
+            finallySteps = finallySteps != null ? List.copyOf(finallySteps) : List.of();
+            decorators   = Map.copyOf(decorators);
         }
     }
 }

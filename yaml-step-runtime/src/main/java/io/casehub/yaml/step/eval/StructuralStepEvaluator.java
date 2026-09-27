@@ -28,6 +28,7 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.IfElseStep i -> evaluateIfElse(i, resolver, runner);
             case ResolvedStep.MatchStep m -> evaluateMatch(m, resolver, runner);
             case ResolvedStep.ParallelStep p -> evaluateParallel(p, resolver, runner);
+            case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, resolver, runner);
             case ResolvedStep.PluginStep ps -> runner.run(ps, resolver);
             case ResolvedStep.InvokeStep is -> runner.run(is, resolver);
         };
@@ -92,6 +93,50 @@ public final class StructuralStepEvaluator {
         }
         return StepResult.of(Map.of());
     }
+
+    private StepResult evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,
+                                               VariableResolver resolver, StepRunner runner) {
+        StepResult tryResult;
+        try {
+            tryResult = evaluateBlock(
+                    new ResolvedStep.BlockStep(tcf.trySteps(), Map.of()), resolver, runner);
+        } catch (Exception e) {
+            tryResult = StepResult.failed(e.getMessage());
+        }
+
+        StepResult result = tryResult;
+        if (!tryResult.isSuccess() && !tcf.catchSteps().isEmpty()) {
+            String errorMessage = tryResult instanceof StepResult.Failure f ? f.message() : "unknown error";
+            VariableResolver errorResolver = resolver.withObjectScope("error",
+                                                                      name -> switch (name) {
+                                                                          case "message" -> errorMessage;
+                                                                          case "step" -> "try-block";
+                                                                          default -> null;
+                                                                      });
+            try {
+                result = evaluateBlock(
+                        new ResolvedStep.BlockStep(tcf.catchSteps(), Map.of()), errorResolver, runner);
+            } catch (Exception e) {
+                result = StepResult.failed("catch failed: " + e.getMessage());
+            }
+        }
+
+        if (!tcf.finallySteps().isEmpty()) {
+            StepResult finallyResult;
+            try {
+                finallyResult = evaluateBlock(
+                        new ResolvedStep.BlockStep(tcf.finallySteps(), Map.of()), resolver, runner);
+            } catch (Exception e) {
+                finallyResult = StepResult.failed("finally failed: " + e.getMessage());
+            }
+            if (!finallyResult.isSuccess()) {
+                return finallyResult;
+            }
+        }
+
+        return result;
+    }
+
 
     private VariableResolver pushMatchContext(VariableResolver resolver, Object value) {
         ObjectVariableSource matchSource;

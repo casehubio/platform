@@ -17,12 +17,13 @@ public final class StepWalker {
     private static final Set<String> RESERVED_KEYS = Set.of(
             "step", "invoke",
             "if", "then", "else", "match", "cases", "block",
+            "try", "catch", "finally",
             "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
             "parallel", "semaphore", "barrier", "quorum", "race");
 
-    private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases");
+    private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
     static final         int         MAX_DEPTH             = 32;
 
 
@@ -80,7 +81,7 @@ public final class StepWalker {
                 // label — skip
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
-            } else if ("block".equals(key) || "parallel".equals(key)) {
+            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key)) {
                 structuralType  = key;
                 structuralValue = e.getValue();
             } else if ("if".equals(key)) {
@@ -156,6 +157,14 @@ public final class StepWalker {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": 'match' requires 'cases'");
         }
+        if (companions.containsKey("catch") && !"try".equals(structuralType)) {
+            throw new IllegalArgumentException(
+                    path + " → Step " + index + ": 'catch' requires 'try'");
+        }
+        if (companions.containsKey("finally") && !"try".equals(structuralType)) {
+            throw new IllegalArgumentException(
+                    path + " → Step " + index + ": 'finally' requires 'try'");
+        }
 
         String stepPath = path + " → Step " + index;
         if ("if".equals(structuralType)) {
@@ -182,6 +191,16 @@ public final class StepWalker {
         if ("parallel".equals(structuralType)) {
             return new ResolvedStep.ParallelStep(
                     resolve((List<Map<String, Object>>) structuralValue, catalog, depth + 1, stepPath + " → parallel"),
+                    decorators);
+        }
+        if ("try".equals(structuralType)) {
+            var trySteps     = (List<Map<String, Object>>) structuralValue;
+            var catchSteps   = (List<Map<String, Object>>) companions.get("catch");
+            var finallySteps = (List<Map<String, Object>>) companions.get("finally");
+            return new ResolvedStep.TryCatchFinallyStep(
+                    resolve(trySteps, catalog, depth + 1, stepPath + " → try"),
+                    catchSteps != null ? resolve(catchSteps, catalog, depth + 1, stepPath + " → catch") : null,
+                    finallySteps != null ? resolve(finallySteps, catalog, depth + 1, stepPath + " → finally") : null,
                     decorators);
         }
         if (matchedEntry != null) {

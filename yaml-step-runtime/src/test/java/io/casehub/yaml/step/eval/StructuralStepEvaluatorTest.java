@@ -422,6 +422,157 @@ class StructuralStepEvaluatorTest {
         }
     }
 
+    // ── TryCatchFinallyStep ─────────────────────────────────────────
+
+    @Nested
+    class TryCatchFinallyStepTests {
+
+        @Test
+        void trySucceeds_catchSkipped_finallyRuns() {
+            var order = new ArrayList<String>();
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    List.of(leaf("finally1")),
+                    Map.of());
+            evaluator.evaluate(step, resolver, trackingRunner(order));
+            assertThat(order).containsExactly("try1", "finally1");
+        }
+
+        @Test
+        void tryFails_catchRuns_finallyRuns() {
+            var order = new ArrayList<String>();
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    List.of(leaf("finally1")),
+                    Map.of());
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    order.add(id);
+                    if ("try1".equals(id)) return StepResult.failed("boom");
+                }
+                return StepResult.of(Map.of());
+            });
+            assertThat(order).containsExactly("try1", "catch1", "finally1");
+        }
+
+        @Test
+        void tryFails_noCatch_finallyStillRuns() {
+            var order = new ArrayList<String>();
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    null,
+                    List.of(leaf("finally1")),
+                    Map.of());
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    order.add(id);
+                    if ("try1".equals(id)) return StepResult.failed("boom");
+                }
+                return StepResult.of(Map.of());
+            });
+            assertThat(order).containsExactly("try1", "finally1");
+        }
+
+        @Test
+        void tryFails_catchSucceeds_overallSuccess() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var result = evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                        && "try1".equals(inv.invokeSpec().get("id"))) {
+                    return StepResult.failed("boom");
+                }
+                return StepResult.of(Map.of("handled", true));
+            });
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("handled", true);
+        }
+
+        @Test
+        void tryFails_noCatch_overallFailure() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    null,
+                    null,
+                    Map.of());
+            var result = evaluator.evaluate(step, resolver,
+                    (s, r) -> StepResult.failed("boom"));
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void finallyFails_overridesTrySuccess() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    null,
+                    List.of(leaf("finally1")),
+                    Map.of());
+            var result = evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                        && "finally1".equals(inv.invokeSpec().get("id"))) {
+                    return StepResult.failed("finally boom");
+                }
+                return StepResult.of(Map.of("ok", true));
+            });
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void catchReceivesErrorContext() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var capturedResolver = new VariableResolver[1];
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    if ("try1".equals(inv.invokeSpec().get("id"))) {
+                        return StepResult.failed("original error");
+                    }
+                    capturedResolver[0] = r;
+                }
+                return StepResult.of(Map.of());
+            });
+            String errorMsg = capturedResolver[0].resolveString("${error.message}", "test");
+            assertThat(errorMsg).isEqualTo("original error");
+        }
+
+        @Test
+        void emptyTry_succeeds() {
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(), null, null, Map.of());
+            var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void multipleTrySteps_secondFails_catchRuns() {
+            var order = new ArrayList<String>();
+            var step = new ResolvedStep.TryCatchFinallyStep(
+                    List.of(leaf("t1"), leaf("t2"), leaf("t3")),
+                    List.of(leaf("c1")),
+                    null,
+                    Map.of());
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    order.add(id);
+                    if ("t2".equals(id)) return StepResult.failed("boom");
+                }
+                return StepResult.of(Map.of());
+            });
+            assertThat(order).containsExactly("t1", "t2", "c1");
+        }
+    }
+
     // ── Leaf passthrough ───────────────────────────────────────────
 
     @Nested

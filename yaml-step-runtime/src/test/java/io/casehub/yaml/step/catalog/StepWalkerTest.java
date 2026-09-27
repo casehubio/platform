@@ -451,4 +451,55 @@ class StepWalkerTest {
         return new CatalogEntry(name, def,
                 (params, services) -> StepResult.of(Map.of()));
     }
+
+    @Test
+    void resolvesTryCatchFinallyStep() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("try", List.of(Map.of("process", Map.of("cmd", "debit"))));
+        step.put("catch", List.of(Map.of("process", Map.of("cmd", "compensate"))));
+        step.put("finally", List.of(Map.of("process", Map.of("cmd", "audit"))));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.TryCatchFinallyStep.class);
+        var tcf = (ResolvedStep.TryCatchFinallyStep) resolved.get(0);
+        assertThat(tcf.trySteps()).hasSize(1);
+        assertThat(tcf.catchSteps()).hasSize(1);
+        assertThat(tcf.finallySteps()).hasSize(1);
+    }
+
+    @Test
+    void resolvesTryWithoutCatch() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("try", List.of(Map.of("process", Map.of("cmd", "run"))));
+        step.put("finally", List.of(Map.of("process", Map.of("cmd", "cleanup"))));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        var                tcf      = (ResolvedStep.TryCatchFinallyStep) resolved.get(0);
+        assertThat(tcf.trySteps()).hasSize(1);
+        assertThat(tcf.catchSteps()).isEmpty();
+        assertThat(tcf.finallySteps()).hasSize(1);
+    }
+
+    @Test
+    void catchWithoutTry_throws() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("cmd", "run"));
+        step.put("catch", List.of(Map.of("process", Map.of("cmd", "handle"))));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'catch' requires 'try'");
+    }
+
+    @Test
+    void finallyWithoutTry_throws() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("cmd", "run"));
+        step.put("finally", List.of(Map.of("process", Map.of("cmd", "cleanup"))));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'finally' requires 'try'");
+    }
 }

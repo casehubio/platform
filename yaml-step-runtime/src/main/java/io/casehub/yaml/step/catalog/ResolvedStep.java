@@ -12,7 +12,8 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.IfElseStep,
                                      ResolvedStep.MatchStep,
                                      ResolvedStep.ParallelStep,
-                                     ResolvedStep.TryCatchFinallyStep {
+                                     ResolvedStep.TryCatchFinallyStep,
+                                     ResolvedStep.SelectStep {
 
     Map<String, Object> decorators();
 
@@ -94,4 +95,29 @@ public sealed interface ResolvedStep permits
             decorators   = Map.copyOf(decorators);
         }
     }
+
+    record SelectBranch(
+            String type,
+            String name,
+            List<ResolvedStep> steps) {
+
+        public SelectBranch {
+            if (type == null || (!type.equals("subscribe") && !type.equals("wait"))) {
+                throw new IllegalArgumentException("SelectBranch type must be 'subscribe' or 'wait', got: " + type);
+            }
+            steps = List.copyOf(steps);
+        }
+    }
+
+    record SelectStep(
+            List<SelectBranch> branches,
+            Map<String, Object> decorators) implements ResolvedStep {
+
+        public SelectStep {
+            branches   = List.copyOf(branches);
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+
 }

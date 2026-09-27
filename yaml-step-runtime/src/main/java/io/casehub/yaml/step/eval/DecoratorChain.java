@@ -11,7 +11,6 @@ import io.casehub.yaml.core.orchestration.RetryDirective;
 import io.casehub.yaml.core.orchestration.ScenarioScope;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
-import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
 import io.casehub.yaml.plugin.api.StepResult;
 
@@ -433,31 +432,47 @@ public final class DecoratorChain {
     @SuppressWarnings("unchecked")
     private DecoratedExecution wrapTransition(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transVal = decorators.get("transition");
-        if (transVal == null) return inner;
-        if (scope == null) return r -> StepResult.failed("'transition' requires a ScenarioScope");
+        if (transVal == null) {return inner;}
+        if (scope == null) {return r -> StepResult.failed("'transition' requires a ScenarioScope");}
         if (!(transVal instanceof Map<?, ?> transMap)) {
             return r -> StepResult.failed("'transition' must be a map with 'machine' and 'event' keys");
         }
 
         String machineName = String.valueOf(transMap.get("machine"));
-        String event = String.valueOf(transMap.get("event"));
+        String event       = String.valueOf(transMap.get("event"));
+        String targetState = transMap.containsKey("to") ? String.valueOf(transMap.get("to")) : null;
 
         return resolver -> {
             StepResult result = inner.execute(resolver);
-            if (!result.isSuccess()) return result;
+            if (!result.isSuccess()) {return result;}
 
             OrcStateMachine<? extends Enum<?>> machine = scope.primitive(machineName, OrcStateMachine.class);
             if (machine == null) {
                 return StepResult.failed("State machine '" + machineName + "' not found");
             }
             Enum<?> currentState = machine.currentState();
-            fireTransitionEvent(machine, currentState, event);
+            if (targetState != null) {
+                fireDirectTransition(machine, currentState, targetState, event);
+            } else {
+                fireEventTransition(machine, currentState, event);
+            }
             return result;
         };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void fireTransitionEvent(OrcStateMachine machine, Enum currentState, String event) {
+    private void fireDirectTransition(OrcStateMachine machine, Enum currentState, String targetName, String event) {
+        Object[] constants = currentState.getDeclaringClass().getEnumConstants();
+        for (Object target : constants) {
+            if (((Enum<?>) target).name().equalsIgnoreCase(targetName)) {
+                machine.transition(currentState, (Enum) target, event);
+                return;
+            }
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void fireEventTransition(OrcStateMachine machine, Enum currentState, String event) {
         Object[] constants = currentState.getDeclaringClass().getEnumConstants();
         for (Object target : constants) {
             if (machine.transition(currentState, (Enum) target, event)) {
@@ -465,4 +480,5 @@ public final class DecoratorChain {
             }
         }
     }
+
 }

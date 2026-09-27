@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
+import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.step.MatchPattern;
@@ -570,6 +571,62 @@ class StructuralStepEvaluatorTest {
                 return StepResult.of(Map.of());
             });
             assertThat(order).containsExactly("t1", "t2", "c1");
+        }
+    }
+
+    // ── SelectStep ──────────────────────────────────────────────────
+
+    @Nested
+    class SelectStepTests {
+
+        @Test
+        void emptySelect_returnsSuccess() {
+            var step = new ResolvedStep.SelectStep(List.of(), Map.of());
+            var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void select_withoutScope_returnsFailure() {
+            var branch = new ResolvedStep.SelectBranch("wait", "sig", List.of(leaf("a")));
+            var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
+            var result = evaluator.evaluate(step, resolver, successRunner(Map.of()));
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void select_signalBranchWins() {
+            try (var scope = new DefaultScenarioScope()) {
+                var scopedEval = new StructuralStepEvaluator(
+                        new ConditionEvaluator(null), scope);
+                var signal = scope.signal("fast");
+                signal.signal("payload");
+
+                var branch1 = new ResolvedStep.SelectBranch("wait", "fast", List.of(leaf("winner")));
+                var branch2 = new ResolvedStep.SelectBranch("wait", "slow", List.of(leaf("loser")));
+                var step = new ResolvedStep.SelectStep(List.of(branch1, branch2), Map.of());
+
+                var order = new ArrayList<String>();
+                scopedEval.evaluate(step, resolver, trackingRunner(order));
+                assertThat(order).containsExactly("winner");
+            }
+        }
+
+        @Test
+        void select_channelBranchWins() throws InterruptedException {
+            try (var scope = new DefaultScenarioScope()) {
+                var scopedEval = new StructuralStepEvaluator(
+                        new ConditionEvaluator(null), scope);
+                var channel = scope.<Object>channel("quotes");
+                channel.send(Map.of("price", 42));
+
+                var branch = new ResolvedStep.SelectBranch("subscribe", "quotes", List.of(leaf("got-quote")));
+                var step = new ResolvedStep.SelectStep(List.of(branch), Map.of());
+
+                var order = new ArrayList<String>();
+                scopedEval.evaluate(step, resolver, trackingRunner(order));
+                assertThat(order).containsExactly("got-quote");
+            }
         }
     }
 

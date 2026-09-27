@@ -17,7 +17,7 @@ public final class StepWalker {
     private static final Set<String> RESERVED_KEYS = Set.of(
             "step", "invoke",
             "if", "then", "else", "match", "cases", "block",
-            "try", "catch", "finally",
+            "try", "catch", "finally", "select",
             "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
@@ -81,7 +81,7 @@ public final class StepWalker {
                 // label — skip
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
-            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key)) {
+            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key)) {
                 structuralType  = key;
                 structuralValue = e.getValue();
             } else if ("if".equals(key)) {
@@ -203,6 +203,12 @@ public final class StepWalker {
                     finallySteps != null ? resolve(finallySteps, catalog, depth + 1, stepPath + " → finally") : null,
                     decorators);
         }
+        if ("select".equals(structuralType)) {
+            var branchMaps = (List<Map<String, Object>>) structuralValue;
+            return new ResolvedStep.SelectStep(
+                    resolveSelectBranches(branchMaps, catalog, depth, stepPath),
+                    decorators);
+        }
         if (matchedEntry != null) {
             return new ResolvedStep.PluginStep(matchedEntry, actionParams, decorators);
         }
@@ -277,4 +283,38 @@ public final class StepWalker {
 
         return result;
     }
+
+    @SuppressWarnings("unchecked")
+    private static List<ResolvedStep.SelectBranch> resolveSelectBranches(
+            List<Map<String, Object>> branches, StepCatalog catalog, int depth, String path) {
+        List<ResolvedStep.SelectBranch> result = new ArrayList<>(branches.size());
+        for (int i = 0; i < branches.size(); i++) {
+            Map<String, Object> branchMap  = branches.get(i);
+            String              branchPath = path + " → select[" + i + "]";
+            String              type;
+            String              name;
+            if (branchMap.containsKey("subscribe")) {
+                type = "subscribe";
+                Object subSpec = branchMap.get("subscribe");
+                if (subSpec instanceof Map<?, ?> subMap) {
+                    name = String.valueOf(subMap.get("channel"));
+                } else {
+                    name = String.valueOf(subSpec);
+                }
+            } else if (branchMap.containsKey("wait")) {
+                type = "wait";
+                name = String.valueOf(branchMap.get("wait"));
+            } else {
+                throw new IllegalArgumentException(
+                        branchPath + ": select branch must contain 'subscribe' or 'wait'");
+            }
+            var steps = branchMap.containsKey("steps")
+                        ? (List<Map<String, Object>>) branchMap.get("steps")
+                        : List.<Map<String, Object>>of();
+            result.add(new ResolvedStep.SelectBranch(
+                    type, name, resolve(steps, catalog, depth + 1, branchPath)));
+        }
+        return result;
+    }
+
 }

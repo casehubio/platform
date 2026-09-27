@@ -1,6 +1,9 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
+import io.casehub.yaml.core.orchestration.OrcChannel;
+import io.casehub.yaml.core.orchestration.OrcSignal;
+import io.casehub.yaml.core.orchestration.ScenarioScope;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.StepResult;
@@ -13,13 +16,21 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class StructuralStepEvaluator {
 
     private final ConditionEvaluator conditionEvaluator;
+    private final ScenarioScope scope;
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
+        this(conditionEvaluator, null);
+    }
+
+    public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ScenarioScope scope) {
         this.conditionEvaluator = conditionEvaluator;
+        this.scope = scope;
     }
 
     public StepResult evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
@@ -29,6 +40,7 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.MatchStep m -> evaluateMatch(m, resolver, runner);
             case ResolvedStep.ParallelStep p -> evaluateParallel(p, resolver, runner);
             case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, resolver, runner);
+            case ResolvedStep.SelectStep s -> evaluateSelect(s, resolver, runner);
             case ResolvedStep.PluginStep ps -> runner.run(ps, resolver);
             case ResolvedStep.InvokeStep is -> runner.run(is, resolver);
         };
@@ -135,6 +147,96 @@ public final class StructuralStepEvaluator {
         }
 
         return result;
+    }
+
+    private StepResult evaluateSelect(ResolvedStep.SelectStep select,
+                                      VariableResolver resolver, StepRunner runner) {
+        if (select.branches().isEmpty()) {
+            return StepResult.of(Map.of());
+        }
+        if (scope == null) {
+            return StepResult.failed("'select' requires a ScenarioScope");
+        }
+
+        var winnerIndex   = new AtomicInteger(-1);
+        var winnerPayload = new AtomicReference<Object>();
+        int branchCount   = select.branches().size();
+        @SuppressWarnings("unchecked")
+        Future<Object>[] futureSlots = new Future[branchCount];
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < branchCount; i++) {
+                int                       branchIdx = i;
+                ResolvedStep.SelectBranch branch    = select.branches().get(i);
+                futureSlots[i] = executor.submit(() -> {
+                    try {
+                        Object payload;
+                        if ("wait".equals(branch.type())) {
+                            OrcSignal signal = scope.signal(branch.name());
+                            signal.await();
+                            payload = signal.payload();
+                        } else {
+                            OrcChannel<Object> channel = scope.channel(branch.name());
+                            payload = channel.receive();
+                        }
+                        if (winnerIndex.compareAndSet(-1, branchIdx)) {
+                            winnerPayload.set(payload);
+                            for (int j = 0; j < branchCount; j++) {
+                                if (j != branchIdx) {
+                                    Future<?> other = futureSlots[j];
+                                    if (other != null) {other.cancel(true);}
+                                }
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return null;
+                });
+            }
+
+            for (Future<Object> f : futureSlots) {
+                try {
+                    f.get();
+                } catch (ExecutionException | java.util.concurrent.CancellationException e) {
+                    // expected for cancelled branches
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return StepResult.failed("Select interrupted");
+        }
+
+        int winner = winnerIndex.get();
+        if (winner < 0) {
+            return StepResult.failed("No select branch completed");
+        }
+
+        ResolvedStep.SelectBranch winningBranch = select.branches().get(winner);
+        if (winningBranch.steps().isEmpty()) {
+            return StepResult.of(Map.of());
+        }
+
+        VariableResolver scoped  = resolver;
+        Object           payload = winnerPayload.get();
+        if (payload != null) {
+            String prefix = "wait".equals(winningBranch.type()) ? "signal" : "channel";
+            String name   = winningBranch.name();
+            if (payload instanceof Map<?, ?> map) {
+                scoped = resolver.withObjectScope(prefix, n -> {
+                    if (n.equals(name)) {return payload;}
+                    String pfx = name + ".";
+                    if (n.startsWith(pfx)) {return map.get(n.substring(pfx.length()));}
+                    return null;
+                });
+            } else {
+                scoped = resolver.withObjectScope(prefix,
+                                                  n -> n.equals(name) ? payload : null);
+            }
+        }
+
+        return evaluateBlock(
+                new ResolvedStep.BlockStep(winningBranch.steps(), Map.of()), scoped, runner);
     }
 
 

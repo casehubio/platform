@@ -502,4 +502,34 @@ class StepWalkerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("'finally' requires 'try'");
     }
+
+    @Test
+    void resolvesSelectStep() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("select", List.of(
+                Map.of("subscribe", Map.of("channel", "quotes"),
+                       "steps", List.of(Map.of("process", Map.of("cmd", "handle")))),
+                Map.of("wait", "timeout",
+                       "steps", List.of(Map.of("process", Map.of("cmd", "fallback"))))));
+
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.SelectStep.class);
+        var sel = (ResolvedStep.SelectStep) resolved.get(0);
+        assertThat(sel.branches()).hasSize(2);
+        assertThat(sel.branches().get(0).type()).isEqualTo("subscribe");
+        assertThat(sel.branches().get(0).name()).isEqualTo("quotes");
+        assertThat(sel.branches().get(1).type()).isEqualTo("wait");
+        assertThat(sel.branches().get(1).name()).isEqualTo("timeout");
+    }
+
+    @Test
+    void selectBranchWithoutSubscribeOrWait_throws() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("select", List.of(Map.of("invalid", "branch")));
+
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("select branch must contain 'subscribe' or 'wait'");
+    }
 }

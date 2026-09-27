@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StructuralStepEvaluatorTest {
 
@@ -717,4 +717,172 @@ class StructuralStepEvaluatorTest {
             assertThat(count.get()).isZero();
         }
     }
+// ── StepResultStore Recording ──────────────────────────────────
+
+    @Nested
+    class StepResultRecordingTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void evaluate_namedStep_recordsSuccessToStore() {
+            var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
+            scopedEvaluator.evaluate(step, resolver,
+                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+
+            assertThat(scope.resultStore().hasCompleted("risk-eval")).isTrue();
+            assertThat(scope.resultStore().result("risk-eval"))
+                    .containsEntry("score", 85);
+            assertThat(scope.resultStore().error("risk-eval")).isNull();
+        }
+
+        @Test
+        void evaluate_namedStep_recordsFailureToStore() {
+            var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
+            scopedEvaluator.evaluate(step, resolver,
+                                     (s, r) -> StepResult.failed("connection timeout"));
+
+            assertThat(scope.resultStore().hasCompleted("risk-eval")).isTrue();
+            assertThat(scope.resultStore().result("risk-eval")).isNull();
+            assertThat(scope.resultStore().error("risk-eval")).isNotNull();
+            assertThat(scope.resultStore().error("risk-eval").message())
+                    .isEqualTo("connection timeout");
+        }
+
+        @Test
+        void evaluate_unnamedStep_doesNotRecord() {
+            var step = new ResolvedStep.InvokeStep(null, Map.of("id", "a"), Map.of());
+            scopedEvaluator.evaluate(step, resolver,
+                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+
+            assertThat(scope.resultStore().hasCompleted("a")).isFalse();
+        }
+
+        @Test
+        void evaluate_noScope_doesNotRecord() {
+            var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
+            evaluator.evaluate(step, resolver,
+                               (s, r) -> StepResult.of(Map.of("score", 85)));
+        }
+
+        @Test
+        void evaluate_nestedNamedSteps_allRecorded() {
+            var inner1 = new ResolvedStep.InvokeStep("step-a", Map.of("id", "a"), Map.of());
+            var inner2 = new ResolvedStep.InvokeStep("step-b", Map.of("id", "b"), Map.of());
+            var block  = new ResolvedStep.BlockStep(null, List.of(inner1, inner2), Map.of());
+            scopedEvaluator.evaluate(block, resolver,
+                                     (s, r) -> StepResult.of(Map.of("id",
+                                                                    ((ResolvedStep.InvokeStep) s).invokeSpec().get("id"))));
+
+            assertThat(scope.resultStore().hasCompleted("step-a")).isTrue();
+            assertThat(scope.resultStore().hasCompleted("step-b")).isTrue();
+        }
+
+        @Test
+        void evaluate_parallelNamedSteps_allRecordedConcurrently() {
+            var step1    = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var step2    = new ResolvedStep.InvokeStep("eval-b", Map.of("id", "b"), Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null, List.of(step1, step2), Map.of());
+            scopedEvaluator.evaluate(parallel, resolver,
+                                     (s, r) -> StepResult.of(Map.of("done", true)));
+
+            assertThat(scope.resultStore().hasCompleted("eval-a")).isTrue();
+            assertThat(scope.resultStore().hasCompleted("eval-b")).isTrue();
+        }
+    }
+
+// ── Result Variable Resolution ────────────────────────────────
+
+    @Nested
+    class ResultVariableResolutionTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void resultVariable_completedStep_resolvesOutput() {
+            var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
+            scopedEvaluator.evaluate(step1, resolver,
+                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+
+            var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
+            var capturedResolver = new VariableResolver[1];
+            scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
+                capturedResolver[0] = r;
+                return StepResult.of(Map.of());
+            });
+
+            Object value = capturedResolver[0].resolve("${result.producer.score}");
+            assertThat(value).isEqualTo(85);
+        }
+
+        @Test
+        void resultVariable_failedStep_resolvesError() {
+            var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
+            scopedEvaluator.evaluate(step1, resolver,
+                                     (s, r) -> StepResult.failed("timeout"));
+
+            var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
+            var capturedResolver = new VariableResolver[1];
+            scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
+                capturedResolver[0] = r;
+                return StepResult.of(Map.of());
+            });
+
+            Object errorMap = capturedResolver[0].resolve("${result.producer.error}");
+            assertThat(errorMap).isInstanceOf(Map.class);
+            @SuppressWarnings("unchecked")
+            var error = (Map<String, Object>) errorMap;
+            assertThat(error).containsEntry("message", "timeout");
+        }
+
+        @Test
+        void resultVariable_uncompletedStep_throwsUnresolved() {
+            var step             = new ResolvedStep.InvokeStep(null, Map.of("id", "a"), Map.of());
+            var capturedResolver = new VariableResolver[1];
+            scopedEvaluator.evaluate(step, resolver, (s, r) -> {
+                capturedResolver[0] = r;
+                return StepResult.of(Map.of());
+            });
+
+            assertThatThrownBy(() -> capturedResolver[0].resolve("${result.nonexistent}"))
+                    .isInstanceOf(io.casehub.yaml.core.resolver.UnresolvedVariableException.class);
+        }
+
+        @Test
+        void resultVariable_soleReference_returnsTypedMap() {
+            var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
+            scopedEvaluator.evaluate(step1, resolver,
+                                     (s, r) -> StepResult.of(Map.of("score", 85, "grade", "A")));
+
+            var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
+            var capturedResolver = new VariableResolver[1];
+            scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
+                capturedResolver[0] = r;
+                return StepResult.of(Map.of());
+            });
+
+            Object value = capturedResolver[0].resolve("${result.producer}");
+            assertThat(value).isInstanceOf(Map.class);
+            @SuppressWarnings("unchecked")
+            var map = (Map<String, Object>) value;
+            assertThat(map).containsEntry("score", 85).containsEntry("grade", "A");
+        }
+    }
+
 }

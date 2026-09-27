@@ -23,6 +23,8 @@ public final class StructuralStepEvaluator {
     private final ConditionEvaluator conditionEvaluator;
     private final ScenarioScope scope;
     private final DecoratorChain decoratorChain;
+    private final io.casehub.yaml.core.resolver.ObjectVariableSource resultSource;
+
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
         this(conditionEvaluator, null);
@@ -30,18 +32,24 @@ public final class StructuralStepEvaluator {
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ScenarioScope scope) {
         this.conditionEvaluator = conditionEvaluator;
-        this.scope = scope;
-        this.decoratorChain = new DecoratorChain(conditionEvaluator,
-                io.casehub.yaml.core.runtime.SpeedMultiplier.identity(), scope);
+        this.scope              = scope;
+        this.decoratorChain     = new DecoratorChain(conditionEvaluator,
+                                                     io.casehub.yaml.core.runtime.SpeedMultiplier.identity(), scope);
+        this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
     }
 
     public StepResult evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
+        VariableResolver    effective  = withResultScope(resolver);
         Map<String, Object> decorators = step.decorators();
+        StepResult          result;
         if (decorators.isEmpty()) {
-            return dispatchStep(step, resolver, runner);
+            result = dispatchStep(step, effective, runner);
+        } else {
+            result = decoratorChain.apply(decorators, r -> dispatchStep(step, r, runner))
+                                   .execute(effective);
         }
-        return decoratorChain.apply(decorators, r -> dispatchStep(step, r, runner))
-                .execute(resolver);
+        recordResult(step.name(), result);
+        return result;
     }
 
     private StepResult dispatchStep(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
@@ -280,4 +288,44 @@ public final class StructuralStepEvaluator {
             return StepResult.failed("Parallel execution interrupted");
         }
     }
+
+    private VariableResolver withResultScope(VariableResolver resolver) {
+        return resultSource != null ? resolver.withObjectScope("result", resultSource) : resolver;
+    }
+
+    private void recordResult(String stepName, StepResult result) {
+        if (stepName == null || scope == null) {return;}
+        io.casehub.yaml.core.orchestration.StepResultStore store = scope.resultStore();
+        if (result.isSuccess()) {
+            store.recordSuccess(stepName, result.output());
+        } else {
+            String message = result instanceof StepResult.Failure f ? f.message() : "unknown error";
+            store.recordFailure(stepName,
+                                new io.casehub.yaml.core.orchestration.StepError(message, null, null));
+        }
+    }
+
+    private static io.casehub.yaml.core.resolver.ObjectVariableSource buildResultSource(
+            io.casehub.yaml.core.orchestration.StepResultStore store) {
+        return name -> {
+            if (!store.hasCompleted(name)) {return null;}
+            Map<String, Object>                          output = store.result(name);
+            io.casehub.yaml.core.orchestration.StepError err    = store.error(name);
+            if (output == null && err == null) {return null;}
+            if (output == null) {
+                return Map.of("error", Map.of(
+                        "message", err.message() != null ? err.message() : "",
+                        "exceptionClass", err.exceptionClass() != null ? err.exceptionClass() : "",
+                        "stackTrace", err.stackTrace() != null ? err.stackTrace() : ""));
+            }
+            if (err == null) {return output;}
+            var composite = new java.util.HashMap<>(output);
+            composite.put("error", Map.of(
+                    "message", err.message() != null ? err.message() : "",
+                    "exceptionClass", err.exceptionClass() != null ? err.exceptionClass() : "",
+                    "stackTrace", err.stackTrace() != null ? err.stackTrace() : ""));
+            return composite;
+        };
+    }
+
 }

@@ -1,0 +1,14 @@
+name: sentiment
+description: Analyze text sentiment
+inputs:
+  text:
+    type: string
+    required: true
+    description: Text to analyze
+outputs:
+  score:
+    type: number
+    description: Sentiment score
+  label:
+    type: string
+    description: Sentiment label

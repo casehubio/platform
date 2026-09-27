@@ -1,7 +1,6 @@
 package io.casehub.yaml.step.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.api.process.CommandNotAllowedException;
 import io.casehub.platform.api.process.CommandPattern;
 import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
@@ -16,30 +15,29 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PythonInvokeHandlerTest {
+class ScriptInvokeHandlerTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final ProcessExecutor executor = new DefaultProcessExecutor();
+    private final ScriptInvokeHandler handler = new ScriptInvokeHandler(mapper, executor);
 
     @Test
-    void supportsOnlyPythonBindings() {
-        var handler = new PythonInvokeHandler(mapper, executor);
-        assertThat(handler.supports(new InvokeBinding.Python("script.py"))).isTrue();
+    void supportsScriptBindings() {
+        assertThat(handler.supports(new InvokeBinding.Script("python3", "s.py", null, null, null))).isTrue();
+        assertThat(handler.supports(new InvokeBinding.Script("node", "s.js", null, null, null))).isTrue();
         assertThat(handler.supports(new InvokeBinding.Mcp("test"))).isFalse();
     }
 
     @Test
     void createsNonNullAction() {
-        var handler = new PythonInvokeHandler(mapper, executor);
-        var binding = new InvokeBinding.Python("steps/sentiment.py");
+        var binding = new InvokeBinding.Script("python3", "steps/sentiment.py", null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
         assertThat(handler.create(def, binding)).isNotNull();
     }
 
     @Test
     void failsGracefullyOnMissingScript() {
-        var handler = new PythonInvokeHandler(mapper, executor);
-        var binding = new InvokeBinding.Python("nonexistent-script.py", "5s");
+        var binding = new InvokeBinding.Script("python3", "nonexistent-script.py", "5s", null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
         StepAction action = handler.create(def, binding);
@@ -52,11 +50,11 @@ class PythonInvokeHandlerTest {
     void respectsAllowList() {
         var restricted = new DefaultProcessExecutor(List.of(
                 new CommandPattern(List.of("echo"), CommandPattern.MatchMode.PREFIX)));
-        var handler = new PythonInvokeHandler(mapper, restricted);
-        var binding = new InvokeBinding.Python("script.py");
+        var restrictedHandler = new ScriptInvokeHandler(mapper, restricted);
+        var binding = new InvokeBinding.Script("python3", "script.py", null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
+        StepAction action = restrictedHandler.create(def, binding);
         StepResult result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isFalse();
@@ -65,7 +63,7 @@ class PythonInvokeHandlerTest {
 
     @Test
     void usesConfiguredTimeout() {
-        var binding = new InvokeBinding.Python("script.py", "60s");
+        var binding = new InvokeBinding.Script("node", "script.js", "60s", null, null);
         assertThat(binding.timeout()).isEqualTo("60s");
     }
 }

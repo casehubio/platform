@@ -16,39 +16,42 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class PythonInvokeHandler implements InvokeHandler {
+public class ScriptInvokeHandler implements InvokeHandler {
 
     private final ObjectMapper objectMapper;
     private final ProcessExecutor processExecutor;
 
-    public PythonInvokeHandler(ObjectMapper objectMapper, ProcessExecutor processExecutor) {
+    public ScriptInvokeHandler(ObjectMapper objectMapper, ProcessExecutor processExecutor) {
         this.objectMapper = objectMapper;
         this.processExecutor = processExecutor;
     }
 
     @Override
     public boolean supports(InvokeBinding binding) {
-        return binding instanceof InvokeBinding.Python;
+        return binding instanceof InvokeBinding.Script;
     }
 
     @Override
     public StepAction create(StepDefinition definition, InvokeBinding binding) {
-        InvokeBinding.Python python = (InvokeBinding.Python) binding;
-        return (params, services) -> executePython(python, params);
+        InvokeBinding.Script script = (InvokeBinding.Script) binding;
+        return (params, services) -> executeScript(script, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executePython(InvokeBinding.Python python, Map<String, Object> params) {
+    private StepResult executeScript(InvokeBinding.Script script, Map<String, Object> params) {
         try {
             byte[] jsonInput = objectMapper.writeValueAsBytes(params);
 
-            ProcessCommand cmd = ProcessCommand.of("python3", python.script())
+            ProcessCommand cmd = ProcessCommand.of(script.runtime(), script.script())
                     .stdin(jsonInput)
                     .mergeStderr(false);
 
-            Duration timeout = parseTimeout(python.timeout());
+            Duration timeout = parseTimeout(script.timeout());
             if (timeout != null) {
                 cmd = cmd.timeout(timeout);
+            }
+            if (script.workingDir() != null) {
+                cmd = cmd.workingDir(script.workingDir());
             }
 
             long start = System.nanoTime();
@@ -58,20 +61,21 @@ public class PythonInvokeHandler implements InvokeHandler {
             if (!result.isSuccess()) {
                 String error = result.stderr() != null && !result.stderr().isBlank()
                                ? result.stderr().trim()
-                               : "Python script exited with code " + result.exitCode();
+                               : "Script exited with code " + result.exitCode();
                 return StepResult.failed(error);
             }
 
             String stdout = result.stdout() != null ? result.stdout().trim() : "";
             Map<String, Object> output = objectMapper.readValue(stdout, LinkedHashMap.class);
-            return StepResult.of(output, Map.of("durationMs", durationMs, "script", python.script()));
+            return StepResult.of(output, Map.of("durationMs", durationMs,
+                    "script", script.script(), "runtime", script.runtime()));
 
         } catch (CommandNotAllowedException e) {
-            return StepResult.failed("Python script not allowed: " + e.getMessage());
+            return StepResult.failed("Script not allowed: " + e.getMessage());
         } catch (ProcessExecutionException e) {
-            return StepResult.failed("Python execution failed: " + e.getMessage());
+            return StepResult.failed("Script execution failed: " + e.getMessage());
         } catch (Exception e) {
-            return StepResult.failed("Python execution failed: " + e.getMessage());
+            return StepResult.failed("Script execution failed: " + e.getMessage());
         }
     }
 

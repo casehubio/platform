@@ -93,15 +93,16 @@ class StepDefinitionParserTest {
     }
 
     @Test
-    void parsesPythonBinding() {
+    void parsesPythonShorthand() {
         Map<String, Object> yaml = Map.of(
                 "actions", Map.of(
                         "sentiment", Map.of(
                                 "invoke", Map.of("python", "steps/sentiment.py"))));
 
         StepDefinitionFile file = StepDefinitionParser.parse(yaml);
-        InvokeBinding.Python python = (InvokeBinding.Python) file.actions().get("sentiment").invoke();
-        assertThat(python.script()).isEqualTo("steps/sentiment.py");
+        InvokeBinding.Script script = (InvokeBinding.Script) file.actions().get("sentiment").invoke();
+        assertThat(script.runtime()).isEqualTo("python3");
+        assertThat(script.script()).isEqualTo("steps/sentiment.py");
     }
 
     @Test

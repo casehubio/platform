@@ -159,16 +159,17 @@ class ValidatingStepActionTest {
     }
 
     @Test
-    void eventBindingTypePython() {
+    void eventBindingTypeScript() {
         List<StepExecutionEvent> events = new ArrayList<>();
-        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Python("s.py"));
+        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(),
+                new InvokeBinding.Script("python3", "s.py", null, null, null));
         var action = new ValidatingStepAction(def,
                                               (params, svc) -> StepResult.of(Map.of(), Map.of()),
                                               events::add);
 
         action.execute(Map.of(), null);
 
-        assertThat(events.get(0).bindingType()).isEqualTo("python");
+        assertThat(events.get(0).bindingType()).isEqualTo("script");
     }
 
     @Test

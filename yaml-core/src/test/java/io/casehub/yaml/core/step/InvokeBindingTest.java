@@ -74,9 +74,13 @@ class InvokeBindingTest {
     }
 
     @Test
-    void pythonBindingStoresScript() {
-        var binding = new InvokeBinding.Python("steps/sentiment.py");
+    void scriptBindingStoresFields() {
+        var binding = new InvokeBinding.Script("python3", "steps/sentiment.py", "60s", "/opt", null);
+        assertThat(binding.runtime()).isEqualTo("python3");
         assertThat(binding.script()).isEqualTo("steps/sentiment.py");
+        assertThat(binding.timeout()).isEqualTo("60s");
+        assertThat(binding.workingDir()).isEqualTo("/opt");
+        assertThat(binding.env()).isEmpty();
     }
 
     @Test
@@ -85,21 +89,30 @@ class InvokeBindingTest {
     }
 
     @Test
-    void pythonBindingDefaultTimeout() {
-        var binding = new InvokeBinding.Python("script.py");
+    void scriptBindingDefaults() {
+        var binding = new InvokeBinding.Script("python3", "script.py", null, null, null);
         assertThat(binding.timeout()).isEqualTo("30s");
+        assertThat(binding.env()).isEmpty();
+        assertThat(binding.workingDir()).isNull();
     }
 
     @Test
-    void pythonBindingCustomTimeout() {
-        var binding = new InvokeBinding.Python("script.py", "60s");
-        assertThat(binding.timeout()).isEqualTo("60s");
+    void scriptBindingConstants() {
+        assertThat(InvokeBinding.Script.PYTHON).isEqualTo("python3");
+        assertThat(InvokeBinding.Script.NODE).isEqualTo("node");
     }
 
     @Test
-    void pythonBindingRequiresScript() {
+    void scriptBindingRequiresRuntime() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new InvokeBinding.Python(null))
-                .withMessageContaining("Python binding requires script");
+                .isThrownBy(() -> new InvokeBinding.Script(null, "script.py", null, null, null))
+                .withMessageContaining("requires runtime");
+    }
+
+    @Test
+    void scriptBindingRequiresScript() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.Script("python3", null, null, null, null))
+                .withMessageContaining("requires script");
     }
 }

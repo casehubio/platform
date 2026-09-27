@@ -68,7 +68,7 @@ public class ValidatingStepAction implements StepAction {
         if (binding == null) return null;
         return switch (binding) {
             case InvokeBinding.Process p -> "process";
-            case InvokeBinding.Python p -> "python";
+            case InvokeBinding.Script s -> "script";
             case InvokeBinding.Agent a -> "agent";
             case InvokeBinding.Mcp m -> "mcp";
             case InvokeBinding.Rest r -> "rest";

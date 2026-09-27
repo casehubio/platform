@@ -82,7 +82,13 @@ public final class StepDefinitionParser {
             return new InvokeBinding.Mcp((String) invokeMap.get("mcp"));
         }
         if (invokeMap.containsKey("python")) {
-            return new InvokeBinding.Python((String) invokeMap.get("python"));
+            return new InvokeBinding.Script(InvokeBinding.Script.PYTHON, (String) invokeMap.get("python"), null, null, null);
+        }
+        if (invokeMap.containsKey("node")) {
+            return new InvokeBinding.Script(InvokeBinding.Script.NODE, (String) invokeMap.get("node"), null, null, null);
+        }
+        if (invokeMap.containsKey("script")) {
+            return parseScriptBinding(invokeMap.get("script"));
         }
         if (invokeMap.containsKey("graphql")) {
             return new InvokeBinding.Graphql((String) invokeMap.get("graphql"));
@@ -123,6 +129,18 @@ public final class StepDefinitionParser {
         return new InvokeBinding.Agent(descriptor, model, timeout,
                 structuredOutput != null && structuredOutput);
     }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.Script parseScriptBinding(Object raw) {
+        Map<String, Object> map = (Map<String, Object>) raw;
+        return new InvokeBinding.Script(
+                (String) map.get("runtime"),
+                (String) map.get("script"),
+                (String) map.get("timeout"),
+                (String) map.get("workingDir"),
+                (Map<String, String>) map.get("env"));
+    }
+
 
     @SuppressWarnings("unchecked")
     private static InvokeBinding.Process parseProcessBinding(Object raw) {

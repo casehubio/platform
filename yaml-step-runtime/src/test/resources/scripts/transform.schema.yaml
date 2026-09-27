@@ -1,0 +1,10 @@
+name: transform
+description: Transform data
+inputs:
+  data:
+    type: object
+    description: Data to transform
+outputs:
+  result:
+    type: string
+    description: Transformed result

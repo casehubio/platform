@@ -18,7 +18,7 @@ class McpInvokeHandlerTest {
     void supportsOnlyMcpBindings() {
         var handler = new McpInvokeHandler();
         assertThat(handler.supports(new InvokeBinding.Mcp("test"))).isTrue();
-        assertThat(handler.supports(new InvokeBinding.Python("test.py"))).isFalse();
+        assertThat(handler.supports(new InvokeBinding.Script("python3", "test.py", null, null, null))).isFalse();
     }
 
     @Test

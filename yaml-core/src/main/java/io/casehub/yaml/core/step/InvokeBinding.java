@@ -19,13 +19,19 @@ public sealed interface InvokeBinding {
 
     record Graphql(String query) implements InvokeBinding {}
 
-    record Python(String script, String timeout) implements InvokeBinding {
-        public Python {
+    record Script(String runtime, String script, String timeout,
+                  String workingDir, Map<String, String> env) implements InvokeBinding {
+        public static final String PYTHON = "python3";
+        public static final String NODE = "node";
+
+        public Script {
+            if (runtime == null)
+                throw new IllegalArgumentException("Script binding requires runtime");
             if (script == null)
-                throw new IllegalArgumentException("Python binding requires script");
+                throw new IllegalArgumentException("Script binding requires script");
             if (timeout == null) timeout = "30s";
+            if (env == null) env = Map.of();
         }
-        public Python(String script) { this(script, null); }
     }
 
     record Agent(String descriptor,

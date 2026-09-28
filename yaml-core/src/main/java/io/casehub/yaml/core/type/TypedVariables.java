@@ -13,12 +13,17 @@ public final class TypedVariables {
         for (var entry : rawVariables.entrySet()) {
             TypedName tn = TypedName.parse(entry.getKey());
             schema.put(tn.name(), tn.type());
-            try {
-                values.put(tn.name(), tn.type().parse(String.valueOf(entry.getValue())));
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(
-                    "Variable '" + tn.name() + "' (" + tn.type()
-                    + "): invalid value '" + entry.getValue() + "'", e);
+            Object raw = entry.getValue();
+            if (tn.type().validate(raw)) {
+                values.put(tn.name(), raw);
+            } else {
+                try {
+                    values.put(tn.name(), tn.type().parse(String.valueOf(raw)));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                            "Variable '" + tn.name() + "' (" + tn.type()
+                            + "): invalid value '" + raw + "'", e);
+                }
             }
         }
         return new TypedMap(Map.copyOf(schema), Map.copyOf(values));

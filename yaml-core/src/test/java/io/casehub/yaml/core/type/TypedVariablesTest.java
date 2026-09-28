@@ -65,6 +65,28 @@ class TypedVariablesTest {
         assertThat(result.schema()).containsEntry("x", ValueType.INTEGER);
     }
 
+
+    @Test
+    void parse_skips_round_trip_when_value_already_matches_type() {
+        Long    longVal   = 500L;
+        Double  doubleVal = 3.14;
+        Boolean boolVal   = Boolean.TRUE;
+        String  strVal    = "hello";
+
+        var raw = new LinkedHashMap<String, Object>();
+        raw.put("count:integer", longVal);
+        raw.put("ratio:number", doubleVal);
+        raw.put("enabled:boolean", boolVal);
+        raw.put("name", strVal);
+
+        TypedMap result = TypedVariables.parse(raw);
+
+        assertThat(result.values().get("count")).isSameAs(longVal);
+        assertThat(result.values().get("ratio")).isSameAs(doubleVal);
+        assertThat(result.values().get("enabled")).isSameAs(boolVal);
+        assertThat(result.values().get("name")).isSameAs(strVal);
+    }
+
     @Test
     void values_are_unmodifiable() {
         TypedMap result = TypedVariables.parse(Map.of("x", "hello"));

@@ -14,6 +14,7 @@ class RestControllerWriterTest {
 
     private static RestResourceDescriptor descriptor;
     private static RestResourceDescriptor sseDescriptor;
+    private static RestResourceDescriptor statusDescriptor;
 
 
     @BeforeAll
@@ -34,6 +35,16 @@ class RestControllerWriterTest {
         List<RestResourceDescriptor> sseDescriptors = scanner.scan(sseIndex);
         if (!sseDescriptors.isEmpty()) {
             sseDescriptor = sseDescriptors.get(0);
+        }
+
+        var statusIndexer = new Indexer();
+        statusIndexer.indexClass(StatusBearingResource.class);
+        statusIndexer.indexClass(StatusBearingCore.class);
+        statusIndexer.indexClass(StatusBearingResult.class);
+        Index                        statusIndex       = statusIndexer.complete();
+        List<RestResourceDescriptor> statusDescriptors = scanner.scan(statusIndex);
+        if (!statusDescriptors.isEmpty()) {
+            statusDescriptor = statusDescriptors.get(0);
         }
     }
 
@@ -108,6 +119,16 @@ class RestControllerWriterTest {
         String source = writer.generate(descriptor, "test.spring").toString();
 
         assertThat(source).contains("MediaType.APPLICATION_JSON_VALUE");
+    }
+
+    @Test
+    void mapsStatusBearingReturnToResponseEntityWithStatus() {
+        assertThat(statusDescriptor).isNotNull();
+        var writer = new RestControllerWriter();
+        String source = writer.generate(statusDescriptor, "test.spring").toString();
+
+        assertThat(source).contains("ResponseEntity.status(result.status()).body(result)");
+        assertThat(source).doesNotContain("ResponseEntity.noContent()");
     }
 
     @Test

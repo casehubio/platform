@@ -10,6 +10,7 @@ import org.jboss.jandex.FieldInfo;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.MethodParameterInfo;
+import org.jboss.jandex.PrimitiveType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -148,11 +149,22 @@ public class RestResourceScanner {
             }
 
             boolean needsHeaders = false;
-            if (hasContextHeaders && delegateClass != null) {
+            com.palantir.javapoet.TypeName delegateReturnType = null;
+            boolean statusBearing = false;
+
+            if (delegateClass != null) {
                 for (MethodInfo delegateMethod : delegateClass.methods()) {
-                    if (delegateMethod.name().equals(method.name())
-                        && delegateMethod.parameterTypes().size() > method.parameterTypes().size()) {
-                        needsHeaders = true;
+                    if (delegateMethod.name().equals(method.name())) {
+                        if (hasContextHeaders
+                            && delegateMethod.parameterTypes().size() > method.parameterTypes().size()) {
+                            needsHeaders = true;
+                        }
+                        boolean isResponseReturn = method.returnType().name().toString()
+                                .equals("jakarta.ws.rs.core.Response");
+                        if (isResponseReturn) {
+                            delegateReturnType = JandexTypeConverter.toTypeName(delegateMethod.returnType());
+                            statusBearing = hasStatusMethod(delegateMethod.returnType(), index);
+                        }
                         break;
                     }
                 }
@@ -161,6 +173,7 @@ public class RestResourceScanner {
             methods.add(new RestMethodDescriptor(
                     method.name(), httpMethod, subPath,
                     JandexTypeConverter.toTypeName(method.returnType()),
+                    delegateReturnType, statusBearing,
                     params, consumes, produces, needsHeaders));
         }
 
@@ -194,6 +207,22 @@ public class RestResourceScanner {
             return new String[0];
         }
         return value.asStringArray();
+    }
+
+    private boolean hasStatusMethod(org.jboss.jandex.Type type, IndexView index) {
+        ClassInfo classInfo = index.getClassByName(type.name());
+        if (classInfo == null) {
+            return false;
+        }
+        for (MethodInfo method : classInfo.methods()) {
+            if (method.name().equals("status")
+                && method.parameterTypes().isEmpty()
+                && method.returnType().kind() == org.jboss.jandex.Type.Kind.PRIMITIVE
+                && method.returnType().asPrimitiveType().primitive() == org.jboss.jandex.PrimitiveType.Primitive.INT) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private MethodInfo findInjectedConstructor(ClassInfo classInfo) {

@@ -125,6 +125,10 @@ public class RestResourceScanner {
 
             List<RestMethodDescriptor.ParameterDescriptor> params = new ArrayList<>();
             for (MethodParameterInfo param : method.parameters()) {
+                if (findParamAnnotation(param, CONTEXT) != null) {
+                    continue;
+                }
+
                 String                         paramName = param.name() != null ? param.name() : "arg" + params.size();
                 com.palantir.javapoet.TypeName paramType = JandexTypeConverter.toTypeName(param.type());
 

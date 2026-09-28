@@ -42,6 +42,11 @@ public interface ScenarioScope extends AutoCloseable {
 
     java.util.Optional<java.time.Duration> remainingTime();
 
+
+    default io.casehub.yaml.core.runtime.SpeedMultiplier speedMultiplier() {
+        return io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
+    }
+
     @Override
     void close();
 }

@@ -214,6 +214,14 @@ public class DefaultScenarioScope implements ScenarioScope {
         return parent != null ? parent.remainingTime() : Optional.empty();
     }
 
+    @Override
+    public SpeedMultiplier speedMultiplier() {return speedMultiplier;}
+
+    void registerPrimitive(String name, Object primitive) {
+        primitives.put(name, primitive);
+    }
+
+
     private void startDeadlineWatcher(Duration scenarioDeadline, Runnable onDeadline) {
         SpeedMultiplier speed = this.speedMultiplier;
         deadlineRemainingNanos = scenarioDeadline.toNanos();

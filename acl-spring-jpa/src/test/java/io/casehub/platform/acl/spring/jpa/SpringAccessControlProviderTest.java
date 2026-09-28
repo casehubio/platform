@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,11 +37,6 @@ class SpringAccessControlProviderTest {
     @EnableJpaRepositories(basePackageClasses = AclEntryEntityRepository.class)
     @EntityScan(basePackageClasses = {AclEntryEntity.class, AclAuditLogEntity.class, ResourceParentEntity.class})
     static class TestConfig {
-        @Bean
-        GroupMembershipProvider groupMembershipProvider() {
-            return (actorId, tenancyId) -> Set.of();
-        }
-
         @Bean
         SpringAccessControlProvider springAccessControlProvider(
                 AclEntryEntityRepository entryRepo,

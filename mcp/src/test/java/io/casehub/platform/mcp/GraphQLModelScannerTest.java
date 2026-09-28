@@ -227,4 +227,14 @@ class GraphQLModelScannerTest {
         assertThat(inputParam.fields()).containsEntry("count", "Integer");
     }
 
+
+    @Test
+    void scanDiscoversDomainReportProviders() {
+        assertThat(registry.getReportProvider("test")).isPresent();
+    }
+
+    @Test
+    void domainWithoutReportProvider_hasEmptyOptional() {
+        assertThat(registry.getReportProvider("nonexistent")).isEmpty();
+    }
 }

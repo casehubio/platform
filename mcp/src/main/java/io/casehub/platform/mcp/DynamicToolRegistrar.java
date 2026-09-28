@@ -100,6 +100,35 @@ public class DynamicToolRegistrar {
 
         LOG.infof("Registered casehub_action with %s schema (%d domains) + casehub_activate",
                   schemaMode, registry.getDomains().size());
+
+        for (var entry : registry.getReportProviders().entrySet()) {
+            String domain = entry.getKey();
+            io.casehub.platform.api.mcp.DomainReportProvider provider = entry.getValue();
+            String toolName = domain + "_report";
+
+            toolManager.newTool(toolName)
+                .setDescription("Runtime status report for the " + domain + " domain — "
+                                + "providers, capabilities, and health status")
+                .addArgument("scope", "Filter: 'all' (default), single provider key, "
+                             + "or comma-separated keys (e.g. 'email,bank')", false, String.class)
+                .setAnnotations(new ToolManager.ToolAnnotations(null, true, false, true, false))
+                .setHandler(args -> {
+                    try {
+                        String scope = (String) args.args().get("scope");
+                        io.casehub.platform.api.mcp.DomainReport report = provider.report(domain);
+                        if (scope != null && !scope.isBlank() && !"all".equalsIgnoreCase(scope)) {
+                            report = filterByScope(report, scope);
+                        }
+                        return ToolResponse.success(mapper.writeValueAsString(report));
+                    } catch (Exception e) {
+                        LOG.errorf(e, "%s report failed", toolName);
+                        return ToolResponse.error(e.getMessage());
+                    }
+                }, true)
+                .register();
+
+            LOG.infof("Registered report tool '%s'", toolName);
+        }
     }
 
     ToolResponse activateDomain(String domain) {
@@ -202,4 +231,18 @@ public class DynamicToolRegistrar {
         }
         return null;
     }
+
+    private static io.casehub.platform.api.mcp.DomainReport filterByScope(
+            io.casehub.platform.api.mcp.DomainReport report, String scope) {
+        var keys = java.util.Arrays.stream(scope.split(","))
+                                   .map(String::trim).collect(java.util.stream.Collectors.toSet());
+        var filtered = report.providers().entrySet().stream()
+                             .filter(e -> keys.contains(e.getKey()))
+                             .collect(java.util.stream.Collectors.toMap(
+                                     Map.Entry::getKey, Map.Entry::getValue,
+                                     (a, b) -> a, java.util.LinkedHashMap::new));
+        return new io.casehub.platform.api.mcp.DomainReport(
+                report.domain(), report.status(), filtered, report.metadata());
+    }
+
 }

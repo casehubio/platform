@@ -20,6 +20,8 @@ public class DomainModelRegistry {
 
     private final Map<String, DomainModel> domains = new ConcurrentHashMap<>();
     private final Map<String, DomainContentFormatter.AppCapability> appCapabilities = new ConcurrentHashMap<>();
+    private final Map<String, io.casehub.platform.api.mcp.DomainReportProvider> reportProviders = new ConcurrentHashMap<>();
+
 
     public void register(DomainModel model) {
         domains.put(model.name(), model);
@@ -28,6 +30,19 @@ public class DomainModelRegistry {
     public void registerAppCapability(String app, DomainContentFormatter.AppCapability capability) {
         appCapabilities.put(app, capability);
     }
+
+    public void registerReportProvider(String domain, io.casehub.platform.api.mcp.DomainReportProvider provider) {
+        reportProviders.put(domain, provider);
+    }
+
+    public Optional<io.casehub.platform.api.mcp.DomainReportProvider> getReportProvider(String domain) {
+        return Optional.ofNullable(reportProviders.get(domain));
+    }
+
+    public Map<String, io.casehub.platform.api.mcp.DomainReportProvider> getReportProviders() {
+        return Map.copyOf(reportProviders);
+    }
+
 
     public Map<String, DomainContentFormatter.AppCapability> getAppCapabilities() {
         return Map.copyOf(appCapabilities);

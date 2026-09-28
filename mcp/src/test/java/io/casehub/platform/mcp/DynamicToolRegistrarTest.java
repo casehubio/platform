@@ -155,4 +155,22 @@ class DynamicToolRegistrarTest {
         java.util.List<String> domainNames = domainEnum.stream().map(Object::toString).toList();
         assertThat(domainNames).contains("cap-test");
     }
+
+    @Test
+    void reportTool_isAutoRegisteredForDomainWithReportProvider() {
+        var tool = toolManager.getTool("test_report");
+        assertThat(tool).isNotNull();
+        assertThat(tool.description()).contains("report");
+        assertThat(tool.description()).contains("test");
+    }
+
+    @Test
+    void reportTool_isReadOnlyAndIdempotent() {
+        var tool = toolManager.getTool("test_report");
+        assertThat(tool).isNotNull();
+        var annotations = tool.annotations();
+        assertThat(annotations).isPresent();
+        assertThat(annotations.get().readOnlyHint()).isTrue();
+        assertThat(annotations.get().idempotentHint()).isTrue();
+    }
 }

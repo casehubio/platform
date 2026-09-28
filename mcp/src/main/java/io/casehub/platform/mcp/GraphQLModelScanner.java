@@ -40,6 +40,10 @@ public class GraphQLModelScanner {
     @Any
     Instance<ModelEnricher> enrichers;
     @Inject
+    @Any
+    Instance<io.casehub.platform.api.mcp.DomainReportProvider> reportProviders;
+
+    @Inject
     Event<ModelScanComplete> scanComplete;
 
 
@@ -172,6 +176,13 @@ public class GraphQLModelScanner {
             }
         }
 
+        Map<String, io.casehub.platform.api.mcp.DomainReportProvider> reportProviderMap = resolveReportProviders();
+        for (var entry : reportProviderMap.entrySet()) {
+            registry.registerReportProvider(entry.getKey(), entry.getValue());
+            LOG.infof("Report provider for domain '%s': %s",
+                      entry.getKey(), entry.getValue().getClass().getName());
+        }
+
         scanComplete.fire(new ModelScanComplete());
     }
 
@@ -188,6 +199,21 @@ public class GraphQLModelScanner {
         }
         return map;
     }
+
+    private Map<String, io.casehub.platform.api.mcp.DomainReportProvider> resolveReportProviders() {
+        Map<String, io.casehub.platform.api.mcp.DomainReportProvider> map = new HashMap<>();
+        for (io.casehub.platform.api.mcp.DomainReportProvider provider : reportProviders) {
+            McpDomain domainAnn = findMcpDomain(provider.getClass());
+            if (domainAnn != null) {
+                map.put(domainAnn.value(), provider);
+            } else {
+                LOG.warnf("DomainReportProvider %s has no @McpDomain — ignoring",
+                          provider.getClass().getName());
+            }
+        }
+        return map;
+    }
+
 
     private McpDomain findMcpDomain(Class<?> cls) {
         while (cls != null && cls != Object.class) {

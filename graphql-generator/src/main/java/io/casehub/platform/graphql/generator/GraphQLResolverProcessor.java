@@ -1834,12 +1834,18 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             "int", "long", "short", "byte", "float", "double", "boolean", "char"
                                                           );
 
+    private static final Set<String> COLLECTION_TYPES = Set.of(
+            "java.util.List", "java.util.Set", "java.util.Collection",
+            "java.util.Map", "java.util.Optional"
+                                                               );
+
     static boolean isSimpleType(String fqcn) {
         return isSimpleType(fqcn, null);
     }
 
     static boolean isSimpleType(String fqcn, IndexView index) {
         if (SIMPLE_TYPES.contains(fqcn)) {return true;}
+        if (COLLECTION_TYPES.contains(fqcn)) {return true;}
         if (fqcn.startsWith("java.time.")) {return true;}
         if (index != null) {
             ClassInfo ci = index.getClassByName(fqcn);

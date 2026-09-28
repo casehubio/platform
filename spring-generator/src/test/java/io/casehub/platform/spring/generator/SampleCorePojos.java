@@ -22,6 +22,13 @@ class SimplePojo {
     public SimplePojo() {}
 }
 
+class InitPojo {
+    public InitPojo() {}
+
+    @jakarta.annotation.PostConstruct
+    void validate() {}
+}
+
 class ConfigPojo {
     private final SampleProperties config;
     public ConfigPojo(SampleProperties config) {

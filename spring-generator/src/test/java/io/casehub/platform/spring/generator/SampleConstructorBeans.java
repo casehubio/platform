@@ -1,7 +1,6 @@
 package io.casehub.platform.spring.generator;
 
 import io.quarkus.arc.DefaultBean;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -75,12 +74,8 @@ class SampleInitBeans {
     @Produces
     @DefaultBean
     @ApplicationScoped
-    public SimplePojo initPojo() {
-        return new SimplePojo();
-    }
-
-    @PostConstruct
-    void validate() {
+    public InitPojo initPojo() {
+        return new InitPojo();
     }
 }
 

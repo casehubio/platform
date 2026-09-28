@@ -2,6 +2,9 @@ package io.casehub.platform.spring;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.preferences.PreferenceProvider;
+import io.casehub.platform.api.process.CommandPattern;
+import io.casehub.platform.api.process.DefaultProcessExecutor;
+import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.platform.mock.MockCurrentPrincipal;
 import io.casehub.platform.mock.MockPreferenceProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,5 +34,25 @@ public class PlatformDefaultsManualConfig {
     @ConditionalOnMissingBean(PreferenceProvider.class)
     public MockPreferenceProvider mockPreferenceProvider() {
         return new MockPreferenceProvider();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(ProcessExecutor.class)
+    public ProcessExecutor processExecutor(
+            @Value("${casehub.invoke.process.allowed-commands:}") List<String> allowedCommands) {
+        if (allowedCommands.isEmpty()) {
+            return new DefaultProcessExecutor();
+        }
+        var patterns = allowedCommands.stream()
+                .map(PlatformDefaultsManualConfig::parseCommandPattern)
+                .toList();
+        return new DefaultProcessExecutor(patterns);
+    }
+
+    private static CommandPattern parseCommandPattern(String spec) {
+        var segments = List.of(spec.split("\\s+"));
+        boolean hasGlob = segments.stream().anyMatch(s -> s.contains("*"));
+        return new CommandPattern(segments,
+                hasGlob ? CommandPattern.MatchMode.GLOB : CommandPattern.MatchMode.EXACT);
     }
 }

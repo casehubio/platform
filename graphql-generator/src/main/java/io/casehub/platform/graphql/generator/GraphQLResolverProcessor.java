@@ -542,6 +542,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private boolean isSimpleTypeMirror(javax.lang.model.type.TypeMirror type) {
+        if (type.getKind().isPrimitive()) {return true;}
         if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {return false;}
         String fqcn = ((javax.lang.model.element.TypeElement)
                                ((javax.lang.model.type.DeclaredType) type).asElement()).getQualifiedName().toString();
@@ -1829,7 +1830,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             "java.lang.String",
             "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte",
             "java.lang.Float", "java.lang.Double", "java.lang.Boolean", "java.lang.Character",
-            "java.util.UUID"
+            "java.util.UUID",
+            "int", "long", "short", "byte", "float", "double", "boolean", "char"
                                                           );
 
     static boolean isSimpleType(String fqcn) {

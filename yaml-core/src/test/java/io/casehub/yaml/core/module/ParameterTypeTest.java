@@ -142,6 +142,19 @@ class ParameterTypeTest {
     }
 
     @Test
+    void scalarType_maps_scalars_to_valueType() {
+        assertThat(ParameterType.STRING.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.STRING);
+        assertThat(ParameterType.INTEGER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.INTEGER);
+        assertThat(ParameterType.NUMBER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.NUMBER);
+        assertThat(ParameterType.BOOLEAN.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.BOOLEAN);
+    }
+
+    @Test
+    void scalarType_list_returns_null() {
+        assertThat(ParameterType.LIST.scalarType()).isNull();
+    }
+
+    @Test
     void fromValueType_maps_all_scalars() {
         assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.STRING)).isEqualTo(ParameterType.STRING);
         assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.INTEGER)).isEqualTo(ParameterType.INTEGER);

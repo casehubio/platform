@@ -90,8 +90,8 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `expression-core/` | `casehub-platform-expression-core` | (none) | Framework-neutral expression engine POJOs |
 | `governance-core/` | `casehub-platform-governance-core` | (none) | Framework-neutral policy enforcer POJOs |
 | `identity-core/` | `casehub-platform-identity-core` | (none) | Framework-neutral identity resolution POJOs |
-| `mcp/` | `casehub-platform-mcp` | `@ApplicationScoped` | MCP hierarchical model -- `GraphQLModelScanner` (auto-discovers domains from `@GraphQLApi`, class-based `@McpDomain`, or interface `@McpDomain`), `DynamicToolRegistrar`, `McpResourceRegistryBridge`, `DomainResourceRegistrar` |
-| `mcp-core/` | `casehub-platform-mcp-core` | (none) | Framework-neutral MCP POJOs |
+| `mcp/` | `casehub-platform-mcp` | `@ApplicationScoped` | MCP hierarchical model -- `GraphQLModelScanner` (auto-discovers domains from `@GraphQLApi`, class-based `@McpDomain`, or interface `@McpDomain`; also discovers `DomainReportProvider` beans), `DynamicToolRegistrar` (McpCapabilityException interception → McpOperationResult success response; auto-registers `<domain>_report` tools from DomainReportProvider), `LandscapeReportService @McpDomain("landscape")` (parallel fan-out aggregator), `McpResourceRegistryBridge`, `DomainResourceRegistrar` |
+| `mcp-core/` | `casehub-platform-mcp-core` | (none) | Framework-neutral MCP POJOs + `PlatformLandscape` (aggregated domain report) |
 | `graphql/` | `casehub-platform-graphql` | (none) | GraphQL foundation -- `@CustomScalar("JSON")`, `PageInput`/`PageInfo`/`PageResult<T>` pagination, `GraphQLError` (RFC 7807) |
 | `graphql-client/` | `casehub-graphql-client` | (none) | Typed CaseHub GraphQL client -- `@GraphQLClientApi` per domain (`CaseClient`, `WorkItemClient`, `LedgerClient`, `QhorusClient`) |
 | `generator-common/` | `casehub-platform-generator-common` | (none) | Shared generator infrastructure -- `McpDomainJandexScanner` (scans `@McpDomain` on interfaces and classes), `DomainScanResult`, `AbstractGeneratorMojo`, `AbstractVerifyMojo`, `JandexTypeConverter` |

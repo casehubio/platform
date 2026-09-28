@@ -933,7 +933,7 @@ stateMachine:
     - from: approved
       to: shipped
       on: ship
-    - from: [approved, pending]
+    - from: approved
       to: cancelled
       on: cancel
     - from: shipped
@@ -941,40 +941,6 @@ stateMachine:
       on: deliver
   terminal: [rejected, cancelled, delivered]
 ```
-
-**`from` and `on` accept MatchPattern shapes** (same dispatch mechanism as `match/cases`):
-
-| Shape | Meaning | MatchPattern type |
-|-------|---------|-------------------|
-| String | Exact value | ValuePattern |
-| Array | Any of these values | AnyOfPattern |
-| Map | Structural subset match | StructuralPattern |
-| `any` | Catch-all | DefaultPattern |
-
-`to` stays as a plain string target (always a specific state).
-
-**AnyOfPattern example — cancel from multiple states:**
-```yaml
-- from: [approved, pending]
-  to: cancelled
-  on: cancel
-```
-
-**Structural event matching — route by event type:**
-```yaml
-- from: pending
-  to: approved
-  on: { type: "approval", source: "system" }
-```
-
-**Catch-all event — handle any unmatched event:**
-```yaml
-- from: any
-  to: error
-  on: any
-```
-
-**`${match}` scoping:** When a structural pattern matches on `on`, the matched event value is accessible via `${match}` and `${match.*}` inside the transition's guard expression and any step that fires the transition. Scoping is provided by `VariableSource.matchContext()`.
 
 **Step integration:**
 ```yaml
@@ -989,8 +955,7 @@ stateMachine:
 **Semantics:**
 - `transitions` define valid state changes. Invalid transitions throw `IllegalTransitionException`.
 - `when` on a transition is a guard condition — evaluated at transition time. If false, the transition is rejected (not an error — the state machine stays in its current state). `on-guard-fail` names a fallback step.
-- `on` accepts string (exact event name), array (any of), map (structural match), or `any` (catch-all). EventRouter dispatches using `MatchPattern.matches()` — first-match-wins evaluation order.
-- `from` accepts the same MatchPattern shapes. EventRouter matches against `currentState().name()`.
+- `on` is the event name that triggers the transition. Steps fire events via the `transition` decorator.
 - `terminal` states are declared explicitly. Attempting to transition from a terminal state throws.
 - State transitions are atomic (CAS on `AtomicReference<State>`). No intermediate states are visible to observers.
 - **Guard-CAS atomicity (TOCTOU):** Guard evaluation and CAS are separate operations. The guard is evaluated against current variable state, then the CAS attempts the transition. Between guard evaluation and CAS, the guard's input data could theoretically change (e.g., `risk-score` changes from 0.5 to 0.9 between guard check and CAS). The CAS ensures **state consistency** (exactly one transition from a given state wins), but does not guarantee **guard-state consistency** (the guard condition still holds at CAS time). This TOCTOU window is microseconds in-process and acceptable for scenario orchestration. For transitions requiring strong guard-state consistency (e.g., financial compliance gates), implement the guard+transition in a `@ScenarioAction` that holds an explicit lock on the guarded data.

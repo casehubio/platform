@@ -2,8 +2,6 @@ package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
 import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
-import io.casehub.yaml.core.orchestration.ScenarioScope;
-import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -211,6 +209,66 @@ class DecoratorChainTest {
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
         }
+
+        @Test
+        void timeout_propagatesDeadlineToInnerContext() {
+            var decorators = Map.<String, Object>of("timeout", "5s");
+            var captured   = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
+            chain.apply(decorators, ctx -> {
+                captured.set(ctx.deadline());
+                return StepResult.of(Map.of());
+            }).execute(new StepContext(resolver));
+
+            assertThat(captured.get()).isNotNull();
+            assertThat(captured.get().hasDeadline()).isTrue();
+            assertThat(captured.get().remainingTime()).isPresent();
+            assertThat(captured.get().remainingTime().get().toMillis()).isLessThanOrEqualTo(5000);
+        }
+
+        @Test
+        void nestedTimeouts_useMinSemantics() {
+            var outerDecorators = Map.<String, Object>of("timeout", "10s");
+            var captured        = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
+            chain.apply(outerDecorators, outerCtx -> {
+                var innerDecorators = Map.<String, Object>of("timeout", "2s");
+                return chain.apply(innerDecorators, innerCtx -> {
+                    captured.set(innerCtx.deadline());
+                    return StepResult.of(Map.of());
+                }).execute(outerCtx);
+            }).execute(new StepContext(resolver));
+
+            assertThat(captured.get().hasDeadline()).isTrue();
+            assertThat(captured.get().remainingTime().get().toMillis()).isLessThanOrEqualTo(2000);
+        }
+
+        @Test
+        void nestedTimeouts_parentShorter_usesParentDeadline() {
+            var outerDecorators = Map.<String, Object>of("timeout", "1s");
+            var captured        = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
+            chain.apply(outerDecorators, outerCtx -> {
+                var innerDecorators = Map.<String, Object>of("timeout", "10s");
+                return chain.apply(innerDecorators, innerCtx -> {
+                    captured.set(innerCtx.deadline());
+                    return StepResult.of(Map.of());
+                }).execute(outerCtx);
+            }).execute(new StepContext(resolver));
+
+            assertThat(captured.get().hasDeadline()).isTrue();
+            assertThat(captured.get().remainingTime().get().toMillis()).isLessThanOrEqualTo(1000);
+        }
+
+        @Test
+        void noTimeout_deadlineIsNone() {
+            var captured = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
+            chain.apply(Map.of(), ctx -> {
+                captured.set(ctx.deadline());
+                return StepResult.of(Map.of());
+            }).execute(new StepContext(resolver));
+
+            assertThat(captured.get().hasDeadline()).isFalse();
+            assertThat(captured.get().remainingTime()).isEmpty();
+        }
+
     }
 
     // ── retry (position 7) ─────────────────────────────────────────
@@ -493,6 +551,32 @@ class DecoratorChainTest {
             var result = chain.apply(decorators, success(Map.of())).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
         }
+
+        @Test
+        void semaphore_withDeadline_exceedsDeadline_returnsFailure() throws Exception {
+            try (var scope = new DefaultScenarioScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var semaphore = scope.semaphore("exhausted", 1);
+                var acquired  = new java.util.concurrent.CountDownLatch(1);
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        semaphore.acquire();
+                        acquired.countDown();
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ignored) {} finally {semaphore.release();}
+                });
+                acquired.await();
+                var decorators = Map.<String, Object>of("semaphore",
+                                                        Map.of("name", "exhausted", "permits", 1));
+                var ctx = new StepContext(resolver, DeadlineContext.NONE.withTimeout(java.time.Duration.ofMillis(50)));
+                var result = scopedChain.apply(decorators, success(Map.of("ok", true)))
+                                        .execute(ctx);
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((StepResult.Failure) result).message()).contains("exceeded deadline");
+            }
+        }
+
     }
 
     // ── wait (position 6) ──────────────────────────────────────────
@@ -520,6 +604,42 @@ class DecoratorChainTest {
             var result = chain.apply(decorators, success(Map.of())).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
         }
+
+        @Test
+        void wait_withDeadline_exceedsDeadline_returnsFailure() {
+            try (var scope = new DefaultScenarioScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var decorators = Map.<String, Object>of("wait", "never-signalled");
+                var ctx        = new StepContext(resolver, DeadlineContext.NONE.withTimeout(java.time.Duration.ofMillis(50)));
+                var result = scopedChain.apply(decorators, success(Map.of("ok", true)))
+                                        .execute(ctx);
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((StepResult.Failure) result).message()).contains("exceeded deadline");
+            }
+        }
+
+        @Test
+        void wait_withoutDeadline_blocksIndefinitely() throws InterruptedException {
+            try (var scope = new DefaultScenarioScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var decorators = Map.<String, Object>of("wait", "ready");
+                var signal     = scope.signal("ready");
+                var done       = new java.util.concurrent.atomic.AtomicBoolean(false);
+                Thread.ofVirtual().start(() -> {
+                    try {Thread.sleep(50);} catch (InterruptedException ignored) {}
+                    signal.signal("late-payload");
+                });
+                var result = scopedChain.apply(decorators, ctx -> {
+                    done.set(true);
+                    return StepResult.of(Map.of());
+                }).execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(done.get()).isTrue();
+            }
+        }
+
     }
 
     // ── signal (position 11) ───────────────────────────────────────

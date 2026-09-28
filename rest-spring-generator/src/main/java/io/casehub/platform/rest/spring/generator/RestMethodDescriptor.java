@@ -9,6 +9,8 @@ public record RestMethodDescriptor(
         String httpMethod,
         String subPath,
         TypeName returnType,
+        TypeName delegateReturnType,
+        boolean statusBearing,
         List<ParameterDescriptor> parameters,
         String[] consumes,
         String[] produces,

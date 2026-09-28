@@ -187,9 +187,28 @@ public class RestControllerWriter {
             args = args.isEmpty() ? "extractHeaders(httpRequest)" : args + ", extractHeaders(httpRequest)";
         }
 
+        if (method.returnType().equals(TypeName.VOID)) {
+            return CodeBlock.builder()
+                            .addStatement("$L.$L($L)", delegateFieldName, method.methodName(), args)
+                            .addStatement("return $T.noContent().build()", RESPONSE_ENTITY)
+                            .build();
+        }
+
         boolean isResponseReturn = method.returnType().toString().equals("jakarta.ws.rs.core.Response");
 
-        if (method.returnType().equals(TypeName.VOID) || isResponseReturn) {
+        if (isResponseReturn && method.statusBearing()) {
+            return CodeBlock.builder()
+                            .addStatement("var result = $L.$L($L)", delegateFieldName, method.methodName(), args)
+                            .addStatement("return $T.status(result.status()).body(result)", RESPONSE_ENTITY)
+                            .build();
+        }
+
+        if (isResponseReturn) {
+            if (method.delegateReturnType() != null && !method.delegateReturnType().equals(TypeName.VOID)) {
+                return CodeBlock.builder()
+                                .addStatement("return $T.ok($L.$L($L))", RESPONSE_ENTITY, delegateFieldName, method.methodName(), args)
+                                .build();
+            }
             return CodeBlock.builder()
                             .addStatement("$L.$L($L)", delegateFieldName, method.methodName(), args)
                             .addStatement("return $T.noContent().build()", RESPONSE_ENTITY)

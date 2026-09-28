@@ -107,6 +107,24 @@ class RestResourceScannerTest {
     }
 
     @Test
+    void detectsStatusBearingDelegateReturnType() throws Exception {
+        var indexer = new Indexer();
+        indexer.indexClass(StatusBearingResource.class);
+        indexer.indexClass(StatusBearingCore.class);
+        indexer.indexClass(StatusBearingResult.class);
+        Index statusIndex = indexer.complete();
+
+        var scanner = new RestResourceScanner();
+        var descriptors = scanner.scan(statusIndex);
+
+        assertThat(descriptors).hasSize(1);
+        var method = descriptors.get(0).methods().get(0);
+        assertThat(method.statusBearing()).isTrue();
+        assertThat(method.delegateReturnType()).isNotNull();
+        assertThat(method.delegateReturnType().toString()).contains("StatusBearingResult");
+    }
+
+    @Test
     void extractsClassLevelMediaTypes() {
         var scanner = new RestResourceScanner();
         RestResourceDescriptor desc = scanner.scan(index).get(0);

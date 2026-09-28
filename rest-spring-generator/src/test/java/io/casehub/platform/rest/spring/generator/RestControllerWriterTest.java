@@ -15,6 +15,7 @@ class RestControllerWriterTest {
     private static RestResourceDescriptor descriptor;
     private static RestResourceDescriptor sseDescriptor;
     private static RestResourceDescriptor statusDescriptor;
+    private static RestResourceDescriptor multivaluedHeaderDescriptor;
 
 
     @BeforeAll
@@ -45,6 +46,15 @@ class RestControllerWriterTest {
         List<RestResourceDescriptor> statusDescriptors = scanner.scan(statusIndex);
         if (!statusDescriptors.isEmpty()) {
             statusDescriptor = statusDescriptors.get(0);
+        }
+
+        var mvhIndexer = new Indexer();
+        mvhIndexer.indexClass(MultivaluedHeaderResource.class);
+        mvhIndexer.indexClass(MultivaluedHeaderCore.class);
+        Index                        mvhIndex       = mvhIndexer.complete();
+        List<RestResourceDescriptor> mvhDescriptors = scanner.scan(mvhIndex);
+        if (!mvhDescriptors.isEmpty()) {
+            multivaluedHeaderDescriptor = mvhDescriptors.get(0);
         }
     }
 
@@ -129,6 +139,28 @@ class RestControllerWriterTest {
 
         assertThat(source).contains("ResponseEntity.status(result.status()).body(result)");
         assertThat(source).doesNotContain("ResponseEntity.noContent()");
+    }
+
+    @Test
+    void generatesMultivaluedHeadersHelper() {
+        assertThat(multivaluedHeaderDescriptor).isNotNull();
+        var writer = new RestControllerWriter();
+        String source = writer.generate(multivaluedHeaderDescriptor, "test.spring").toString();
+
+        assertThat(source).contains("extractMultivaluedHeaders(httpRequest)");
+        assertThat(source).contains("Map<String, List<String>> headers");
+        assertThat(source).contains("request.getHeaders(name)");
+    }
+
+    @Test
+    void generatesFlatHeadersHelper() {
+        assertThat(multivaluedHeaderDescriptor).isNotNull();
+        var writer = new RestControllerWriter();
+        String source = writer.generate(multivaluedHeaderDescriptor, "test.spring").toString();
+
+        assertThat(source).contains("extractHeaders(httpRequest)");
+        assertThat(source).contains("Map<String, String> headers");
+        assertThat(source).contains("request.getHeader(name)");
     }
 
     @Test

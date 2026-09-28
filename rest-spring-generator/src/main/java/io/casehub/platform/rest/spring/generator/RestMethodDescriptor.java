@@ -14,7 +14,8 @@ public record RestMethodDescriptor(
         List<ParameterDescriptor> parameters,
         String[] consumes,
         String[] produces,
-        boolean needsHeaderInjection
+        boolean needsHeaderInjection,
+        boolean multivaluedHeaders
 ) {
     public record ParameterDescriptor(
             String name,

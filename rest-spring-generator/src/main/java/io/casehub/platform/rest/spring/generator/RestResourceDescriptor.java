@@ -11,4 +11,12 @@ public record RestResourceDescriptor(
         String[] classConsumes,
         String[] classProduces,
         boolean hasContextHeaders
-) {}
+) {
+    boolean needsMultivaluedHeaders() {
+        return methods.stream().anyMatch(m -> m.needsHeaderInjection() && m.multivaluedHeaders());
+    }
+
+    boolean needsFlatHeaders() {
+        return methods.stream().anyMatch(m -> m.needsHeaderInjection() && !m.multivaluedHeaders());
+    }
+}

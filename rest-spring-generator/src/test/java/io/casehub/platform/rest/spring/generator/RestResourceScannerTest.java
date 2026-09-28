@@ -125,6 +125,33 @@ class RestResourceScannerTest {
     }
 
     @Test
+    void detectsMultivaluedAndFlatHeaders() throws Exception {
+        var indexer = new Indexer();
+        indexer.indexClass(MultivaluedHeaderResource.class);
+        indexer.indexClass(MultivaluedHeaderCore.class);
+        Index mvhIndex = indexer.complete();
+
+        var scanner = new RestResourceScanner();
+        var descriptors = scanner.scan(mvhIndex);
+        assertThat(descriptors).hasSize(1);
+
+        var desc = descriptors.get(0);
+        assertThat(desc.hasContextHeaders()).isTrue();
+        assertThat(desc.needsMultivaluedHeaders()).isTrue();
+        assertThat(desc.needsFlatHeaders()).isTrue();
+
+        var multiMethod = desc.methods().stream()
+                .filter(m -> m.methodName().equals("processMultivalued")).findFirst().orElseThrow();
+        assertThat(multiMethod.needsHeaderInjection()).isTrue();
+        assertThat(multiMethod.multivaluedHeaders()).isTrue();
+
+        var flatMethod = desc.methods().stream()
+                .filter(m -> m.methodName().equals("processFlat")).findFirst().orElseThrow();
+        assertThat(flatMethod.needsHeaderInjection()).isTrue();
+        assertThat(flatMethod.multivaluedHeaders()).isFalse();
+    }
+
+    @Test
     void extractsClassLevelMediaTypes() {
         var scanner = new RestResourceScanner();
         RestResourceDescriptor desc = scanner.scan(index).get(0);

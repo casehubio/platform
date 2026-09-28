@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -1349,6 +1350,33 @@ class GraphQLResolverProcessorTest {
         assertThat(content).contains("@QueryParam(\"offset\")");
         assertThat(content).contains("@QueryParam(\"limit\")");
         assertThat(content).contains("new test.CaseFilter(query, assigneeId, offset, limit)");
+    }
+
+    @Test
+    void jandexCanonicalConstructorPreservesDeclarationOrder() throws IOException {
+        record ZebraAlpha(String zebra, int alpha, boolean middle) {}
+        var indexer = new Indexer();
+        indexer.indexClass(ZebraAlpha.class);
+        var index = indexer.complete();
+
+        var ci = index.getClassByName(DotName.createSimple(ZebraAlpha.class.getName()));
+        assertThat(ci).isNotNull();
+
+        // recordComponents() returns alphabetical — NOT declaration order
+        List<String> fromComponents = ci.recordComponents().stream()
+                .map(rc -> rc.name()).toList();
+        assertThat(fromComponents).containsExactly("alpha", "middle", "zebra");
+
+        // The canonical constructor preserves declaration order
+        var canonicalCtor = ci.methods().stream()
+                .filter(m -> m.name().equals("<init>"))
+                .filter(m -> m.parametersCount() == ci.recordComponents().size())
+                .findFirst().orElseThrow();
+        List<String> fromCtor = new java.util.ArrayList<>();
+        for (int i = 0; i < canonicalCtor.parametersCount(); i++) {
+            fromCtor.add(canonicalCtor.parameterName(i));
+        }
+        assertThat(fromCtor).containsExactly("zebra", "alpha", "middle");
     }
 
     @Test

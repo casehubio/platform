@@ -153,12 +153,11 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void isSimpleType_collections() {
-        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.List")).isTrue();
-        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Set")).isTrue();
-        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Collection")).isTrue();
-        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Map")).isTrue();
-        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Optional")).isTrue();
+    void collectionTypesAreTracked() {
+        assertThat(GraphQLResolverProcessor.COLLECTION_TYPES).contains(
+                "java.util.List", "java.util.Set", "java.util.Collection",
+                "java.util.Map", "java.util.Optional");
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.List")).isFalse();
     }
 
     @Test
@@ -1754,6 +1753,45 @@ class GraphQLResolverProcessorTest {
         String restContent = restSource.get().getCharContent(true).toString();
         assertThat(restContent).doesNotContain("BeanParam");
         assertThat(restContent).doesNotContain("new List");
+    }
+
+    @Test
+    void listOfComplexTypeTreatedAsBody() throws Exception {
+        var entry = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.EntryRequest",
+                """
+                package test;
+                public record EntryRequest(String actorId, String resourceId) {}
+                """);
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.BatchApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("batch-ops")
+                @ApplicationScoped
+                public class BatchApi {
+                    @PlatformMutation("Grant batch")
+                    public void grantBatch(List<EntryRequest> entries) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=batch-ops", "-AgenerateGraphQL=false")
+                .compile(entry, spi);
+
+        assertThat(compilation.errors()).isEmpty();
+        var restSource = compilation.generatedSourceFiles().stream()
+                .filter(f -> f.getName().contains("BatchOpsResource"))
+                .findFirst();
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).doesNotContain("@QueryParam");
+        assertThat(restContent).contains("List<EntryRequest>");
     }
 
     @Test

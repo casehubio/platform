@@ -1,0 +1,32 @@
+{
+  "properties": [
+    {
+      "name": "casehub.streams.kafka.topic",
+      "type": "java.lang.String",
+      "description": "Kafka topic for stream ingestion. Activates the Kafka stream processor when set."
+    },
+    {
+      "name": "casehub.streams.kafka.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the Kafka listener auto-starts.",
+      "defaultValue": true
+    },
+    {
+      "name": "casehub.streams.amqp.queue",
+      "type": "java.lang.String",
+      "description": "RabbitMQ queue name for stream ingestion. Activates the AMQP stream processor when set."
+    },
+    {
+      "name": "casehub.streams.amqp.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the RabbitMQ listener auto-starts.",
+      "defaultValue": true
+    },
+    {
+      "name": "casehub.streams.poll.interval",
+      "type": "java.lang.Long",
+      "description": "HTTP polling interval in milliseconds.",
+      "defaultValue": 60000
+    }
+  ]
+}

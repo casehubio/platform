@@ -153,6 +153,15 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
+    void isSimpleType_collections() {
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.List")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Set")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Collection")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Map")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.Optional")).isTrue();
+    }
+
+    @Test
     void isSimpleType_primitives() {
         assertThat(GraphQLResolverProcessor.isSimpleType("int")).isTrue();
         assertThat(GraphQLResolverProcessor.isSimpleType("long")).isTrue();
@@ -1714,6 +1723,37 @@ class GraphQLResolverProcessorTest {
         assertThat(compilation.errors()).isNotEmpty();
         assertThat(compilation.errors().get(0).getMessage(null))
                 .contains("@BeanParam expansion requires a Java record");
+    }
+
+    @Test
+    void listParamInGetMethodNotTreatedAsBeanParam() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.WorkItemApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("work-items")
+                @ApplicationScoped
+                public class WorkItemApi {
+                    @PlatformQuery("Find work items by tags")
+                    public List<String> findByTags(List<String> tags, int limit) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=work-items", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        assertThat(compilation.errors()).isEmpty();
+        var restSource = compilation.generatedSourceFile("test.rest.WorkItemsResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).doesNotContain("BeanParam");
+        assertThat(restContent).doesNotContain("new List");
     }
 
     @Test

@@ -72,15 +72,15 @@ public final class DecoratorChain {
         if (whenVal == null) {return inner;}
 
         String condition = String.valueOf(whenVal);
-        return resolver -> {
+        return ctx -> {
             try {
-                if (!resolveCondition(condition, resolver, "when-guard")) {
+                if (!resolveCondition(condition, ctx.resolver(), "when-guard")) {
                     return StepResult.of(Map.of());
                 }
             } catch (Exception e) {
                 return StepResult.failed("when guard failed: " + e.getMessage());
             }
-            return inner.execute(resolver);
+            return inner.execute(ctx);
         };
     }
 
@@ -89,7 +89,7 @@ public final class DecoratorChain {
         if (loopVal == null) {return inner;}
 
         LoopDirective directive = LoopDirective.parse(loopVal);
-        return resolver -> {
+        return ctx -> {
             StepResult last = StepResult.of(Map.of());
             int maxIterations = switch (directive) {
                 case LoopDirective.Count c -> c.count();
@@ -103,12 +103,12 @@ public final class DecoratorChain {
             };
 
             for (int i = 0; i < maxIterations; i++) {
-                last = inner.execute(resolver);
+                last = inner.execute(ctx);
                 if (!last.isSuccess()) {return last;}
 
                 if (untilCondition != null) {
                     try {
-                        if (resolveCondition(untilCondition, resolver, "loop-until")) {
+                        if (resolveCondition(untilCondition, ctx.resolver(), "loop-until")) {
                             return last;
                         }
                     } catch (Exception e) {
@@ -125,10 +125,10 @@ public final class DecoratorChain {
         if (onErrorVal == null) {return inner;}
 
         String fallbackStep = String.valueOf(onErrorVal);
-        return resolver -> {
+        return ctx -> {
             StepResult result;
             try {
-                result = inner.execute(resolver);
+                result = inner.execute(ctx);
             } catch (Exception e) {
                 return StepResult.of(Map.of(
                                              "on-error.caught", e.getMessage(),
@@ -148,15 +148,18 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapTimeout(DecoratedExecution inner, Map<String, Object> decorators) {
         Object timeoutVal = decorators.get("timeout");
-        if (timeoutVal == null) return inner;
+        if (timeoutVal == null) {return inner;}
 
         Duration timeout = DurationParser.parse(String.valueOf(timeoutVal));
-        return resolver -> {
-            double speed = speedMultiplier.currentSpeed();
-            long adjustedMs = Math.max(1, (long) (timeout.toMillis() / speed));
+        return ctx -> {
+            double   speed      = speedMultiplier.currentSpeed();
+            long     adjustedMs = Math.max(1, (long) (timeout.toMillis() / speed));
+            Duration adjusted   = Duration.ofMillis(adjustedMs);
+
+            StepContext deadlineCtx = ctx.withDeadline(adjusted);
 
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                Future<StepResult> future = executor.submit(() -> inner.execute(resolver));
+                Future<StepResult> future = executor.submit(() -> inner.execute(deadlineCtx));
                 try {
                     return future.get(adjustedMs, TimeUnit.MILLISECONDS);
                 } catch (TimeoutException e) {
@@ -174,10 +177,10 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapRetry(DecoratedExecution inner, Map<String, Object> decorators) {
         Object retryVal = decorators.get("retry");
-        if (retryVal == null) return inner;
+        if (retryVal == null) {return inner;}
 
         RetryDirective directive = RetryDirective.parse(retryVal);
-        return resolver -> {
+        return ctx -> {
             int max = switch (directive) {
                 case RetryDirective.Simple s -> s.max();
                 case RetryDirective.Full f -> f.max();
@@ -194,16 +197,16 @@ public final class DecoratorChain {
             StepResult last = null;
             for (int attempt = 0; attempt < max; attempt++) {
                 try {
-                    last = inner.execute(resolver);
-                    if (last.isSuccess()) return last;
+                    last = inner.execute(ctx);
+                    if (last.isSuccess()) {return last;}
                 } catch (Exception e) {
                     last = StepResult.failed(e.getMessage());
                 }
 
                 if (attempt < max - 1 && !delay.isZero()) {
-                    long delayMs = computeDelay(delay, backoff, attempt);
-                    double speed = speedMultiplier.currentSpeed();
-                    long adjustedMs = Math.max(1, (long) (delayMs / speed));
+                    long   delayMs    = computeDelay(delay, backoff, attempt);
+                    double speed      = speedMultiplier.currentSpeed();
+                    long   adjustedMs = Math.max(1, (long) (delayMs / speed));
                     try {
                         Thread.sleep(adjustedMs);
                     } catch (InterruptedException e) {
@@ -230,29 +233,29 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapDelay(DecoratedExecution inner, Map<String, Object> decorators) {
         Object delayVal = decorators.get("delay");
-        if (delayVal == null) return inner;
+        if (delayVal == null) {return inner;}
 
         Duration delay = DurationParser.parse(String.valueOf(delayVal));
-        return resolver -> {
-            double speed = speedMultiplier.currentSpeed();
-            long adjustedMs = Math.max(1, (long) (delay.toMillis() / speed));
+        return ctx -> {
+            double speed      = speedMultiplier.currentSpeed();
+            long   adjustedMs = Math.max(1, (long) (delay.toMillis() / speed));
             try {
                 Thread.sleep(adjustedMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return StepResult.failed("Delay interrupted");
             }
-            return inner.execute(resolver);
+            return inner.execute(ctx);
         };
     }
 
     private DecoratedExecution wrapTransform(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transformVal = decorators.get("transform");
-        if (transformVal == null) return inner;
+        if (transformVal == null) {return inner;}
 
-        return resolver -> {
-            StepResult result = inner.execute(resolver);
-            if (!result.isSuccess()) return result;
+        return ctx -> {
+            StepResult result = inner.execute(ctx);
+            if (!result.isSuccess()) {return result;}
             return result;
         };
     }
@@ -260,52 +263,52 @@ public final class DecoratorChain {
     @SuppressWarnings("unchecked")
     private DecoratedExecution wrapForEach(DecoratedExecution inner, Map<String, Object> decorators) {
         Object forEachVal = decorators.get("forEach");
-        if (forEachVal == null) return inner;
+        if (forEachVal == null) {return inner;}
         if (!(forEachVal instanceof Map<?, ?> forEachMap)) {
-            return r -> StepResult.failed("forEach must be a map with 'in' and 'as' keys");
+            return ctx -> StepResult.failed("forEach must be a map with 'in' and 'as' keys");
         }
 
         String inExpr = String.valueOf(forEachMap.get("in"));
-        String as = (String) forEachMap.get("as");
-        if (as == null) as = "item";
+        String as     = (String) forEachMap.get("as");
+        if (as == null) {as = "item";}
         boolean parallel = Boolean.TRUE.equals(forEachMap.get("parallel"));
-        String asName = as;
+        String  asName   = as;
 
-        return resolver -> {
-            Object resolved = resolver.resolve(inExpr);
+        return ctx -> {
+            Object resolved = ctx.resolver().resolve(inExpr);
             if (!(resolved instanceof List<?> items)) {
                 return StepResult.failed("forEach 'in' did not resolve to a list");
             }
-            if (items.isEmpty()) return StepResult.of(Map.of());
+            if (items.isEmpty()) {return StepResult.of(Map.of());}
 
             if (parallel) {
-                return executeForEachParallel(items, asName, inner, resolver);
+                return executeForEachParallel(items, asName, inner, ctx);
             }
-            return executeForEachSequential(items, asName, inner, resolver);
+            return executeForEachSequential(items, asName, inner, ctx);
         };
     }
 
     private StepResult executeForEachSequential(List<?> items, String as,
-                                                 DecoratedExecution inner, VariableResolver resolver) {
+                                                DecoratedExecution inner, StepContext ctx) {
         StepResult last = StepResult.of(Map.of());
         for (int i = 0; i < items.size(); i++) {
-            VariableResolver scoped = pushEachContext(resolver, as, items.get(i), i);
-            last = inner.execute(scoped);
-            if (!last.isSuccess()) return last;
+            VariableResolver scoped = pushEachContext(ctx.resolver(), as, items.get(i), i);
+            last = inner.execute(ctx.withResolver(scoped));
+            if (!last.isSuccess()) {return last;}
         }
         return last;
     }
 
     private StepResult executeForEachParallel(List<?> items, String as,
-                                               DecoratedExecution inner, VariableResolver resolver) {
+                                              DecoratedExecution inner, StepContext ctx) {
         var futures = new ArrayList<Future<StepResult>>();
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < items.size(); i++) {
-                int idx = i;
+                int    idx  = i;
                 Object item = items.get(i);
                 futures.add(executor.submit(() -> {
-                    VariableResolver scoped = pushEachContext(resolver, as, item, idx);
-                    return inner.execute(scoped);
+                    VariableResolver scoped = pushEachContext(ctx.resolver(), as, item, idx);
+                    return inner.execute(ctx.withResolver(scoped));
                 }));
             }
             var results = new ArrayList<StepResult>(futures.size());
@@ -317,7 +320,7 @@ public final class DecoratorChain {
                 }
             }
             for (StepResult r : results) {
-                if (!r.isSuccess()) return r;
+                if (!r.isSuccess()) {return r;}
             }
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {
@@ -341,53 +344,69 @@ public final class DecoratorChain {
 
     private DecoratedExecution wrapWait(DecoratedExecution inner, Map<String, Object> decorators) {
         Object waitVal = decorators.get("wait");
-        if (waitVal == null) return inner;
-        if (scope == null) return r -> StepResult.failed("'wait' requires a ScenarioScope");
+        if (waitVal == null) {return inner;}
+        if (scope == null) {return ctx -> StepResult.failed("'wait' requires a ScenarioScope");}
 
         String signalName = String.valueOf(waitVal);
-        return resolver -> {
+        return ctx -> {
             OrcSignal signal = scope.signal(signalName);
             try {
-                signal.await();
+                var remaining = ctx.deadline().remainingTime();
+                if (remaining.isPresent()) {
+                    if (!signal.await(remaining.get().toMillis(), TimeUnit.MILLISECONDS)) {
+                        return StepResult.failed(
+                                "Wait for signal '" + signalName + "' exceeded deadline");
+                    }
+                } else {
+                    signal.await();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return StepResult.failed("Wait for signal '" + signalName + "' interrupted");
             }
-            VariableResolver scoped = ScopeUtils.pushScope(resolver, "signal", signal.payload());
-            return inner.execute(scoped);
+            VariableResolver scoped = ScopeUtils.pushScope(ctx.resolver(), "signal", signal.payload());
+            return inner.execute(ctx.withResolver(scoped));
         };
     }
 
     @SuppressWarnings("unchecked")
     private DecoratedExecution wrapSemaphore(DecoratedExecution inner, Map<String, Object> decorators) {
-        Object semVal = decorators.get("semaphore");
+        Object semVal   = decorators.get("semaphore");
         Object mutexVal = decorators.get("mutex");
-        if (semVal == null && mutexVal == null) return inner;
-        if (scope == null) return r -> StepResult.failed("'semaphore'/'mutex' requires a ScenarioScope");
+        if (semVal == null && mutexVal == null) {return inner;}
+        if (scope == null) {return ctx -> StepResult.failed("'semaphore'/'mutex' requires a ScenarioScope");}
 
         String name;
-        int permits;
+        int    permits;
         if (mutexVal != null) {
-            name = String.valueOf(mutexVal);
+            name    = String.valueOf(mutexVal);
             permits = 1;
         } else if (semVal instanceof Map<?, ?> semMap) {
-            name = String.valueOf(semMap.get("name"));
+            name    = String.valueOf(semMap.get("name"));
             permits = semMap.containsKey("permits") ? ((Number) semMap.get("permits")).intValue() : 1;
         } else {
-            name = String.valueOf(semVal);
+            name    = String.valueOf(semVal);
             permits = 1;
         }
 
-        return resolver -> {
+        return ctx -> {
             OrcSemaphore semaphore = scope.semaphore(name, permits);
             try {
-                semaphore.acquire();
+                var remaining = ctx.deadline().remainingTime();
+                if (remaining.isPresent()) {
+                    if (!semaphore.tryAcquire(remaining.get().toMillis(), TimeUnit.MILLISECONDS)) {
+                        return StepResult.failed(
+                                "Semaphore '" + name + "' acquire exceeded deadline");
+                    }
+                } else {
+                    semaphore.acquire();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return StepResult.failed("Semaphore '" + name + "' acquire interrupted");
             }
             try {
-                return inner.execute(resolver);
+                return inner.execute(ctx);
             } finally {
                 semaphore.release();
             }
@@ -395,21 +414,21 @@ public final class DecoratorChain {
     }
 
     private DecoratedExecution wrapPostSignal(DecoratedExecution inner, Map<String, Object> decorators) {
-        Object signalVal = decorators.get("signal");
+        Object signalVal  = decorators.get("signal");
         Object publishVal = decorators.get("publish");
-        if (signalVal == null && publishVal == null) return inner;
-        if (scope == null) return r -> StepResult.failed("'signal'/'publish' requires a ScenarioScope");
+        if (signalVal == null && publishVal == null) {return inner;}
+        if (scope == null) {return ctx -> StepResult.failed("'signal'/'publish' requires a ScenarioScope");}
 
-        return resolver -> {
-            StepResult result = inner.execute(resolver);
-            if (!result.isSuccess()) return result;
+        return ctx -> {
+            StepResult result = inner.execute(ctx);
+            if (!result.isSuccess()) {return result;}
 
             if (signalVal != null) {
                 OrcSignal signal = scope.signal(String.valueOf(signalVal));
                 signal.signal(result.output());
             }
             if (publishVal != null) {
-                applyPublish(publishVal, result, resolver);
+                applyPublish(publishVal, result, ctx.resolver());
             }
             return result;
         };
@@ -432,17 +451,17 @@ public final class DecoratorChain {
     private DecoratedExecution wrapTransition(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transVal = decorators.get("transition");
         if (transVal == null) {return inner;}
-        if (scope == null) {return r -> StepResult.failed("'transition' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> StepResult.failed("'transition' requires a ScenarioScope");}
         if (!(transVal instanceof Map<?, ?> transMap)) {
-            return r -> StepResult.failed("'transition' must be a map with 'machine' and 'event' keys");
+            return ctx -> StepResult.failed("'transition' must be a map with 'machine' and 'event' keys");
         }
 
         String machineName = String.valueOf(transMap.get("machine"));
         String event       = String.valueOf(transMap.get("event"));
         String targetState = transMap.containsKey("to") ? String.valueOf(transMap.get("to")) : null;
 
-        return resolver -> {
-            StepResult result = inner.execute(resolver);
+        return ctx -> {
+            StepResult result = inner.execute(ctx);
             if (!result.isSuccess()) {return result;}
 
             OrcStateMachine<? extends Enum<?>> machine = scope.primitive(machineName, OrcStateMachine.class);

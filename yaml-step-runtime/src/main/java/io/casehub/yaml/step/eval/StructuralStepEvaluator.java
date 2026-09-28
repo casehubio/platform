@@ -41,18 +41,23 @@ public final class StructuralStepEvaluator {
     }
 
     public StepResult evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
-        VariableResolver    effective  = withResultScope(resolver);
+        StepContext ctx = new StepContext(withResultScope(resolver));
+        return evaluateInternal(step, ctx, runner);
+    }
+
+    private StepResult evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
         Map<String, Object> decorators = step.decorators();
         StepResult          result;
         if (decorators.isEmpty()) {
-            result = dispatchStep(step, effective, runner);
+            result = dispatchStep(step, ctx, runner);
         } else {
-            result = decoratorChain.apply(decorators, r -> dispatchStep(step, r, runner))
-                                   .execute(effective);
+            result = decoratorChain.apply(decorators, c -> dispatchStep(step, c, runner))
+                                   .execute(ctx);
         }
         recordResult(step.name(), result);
         return result;
     }
+
 
     public void preRegisterLatches(java.util.List<ResolvedStep> steps) {
         if (scope == null) {return;}
@@ -87,29 +92,29 @@ public final class StructuralStepEvaluator {
     }
 
 
-    private StepResult dispatchStep(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
+    private StepResult dispatchStep(ResolvedStep step, StepContext ctx, StepRunner runner) {
         return switch (step) {
-            case ResolvedStep.BlockStep b -> evaluateBlock(b, resolver, runner);
-            case ResolvedStep.IfElseStep i -> evaluateIfElse(i, resolver, runner);
-            case ResolvedStep.MatchStep m -> evaluateMatch(m, resolver, runner);
-            case ResolvedStep.ParallelStep p -> evaluateParallel(p, resolver, runner);
-            case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, resolver, runner);
-            case ResolvedStep.SelectStep s -> evaluateSelect(s, resolver, runner);
+            case ResolvedStep.BlockStep b -> evaluateBlock(b, ctx, runner);
+            case ResolvedStep.IfElseStep i -> evaluateIfElse(i, ctx, runner);
+            case ResolvedStep.MatchStep m -> evaluateMatch(m, ctx, runner);
+            case ResolvedStep.ParallelStep p -> evaluateParallel(p, ctx, runner);
+            case ResolvedStep.TryCatchFinallyStep t -> evaluateTryCatchFinally(t, ctx, runner);
+            case ResolvedStep.SelectStep s -> evaluateSelect(s, ctx, runner);
             case ResolvedStep.BarrierStep b -> evaluateBarrier(b);
             case ResolvedStep.QuorumStep q -> evaluateQuorum(q);
-            case ResolvedStep.PluginStep ps -> runner.run(ps, resolver);
-            case ResolvedStep.InvokeStep is -> runner.run(is, resolver);
+            case ResolvedStep.PluginStep ps -> runner.run(ps, ctx.resolver());
+            case ResolvedStep.InvokeStep is -> runner.run(is, ctx.resolver());
         };
     }
 
     private StepResult evaluateBlock(ResolvedStep.BlockStep block,
-                                     VariableResolver resolver, StepRunner runner) {
+                                     StepContext ctx, StepRunner runner) {
         if (block.steps().isEmpty()) {
             return StepResult.of(Map.of());
         }
         StepResult last = StepResult.of(Map.of());
         for (ResolvedStep sub : block.steps()) {
-            last = evaluate(sub, resolver, runner);
+            last = evaluateInternal(sub, ctx, runner);
             if (!last.isSuccess()) {
                 return last;
             }
@@ -118,10 +123,10 @@ public final class StructuralStepEvaluator {
     }
 
     private StepResult evaluateIfElse(ResolvedStep.IfElseStep ifElse,
-                                      VariableResolver resolver, StepRunner runner) {
+                                      StepContext ctx, StepRunner runner) {
         boolean condition;
         try {
-            String resolved = resolver.resolveString(ifElse.condition(), "if-condition");
+            String resolved = ctx.resolver().resolveString(ifElse.condition(), "if-condition");
             condition = conditionEvaluator.evaluate(resolved);
         } catch (Exception e) {
             return StepResult.failed("Condition evaluation failed: " + e.getMessage());
@@ -131,12 +136,12 @@ public final class StructuralStepEvaluator {
         if (branch.isEmpty()) {
             return StepResult.of(Map.of());
         }
-        return evaluateBlock(new ResolvedStep.BlockStep(null, branch, Map.of()), resolver, runner);
+        return evaluateBlock(new ResolvedStep.BlockStep(null, branch, Map.of()), ctx, runner);
     }
 
     private StepResult evaluateMatch(ResolvedStep.MatchStep match,
-                                     VariableResolver resolver, StepRunner runner) {
-        Object scrutineeValue = resolver.resolve(match.scrutinee());
+                                     StepContext ctx, StepRunner runner) {
+        Object scrutineeValue = ctx.resolver().resolve(match.scrutinee());
 
         for (ResolvedMatchCase mc : match.cases()) {
             if (!mc.pattern().matches(scrutineeValue)) {
@@ -144,7 +149,7 @@ public final class StructuralStepEvaluator {
             }
             if (mc.guard() != null) {
                 try {
-                    String resolvedGuard = resolver.resolveString(mc.guard(), "match-guard");
+                    String resolvedGuard = ctx.resolver().resolveString(mc.guard(), "match-guard");
                     if (!conditionEvaluator.evaluate(resolvedGuard)) {
                         continue;
                     }
@@ -152,22 +157,22 @@ public final class StructuralStepEvaluator {
                     return StepResult.failed("Guard evaluation failed: " + e.getMessage());
                 }
             }
-            VariableResolver matchResolver = pushMatchContext(resolver, scrutineeValue);
+            StepContext matchCtx = ctx.withResolver(pushMatchContext(ctx.resolver(), scrutineeValue));
             if (mc.steps().isEmpty()) {
                 return StepResult.of(Map.of());
             }
             return evaluateBlock(
-                    new ResolvedStep.BlockStep(null, mc.steps(), Map.of()), matchResolver, runner);
+                    new ResolvedStep.BlockStep(null, mc.steps(), Map.of()), matchCtx, runner);
         }
         return StepResult.of(Map.of());
     }
 
     private StepResult evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,
-                                               VariableResolver resolver, StepRunner runner) {
+                                               StepContext ctx, StepRunner runner) {
         StepResult tryResult;
         try {
             tryResult = evaluateBlock(
-                    new ResolvedStep.BlockStep(null, tcf.trySteps(), Map.of()), resolver, runner);
+                    new ResolvedStep.BlockStep(null, tcf.trySteps(), Map.of()), ctx, runner);
         } catch (Exception e) {
             tryResult = StepResult.failed(e.getMessage());
         }
@@ -175,15 +180,15 @@ public final class StructuralStepEvaluator {
         StepResult result = tryResult;
         if (!tryResult.isSuccess() && !tcf.catchSteps().isEmpty()) {
             String errorMessage = tryResult instanceof StepResult.Failure f ? f.message() : "unknown error";
-            VariableResolver errorResolver = resolver.withObjectScope("error",
-                                                                      name -> switch (name) {
-                                                                          case "message" -> errorMessage;
-                                                                          case "step" -> "try-block";
-                                                                          default -> null;
-                                                                      });
+            VariableResolver errorResolver = ctx.resolver().withObjectScope("error",
+                                                                            name -> switch (name) {
+                                                                                case "message" -> errorMessage;
+                                                                                case "step" -> "try-block";
+                                                                                default -> null;
+                                                                            });
             try {
                 result = evaluateBlock(
-                        new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), errorResolver, runner);
+                        new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), ctx.withResolver(errorResolver), runner);
             } catch (Exception e) {
                 result = StepResult.failed("catch failed: " + e.getMessage());
             }
@@ -193,7 +198,7 @@ public final class StructuralStepEvaluator {
             StepResult finallyResult;
             try {
                 finallyResult = evaluateBlock(
-                        new ResolvedStep.BlockStep(null, tcf.finallySteps(), Map.of()), resolver, runner);
+                        new ResolvedStep.BlockStep(null, tcf.finallySteps(), Map.of()), ctx, runner);
             } catch (Exception e) {
                 finallyResult = StepResult.failed("finally failed: " + e.getMessage());
             }
@@ -206,7 +211,7 @@ public final class StructuralStepEvaluator {
     }
 
     private StepResult evaluateSelect(ResolvedStep.SelectStep select,
-                                      VariableResolver resolver, StepRunner runner) {
+                                      StepContext ctx, StepRunner runner) {
         if (select.branches().isEmpty()) {
             return StepResult.of(Map.of());
         }
@@ -273,11 +278,11 @@ public final class StructuralStepEvaluator {
             return StepResult.of(Map.of());
         }
 
-        VariableResolver scoped = resolver;
-        Object payload = winnerPayload.get();
+        StepContext scoped  = ctx;
+        Object      payload = winnerPayload.get();
         if (payload != null) {
             String prefix = winningBranch.type() == ResolvedStep.SelectBranchType.WAIT ? "signal" : "channel";
-            scoped = ScopeUtils.pushScope(resolver, prefix, payload);
+            scoped = ctx.withResolver(ScopeUtils.pushScope(ctx.resolver(), prefix, payload));
         }
 
         return evaluateBlock(
@@ -290,7 +295,7 @@ public final class StructuralStepEvaluator {
     }
 
     private StepResult evaluateParallel(ResolvedStep.ParallelStep parallel,
-                                        VariableResolver resolver, StepRunner runner) {
+                                        StepContext ctx, StepRunner runner) {
         if (parallel.steps().isEmpty()) {
             return StepResult.of(Map.of());
         }
@@ -302,7 +307,7 @@ public final class StructuralStepEvaluator {
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < stepCount; i++) {
                 ResolvedStep sub = parallel.steps().get(i);
-                futures[i] = executor.submit(() -> evaluate(sub, resolver, runner));
+                futures[i] = executor.submit(() -> evaluateInternal(sub, ctx, runner));
             }
 
             var results = new ArrayList<StepResult>(stepCount);

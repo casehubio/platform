@@ -155,6 +155,7 @@ public class RestResourceScanner {
             }
 
             boolean needsHeaders = false;
+            boolean multivaluedHeaders = false;
             com.palantir.javapoet.TypeName delegateReturnType = null;
             boolean statusBearing = false;
 
@@ -164,6 +165,18 @@ public class RestResourceScanner {
                         if (hasContextHeaders
                             && delegateMethod.parameterTypes().size() > method.parameterTypes().size()) {
                             needsHeaders = true;
+                            org.jboss.jandex.Type extraParam = delegateMethod.parameterTypes()
+                                    .get(delegateMethod.parameterTypes().size() - 1);
+                            if (extraParam.kind() == org.jboss.jandex.Type.Kind.PARAMETERIZED_TYPE) {
+                                var paramType = extraParam.asParameterizedType();
+                                if (paramType.arguments().size() == 2) {
+                                    org.jboss.jandex.Type valueType = paramType.arguments().get(1);
+                                    if (valueType.kind() == org.jboss.jandex.Type.Kind.PARAMETERIZED_TYPE
+                                        && valueType.name().toString().equals("java.util.List")) {
+                                        multivaluedHeaders = true;
+                                    }
+                                }
+                            }
                         }
                         boolean isResponseReturn = method.returnType().name().toString()
                                 .equals("jakarta.ws.rs.core.Response");
@@ -180,7 +193,7 @@ public class RestResourceScanner {
                     method.name(), httpMethod, subPath,
                     JandexTypeConverter.toTypeName(method.returnType()),
                     delegateReturnType, statusBearing,
-                    params, consumes, produces, needsHeaders));
+                    params, consumes, produces, needsHeaders, multivaluedHeaders));
         }
 
         return methods;

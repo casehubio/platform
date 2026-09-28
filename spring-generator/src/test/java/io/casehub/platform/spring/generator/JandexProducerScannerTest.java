@@ -149,7 +149,7 @@ class JandexProducerScannerTest {
 
     @Test
     void detectsPostConstructInitMethod() throws IOException {
-        Index scanIndex = indexClasses(SampleInitBeans.class, SimplePojo.class);
+        Index scanIndex = indexClasses(SampleInitBeans.class, InitPojo.class);
         var scanner = new JandexProducerScanner();
 
         List<ProducerDescriptor> descriptors = scanner.scan(scanIndex);

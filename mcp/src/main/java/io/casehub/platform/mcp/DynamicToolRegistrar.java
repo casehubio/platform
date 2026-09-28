@@ -3,6 +3,8 @@ package io.casehub.platform.mcp;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.casehub.platform.api.mcp.McpCapabilityException;
+import io.casehub.platform.api.mcp.McpOperationResult;
 import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -11,6 +13,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,17 @@ public class DynamicToolRegistrar {
                        } catch (IllegalArgumentException | IllegalStateException e) {
                            return ToolResponse.error(e.getMessage());
                        } catch (Exception e) {
+                           McpCapabilityException capEx = unwrapCapabilityException(e);
+                           if (capEx != null) {
+                               try {
+                                   String domain = (String) args.args().get("domain");
+                                   String operation = (String) args.args().get("operation");
+                                   var capResult = McpOperationResult.from(capEx, domain, operation);
+                                   return ToolResponse.success(mapper.writeValueAsString(capResult));
+                               } catch (Exception jsonEx) {
+                                   return ToolResponse.error(capEx.getMessage());
+                               }
+                           }
                            LOG.errorf(e, "casehub_action dispatch failed");
                            return ToolResponse.error(e.getMessage());
                        }
@@ -158,6 +172,15 @@ public class DynamicToolRegistrar {
             } catch (IllegalArgumentException | IllegalStateException e) {
                 return ToolResponse.error(e.getMessage());
             } catch (Exception e) {
+                McpCapabilityException capEx = unwrapCapabilityException(e);
+                if (capEx != null) {
+                    try {
+                        var capResult = McpOperationResult.from(capEx, domain, op.name());
+                        return ToolResponse.success(mapper.writeValueAsString(capResult));
+                    } catch (Exception jsonEx) {
+                        return ToolResponse.error(capEx.getMessage());
+                    }
+                }
                 LOG.errorf(e, "%s dispatch failed", toolName);
                 return ToolResponse.error(e.getMessage());
             }
@@ -166,4 +189,17 @@ public class DynamicToolRegistrar {
         def.register();
     }
 
+
+    private static McpCapabilityException unwrapCapabilityException(Exception e) {
+        if (e instanceof McpCapabilityException cap) {
+            return cap;
+        }
+        if (e instanceof InvocationTargetException ite && ite.getCause() instanceof McpCapabilityException cap) {
+            return cap;
+        }
+        if (e.getCause() instanceof McpCapabilityException cap) {
+            return cap;
+        }
+        return null;
+    }
 }

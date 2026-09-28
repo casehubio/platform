@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @QuarkusTest
 class DynamicToolRegistrarTest {
@@ -16,6 +17,8 @@ class DynamicToolRegistrarTest {
     ToolManager toolManager;
     @Inject
     DynamicToolRegistrar registrar;
+    @Inject
+    ReflectiveOperationDispatcher dispatcher;
 
 
     @Test
@@ -131,5 +134,25 @@ class DynamicToolRegistrarTest {
         assertThat(annotations.get().readOnlyHint()).isFalse();
         assertThat(annotations.get().idempotentHint()).isFalse();
         assertThat(annotations.get().destructiveHint()).isFalse();
+    }
+
+    @Test
+    void dispatch_mcpCapabilityException_propagatesFromDispatcher() {
+        assertThatThrownBy(() -> dispatcher.dispatch("cap-test", "search", java.util.Map.of("query", "test")))
+                .isInstanceOf(java.lang.reflect.InvocationTargetException.class)
+                .hasCauseInstanceOf(io.casehub.platform.api.mcp.McpCapabilityException.class);
+    }
+
+    @Test
+    void capTestDomain_isDiscovered() {
+        var tool = toolManager.getTool("casehub_action");
+        assertThat(tool).isNotNull();
+        var                    json        = tool.asJson();
+        var                    inputSchema = json.getJsonObject("inputSchema");
+        var                    properties  = inputSchema.getJsonObject("properties");
+        var                    domainProp  = properties.getJsonObject("domain");
+        var                    domainEnum  = domainProp.getJsonArray("enum");
+        java.util.List<String> domainNames = domainEnum.stream().map(Object::toString).toList();
+        assertThat(domainNames).contains("cap-test");
     }
 }

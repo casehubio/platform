@@ -403,7 +403,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean            isQueryParam   = qpAnn != null;
             String             queryParamName = (qpAnn != null && qpAnn.value() != null) ? qpAnn.value().asString() : null;
 
-            boolean simple = isSimpleType(typeFqcn, jandexIndex);
+            boolean simple = isSimpleTypeJandex(paramType, jandexIndex);
             params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue, isHeaderParam, headerParamName, isQueryParam, queryParamName));
         }
 
@@ -544,10 +544,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private boolean isSimpleTypeMirror(javax.lang.model.type.TypeMirror type) {
         if (type.getKind().isPrimitive()) {return true;}
         if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {return false;}
-        String fqcn = ((javax.lang.model.element.TypeElement)
-                               ((javax.lang.model.type.DeclaredType) type).asElement()).getQualifiedName().toString();
+        javax.lang.model.type.DeclaredType declared = (javax.lang.model.type.DeclaredType) type;
+        String fqcn = ((javax.lang.model.element.TypeElement) declared.asElement()).getQualifiedName().toString();
+        if (COLLECTION_TYPES.contains(fqcn)) {
+            if (declared.getTypeArguments().isEmpty()) {return true;}
+            return declared.getTypeArguments().stream().allMatch(this::isSimpleTypeMirror);
+        }
         if (isSimpleType(fqcn, jandexIndex)) {return true;}
-        javax.lang.model.element.Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+        javax.lang.model.element.Element element = declared.asElement();
         if (element.getKind() == javax.lang.model.element.ElementKind.ENUM) {return true;}
         for (javax.lang.model.element.Element enclosed : element.getEnclosedElements()) {
             if (enclosed.getKind() == javax.lang.model.element.ElementKind.METHOD) {
@@ -1834,10 +1838,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             "int", "long", "short", "byte", "float", "double", "boolean", "char"
                                                           );
 
-    private static final Set<String> COLLECTION_TYPES = Set.of(
+    static final Set<String> COLLECTION_TYPES = Set.of(
             "java.util.List", "java.util.Set", "java.util.Collection",
             "java.util.Map", "java.util.Optional"
-                                                               );
+                                                      );
+
+    static boolean isSimpleTypeJandex(Type type, IndexView index) {
+        String fqcn = type.name().toString();
+        if (COLLECTION_TYPES.contains(fqcn)) {
+            if (type.kind() != Type.Kind.PARAMETERIZED_TYPE) {return true;}
+            return type.asParameterizedType().arguments().stream()
+                    .allMatch(arg -> isSimpleTypeJandex(arg, index));
+        }
+        return isSimpleType(fqcn, index);
+    }
 
     static boolean isSimpleType(String fqcn) {
         return isSimpleType(fqcn, null);
@@ -1845,7 +1859,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     static boolean isSimpleType(String fqcn, IndexView index) {
         if (SIMPLE_TYPES.contains(fqcn)) {return true;}
-        if (COLLECTION_TYPES.contains(fqcn)) {return true;}
         if (fqcn.startsWith("java.time.")) {return true;}
         if (index != null) {
             ClassInfo ci = index.getClassByName(fqcn);

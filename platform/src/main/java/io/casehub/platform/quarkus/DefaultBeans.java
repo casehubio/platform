@@ -58,7 +58,7 @@ public class DefaultBeans {
         return new MockCurrentPrincipal(actorId, groups.orElse(List.of()), tenancyId, crossTenantAdmin);
     }
 
-    @Produces @Alternative @Priority(100) @ApplicationScoped
+    @Produces @DefaultBean @ApplicationScoped
     public MockGroupMembershipProvider mockGroupMembershipProvider() {
         return new MockGroupMembershipProvider();
     }

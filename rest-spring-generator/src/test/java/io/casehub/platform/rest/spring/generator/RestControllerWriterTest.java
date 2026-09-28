@@ -15,6 +15,7 @@ class RestControllerWriterTest {
     private static RestResourceDescriptor descriptor;
     private static RestResourceDescriptor sseDescriptor;
     private static RestResourceDescriptor statusDescriptor;
+    private static RestResourceDescriptor multipartDescriptor;
 
 
     @BeforeAll
@@ -45,6 +46,15 @@ class RestControllerWriterTest {
         List<RestResourceDescriptor> statusDescriptors = scanner.scan(statusIndex);
         if (!statusDescriptors.isEmpty()) {
             statusDescriptor = statusDescriptors.get(0);
+        }
+
+        var multipartIndexer = new Indexer();
+        multipartIndexer.indexClass(SampleMultipartResource.class);
+        multipartIndexer.indexClass(SampleMultipartCore.class);
+        Index multipartIndex = multipartIndexer.complete();
+        List<RestResourceDescriptor> multipartDescriptors = scanner.scan(multipartIndex);
+        if (!multipartDescriptors.isEmpty()) {
+            multipartDescriptor = multipartDescriptors.get(0);
         }
     }
 
@@ -129,6 +139,19 @@ class RestControllerWriterTest {
 
         assertThat(source).contains("ResponseEntity.status(result.status()).body(result)");
         assertThat(source).doesNotContain("ResponseEntity.noContent()");
+    }
+
+    @Test
+    void generatesMultipartFileParameter() {
+        assertThat(multipartDescriptor).isNotNull();
+        var writer = new RestControllerWriter();
+        String source = writer.generate(multipartDescriptor, "test.spring").toString();
+
+        assertThat(source).contains("@RequestPart(\"file\") MultipartFile file");
+        assertThat(source).contains("file.getBytes()");
+        assertThat(source).contains("file.getOriginalFilename()");
+        assertThat(source).contains("IOException");
+        assertThat(source).doesNotContain("FileUpload");
     }
 
     @Test

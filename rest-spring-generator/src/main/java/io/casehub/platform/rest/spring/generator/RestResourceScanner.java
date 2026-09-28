@@ -33,6 +33,8 @@ public class RestResourceScanner {
     private static final DotName PRODUCES = DotName.createSimple("jakarta.ws.rs.Produces");
     private static final DotName CONTEXT = DotName.createSimple("jakarta.ws.rs.core.Context");
     private static final DotName HTTP_HEADERS = DotName.createSimple("jakarta.ws.rs.core.HttpHeaders");
+    private static final DotName REST_FORM = DotName.createSimple("org.jboss.resteasy.reactive.RestForm");
+    private static final DotName FILE_UPLOAD = DotName.createSimple("org.jboss.resteasy.reactive.multipart.FileUpload");
 
     private static final List<DotName> HTTP_METHODS = List.of(GET, POST, PUT, DELETE, PATCH);
     private static final List<String> HTTP_METHOD_NAMES = List.of("GET", "POST", "PUT", "DELETE", "PATCH");
@@ -53,7 +55,7 @@ public class RestResourceScanner {
             if (classInfo.name().toString().contains(".rest.generated.")) {
                 continue;
             }
-            if (classInfo.annotation(REGISTER_REST_CLIENT) != null) {
+            if (classInfo.declaredAnnotation(REGISTER_REST_CLIENT) != null) {
                 continue;
             }
 
@@ -79,8 +81,8 @@ public class RestResourceScanner {
                 }
             }
 
-            String[] classConsumes = extractMediaTypes(classInfo.annotation(CONSUMES));
-            String[] classProduces = extractMediaTypes(classInfo.annotation(PRODUCES));
+            String[] classConsumes = extractMediaTypes(classInfo.declaredAnnotation(CONSUMES));
+            String[] classProduces = extractMediaTypes(classInfo.declaredAnnotation(PRODUCES));
 
             boolean hasContextHeaders = false;
             for (FieldInfo field : classInfo.fields()) {
@@ -132,6 +134,7 @@ public class RestResourceScanner {
                 AnnotationInstance pathParam   = findParamAnnotation(param, PATH_PARAM);
                 AnnotationInstance queryParam  = findParamAnnotation(param, QUERY_PARAM);
                 AnnotationInstance headerParam = findParamAnnotation(param, HEADER_PARAM);
+                AnnotationInstance restForm    = findParamAnnotation(param, REST_FORM);
 
                 if (pathParam != null) {
                     source          = RestMethodDescriptor.ParameterSource.PATH;
@@ -142,6 +145,9 @@ public class RestResourceScanner {
                 } else if (headerParam != null) {
                     source          = RestMethodDescriptor.ParameterSource.HEADER;
                     annotationValue = headerParam.value().asString();
+                } else if (restForm != null && param.type().name().equals(FILE_UPLOAD)) {
+                    source = RestMethodDescriptor.ParameterSource.MULTIPART;
+                    annotationValue = restForm.value() != null ? restForm.value().asString() : paramName;
                 }
 
                 params.add(new RestMethodDescriptor.ParameterDescriptor(

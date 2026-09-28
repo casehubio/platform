@@ -132,4 +132,22 @@ class RestResourceScannerTest {
         assertThat(desc.classConsumes()).containsExactly("application/json");
         assertThat(desc.classProduces()).containsExactly("application/json");
     }
+
+    @Test
+    void detectsMultipartFileUploadParameter() throws Exception {
+        var indexer = new Indexer();
+        indexer.indexClass(SampleMultipartResource.class);
+        indexer.indexClass(SampleMultipartCore.class);
+        Index multipartIndex = indexer.complete();
+
+        var scanner = new RestResourceScanner();
+        var descriptors = scanner.scan(multipartIndex);
+        assertThat(descriptors).hasSize(1);
+
+        var method = descriptors.get(0).methods().get(0);
+        assertThat(method.methodName()).isEqualTo("verifyUpload");
+        assertThat(method.parameters()).hasSize(1);
+        assertThat(method.parameters().get(0).source()).isEqualTo(RestMethodDescriptor.ParameterSource.MULTIPART);
+        assertThat(method.parameters().get(0).annotationValue()).isEqualTo("file");
+    }
 }

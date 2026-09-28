@@ -33,6 +33,8 @@ public class RestControllerWriter {
     private static final ClassName SSE_EMITTER          = ClassName.get("org.springframework.web.servlet.mvc.method.annotation", "SseEmitter");
     private static final ClassName FLOW_SUBSCRIBER      = ClassName.get("java.util.concurrent", "Flow", "Subscriber");
     private static final ClassName FLOW_SUBSCRIPTION    = ClassName.get("java.util.concurrent", "Flow", "Subscription");
+    private static final ClassName REQUEST_PART         = ClassName.get("org.springframework.web.bind.annotation", "RequestPart");
+    private static final ClassName MULTIPART_FILE       = ClassName.get("org.springframework.web.multipart", "MultipartFile");
 
 
     public JavaFile generate(RestResourceDescriptor descriptor, String targetPackage) {
@@ -111,6 +113,12 @@ public class RestControllerWriter {
             builder.addParameter(HTTP_SERVLET_REQUEST, "httpRequest");
         }
 
+        boolean hasMultipart = method.parameters().stream()
+                .anyMatch(p -> p.source() == RestMethodDescriptor.ParameterSource.MULTIPART);
+        if (hasMultipart) {
+            builder.addException(ClassName.get("java.io", "IOException"));
+        }
+
         builder.addCode(buildMethodBody(method, delegateFieldName, method.needsHeaderInjection()));
 
         return builder.build();
@@ -135,7 +143,9 @@ public class RestControllerWriter {
     }
 
     private ParameterSpec buildParameter(RestMethodDescriptor.ParameterDescriptor param) {
-        ParameterSpec.Builder builder = ParameterSpec.builder(param.type(), param.name());
+        TypeName paramType = param.source() == RestMethodDescriptor.ParameterSource.MULTIPART
+                ? MULTIPART_FILE : param.type();
+        ParameterSpec.Builder builder = ParameterSpec.builder(paramType, param.name());
 
         switch (param.source()) {
             case PATH -> builder.addAnnotation(AnnotationSpec.builder(PATH_VARIABLE)
@@ -148,6 +158,9 @@ public class RestControllerWriter {
                     .addMember("value", "$S", param.annotationValue())
                     .build());
             case BODY -> builder.addAnnotation(REQUEST_BODY);
+            case MULTIPART -> builder.addAnnotation(AnnotationSpec.builder(REQUEST_PART)
+                    .addMember("value", "$S", param.annotationValue())
+                    .build());
         }
 
         return builder.build();
@@ -178,8 +191,13 @@ public class RestControllerWriter {
 
 
     private CodeBlock buildMethodBody(RestMethodDescriptor method, String delegateFieldName, boolean hasContextHeaders) {
+        boolean hasMultipart = method.parameters().stream()
+                .anyMatch(p -> p.source() == RestMethodDescriptor.ParameterSource.MULTIPART);
+
         String args = method.parameters().stream()
-                            .map(RestMethodDescriptor.ParameterDescriptor::name)
+                            .map(p -> p.source() == RestMethodDescriptor.ParameterSource.MULTIPART
+                                    ? p.name() + ".getBytes(), " + p.name() + ".getOriginalFilename()"
+                                    : p.name())
                             .reduce((a, b) -> a + ", " + b)
                             .orElse("");
 

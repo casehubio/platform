@@ -24,6 +24,6 @@ public record RestMethodDescriptor(
     ) {}
 
     public enum ParameterSource {
-        PATH, QUERY, HEADER, BODY
+        PATH, QUERY, HEADER, BODY, MULTIPART
     }
 }

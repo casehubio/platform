@@ -2,6 +2,7 @@ package io.casehub.platform.subscription;
 
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PlatformQuery;
+import io.casehub.platform.api.mcp.RestPath;
 import io.casehub.platform.api.subscription.EventTypeDescriptor;
 import io.casehub.platform.api.subscription.EventTypeRegistry;
 
@@ -17,6 +18,7 @@ public class EventTypeService {
     }
 
     @PlatformQuery("List available subscription event types")
+    @RestPath("/")
     public Set<EventTypeDescriptor> listEventTypes() {
         return eventTypeRegistry.discover();
     }

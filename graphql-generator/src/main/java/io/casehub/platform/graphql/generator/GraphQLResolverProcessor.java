@@ -1901,7 +1901,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         if (returnType.startsWith("Optional<")) {
             return "return " + delegateCall + ".map(v -> Response.ok(v).build()).orElse(Response.status(404).build());";
         }
-        if (hasPathParam && !isCollectionType(returnType)) {
+        if ("boolean".equals(returnType) && hasPathParam) {
+            int successStatus = restStatusOverride > 0 ? restStatusOverride : 204;
+            if (successStatus == 204) {
+                return "return " + delegateCall + " ? Response.noContent().build() : Response.status(404).build();";
+            }
+            return "return " + delegateCall + " ? Response.status(" + successStatus + ").build() : Response.status(404).build();";
+        }
+        if (hasPathParam && !isCollectionType(returnType) && !isPrimitiveType(returnType)) {
             String statusExpr = restStatusOverride > 0
                     ? "Response.status(" + restStatusOverride + ").entity(result).build()"
                     : "Response.ok(result).build()";
@@ -1935,6 +1942,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     static boolean isCollectionType(String returnType) {
         return returnType.startsWith("List<") || returnType.startsWith("Set<")
                || returnType.startsWith("Collection<") || returnType.startsWith("Map<");
+    }
+
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+            "boolean", "byte", "char", "short", "int", "long", "float", "double");
+
+    static boolean isPrimitiveType(String returnType) {
+        return PRIMITIVE_TYPES.contains(returnType);
     }
 
 

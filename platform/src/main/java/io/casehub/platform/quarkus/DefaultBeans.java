@@ -183,6 +183,9 @@ public class DefaultBeans {
     @Produces @DefaultBean @ApplicationScoped
     public NoOpMcpResourceRegistry noOpMcpResourceRegistry() { return new NoOpMcpResourceRegistry(); }
 
+    @Produces @DefaultBean @ApplicationScoped
+    public io.casehub.platform.mcp.NoOpDomainReportProvider noOpDomainReportProvider() { return new io.casehub.platform.mcp.NoOpDomainReportProvider(); }
+
     // --- Governance ---
 
     @Produces @DefaultBean @ApplicationScoped

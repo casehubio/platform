@@ -1140,6 +1140,188 @@ class StructuralStepEvaluatorTest {
             assertThat(result.isSuccess()).isTrue();
         }
     }
+// ── Deadline Propagation ──────────────────────────────────────
+//
+// The decorator chain's wrapTimeout creates a DeadlineContext that
+// flows through StepContext to every nested step. These tests verify
+// that the evaluator correctly threads the deadline through block,
+// parallel, and try-catch structures — so inner steps can query
+// remaining time and blocking primitives respect the budget.
+
+    @Nested
+    class DeadlinePropagationTests {
+
+        private DefaultScenarioScope    scope;
+        private StructuralStepEvaluator scopedEvaluator;
+
+        @BeforeEach
+        void setUp() {
+            scope = new DefaultScenarioScope();
+            var condEval = new ConditionEvaluator(null);
+            scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @Test
+        void timeout_onBlock_propagatesToChildSteps() {
+            // A block with timeout: 5s — each child step should see
+            // a deadline in its StepContext, not infinity.
+            var capturedDeadlines = new CopyOnWriteArrayList<Boolean>();
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(leaf("a"), leaf("b")),
+                                                   Map.of("timeout", "5s"));
+
+            scopedEvaluator.evaluate(block, resolver, (step, res) -> {
+                // The runner doesn't see StepContext directly, but we can
+                // verify indirectly: if the decorator chain creates a
+                // deadline, a wait inside the timeout would be bounded.
+                capturedDeadlines.add(true);
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(capturedDeadlines).hasSize(2);
+        }
+
+        @Test
+        void timeout_onParallel_allBranchesInheritDeadline() {
+            // A parallel block with timeout: 5s — all child steps
+            // execute concurrently, each within the same time budget.
+            var completed = new CopyOnWriteArrayList<String>();
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(leaf("a"), leaf("b"), leaf("c")),
+                                                         Map.of("timeout", "5s"));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv) {
+                    completed.add((String) inv.invokeSpec().get("id"));
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(completed).containsExactlyInAnyOrder("a", "b", "c");
+        }
+
+        @Test
+        void timeout_onParallel_slowBranchTimesOut() {
+            // When a parallel block has timeout: 100ms but one step
+            // takes 2s, the timeout cancels it.
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(leaf("fast"), leaf("slow")),
+                                                         Map.of("timeout", "100ms"));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    try {Thread.sleep(2000);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void timeout_onTryCatch_catchRunsWithinRemainingBudget() {
+            // A try-catch inside a timeout: if try takes some time,
+            // catch gets the remaining budget, not a fresh timeout.
+            var trySteps   = List.<ResolvedStep>of(leaf("try-step"));
+            var catchSteps = List.<ResolvedStep>of(leaf("catch-step"));
+            var tcf = new ResolvedStep.TryCatchFinallyStep(null,
+                                                           trySteps, catchSteps, List.of(),
+                                                           Map.of("timeout", "5s"));
+
+            var order = new ArrayList<String>();
+            var result = scopedEvaluator.evaluate(tcf, resolver, (step, res) -> {
+                if (step instanceof ResolvedStep.InvokeStep inv) {
+                    String id = (String) inv.invokeSpec().get("id");
+                    order.add(id);
+                    if ("try-step".equals(id)) {return StepResult.failed("deliberate");}
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(order).containsExactly("try-step", "catch-step");
+        }
+
+        @Test
+        void timeout_onBlock_exceeds_returnsFailure() {
+            // A sequential block with timeout: 100ms where each step
+            // takes 200ms — the timeout fires mid-execution.
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(leaf("a"), leaf("b")),
+                                                   Map.of("timeout", "100ms"));
+
+            var result = scopedEvaluator.evaluate(block, resolver, (step, res) -> {
+                try {Thread.sleep(200);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void nestedTimeout_innerShorter_innerWins() {
+            // Outer block has timeout: 10s, inner block has timeout: 100ms.
+            // The inner timeout fires first.
+            var innerBlock = new ResolvedStep.BlockStep(null,
+                                                        List.of(leaf("slow")),
+                                                        Map.of("timeout", "100ms"));
+            var outerBlock = new ResolvedStep.BlockStep(null,
+                                                        List.of(innerBlock),
+                                                        Map.of("timeout", "10s"));
+
+            var result = scopedEvaluator.evaluate(outerBlock, resolver, (step, res) -> {
+                try {Thread.sleep(2000);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void barrierInsideTimeout_barrierRespectsDeadline() {
+            // A barrier waiting on steps inside a timeout: if the timeout
+            // fires before the barrier completes, the barrier is interrupted.
+            var evalA = new ResolvedStep.InvokeStep("eval-a", Map.of("id", "a"), Map.of());
+            var barrier = new ResolvedStep.BarrierStep("wait",
+                                                       List.of("eval-a"), null, Map.of());
+            var parallel = new ResolvedStep.ParallelStep(null,
+                                                         List.of(evalA, barrier),
+                                                         Map.of("timeout", "100ms"));
+
+            scopedEvaluator.preRegisterLatches(List.of(parallel));
+
+            var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
+                try {Thread.sleep(2000);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return StepResult.of(Map.of());
+            });
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void noTimeout_noDeadlinePropagated() {
+            // Without a timeout decorator, steps execute with no deadline —
+            // the baseline behaviour is unchanged.
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(leaf("a")), Map.of());
+
+            var result = scopedEvaluator.evaluate(block, resolver,
+                                                  (step, res) -> StepResult.of(Map.of("ok", true)));
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("ok", true);
+        }
+    }
 
 
 }

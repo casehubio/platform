@@ -1441,7 +1441,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         if (jandexIndex != null) {
             ClassInfo ci = jandexIndex.getClassByName(DotName.createSimple(typeFqcn));
             if (ci != null) {
-                List<String> fields = ci.recordComponents().stream().map(rc -> rc.name()).toList();
+                List<String> fields = resolveRecordFieldOrder(ci);
                 if (fields.isEmpty()) {
                     processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                                              "REST generator: @BeanParam expansion requires a Java record, but '"
@@ -1517,6 +1517,24 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return imports;
     }
 
+    /**
+     * Resolve record component names in declaration order via the canonical constructor.
+     * Jandex recordComponents() and fields() both return alphabetical order, but
+     * the canonical constructor parameters preserve the source declaration order.
+     */
+    private List<String> resolveRecordFieldOrder(ClassInfo ci) {
+        int componentCount = ci.recordComponents().size();
+        for (var m : ci.methods()) {
+            if (m.name().equals("<init>") && m.parametersCount() == componentCount) {
+                List<String> names = new ArrayList<>(componentCount);
+                for (int i = 0; i < componentCount; i++) {
+                    names.add(m.parameterName(i));
+                }
+                return names;
+            }
+        }
+        return ci.recordComponents().stream().map(rc -> rc.name()).toList();
+    }
 
     private void generateMethod(PrintWriter out, ResolvedOperation op) {
         if (op.type() == OperationType.STREAM) {

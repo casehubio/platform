@@ -153,6 +153,26 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
+    void collectionTypesAreTracked() {
+        assertThat(GraphQLResolverProcessor.COLLECTION_TYPES).contains(
+                "java.util.List", "java.util.Set", "java.util.Collection",
+                "java.util.Map", "java.util.Optional");
+        assertThat(GraphQLResolverProcessor.isSimpleType("java.util.List")).isFalse();
+    }
+
+    @Test
+    void isSimpleType_primitives() {
+        assertThat(GraphQLResolverProcessor.isSimpleType("int")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("long")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("boolean")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("double")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("float")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("short")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("byte")).isTrue();
+        assertThat(GraphQLResolverProcessor.isSimpleType("char")).isTrue();
+    }
+
+    @Test
     void responseWrapping_void_returns204() {
         assertThat(GraphQLResolverProcessor.generateResponseCode("void", "spi.doThing(arg0)"))
                 .isEqualTo("spi.doThing(arg0); return Response.noContent().build();");
@@ -1702,6 +1722,232 @@ class GraphQLResolverProcessorTest {
         assertThat(compilation.errors()).isNotEmpty();
         assertThat(compilation.errors().get(0).getMessage(null))
                 .contains("@BeanParam expansion requires a Java record");
+    }
+
+    @Test
+    void listParamInGetMethodNotTreatedAsBeanParam() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.WorkItemApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("work-items")
+                @ApplicationScoped
+                public class WorkItemApi {
+                    @PlatformQuery("Find work items by tags")
+                    public List<String> findByTags(List<String> tags, int limit) { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=work-items", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        assertThat(compilation.errors()).isEmpty();
+        var restSource = compilation.generatedSourceFile("test.rest.WorkItemsResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).doesNotContain("BeanParam");
+        assertThat(restContent).doesNotContain("new List");
+    }
+
+    @Test
+    void listOfComplexTypeTreatedAsBody() throws Exception {
+        var entry = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.EntryRequest",
+                """
+                package test;
+                public record EntryRequest(String actorId, String resourceId) {}
+                """);
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.BatchApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("batch-ops")
+                @ApplicationScoped
+                public class BatchApi {
+                    @PlatformMutation("Grant batch")
+                    public void grantBatch(List<EntryRequest> entries) {}
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=batch-ops", "-AgenerateGraphQL=false")
+                .compile(entry, spi);
+
+        assertThat(compilation.errors()).isEmpty();
+        var restSource = compilation.generatedSourceFiles().stream()
+                .filter(f -> f.getName().contains("BatchOpsResource"))
+                .findFirst();
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).doesNotContain("@QueryParam");
+        assertThat(restContent).contains("List<EntryRequest>");
+    }
+
+    @Test
+    void nestedClassReturnTypeGeneratesValidJava() throws Exception {
+        var outer = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GovernanceQuery",
+                """
+                package test;
+                public class GovernanceQuery {
+                    public static class QueueStatus {
+                        public int pending;
+                        public int active;
+                    }
+                    public static class Problem {
+                        public String id;
+                        public String description;
+                    }
+                }
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GovernanceApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+
+                @McpDomain("governance")
+                @ApplicationScoped
+                public class GovernanceApi {
+                    @PlatformQuery("Get queue status")
+                    public GovernanceQuery.QueueStatus queueStatus() { return null; }
+
+                    @PlatformQuery("List problems")
+                    public List<GovernanceQuery.Problem> problems() { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=governance")
+                .compile(outer, spi);
+
+        var restSource = compilation.generatedSourceFile("test.rest.GovernanceResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+
+        var gqlSource = compilation.generatedSourceFile("test.graphql.GovernanceResolver");
+        assertThat(gqlSource).isPresent();
+        String gqlContent = gqlSource.get().getCharContent(true).toString();
+
+        assertThat(restContent).contains("import test.GovernanceQuery");
+        assertThat(compilation.errors()).isEmpty();
+    }
+
+    @Test
+    void nestedClassReturnTypeWithPagedResultAndPathParams() throws Exception {
+        var queryService = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.GovernanceQueryService",
+                """
+                package test;
+                import java.util.*;
+                public class GovernanceQueryService {
+                    public record QueueStatus(int total, Map<String, Integer> counts) {}
+                    public record Problem(String category, String severity, String description) {}
+                    public record MergeQueueStatus(int queuedCount, int activeBatchCount) {}
+                    public record BatchStatus(String batchId, UUID caseId) {}
+                    public record MergeQueueMetrics(int queueDepth, int activeBatches) {}
+                    public record TriageItem(UUID workItemId, String prRef) {}
+                    public record SlaComparison(List<String> entries) {}
+                    public record SystemHealth(int activeCases, int fleetSize) {}
+                }
+                """);
+
+        var pagedResult = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.PagedResult",
+                """
+                package test;
+                import java.util.List;
+                public record PagedResult<T>(List<T> items, String nextCursor, int totalCount) {
+                    public static <T> PagedResult<T> paginate(List<T> all, String cursor, int limit) {
+                        return new PagedResult<>(all, null, all.size());
+                    }
+                }
+                """);
+
+        var api = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.DevtownGovernanceApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.enterprise.context.ApplicationScoped;
+                import java.util.List;
+                import java.util.UUID;
+
+                @McpDomain(value = "devtown/governance", basePath = "/api/devtown/governance")
+                @ApplicationScoped
+                public class DevtownGovernanceApi {
+                    @PlatformQuery("Get queue status")
+                    @RestPath("/queue-status")
+                    public GovernanceQueryService.QueueStatus queueStatus() { return null; }
+
+                    @PlatformQuery("Get system health")
+                    @RestPath("/system-health")
+                    public GovernanceQueryService.SystemHealth systemHealth() { return null; }
+
+                    @PlatformQuery("Get governance problems")
+                    @RestPath("/problems")
+                    public PagedResult<GovernanceQueryService.Problem> problems(
+                            int thresholdMinutes, String cursor, int limit) {
+                        return null;
+                    }
+
+                    @PlatformQuery("Get merge queue status")
+                    @RestPath("/merge-queue")
+                    public GovernanceQueryService.MergeQueueStatus mergeQueue() { return null; }
+
+                    @PlatformQuery("Get merge queue metrics")
+                    @RestPath("/merge-queue/metrics")
+                    public GovernanceQueryService.MergeQueueMetrics mergeQueueMetrics() { return null; }
+
+                    @PlatformQuery("Get merge batch status")
+                    @RestPath("/merge-queue/batch/{batchId}")
+                    public GovernanceQueryService.BatchStatus batchStatus(@PathParam UUID batchId) { return null; }
+
+                    @PlatformQuery("Get triage items")
+                    @RestPath("/triage")
+                    public PagedResult<GovernanceQueryService.TriageItem> triageItems(
+                            String cursor, int limit) {
+                        return null;
+                    }
+
+                    @PlatformQuery("Get SLA comparison")
+                    @RestPath("/sla-comparison")
+                    public GovernanceQueryService.SlaComparison slaComparison() { return null; }
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=devtown/governance")
+                .compile(queryService, pagedResult, api);
+
+        System.out.println("=== Compilation errors ===");
+        compilation.errors().forEach(e -> System.out.println("  " + e));
+        System.out.println("=== Compilation warnings ===");
+        compilation.warnings().forEach(w -> System.out.println("  " + w));
+
+        var restSource = compilation.generatedSourceFile("test.rest.DevtownGovernanceResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        System.out.println("=== Generated REST Resource ===");
+        System.out.println(restContent);
+
+        assertThat(compilation.errors()).isEmpty();
     }
 
     @Test

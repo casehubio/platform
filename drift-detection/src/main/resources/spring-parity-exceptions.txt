@@ -106,3 +106,7 @@ spring-actuator
 yaml-codegen
 # YAML Jackson mixins — no CDI beans
 yaml-jackson
+# YAML APT — build-time annotation processor, no CDI beans
+yaml-plugin-processor
+# YAML step runtime — framework-neutral step catalog SPI, no CDI beans
+yaml-step-runtime

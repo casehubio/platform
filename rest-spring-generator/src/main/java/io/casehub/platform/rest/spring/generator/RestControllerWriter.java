@@ -63,7 +63,7 @@ public class RestControllerWriter {
             classBuilder.addMethod(buildMethod(method, descriptor.delegateFieldName(), descriptor.hasContextHeaders()));
         }
 
-        if (descriptor.hasContextHeaders()) {
+        if (descriptor.needsFlatHeaders()) {
             classBuilder.addMethod(MethodSpec.methodBuilder("extractHeaders")
                                              .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                                              .returns(ParameterizedTypeName.get(
@@ -74,6 +74,25 @@ public class RestControllerWriter {
                                              .addStatement("$T<$T, $T> headers = new $T<>()",
                                                            java.util.Map.class, String.class, String.class, java.util.HashMap.class)
                                              .addStatement("for (String name : $T.list(request.getHeaderNames())) headers.put(name, request.getHeader(name))",
+                                                           ClassName.get("java.util", "Collections"))
+                                             .addStatement("return headers")
+                                             .build());
+        }
+
+        if (descriptor.needsMultivaluedHeaders()) {
+            classBuilder.addMethod(MethodSpec.methodBuilder("extractMultivaluedHeaders")
+                                             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                                             .returns(ParameterizedTypeName.get(
+                                                     ClassName.get("java.util", "Map"),
+                                                     ClassName.get("java.lang", "String"),
+                                                     ParameterizedTypeName.get(
+                                                             ClassName.get("java.util", "List"),
+                                                             ClassName.get("java.lang", "String"))))
+                                             .addParameter(HTTP_SERVLET_REQUEST, "request")
+                                             .addStatement("$T<$T, $T<$T>> headers = new $T<>()",
+                                                           java.util.Map.class, String.class, java.util.List.class, String.class, java.util.HashMap.class)
+                                             .addStatement("for (String name : $T.list(request.getHeaderNames())) headers.put(name, $T.list(request.getHeaders(name)))",
+                                                           ClassName.get("java.util", "Collections"),
                                                            ClassName.get("java.util", "Collections"))
                                              .addStatement("return headers")
                                              .build());
@@ -201,8 +220,11 @@ public class RestControllerWriter {
                             .reduce((a, b) -> a + ", " + b)
                             .orElse("");
 
-        if (hasContextHeaders) {
-            args = args.isEmpty() ? "extractHeaders(httpRequest)" : args + ", extractHeaders(httpRequest)";
+        if (method.needsHeaderInjection()) {
+            String headerCall = method.multivaluedHeaders()
+                    ? "extractMultivaluedHeaders(httpRequest)"
+                    : "extractHeaders(httpRequest)";
+            args = args.isEmpty() ? headerCall : args + ", " + headerCall;
         }
 
         if (method.returnType().equals(TypeName.VOID)) {

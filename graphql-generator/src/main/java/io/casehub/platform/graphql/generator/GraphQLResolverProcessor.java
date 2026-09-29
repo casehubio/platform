@@ -403,7 +403,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean            isQueryParam   = qpAnn != null;
             String             queryParamName = (qpAnn != null && qpAnn.value() != null) ? qpAnn.value().asString() : null;
 
-            boolean simple = isSimpleType(typeFqcn, jandexIndex);
+            boolean simple = isSimpleTypeJandex(paramType, jandexIndex);
             params.add(new ResolvedParam(paramName, typeStr, typeFqcn, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue, isHeaderParam, headerParamName, isQueryParam, queryParamName));
         }
 
@@ -542,11 +542,16 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private boolean isSimpleTypeMirror(javax.lang.model.type.TypeMirror type) {
+        if (type.getKind().isPrimitive()) {return true;}
         if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {return false;}
-        String fqcn = ((javax.lang.model.element.TypeElement)
-                               ((javax.lang.model.type.DeclaredType) type).asElement()).getQualifiedName().toString();
+        javax.lang.model.type.DeclaredType declared = (javax.lang.model.type.DeclaredType) type;
+        String fqcn = ((javax.lang.model.element.TypeElement) declared.asElement()).getQualifiedName().toString();
+        if (COLLECTION_TYPES.contains(fqcn)) {
+            if (declared.getTypeArguments().isEmpty()) {return true;}
+            return declared.getTypeArguments().stream().allMatch(this::isSimpleTypeMirror);
+        }
         if (isSimpleType(fqcn, jandexIndex)) {return true;}
-        javax.lang.model.element.Element element = ((javax.lang.model.type.DeclaredType) type).asElement();
+        javax.lang.model.element.Element element = declared.asElement();
         if (element.getKind() == javax.lang.model.element.ElementKind.ENUM) {return true;}
         for (javax.lang.model.element.Element enclosed : element.getEnclosedElements()) {
             if (enclosed.getKind() == javax.lang.model.element.ElementKind.METHOD) {
@@ -1829,8 +1834,24 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             "java.lang.String",
             "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte",
             "java.lang.Float", "java.lang.Double", "java.lang.Boolean", "java.lang.Character",
-            "java.util.UUID"
+            "java.util.UUID",
+            "int", "long", "short", "byte", "float", "double", "boolean", "char"
                                                           );
+
+    static final Set<String> COLLECTION_TYPES = Set.of(
+            "java.util.List", "java.util.Set", "java.util.Collection",
+            "java.util.Map", "java.util.Optional"
+                                                      );
+
+    static boolean isSimpleTypeJandex(Type type, IndexView index) {
+        String fqcn = type.name().toString();
+        if (COLLECTION_TYPES.contains(fqcn)) {
+            if (type.kind() != Type.Kind.PARAMETERIZED_TYPE) {return true;}
+            return type.asParameterizedType().arguments().stream()
+                    .allMatch(arg -> isSimpleTypeJandex(arg, index));
+        }
+        return isSimpleType(fqcn, index);
+    }
 
     static boolean isSimpleType(String fqcn) {
         return isSimpleType(fqcn, null);
@@ -1880,7 +1901,14 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         if (returnType.startsWith("Optional<")) {
             return "return " + delegateCall + ".map(v -> Response.ok(v).build()).orElse(Response.status(404).build());";
         }
-        if (hasPathParam && !isCollectionType(returnType)) {
+        if ("boolean".equals(returnType) && hasPathParam) {
+            int successStatus = restStatusOverride > 0 ? restStatusOverride : 204;
+            if (successStatus == 204) {
+                return "return " + delegateCall + " ? Response.noContent().build() : Response.status(404).build();";
+            }
+            return "return " + delegateCall + " ? Response.status(" + successStatus + ").build() : Response.status(404).build();";
+        }
+        if (hasPathParam && !isCollectionType(returnType) && !isPrimitiveType(returnType)) {
             String statusExpr = restStatusOverride > 0
                     ? "Response.status(" + restStatusOverride + ").entity(result).build()"
                     : "Response.ok(result).build()";
@@ -1914,6 +1942,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     static boolean isCollectionType(String returnType) {
         return returnType.startsWith("List<") || returnType.startsWith("Set<")
                || returnType.startsWith("Collection<") || returnType.startsWith("Map<");
+    }
+
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+            "boolean", "byte", "char", "short", "int", "long", "float", "double");
+
+    static boolean isPrimitiveType(String returnType) {
+        return PRIMITIVE_TYPES.contains(returnType);
     }
 
 

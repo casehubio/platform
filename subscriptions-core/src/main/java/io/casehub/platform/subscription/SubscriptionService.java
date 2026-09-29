@@ -1,6 +1,7 @@
 package io.casehub.platform.subscription;
 
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
+import io.casehub.platform.api.mcp.DefaultValue;
 import io.casehub.platform.api.mcp.HttpMethod;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PathParam;
@@ -8,6 +9,7 @@ import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.api.mcp.RestMethod;
 import io.casehub.platform.api.mcp.RestPath;
+import io.casehub.platform.api.mcp.RestStatus;
 import io.casehub.platform.api.expression.ExpressionEvaluator;
 import io.casehub.platform.api.expression.JQExpressionEvaluator;
 import io.casehub.platform.api.expression.MvelExpressionEvaluator;
@@ -43,6 +45,7 @@ public class SubscriptionService {
 
     @PlatformMutation("Create a subscription")
     @RestPath("/")
+    @RestStatus(201)
     public Subscription create(SubscriptionInput input) {
         var effectiveScope = input.scope();
 
@@ -91,7 +94,7 @@ public class SubscriptionService {
 
     @PlatformQuery("List subscriptions")
     @RestPath("/")
-    public SubscriptionPage list(Boolean enabled, SubscriptionScope scope, String cursor, int limit) {
+    public SubscriptionPage list(Boolean enabled, SubscriptionScope scope, String cursor, @DefaultValue("25") int limit) {
         return store.find(new SubscriptionQuery(
                 scope == SubscriptionScope.SYSTEM ? null : principal.actorId(),
                 principal.tenancyId(),

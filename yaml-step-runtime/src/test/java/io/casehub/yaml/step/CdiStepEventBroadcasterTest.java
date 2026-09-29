@@ -19,56 +19,56 @@ class CdiStepEventBroadcasterTest {
     @Test
     void acceptFiresAsyncEvent() throws Exception {
         var broadcaster = new CdiStepEventBroadcaster();
-        AtomicReference<StepExecutionEvent> fired = new AtomicReference<>();
+        AtomicReference<ActionExecutionEvent> fired = new AtomicReference<>();
 
         Field eventField = CdiStepEventBroadcaster.class.getDeclaredField("event");
         eventField.setAccessible(true);
         eventField.set(broadcaster, new StubEvent(fired));
 
-        var event = new StepExecutionEvent("test-action", 42, true, Map.of());
+        var event = new ActionExecutionEvent("test-action", 42, true, Map.of());
         broadcaster.accept(event);
 
         assertThat(fired.get()).isSameAs(event);
     }
 
     @SuppressWarnings("unchecked")
-    private static class StubEvent implements Event<StepExecutionEvent> {
-        private final AtomicReference<StepExecutionEvent> captured;
+    private static class StubEvent implements Event<ActionExecutionEvent> {
+        private final AtomicReference<ActionExecutionEvent> captured;
 
-        StubEvent(AtomicReference<StepExecutionEvent> captured) {
+        StubEvent(AtomicReference<ActionExecutionEvent> captured) {
             this.captured = captured;
         }
 
         @Override
-        public void fire(StepExecutionEvent event) {
+        public void fire(ActionExecutionEvent event) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public <U extends StepExecutionEvent> CompletionStage<U> fireAsync(U event) {
+        public <U extends ActionExecutionEvent> CompletionStage<U> fireAsync(U event) {
             captured.set(event);
             return CompletableFuture.completedFuture(event);
         }
 
         @Override
-        public <U extends StepExecutionEvent> CompletionStage<U> fireAsync(U event,
+        public <U extends ActionExecutionEvent> CompletionStage<U> fireAsync(U event,
                 NotificationOptions options) {
             return fireAsync(event);
         }
 
         @Override
-        public Event<StepExecutionEvent> select(Annotation... qualifiers) {
+        public Event<ActionExecutionEvent> select(Annotation... qualifiers) {
             return this;
         }
 
         @Override
-        public <U extends StepExecutionEvent> Event<U> select(Class<U> subtype,
+        public <U extends ActionExecutionEvent> Event<U> select(Class<U> subtype,
                 Annotation... qualifiers) {
             return (Event<U>) this;
         }
 
         @Override
-        public <U extends StepExecutionEvent> Event<U> select(TypeLiteral<U> subtype,
+        public <U extends ActionExecutionEvent> Event<U> select(TypeLiteral<U> subtype,
                 Annotation... qualifiers) {
             return (Event<U>) this;
         }

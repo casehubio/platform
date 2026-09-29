@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class ProcessInvokeHandlerTest {
         var handler = new ProcessInvokeHandler(mapper, executor);
         var binding = new InvokeBinding.Process("/bin/echo", List.of("{\"key\":\"value\"}"),
                 "json", "5s", null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of(), null);
@@ -47,7 +47,7 @@ class ProcessInvokeHandlerTest {
         var handler = new ProcessInvokeHandler(mapper, executor);
         var binding = new InvokeBinding.Process("/bin/echo", List.of("hello world"),
                 "raw", null, null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of(), null);
@@ -61,7 +61,7 @@ class ProcessInvokeHandlerTest {
         var handler = new ProcessInvokeHandler(mapper, executor);
         var binding = new InvokeBinding.Process("/bin/echo", List.of("line1"),
                 "lines", null, null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of(), null);
@@ -75,7 +75,7 @@ class ProcessInvokeHandlerTest {
         var handler = new ProcessInvokeHandler(mapper, executor);
         var binding = new InvokeBinding.Process("/bin/sh", List.of("-c", "exit 1"),
                 "raw", null, null, null, "stderr");
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of(), null);
@@ -88,7 +88,7 @@ class ProcessInvokeHandlerTest {
         var handler = new ProcessInvokeHandler(mapper, executor);
         var binding = new InvokeBinding.Process("/bin/echo", List.of("${greeting}"),
                 "raw", null, null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of("greeting", "hello"), null);

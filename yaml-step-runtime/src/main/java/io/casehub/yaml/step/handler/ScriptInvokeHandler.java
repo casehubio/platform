@@ -7,7 +7,7 @@ import io.casehub.platform.api.process.ProcessExecutionException;
 import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.platform.api.process.ProcessResult;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
@@ -32,7 +32,7 @@ public class ScriptInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public Action create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(Declaration declaration, InvokeBinding binding) {
         InvokeBinding.Script script = (InvokeBinding.Script) binding;
         return (params, services) -> executeScript(script, params);
     }

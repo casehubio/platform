@@ -3,8 +3,9 @@ package io.casehub.yaml.step.catalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.casehub.yaml.core.step.StepParameter;
-import io.casehub.yaml.step.StepCatalog;
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
+import io.casehub.yaml.plugin.api.PluginRegistry;
 
 import java.util.Map;
 import java.util.Set;
@@ -19,12 +20,12 @@ public final class StepSchemaComposer {
 
     private StepSchemaComposer() {}
 
-    public static ObjectNode compose(StepCatalog catalog, ObjectMapper mapper) {
+    public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper) {
         ObjectNode root  = mapper.createObjectNode();
         ArrayNode  oneOf = root.putArray("oneOf");
 
-        for (String action : catalog.availableActions()) {
-            catalog.resolve(action).ifPresent(entry -> {
+        for (String action : registry.availableActions()) {
+            registry.resolve(action).ifPresent(definition -> {
                 ObjectNode variant      = mapper.createObjectNode();
                 ObjectNode variantProps = variant.putObject("properties");
 
@@ -33,8 +34,8 @@ public final class StepSchemaComposer {
                 ObjectNode actionProps = actionSchema.putObject("properties");
                 ArrayNode  requiredArr = actionSchema.putArray("required");
 
-                for (Map.Entry<String, StepParameter> param
-                        : entry.definition().inputs().entrySet()) {
+                for (Map.Entry<String, Parameter> param
+                        : definition.inputs().entrySet()) {
                     ObjectNode paramNode = actionProps.putObject(param.getKey());
                     paramNode.put("type", mapType(param.getValue().type()));
                     if (param.getValue().description() != null) {
@@ -94,7 +95,7 @@ public final class StepSchemaComposer {
         return root;
     }
 
-    private static String mapType(io.casehub.yaml.core.step.StepParameterType type) {
+    private static String mapType(ParameterType type) {
         return switch (type) {
             case STRING -> "string";
             case INTEGER -> "integer";

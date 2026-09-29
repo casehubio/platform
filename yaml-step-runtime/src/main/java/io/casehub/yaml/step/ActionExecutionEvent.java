@@ -2,7 +2,7 @@ package io.casehub.yaml.step;
 
 import java.util.Map;
 
-public record StepExecutionEvent(
+public record ActionExecutionEvent(
         String actionName,
         long durationMs,
         boolean success,
@@ -15,7 +15,7 @@ public record StepExecutionEvent(
         String parentStepName,
         String executionEnvironment) {
 
-    public StepExecutionEvent(String actionName, long durationMs,
+    public ActionExecutionEvent(String actionName, long durationMs,
                               boolean success, Map<String, Object> metadata) {
         this(actionName, durationMs, success, metadata,
              null, null, null, null, null, null, null);

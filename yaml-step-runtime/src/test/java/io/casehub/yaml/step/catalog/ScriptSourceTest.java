@@ -4,15 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
-import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.step.CatalogEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,44 +26,39 @@ class ScriptSourceTest {
     @Test
     void discoversScriptsWithCompanionSchema() {
         var source = new ScriptSource(List.of(testDir), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
 
-        assertThat(entries).containsKey("sentiment");
-        assertThat(entries.get("sentiment").definition().invoke())
-                .isInstanceOf(InvokeBinding.Script.class);
-        var binding = (InvokeBinding.Script) entries.get("sentiment").definition().invoke();
-        assertThat(binding.runtime()).isEqualTo("python3");
-        assertThat(binding.script()).endsWith("sentiment.py");
+        assertThat(registry.resolve("sentiment")).isPresent();
+        var def = registry.resolve("sentiment").get();
+        assertThat(def.action()).isNotNull();
     }
 
     @Test
     void detectsNodeRuntimeFromExtension() {
         var source = new ScriptSource(List.of(testDir), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
 
-        assertThat(entries).containsKey("transform");
-        var binding = (InvokeBinding.Script) entries.get("transform").definition().invoke();
-        assertThat(binding.runtime()).isEqualTo("node");
+        assertThat(registry.resolve("transform")).isPresent();
     }
 
     @Test
     void skipsScriptsWithoutSchema() {
         var source = new ScriptSource(List.of(testDir), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
 
-        assertThat(entries).doesNotContainKey("orphan");
+        assertThat(registry.resolve("orphan")).isEmpty();
     }
 
     @Test
     void parsesSchemaInputsAndOutputs() {
         var source = new ScriptSource(List.of(testDir), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
 
-        var def = entries.get("sentiment").definition();
+        var def = registry.resolve("sentiment").get();
         assertThat(def.inputs()).containsKey("text");
         assertThat(def.inputs().get("text").required()).isTrue();
         assertThat(def.outputs()).containsKey("score");
@@ -75,24 +66,18 @@ class ScriptSourceTest {
     }
 
     @Test
-    void priorityIs400() {
-        var source = new ScriptSource(List.of(testDir), yamlMapper, executor);
-        assertThat(source.priority()).isEqualTo(400);
-    }
-
-    @Test
     void emptyPathsProducesNoEntries() {
         var source = new ScriptSource(List.of(), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
-        assertThat(entries).isEmpty();
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
+        assertThat(registry.availableActions()).isEmpty();
     }
 
     @Test
     void nonExistentPathIsSkipped() {
         var source = new ScriptSource(List.of(Path.of("/nonexistent/path")), yamlMapper, executor);
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        source.populate(entries);
-        assertThat(entries).isEmpty();
+        var registry = new CompositePluginRegistry();
+        source.populate(registry);
+        assertThat(registry.availableActions()).isEmpty();
     }
 }

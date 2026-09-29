@@ -36,23 +36,16 @@ class BinderEmitter {
             w.println("package " + packageName + ";");
             w.println();
             w.println("import io.casehub.yaml.plugin.api.ServiceRegistry;");
-            w.println("import io.casehub.yaml.plugin.api.StepAction;");
-            w.println("import io.casehub.yaml.plugin.api.StepResult;");
+            w.println("import io.casehub.yaml.plugin.api.Action;");
+            w.println("import io.casehub.yaml.plugin.api.Result;");
             w.println("import java.util.Map;");
             w.println();
-            w.println("public final class " + className + " implements StepAction {");
-            w.println();
-
-            // name()
-            w.println("    @Override");
-            w.println("    public String name() {");
-            w.println("        return \"" + model.name() + "\";");
-            w.println("    }");
+            w.println("public final class " + className + " implements Action {");
             w.println();
 
             // execute()
             w.println("    @Override");
-            w.println("    public StepResult execute(Map<String, Object> parameters, ServiceRegistry services) {");
+            w.println("    public Result execute(Map<String, Object> parameters, ServiceRegistry services) {");
 
             // Validate required fields (kebab-case keys match YAML convention)
             for (RecordComponentElement field : model.fields()) {

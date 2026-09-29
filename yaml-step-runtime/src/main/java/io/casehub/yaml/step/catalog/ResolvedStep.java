@@ -1,6 +1,6 @@
 package io.casehub.yaml.step.catalog;
 
-import io.casehub.yaml.step.CatalogEntry;
+import io.casehub.yaml.plugin.api.Definition;
 
 import java.util.List;
 import java.util.Map;
@@ -23,7 +23,7 @@ public sealed interface ResolvedStep permits
 
     record PluginStep(
             String name,
-            CatalogEntry entry,
+            Definition definition,
             Map<String, Object> params,
             Map<String, Object> decorators) implements ResolvedStep {
 

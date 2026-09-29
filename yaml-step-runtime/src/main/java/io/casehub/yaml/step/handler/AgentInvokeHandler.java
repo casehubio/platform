@@ -7,7 +7,7 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
@@ -46,13 +46,13 @@ public class AgentInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public Action create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(Declaration declaration, InvokeBinding binding) {
         InvokeBinding.Agent agent = (InvokeBinding.Agent) binding;
-        return (params, services) -> executeAgent(agent, definition, params);
+        return (params, services) -> executeAgent(agent, declaration, params);
     }
 
     @SuppressWarnings("unchecked")
-    private Result executeAgent(InvokeBinding.Agent agent, StepDefinition definition,
+    private Result executeAgent(InvokeBinding.Agent agent, Declaration declaration,
                                 Map<String, Object> params) {
         if (agentProvider == null) {
             return Result.failed("AgentProvider not available");

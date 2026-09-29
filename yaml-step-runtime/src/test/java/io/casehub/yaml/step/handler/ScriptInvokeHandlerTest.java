@@ -5,7 +5,7 @@ import io.casehub.platform.api.process.CommandPattern;
 import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
@@ -31,14 +31,14 @@ class ScriptInvokeHandlerTest {
     @Test
     void createsNonNullAction() {
         var binding = new InvokeBinding.Script("python3", "steps/sentiment.py", null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
         assertThat(handler.create(def, binding)).isNotNull();
     }
 
     @Test
     void failsGracefullyOnMissingScript() {
         var binding = new InvokeBinding.Script("python3", "nonexistent-script.py", "5s", null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = handler.create(def, binding);
         Result result = action.execute(Map.of("key", "value"), null);
@@ -52,7 +52,7 @@ class ScriptInvokeHandlerTest {
                 new CommandPattern(List.of("echo"), CommandPattern.MatchMode.PREFIX)));
         var restrictedHandler = new ScriptInvokeHandler(mapper, restricted);
         var binding = new InvokeBinding.Script("python3", "script.py", null, null, null);
-        var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
+        var def = new Declaration("test", null, Map.of(), Map.of(), binding);
 
         Action action = restrictedHandler.create(def, binding);
         Result result = action.execute(Map.of(), null);

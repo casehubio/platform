@@ -2,18 +2,15 @@ package io.casehub.yaml.step.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepParameter;
-import io.casehub.yaml.core.step.StepParameterType;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
+import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.StepCatalog;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,13 +20,13 @@ class StepSchemaComposerTest {
 
     @Test
     void composesSchemaWithOneOfPerPlugin() {
-        StepCatalog catalog = catalogWith(
+        PluginRegistry registry = registryWith(
                 "process", Map.of(
-                        "command", new StepParameter(StepParameterType.STRING, true, null, null, null, null)),
+                        "command", new Parameter(ParameterType.STRING, true, null, null, null, null)),
                 "assert", Map.of(
-                        "expression", new StepParameter(StepParameterType.STRING, true, null, null, null, null)));
+                        "expression", new Parameter(ParameterType.STRING, true, null, null, null, null)));
 
-        ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
+        ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
         assertThat(schema.has("oneOf")).isTrue();
         assertThat(schema.get("oneOf").size()).isGreaterThanOrEqualTo(3);
@@ -37,9 +34,9 @@ class StepSchemaComposerTest {
 
     @Test
     void includesDecoratorProperties() {
-        StepCatalog catalog = catalogWith("process", Map.of());
+        PluginRegistry registry = registryWith("process", Map.of());
 
-        ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
+        ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
         assertThat(schema.has("properties")).isTrue();
         var props = schema.get("properties");
@@ -50,9 +47,9 @@ class StepSchemaComposerTest {
 
     @Test
     void includesInvokeEscapeHatch() {
-        StepCatalog catalog = catalogWith("process", Map.of());
+        PluginRegistry registry = registryWith("process", Map.of());
 
-        ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
+        ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
         boolean hasInvoke = false;
         for (var variant : schema.get("oneOf")) {
@@ -65,28 +62,22 @@ class StepSchemaComposerTest {
     }
 
     @Test
-    void emptySchemaForEmptyCatalog() {
-        StepCatalog catalog = new StepCatalog() {
-            @Override
-            public Optional<CatalogEntry> resolve(String name) { return Optional.empty(); }
+    void emptySchemaForEmptyRegistry() {
+        PluginRegistry registry = new CompositePluginRegistry();
 
-            @Override
-            public Set<String> availableActions() { return Set.of(); }
-        };
-
-        ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
+        ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
         assertThat(schema.get("oneOf").size()).isEqualTo(5);
     }
 
     @Test
     void pluginSchemaIncludesRequiredFields() {
-        StepCatalog catalog = catalogWith(
+        PluginRegistry registry = registryWith(
                 "process", Map.of(
-                        "command", new StepParameter(StepParameterType.STRING, true, null, null, null, null),
-                        "timeout", new StepParameter(StepParameterType.STRING, false, null, null, null, null)));
+                        "command", new Parameter(ParameterType.STRING, true, null, null, null, null),
+                        "timeout", new Parameter(ParameterType.STRING, false, null, null, null, null)));
 
-        ObjectNode schema = StepSchemaComposer.compose(catalog, mapper);
+        ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
         var oneOf = schema.get("oneOf");
         for (var variant : oneOf) {
@@ -105,15 +96,15 @@ class StepSchemaComposerTest {
 
     @Test
     void schemaIncludesBlockVariant() {
-        StepCatalog catalog = catalogWith("process", Map.of());
-        ObjectNode  schema  = StepSchemaComposer.compose(catalog, mapper);
+        PluginRegistry registry = registryWith("process", Map.of());
+        ObjectNode     schema   = StepSchemaComposer.compose(registry, mapper);
         assertThat(hasVariantWithKey(schema, "block")).isTrue();
     }
 
     @Test
     void schemaIncludesIfThenElseVariant() {
-        StepCatalog catalog   = catalogWith("process", Map.of());
-        ObjectNode  schema    = StepSchemaComposer.compose(catalog, mapper);
+        PluginRegistry registry = registryWith("process", Map.of());
+        ObjectNode     schema   = StepSchemaComposer.compose(registry, mapper);
         boolean     hasIfThen = false;
         for (var variant : schema.get("oneOf")) {
             if (variant.has("properties") && variant.get("properties").has("if")
@@ -127,8 +118,8 @@ class StepSchemaComposerTest {
 
     @Test
     void schemaIncludesMatchCasesVariant() {
-        StepCatalog catalog  = catalogWith("process", Map.of());
-        ObjectNode  schema   = StepSchemaComposer.compose(catalog, mapper);
+        PluginRegistry registry = registryWith("process", Map.of());
+        ObjectNode     schema   = StepSchemaComposer.compose(registry, mapper);
         boolean     hasMatch = false;
         for (var variant : schema.get("oneOf")) {
             if (variant.has("properties") && variant.get("properties").has("match")
@@ -142,8 +133,8 @@ class StepSchemaComposerTest {
 
     @Test
     void schemaIncludesParallelVariant() {
-        StepCatalog catalog = catalogWith("process", Map.of());
-        ObjectNode  schema  = StepSchemaComposer.compose(catalog, mapper);
+        PluginRegistry registry = registryWith("process", Map.of());
+        ObjectNode     schema   = StepSchemaComposer.compose(registry, mapper);
         assertThat(hasVariantWithKey(schema, "parallel")).isTrue();
     }
 
@@ -156,35 +147,20 @@ class StepSchemaComposerTest {
         return false;
     }
 
-    private StepCatalog catalogWith(String name, Map<String, StepParameter> inputs) {
-        var def = new StepDefinition(name, null, inputs, Map.of(), new InvokeBinding.Mcp(name));
-        var entry = new CatalogEntry(name, def, (p, s) -> Result.of(Map.of()));
-        return new StepCatalog() {
-            @Override
-            public Optional<CatalogEntry> resolve(String n) {
-                return name.equals(n) ? Optional.of(entry) : Optional.empty();
-            }
-
-            @Override
-            public Set<String> availableActions() { return Set.of(name); }
-        };
+    private PluginRegistry registryWith(String name, Map<String, Parameter> inputs) {
+        var registry = new CompositePluginRegistry();
+        registry.register(new Definition(name, null, inputs, Map.of(), Portability.JAVA,
+                (p, s) -> Result.of(Map.of())));
+        return registry;
     }
 
-    private StepCatalog catalogWith(String name1, Map<String, StepParameter> inputs1,
-                                     String name2, Map<String, StepParameter> inputs2) {
-        var def1 = new StepDefinition(name1, null, inputs1, Map.of(), new InvokeBinding.Mcp(name1));
-        var entry1 = new CatalogEntry(name1, def1, (p, s) -> Result.of(Map.of()));
-        var def2 = new StepDefinition(name2, null, inputs2, Map.of(), new InvokeBinding.Mcp(name2));
-        var entry2 = new CatalogEntry(name2, def2, (p, s) -> Result.of(Map.of()));
-        Map<String, CatalogEntry> entries = Map.of(name1, entry1, name2, entry2);
-        return new StepCatalog() {
-            @Override
-            public Optional<CatalogEntry> resolve(String n) {
-                return Optional.ofNullable(entries.get(n));
-            }
-
-            @Override
-            public Set<String> availableActions() { return entries.keySet(); }
-        };
+    private PluginRegistry registryWith(String name1, Map<String, Parameter> inputs1,
+                                         String name2, Map<String, Parameter> inputs2) {
+        var registry = new CompositePluginRegistry();
+        registry.register(new Definition(name1, null, inputs1, Map.of(), Portability.JAVA,
+                (p, s) -> Result.of(Map.of())));
+        registry.register(new Definition(name2, null, inputs2, Map.of(), Portability.JAVA,
+                (p, s) -> Result.of(Map.of())));
+        return registry;
     }
 }

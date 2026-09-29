@@ -1,9 +1,9 @@
 package io.casehub.yaml.step;
 
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepParameter;
-import io.casehub.yaml.core.step.StepParameterType;
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
@@ -16,17 +16,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ValidatingActionTest {
 
-    private StepDefinition defWithRequiredStringInput() {
-        return new StepDefinition("test", null,
-                Map.of("name", new StepParameter(StepParameterType.STRING, true, null, null, null, null)),
-                Map.of("result", new StepParameter(StepParameterType.STRING, false, null, null, null, null)),
+    private Declaration defWithRequiredStringInput() {
+        return new Declaration("test", null,
+                Map.of("name", new Parameter(ParameterType.STRING, true, null, null, null, null)),
+                Map.of("result", new Parameter(ParameterType.STRING, false, null, null, null, null)),
                 new InvokeBinding.Mcp("test"));
     }
 
     @Test
     void validInputDelegatesAndReturnsResult() {
         Action                   delegate = (params, services) -> Result.of(Map.of("result", "ok"));
-        List<StepExecutionEvent> events   = new ArrayList<>();
+        List<ActionExecutionEvent> events   = new ArrayList<>();
 
         var    action = new ValidatingAction(defWithRequiredStringInput(), delegate, events::add);
         Result result = action.execute(Map.of("name", "hello"), null);
@@ -46,7 +46,7 @@ class ValidatingActionTest {
             delegateCalled[0] = true;
             return Result.of(Map.of());
         };
-        List<StepExecutionEvent> events = new ArrayList<>();
+        List<ActionExecutionEvent> events = new ArrayList<>();
 
         var    action = new ValidatingAction(defWithRequiredStringInput(), delegate, events::add);
         Result result = action.execute(Map.of(), null);
@@ -58,13 +58,13 @@ class ValidatingActionTest {
 
     @Test
     void invalidOutputReturnsFailure() {
-        var def = new StepDefinition("test", null,
+        var def = new Declaration("test", null,
                 Map.of(),
-                Map.of("count", new StepParameter(StepParameterType.INTEGER, true, null, null, null, null)),
+                Map.of("count", new Parameter(ParameterType.INTEGER, true, null, null, null, null)),
                 new InvokeBinding.Mcp("test"));
 
         Action                   delegate = (params, services) -> Result.of(Map.of("count", "not-an-integer"));
-        List<StepExecutionEvent> events   = new ArrayList<>();
+        List<ActionExecutionEvent> events   = new ArrayList<>();
 
         var    action = new ValidatingAction(def, delegate, events::add);
         Result result = action.execute(Map.of(), null);
@@ -79,7 +79,7 @@ class ValidatingActionTest {
     void executionMetadataFlowsThrough() {
         Action delegate = (params, services) ->
                 Result.of(Map.of("result", "ok"), Map.of("cost", 0.05, "model", "claude"));
-        List<StepExecutionEvent> events = new ArrayList<>();
+        List<ActionExecutionEvent> events = new ArrayList<>();
 
         var    action = new ValidatingAction(defWithRequiredStringInput(), delegate, events::add);
         Result result = action.execute(Map.of("name", "hello"), null);
@@ -92,7 +92,7 @@ class ValidatingActionTest {
     @Test
     void delegateFailureIsPassedThrough() {
         Action                   delegate = (params, services) -> Result.failed("backend error");
-        List<StepExecutionEvent> events   = new ArrayList<>();
+        List<ActionExecutionEvent> events   = new ArrayList<>();
 
         var    action = new ValidatingAction(defWithRequiredStringInput(), delegate, events::add);
         Result result = action.execute(Map.of("name", "hello"), null);
@@ -106,9 +106,9 @@ class ValidatingActionTest {
 
     @Test
     void eventIncludesBindingType() {
-        List<StepExecutionEvent> events  = new ArrayList<>();
+        List<ActionExecutionEvent> events  = new ArrayList<>();
         var                      binding = new InvokeBinding.Process("/bin/echo", List.of("hi"), "raw", null, null, null, null);
-        var                      def     = new StepDefinition("test-step", null, Map.of(), Map.of(), binding);
+        var                      def     = new Declaration("test-step", null, Map.of(), Map.of(), binding);
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.of(Map.of(), Map.of()),
                                           events::add);
@@ -121,8 +121,8 @@ class ValidatingActionTest {
 
     @Test
     void eventClassifiesSuccess() {
-        List<StepExecutionEvent> events = new ArrayList<>();
-        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
+        List<ActionExecutionEvent> events = new ArrayList<>();
+        var                      def    = new Declaration("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.of(Map.of(), Map.of()),
                                           events::add);
@@ -134,8 +134,8 @@ class ValidatingActionTest {
 
     @Test
     void eventClassifiesFailure() {
-        List<StepExecutionEvent> events = new ArrayList<>();
-        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
+        List<ActionExecutionEvent> events = new ArrayList<>();
+        var                      def    = new Declaration("test", null, Map.of(), Map.of(), new InvokeBinding.Mcp("t"));
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.failed("something broke"),
                                           events::add);
@@ -147,8 +147,8 @@ class ValidatingActionTest {
 
     @Test
     void eventNullBindingTypeWhenNoBinding() {
-        List<StepExecutionEvent> events = new ArrayList<>();
-        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(), null);
+        List<ActionExecutionEvent> events = new ArrayList<>();
+        var                      def    = new Declaration("test", null, Map.of(), Map.of(), null);
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.of(Map.of(), Map.of()),
                                           events::add);
@@ -160,8 +160,8 @@ class ValidatingActionTest {
 
     @Test
     void eventBindingTypeScript() {
-        List<StepExecutionEvent> events = new ArrayList<>();
-        var                      def    = new StepDefinition("test", null, Map.of(), Map.of(),
+        List<ActionExecutionEvent> events = new ArrayList<>();
+        var                      def    = new Declaration("test", null, Map.of(), Map.of(),
                 new InvokeBinding.Script("python3", "s.py", null, null, null));
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.of(Map.of(), Map.of()),
@@ -174,8 +174,8 @@ class ValidatingActionTest {
 
     @Test
     void eventBindingTypeAgent() {
-        List<StepExecutionEvent> events = new ArrayList<>();
-        var def = new StepDefinition("test", null, Map.of(), Map.of(),
+        List<ActionExecutionEvent> events = new ArrayList<>();
+        var def = new Declaration("test", null, Map.of(), Map.of(),
                                      new InvokeBinding.Agent("analyst", null, null, false));
         var action = new ValidatingAction(def,
                                           (params, svc) -> Result.of(Map.of(), Map.of()),

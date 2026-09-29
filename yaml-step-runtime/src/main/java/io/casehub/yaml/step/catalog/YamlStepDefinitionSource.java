@@ -2,13 +2,15 @@ package io.casehub.yaml.step.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.casehub.yaml.core.step.Declaration;
+import io.casehub.yaml.core.step.DeclarationFile;
+import io.casehub.yaml.core.step.DeclarationParser;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepDefinitionFile;
-import io.casehub.yaml.core.step.StepDefinitionParser;
 import io.casehub.yaml.plugin.api.Action;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.CatalogSource;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
+import io.casehub.yaml.step.ActionExecutionEvent;
 import io.casehub.yaml.step.InvokeHandler;
 import io.casehub.yaml.step.ValidatingAction;
 
@@ -18,25 +20,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class YamlStepDefinitionSource implements CatalogSource {
+public class YamlStepDefinitionSource {
 
     private final List<String> definitionFiles;
     private final List<InvokeHandler> handlers;
-    private final Consumer<io.casehub.yaml.step.StepExecutionEvent> eventSink;
+    private final Consumer<ActionExecutionEvent> eventSink;
 
     public YamlStepDefinitionSource(List<String> definitionFiles,
                                      List<InvokeHandler> handlers,
-                                     Consumer<io.casehub.yaml.step.StepExecutionEvent> eventSink) {
+                                     Consumer<ActionExecutionEvent> eventSink) {
         this.definitionFiles = definitionFiles;
         this.handlers = handlers;
         this.eventSink = eventSink;
     }
 
-    @Override
-    public void populate(Map<String, CatalogEntry> entries) {
+    public void populate(PluginRegistry registry) {
         for (String file : definitionFiles) {
             try {
-                loadFile(file, entries);
+                loadFile(file, registry);
             } catch (IOException e) {
                 throw new IllegalStateException(
                         "Failed to load step definition file: " + file, e);
@@ -44,13 +45,8 @@ public class YamlStepDefinitionSource implements CatalogSource {
         }
     }
 
-    @Override
-    public int priority() {
-        return 100;
-    }
-
     @SuppressWarnings("unchecked")
-    private void loadFile(String path, Map<String, CatalogEntry> entries) throws IOException {
+    private void loadFile(String path, PluginRegistry registry) throws IOException {
         InputStream is = Thread.currentThread().getContextClassLoader()
                                .getResourceAsStream(path);
         if (is == null) {
@@ -77,19 +73,24 @@ public class YamlStepDefinitionSource implements CatalogSource {
             raw = adjusted;
         }
 
-        StepDefinitionFile defFile = StepDefinitionParser.parse(raw);
+        DeclarationFile defFile = DeclarationParser.parse(raw);
 
-        for (Map.Entry<String, StepDefinition> entry : defFile.actions().entrySet()) {
-            StepDefinition def     = entry.getValue();
-            InvokeBinding  binding = def.invoke();
+        for (Map.Entry<String, Declaration> entry : defFile.actions().entrySet()) {
+            Declaration decl    = entry.getValue();
+            InvokeBinding binding = decl.invoke();
 
-            Action action    = resolveHandler(binding).create(def, binding);
-            Action validated = new ValidatingAction(def, action, eventSink);
+            Action action    = resolveHandler(binding).create(decl, binding);
+            Action validated = new ValidatingAction(decl, action, eventSink);
 
-            String qualifiedName = def.qualifiedName(defFile.namespace());
-            entries.putIfAbsent(qualifiedName, new CatalogEntry(qualifiedName, def, validated));
+            Portability portability = decl.portability() != null
+                    ? decl.portability() : Portability.UNIVERSAL;
+
+            String qualifiedName = decl.qualifiedName(defFile.namespace());
+            registry.register(new Definition(qualifiedName, decl.description(),
+                    decl.inputs(), decl.outputs(), portability, validated));
             if (!defFile.namespace().isEmpty()) {
-                entries.putIfAbsent(def.name(), new CatalogEntry(def.name(), def, validated));
+                registry.register(new Definition(decl.name(), decl.description(),
+                        decl.inputs(), decl.outputs(), portability, validated));
             }
         }
     }

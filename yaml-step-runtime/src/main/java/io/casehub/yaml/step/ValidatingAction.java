@@ -1,8 +1,8 @@
 package io.casehub.yaml.step;
 
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepValidator;
+import io.casehub.yaml.core.step.Validator;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
@@ -13,22 +13,22 @@ import java.util.function.Consumer;
 
 public class ValidatingAction implements Action {
 
-    private final StepDefinition               definition;
-    private final Action                       delegate;
-    private final Consumer<StepExecutionEvent> eventSink;
+    private final Declaration                    declaration;
+    private final Action                         delegate;
+    private final Consumer<ActionExecutionEvent> eventSink;
 
-    public ValidatingAction(StepDefinition definition,
+    public ValidatingAction(Declaration declaration,
                             Action delegate,
-                            Consumer<StepExecutionEvent> eventSink) {
-        this.definition = definition;
+                            Consumer<ActionExecutionEvent> eventSink) {
+        this.declaration = declaration;
         this.delegate = delegate;
         this.eventSink = eventSink;
     }
 
     @Override
     public Result execute(Map<String, Object> params, ServiceRegistry services) {
-        List<String> inputErrors = StepValidator.validateStep(
-                definition.name(), params, definition);
+        List<String> inputErrors = Validator.validateStep(
+                declaration.name(), params, declaration);
         if (!inputErrors.isEmpty()) {
             return Result.failed("Input validation: " + String.join("; ", inputErrors));
         }
@@ -38,8 +38,8 @@ public class ValidatingAction implements Action {
         long   durationMs = (System.nanoTime() - start) / 1_000_000;
 
         if (result.isSuccess()) {
-            List<String> outputErrors = StepValidator.validateOutputs(
-                    result.output(), definition);
+            List<String> outputErrors = Validator.validateOutputs(
+                    result.output(), declaration);
             if (!outputErrors.isEmpty()) {
                 fireEvent(durationMs, false, Map.of("error",
                         "Output validation: " + String.join("; ", outputErrors)));
@@ -56,10 +56,10 @@ public class ValidatingAction implements Action {
     }
 
     private void fireEvent(long durationMs, boolean success, Map<String, Object> metadata) {
-        String bindingType = extractBindingType(definition.invoke());
+        String bindingType = extractBindingType(declaration.invoke());
         String classification = success ? "SUCCESS" : "FAILURE";
-        eventSink.accept(new StepExecutionEvent(
-                definition.name(), durationMs, success, metadata,
+        eventSink.accept(new ActionExecutionEvent(
+                declaration.name(), durationMs, success, metadata,
                 bindingType, classification,
                 null, null, null, null, null));
     }

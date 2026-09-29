@@ -5,13 +5,12 @@ import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.ModelScanComplete;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
-import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.step.CatalogEntry;
+import io.casehub.yaml.plugin.api.ParameterType;
+import io.casehub.yaml.plugin.api.PluginRegistry;
 import jakarta.enterprise.inject.Instance;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,29 +20,36 @@ import static org.mockito.Mockito.when;
 
 class McpStepCatalogWiringTest {
 
-    private DomainModelRegistry registry;
+    private DomainModelRegistry domainRegistry;
     private McpStepCatalogWiring wiring;
+    private CompositePluginRegistry pluginRegistry;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        registry = new DomainModelRegistry();
+        domainRegistry = new DomainModelRegistry();
+        pluginRegistry = new CompositePluginRegistry();
 
         Instance<DomainModelRegistry> registryInstance = mock(Instance.class);
         when(registryInstance.isResolvable()).thenReturn(true);
-        when(registryInstance.get()).thenReturn(registry);
+        when(registryInstance.get()).thenReturn(domainRegistry);
 
         Instance<io.casehub.platform.api.mcp.ToolDispatcher> dispatcherInstance = mock(Instance.class);
         when(dispatcherInstance.isResolvable()).thenReturn(false);
 
+        Instance<PluginRegistry> pluginRegistryInst = mock(Instance.class);
+        when(pluginRegistryInst.isResolvable()).thenReturn(true);
+        when(pluginRegistryInst.get()).thenReturn(pluginRegistry);
+
         wiring = new McpStepCatalogWiring();
         wiring.registryInstance = registryInstance;
         wiring.dispatcherInstance = dispatcherInstance;
+        wiring.pluginRegistryInstance = pluginRegistryInst;
     }
 
     @Test
     void populatesToolsFromDomainRegistry() {
-        registry.register(new DomainModel("acl", null, "Access control", List.of(
+        domainRegistry.register(new DomainModel("acl", null, "Access control", List.of(
                 new OperationDescriptor("canAccess", OperationDescriptor.OperationType.QUERY,
                         "Check access",
                         List.of(new ParameterDescriptor("actorId", "String", true, "Actor ID", Map.of()),
@@ -53,20 +59,17 @@ class McpStepCatalogWiringTest {
 
         wiring.onScanComplete(new ModelScanComplete());
 
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        wiring.populate(entries);
-
-        assertThat(entries).containsKey("acl_canAccess");
-        var def = entries.get("acl_canAccess").definition();
+        assertThat(pluginRegistry.resolve("acl_canAccess")).isPresent();
+        var def = pluginRegistry.resolve("acl_canAccess").get();
         assertThat(def.inputs()).containsKey("actorId");
         assertThat(def.inputs()).containsKey("resourceId");
-        assertThat(def.inputs().get("actorId").type()).isEqualTo(StepParameterType.STRING);
+        assertThat(def.inputs().get("actorId").type()).isEqualTo(ParameterType.STRING);
         assertThat(def.inputs().get("actorId").required()).isTrue();
     }
 
     @Test
     void skipsStreamOperations() {
-        registry.register(new DomainModel("events", null, "Events", List.of(
+        domainRegistry.register(new DomainModel("events", null, "Events", List.of(
                 new OperationDescriptor("subscribe", OperationDescriptor.OperationType.STREAM,
                         "Subscribe", List.of(), "Publisher", null, null),
                 new OperationDescriptor("list", OperationDescriptor.OperationType.QUERY,
@@ -75,16 +78,13 @@ class McpStepCatalogWiringTest {
 
         wiring.onScanComplete(new ModelScanComplete());
 
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        wiring.populate(entries);
-
-        assertThat(entries).containsKey("events_list");
-        assertThat(entries).doesNotContainKey("events_subscribe");
+        assertThat(pluginRegistry.resolve("events_list")).isPresent();
+        assertThat(pluginRegistry.resolve("events_subscribe")).isEmpty();
     }
 
     @Test
     void mapsParameterTypes() {
-        registry.register(new DomainModel("test", null, null, List.of(
+        domainRegistry.register(new DomainModel("test", null, null, List.of(
                 new OperationDescriptor("op", OperationDescriptor.OperationType.MUTATION, null,
                         List.of(new ParameterDescriptor("count", "Integer", false, null, Map.of()),
                                 new ParameterDescriptor("ratio", "Double", false, null, Map.of()),
@@ -96,15 +96,12 @@ class McpStepCatalogWiringTest {
 
         wiring.onScanComplete(new ModelScanComplete());
 
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        wiring.populate(entries);
-
-        var inputs = entries.get("test_op").definition().inputs();
-        assertThat(inputs.get("count").type()).isEqualTo(StepParameterType.INTEGER);
-        assertThat(inputs.get("ratio").type()).isEqualTo(StepParameterType.NUMBER);
-        assertThat(inputs.get("active").type()).isEqualTo(StepParameterType.BOOLEAN);
-        assertThat(inputs.get("tags").type()).isEqualTo(StepParameterType.ARRAY);
-        assertThat(inputs.get("meta").type()).isEqualTo(StepParameterType.OBJECT);
+        var def = pluginRegistry.resolve("test_op").get();
+        assertThat(def.inputs().get("count").type()).isEqualTo(ParameterType.INTEGER);
+        assertThat(def.inputs().get("ratio").type()).isEqualTo(ParameterType.NUMBER);
+        assertThat(def.inputs().get("active").type()).isEqualTo(ParameterType.BOOLEAN);
+        assertThat(def.inputs().get("tags").type()).isEqualTo(ParameterType.ARRAY);
+        assertThat(def.inputs().get("meta").type()).isEqualTo(ParameterType.OBJECT);
     }
 
     @Test
@@ -116,41 +113,25 @@ class McpStepCatalogWiringTest {
 
         wiring.onScanComplete(new ModelScanComplete());
 
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        wiring.populate(entries);
-
-        assertThat(entries).isEmpty();
-    }
-
-    @Test
-    void populateIsNoOpBeforeScanComplete() {
-        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
-        wiring.populate(entries);
-
-        assertThat(entries).isEmpty();
-    }
-
-    @Test
-    void priorityIs300() {
-        assertThat(wiring.priority()).isEqualTo(300);
+        assertThat(pluginRegistry.availableActions()).isEmpty();
     }
 
     @Test
     void mapsNullTypeNameToString() {
-        assertThat(McpStepCatalogWiring.mapType(null)).isEqualTo(StepParameterType.STRING);
+        assertThat(McpStepCatalogWiring.mapType(null)).isEqualTo(ParameterType.STRING);
     }
 
     @Test
     void mapsCollectionToArray() {
-        assertThat(McpStepCatalogWiring.mapType("Collection<Foo>")).isEqualTo(StepParameterType.ARRAY);
+        assertThat(McpStepCatalogWiring.mapType("Collection<Foo>")).isEqualTo(ParameterType.ARRAY);
     }
 
     @Test
     void mapsPrimitiveTypes() {
-        assertThat(McpStepCatalogWiring.mapType("int")).isEqualTo(StepParameterType.INTEGER);
-        assertThat(McpStepCatalogWiring.mapType("long")).isEqualTo(StepParameterType.INTEGER);
-        assertThat(McpStepCatalogWiring.mapType("double")).isEqualTo(StepParameterType.NUMBER);
-        assertThat(McpStepCatalogWiring.mapType("float")).isEqualTo(StepParameterType.NUMBER);
-        assertThat(McpStepCatalogWiring.mapType("boolean")).isEqualTo(StepParameterType.BOOLEAN);
+        assertThat(McpStepCatalogWiring.mapType("int")).isEqualTo(ParameterType.INTEGER);
+        assertThat(McpStepCatalogWiring.mapType("long")).isEqualTo(ParameterType.INTEGER);
+        assertThat(McpStepCatalogWiring.mapType("double")).isEqualTo(ParameterType.NUMBER);
+        assertThat(McpStepCatalogWiring.mapType("float")).isEqualTo(ParameterType.NUMBER);
+        assertThat(McpStepCatalogWiring.mapType("boolean")).isEqualTo(ParameterType.BOOLEAN);
     }
 }

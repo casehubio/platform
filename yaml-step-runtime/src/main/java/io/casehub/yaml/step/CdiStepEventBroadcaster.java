@@ -7,13 +7,13 @@ import jakarta.inject.Inject;
 import java.util.function.Consumer;
 
 @ApplicationScoped
-public class CdiStepEventBroadcaster implements Consumer<StepExecutionEvent> {
+public class CdiStepEventBroadcaster implements Consumer<ActionExecutionEvent> {
 
     @Inject
-    Event<StepExecutionEvent> event;
+    Event<ActionExecutionEvent> event;
 
     @Override
-    public void accept(StepExecutionEvent stepExecutionEvent) {
-        event.fireAsync(stepExecutionEvent);
+    public void accept(ActionExecutionEvent actionExecutionEvent) {
+        event.fireAsync(actionExecutionEvent);
     }
 }

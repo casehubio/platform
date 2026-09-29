@@ -2,7 +2,7 @@ package io.casehub.yaml.step.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
@@ -39,7 +39,7 @@ public class GraphqlInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public Action create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(Declaration declaration, InvokeBinding binding) {
         InvokeBinding.Graphql graphql = (InvokeBinding.Graphql) binding;
         return (params, services) -> executeGraphql(graphql, params);
     }

@@ -21,7 +21,7 @@ class GraphqlInvokeHandlerTest {
     void createsNonNullAction() {
         var handler = new GraphqlInvokeHandler(mapper, "http://localhost/graphql");
         var binding = new InvokeBinding.Graphql("{ positions { symbol } }");
-        var def = new io.casehub.yaml.core.step.StepDefinition("test", null,
+        var def = new io.casehub.yaml.core.step.Declaration("test", null,
                 java.util.Map.of(), java.util.Map.of(), binding);
         assertThat(handler.create(def, binding)).isNotNull();
     }

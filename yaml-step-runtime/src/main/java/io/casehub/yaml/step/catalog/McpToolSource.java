@@ -1,32 +1,33 @@
 package io.casehub.yaml.step.catalog;
 
+import io.casehub.yaml.core.step.Declaration;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.CatalogSource;
-import io.casehub.yaml.core.step.StepDefinition;
 
 import java.util.Map;
 import java.util.function.BiFunction;
 
-public class McpToolSource implements CatalogSource {
+public class McpToolSource {
 
-    private final Map<String, StepDefinition> definitions;
+    private final Map<String, Declaration> declarations;
     private final BiFunction<String, Map<String, Object>, Map<String, Object>> toolInvoker;
 
     public McpToolSource(
-            Map<String, StepDefinition> definitions,
+            Map<String, Declaration> declarations,
             BiFunction<String, Map<String, Object>, Map<String, Object>> toolInvoker) {
-        this.definitions = Map.copyOf(definitions);
+        this.declarations = Map.copyOf(declarations);
         this.toolInvoker = toolInvoker;
     }
 
-    @Override
-    public void populate(Map<String, CatalogEntry> entries) {
-        for (var e : definitions.entrySet()) {
+    public void populate(PluginRegistry registry) {
+        for (var e : declarations.entrySet()) {
             String toolName = e.getKey();
-            StepDefinition def = e.getValue();
+            Declaration decl = e.getValue();
 
-            entries.putIfAbsent(toolName, new CatalogEntry(toolName, def,
+            registry.register(new Definition(toolName, decl.description(),
+                    decl.inputs(), decl.outputs(), Portability.UNIVERSAL,
                     (params, services) -> {
                         try {
                             Map<String, Object> result = toolInvoker.apply(toolName, params);
@@ -39,10 +40,5 @@ public class McpToolSource implements CatalogSource {
                         }
                     }));
         }
-    }
-
-    @Override
-    public int priority() {
-        return 300;
     }
 }

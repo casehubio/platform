@@ -2,12 +2,13 @@ package io.casehub.yaml.step.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.process.ProcessExecutor;
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepParameter;
-import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.CatalogSource;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
+import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.step.handler.ScriptInvokeHandler;
 
 import java.io.IOException;
@@ -18,7 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ScriptSource implements CatalogSource {
+public class ScriptSource {
 
     private static final Map<String, String> EXTENSION_RUNTIMES = Map.of(
             ".py", "python3",
@@ -36,9 +37,8 @@ public class ScriptSource implements CatalogSource {
         this.handler = new ScriptInvokeHandler(new ObjectMapper(), processExecutor);
     }
 
-    @Override
     @SuppressWarnings("unchecked")
-    public void populate(Map<String, CatalogEntry> entries) {
+    public void populate(PluginRegistry registry) {
         for (Path dir : paths) {
             if (!Files.isDirectory(dir)) continue;
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -51,8 +51,6 @@ public class ScriptSource implements CatalogSource {
                     Path schemaPath = dir.resolve(baseName + ".schema.yaml");
                     if (!Files.exists(schemaPath)) continue;
 
-                    if (entries.containsKey(baseName)) continue;
-
                     Map<String, Object> schema = yamlMapper.readValue(
                             schemaPath.toFile(), LinkedHashMap.class);
 
@@ -61,17 +59,17 @@ public class ScriptSource implements CatalogSource {
                     String description = (String) schema.get("description");
                     String timeout = (String) schema.get("timeout");
 
-                    Map<String, StepParameter> inputs = parseParams(
+                    Map<String, Parameter> inputs = parseParams(
                             (Map<String, Object>) schema.get("inputs"));
-                    Map<String, StepParameter> outputs = parseParams(
+                    Map<String, Parameter> outputs = parseParams(
                             (Map<String, Object>) schema.get("outputs"));
 
                     InvokeBinding.Script binding = new InvokeBinding.Script(
                             runtime, file.toAbsolutePath().toString(), timeout, null, null);
-                    StepDefinition def = new StepDefinition(name, description, inputs, outputs, binding);
+                    Declaration decl = new Declaration(name, description, inputs, outputs, binding);
 
-                    entries.put(name, new CatalogEntry(name, def,
-                            handler.create(def, binding)));
+                    registry.register(new Definition(name, description, inputs, outputs,
+                            Portability.UNIVERSAL, handler.create(decl, binding)));
                 }
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to scan script directory: " + dir, e);
@@ -79,22 +77,17 @@ public class ScriptSource implements CatalogSource {
         }
     }
 
-    @Override
-    public int priority() {
-        return 400;
-    }
-
     @SuppressWarnings("unchecked")
-    private Map<String, StepParameter> parseParams(Map<String, Object> raw) {
+    private Map<String, Parameter> parseParams(Map<String, Object> raw) {
         if (raw == null) return Map.of();
-        Map<String, StepParameter> result = new LinkedHashMap<>();
+        Map<String, Parameter> result = new LinkedHashMap<>();
         for (var entry : raw.entrySet()) {
             Map<String, Object> paramMap = (Map<String, Object>) entry.getValue();
             String typeStr = (String) paramMap.getOrDefault("type", "string");
             boolean required = Boolean.TRUE.equals(paramMap.get("required"));
             String desc = (String) paramMap.get("description");
-            result.put(entry.getKey(), new StepParameter(
-                    StepParameterType.fromString(typeStr), required, null, null, null, desc));
+            result.put(entry.getKey(), new Parameter(
+                    ParameterType.fromString(typeStr), required, null, null, null, desc));
         }
         return result;
     }

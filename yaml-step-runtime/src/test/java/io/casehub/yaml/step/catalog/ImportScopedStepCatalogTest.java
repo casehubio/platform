@@ -1,78 +1,62 @@
 package io.casehub.yaml.step.catalog;
 
-import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.StepCatalog;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ImportScopedStepCatalogTest {
 
-    private CatalogEntry entry(String name) {
-        var def = new StepDefinition(name, null, Map.of(), Map.of(),
-                new InvokeBinding.Mcp(name));
-        return new CatalogEntry(name, def,
+    private Definition defn(String name) {
+        return new Definition(name, null, Map.of(), Map.of(), Portability.JAVA,
                 (params, services) -> Result.of(Map.of()));
     }
 
-    private StepCatalog globalCatalog() {
-        return new StepCatalog() {
-            @Override
-            public Optional<CatalogEntry> resolve(String actionName) {
-                if ("global-action".equals(actionName)) {
-                    return Optional.of(entry("global-action"));
-                }
-                return Optional.empty();
-            }
-
-            @Override
-            public Set<String> availableActions() {
-                return Set.of("global-action");
-            }
-        };
+    private PluginRegistry globalRegistry() {
+        var registry = new CompositePluginRegistry();
+        registry.register(defn("global-action"));
+        return registry;
     }
 
     @Test
     void importScopedShadowsGlobal() {
-        var importedEntry = entry("local-override");
-        var catalog = new ImportScopedStepCatalog(
-                Map.of("global-action", importedEntry), globalCatalog());
+        var importedDef = defn("local-override");
+        var scoped = new ImportScopedStepCatalog(
+                Map.of("global-action", importedDef), globalRegistry());
 
-        assertThat(catalog.resolve("global-action")).isPresent();
-        assertThat(catalog.resolve("global-action").get().definition().name())
+        assertThat(scoped.resolve("global-action")).isPresent();
+        assertThat(scoped.resolve("global-action").get().name())
                 .isEqualTo("local-override");
     }
 
     @Test
     void fallsBackToGlobalForUnimportedActions() {
-        var catalog = new ImportScopedStepCatalog(
-                Map.of("local-only", entry("local-only")), globalCatalog());
+        var scoped = new ImportScopedStepCatalog(
+                Map.of("local-only", defn("local-only")), globalRegistry());
 
-        assertThat(catalog.resolve("global-action")).isPresent();
-        assertThat(catalog.resolve("global-action").get().definition().name())
+        assertThat(scoped.resolve("global-action")).isPresent();
+        assertThat(scoped.resolve("global-action").get().name())
                 .isEqualTo("global-action");
     }
 
     @Test
     void availableActionsIncludesBothScopes() {
-        var catalog = new ImportScopedStepCatalog(
-                Map.of("local-only", entry("local-only")), globalCatalog());
+        var scoped = new ImportScopedStepCatalog(
+                Map.of("local-only", defn("local-only")), globalRegistry());
 
-        assertThat(catalog.availableActions())
+        assertThat(scoped.availableActions())
                 .containsExactlyInAnyOrder("local-only", "global-action");
     }
 
     @Test
     void resolveMissingFromBothReturnsEmpty() {
-        var catalog = new ImportScopedStepCatalog(Map.of(), globalCatalog());
+        var scoped = new ImportScopedStepCatalog(Map.of(), globalRegistry());
 
-        assertThat(catalog.resolve("nonexistent")).isEmpty();
+        assertThat(scoped.resolve("nonexistent")).isEmpty();
     }
 }

@@ -21,7 +21,7 @@ class RestInvokeHandlerTest {
     void createsNonNullAction() {
         var handler = new RestInvokeHandler(mapper);
         var binding = new InvokeBinding.Rest("GET", "http://localhost/api", null, null);
-        var def = new io.casehub.yaml.core.step.StepDefinition("test", null,
+        var def = new io.casehub.yaml.core.step.Declaration("test", null,
                 java.util.Map.of(), java.util.Map.of(), binding);
         assertThat(handler.create(def, binding)).isNotNull();
     }

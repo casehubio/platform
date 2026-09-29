@@ -1,10 +1,9 @@
 package io.casehub.yaml.step.catalog;
 
-import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.Portability;
+import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.step.CatalogEntry;
-import io.casehub.yaml.step.StepCatalog;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -18,35 +17,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StepWalkerTest {
 
-    private final CatalogEntry processEntry = entry("process");
-    private final CatalogEntry assertEntry = entry("assert");
+    private final Definition processDefn = defn("process");
+    private final Definition assertDefn = defn("assert");
 
-    private final StepCatalog catalog = new StepCatalog() {
-        private final Map<String, CatalogEntry> entries = Map.of(
-                "process", processEntry, "assert", assertEntry);
-
-        @Override
-        public Optional<CatalogEntry> resolve(String actionName) {
-            return Optional.ofNullable(entries.get(actionName));
-        }
-
-        @Override
-        public Set<String> availableActions() {
-            return entries.keySet();
-        }
-    };
+    private final PluginRegistry registry = new CompositePluginRegistry() {{
+        register(processDefn);
+        register(assertDefn);
+    }};
 
     @Test
     void resolvesPluginNameAsKey() {
         Map<String, Object> step = new LinkedHashMap<>();
         step.put("process", Map.of("command", "deploy.sh"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
-        assertThat(plugin.entry().qualifiedName()).isEqualTo("process");
+        assertThat(plugin.definition().name()).isEqualTo("process");
         assertThat(plugin.params()).containsEntry("command", "deploy.sh");
         assertThat(plugin.decorators()).isEmpty();
     }
@@ -58,7 +47,7 @@ class StepWalkerTest {
         step.put("if", "${env.ready}");
         step.put("timeout", "30s");
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
         assertThat(plugin.decorators()).containsEntry("if", "${env.ready}");
@@ -70,7 +59,7 @@ class StepWalkerTest {
         Map<String, Object> step = new LinkedHashMap<>();
         step.put("invoke", Map.of("mcp", Map.of("tool", "custom-tool")));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.InvokeStep.class);
@@ -84,10 +73,10 @@ class StepWalkerTest {
         step.put("step", "deploy-prod");
         step.put("process", Map.of("command", "deploy.sh"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
-        assertThat(plugin.entry().qualifiedName()).isEqualTo("process");
+        assertThat(plugin.definition().name()).isEqualTo("process");
         assertThat(plugin.decorators()).doesNotContainKey("step");
     }
 
@@ -97,7 +86,7 @@ class StepWalkerTest {
         step.put("step", "risk-eval");
         step.put("process", Map.of("command", "evaluate.sh"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0).name()).isEqualTo("risk-eval");
@@ -108,7 +97,7 @@ class StepWalkerTest {
         Map<String, Object> step = new LinkedHashMap<>();
         step.put("process", Map.of("command", "deploy.sh"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved.get(0).name()).isNull();
     }
@@ -123,7 +112,7 @@ class StepWalkerTest {
         step2.put("step", "eval");
         step2.put("process", Map.of("command", "b.sh"));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step1, step2), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step1, step2), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate step name 'eval'");
     }
@@ -141,7 +130,7 @@ class StepWalkerTest {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("block", List.of(inner));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(block, outer), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(block, outer), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate step name 'eval'");
     }
@@ -158,7 +147,7 @@ class StepWalkerTest {
         step.put("step", "await-all");
         step.put("barrier", Map.of("await", List.of("eval-a", "eval-b"), "timeout", "30s"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(evalA, evalB, step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(evalA, evalB, step), registry);
 
         assertThat(resolved).hasSize(3);
         assertThat(resolved.get(2)).isInstanceOf(ResolvedStep.BarrierStep.class);
@@ -183,7 +172,7 @@ class StepWalkerTest {
         step.put("step", "consensus");
         step.put("quorum", Map.of("required", 2, "of", List.of("strat-a", "strat-b", "strat-c"), "timeout", "15s"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(a, b, c, step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(a, b, c, step), registry);
 
         assertThat(resolved.get(3)).isInstanceOf(ResolvedStep.QuorumStep.class);
         var quorum = (ResolvedStep.QuorumStep) resolved.get(3);
@@ -199,7 +188,7 @@ class StepWalkerTest {
         step.put("step", "wait");
         step.put("barrier", Map.of());
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("await");
     }
@@ -213,7 +202,7 @@ class StepWalkerTest {
         step.put("step", "q");
         step.put("quorum", Map.of("required", 5, "of", List.of("a")));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(evalA, step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(evalA, step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("required");
     }
@@ -224,7 +213,7 @@ class StepWalkerTest {
         step.put("step", "wait");
         step.put("barrier", Map.of("await", List.of("nonexistent")));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown step 'nonexistent'");
     }
@@ -235,7 +224,7 @@ class StepWalkerTest {
         step.put("step", "q");
         step.put("quorum", Map.of("required", 1, "of", List.of("ghost")));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown step 'ghost'");
     }
@@ -246,7 +235,7 @@ class StepWalkerTest {
         Map<String, Object> step = new LinkedHashMap<>();
         step.put("unknown-action", Map.of("param", "value"));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown-action")
                 .hasMessageContaining("process")
@@ -257,7 +246,7 @@ class StepWalkerTest {
     void throwsOnEmptyStepMap() {
         Map<String, Object> step = new LinkedHashMap<>();
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("empty");
     }
@@ -269,12 +258,12 @@ class StepWalkerTest {
         Map<String, Object> step2 = new LinkedHashMap<>();
         step2.put("assert", Map.of("expression", "true"));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step1, step2), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step1, step2), registry);
 
         assertThat(resolved).hasSize(2);
-        assertThat(((ResolvedStep.PluginStep) resolved.get(0)).entry().qualifiedName())
+        assertThat(((ResolvedStep.PluginStep) resolved.get(0)).definition().name())
                 .isEqualTo("process");
-        assertThat(((ResolvedStep.PluginStep) resolved.get(1)).entry().qualifiedName())
+        assertThat(((ResolvedStep.PluginStep) resolved.get(1)).definition().name())
                 .isEqualTo("assert");
     }
 
@@ -288,7 +277,7 @@ class StepWalkerTest {
         step.put("on-success", "next");
         step.put("on-failure", "abort");
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
         assertThat(plugin.decorators()).containsKeys("if", "retry", "on-error",
@@ -306,7 +295,7 @@ class StepWalkerTest {
                                  ));
         step.put("loop", Map.of("count", 3));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
@@ -323,7 +312,7 @@ class StepWalkerTest {
         step.put("else", List.of(Map.of("process", Map.of("command", "proceed.sh"))));
         step.put("timeout", "30s");
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.IfElseStep.class);
@@ -341,7 +330,7 @@ class StepWalkerTest {
         step.put("if", "${enabled}");
         step.put("then", List.of(Map.of("process", Map.of("command", "a.sh"))));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         var ifElse = (ResolvedStep.IfElseStep) resolved.get(0);
         assertThat(ifElse.elseSteps()).isEmpty();
@@ -353,7 +342,7 @@ class StepWalkerTest {
         step.put("process", Map.of("command", "a.sh"));
         step.put("if", "${enabled}");
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
         assertThat(resolved.get(0).decorators()).containsKey("if");
@@ -373,7 +362,7 @@ class StepWalkerTest {
         step.put("match", "${event}");
         step.put("cases", List.of(caseEntry, defaultEntry));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.MatchStep.class);
@@ -394,7 +383,7 @@ class StepWalkerTest {
                                     ));
         step.put("timeout", "60s");
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
 
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.ParallelStep.class);
@@ -409,7 +398,7 @@ class StepWalkerTest {
         step.put("block", List.of(Map.of("process", Map.of("command", "a.sh"))));
         step.put("process", Map.of("command", "b.sh"));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ambiguous");
     }
@@ -420,7 +409,7 @@ class StepWalkerTest {
         step.put("process", Map.of("command", "a.sh"));
         step.put("then", List.of(Map.of("process", Map.of("command", "b.sh"))));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("then");
     }
@@ -431,7 +420,7 @@ class StepWalkerTest {
         step.put("process", Map.of("command", "a.sh"));
         step.put("else", List.of(Map.of("process", Map.of("command", "b.sh"))));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("else");
     }
@@ -448,7 +437,7 @@ class StepWalkerTest {
         step.put("match", "${status}");
         step.put("cases", List.of(defaultEntry, caseEntry));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("default must be the last case");
     }
@@ -464,7 +453,7 @@ class StepWalkerTest {
         step.put("match", "${status}");
         step.put("cases", List.of(caseEntry));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must contain either 'pattern' or 'default'");
     }
@@ -481,7 +470,7 @@ class StepWalkerTest {
                 Map.of("process", Map.of("command", "outer.sh")),
                 innerBlock));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(outerBlock), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(outerBlock), registry);
 
         var outer = (ResolvedStep.BlockStep) resolved.get(0);
         assertThat(outer.steps()).hasSize(2);
@@ -522,7 +511,7 @@ class StepWalkerTest {
         var logger = java.util.logging.Logger.getLogger(StepWalker.class.getName());
         logger.addHandler(handler);
         try {
-            StepWalker.resolve(List.of(step), catalog);
+            StepWalker.resolve(List.of(step), registry);
             assertThat(handler.warnings).hasSize(1);
             assertThat(handler.warnings.get(0)).contains("default");
         } finally {
@@ -563,7 +552,7 @@ class StepWalkerTest {
         var logger = java.util.logging.Logger.getLogger(StepWalker.class.getName());
         logger.addHandler(handler);
         try {
-            StepWalker.resolve(List.of(step), catalog);
+            StepWalker.resolve(List.of(step), registry);
             assertThat(handler.warnings).isEmpty();
         } finally {
             logger.removeHandler(handler);
@@ -577,7 +566,7 @@ class StepWalkerTest {
             deeplyNested = new LinkedHashMap<>(Map.of("block", List.of(deeplyNested)));
         }
         var steps = List.of(deeplyNested);
-        assertThatThrownBy(() -> StepWalker.resolve(steps, catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(steps, registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Maximum nesting depth")
                 .hasMessageContaining("" + StepWalker.MAX_DEPTH);
@@ -590,15 +579,13 @@ class StepWalkerTest {
             nested = new LinkedHashMap<>(Map.of("block", List.of(nested)));
         }
         var steps  = List.of(nested);
-        var result = StepWalker.resolve(steps, catalog);
+        var result = StepWalker.resolve(steps, registry);
         assertThat(result).hasSize(1);
     }
 
 
-    private static CatalogEntry entry(String name) {
-        var def = new StepDefinition(name, null, Map.of(), Map.of(),
-                new InvokeBinding.Mcp(name));
-        return new CatalogEntry(name, def,
+    private static Definition defn(String name) {
+        return new Definition(name, null, Map.of(), Map.of(), Portability.JAVA,
                 (params, services) -> Result.of(Map.of()));
     }
 
@@ -609,7 +596,7 @@ class StepWalkerTest {
         step.put("catch", List.of(Map.of("process", Map.of("cmd", "compensate"))));
         step.put("finally", List.of(Map.of("process", Map.of("cmd", "audit"))));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.TryCatchFinallyStep.class);
         var tcf = (ResolvedStep.TryCatchFinallyStep) resolved.get(0);
@@ -624,7 +611,7 @@ class StepWalkerTest {
         step.put("try", List.of(Map.of("process", Map.of("cmd", "run"))));
         step.put("finally", List.of(Map.of("process", Map.of("cmd", "cleanup"))));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
         var                tcf      = (ResolvedStep.TryCatchFinallyStep) resolved.get(0);
         assertThat(tcf.trySteps()).hasSize(1);
         assertThat(tcf.catchSteps()).isEmpty();
@@ -637,7 +624,7 @@ class StepWalkerTest {
         step.put("process", Map.of("cmd", "run"));
         step.put("catch", List.of(Map.of("process", Map.of("cmd", "handle"))));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("'catch' requires 'try'");
     }
@@ -648,7 +635,7 @@ class StepWalkerTest {
         step.put("process", Map.of("cmd", "run"));
         step.put("finally", List.of(Map.of("process", Map.of("cmd", "cleanup"))));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("'finally' requires 'try'");
     }
@@ -662,7 +649,7 @@ class StepWalkerTest {
                 Map.of("wait", "timeout",
                        "steps", List.of(Map.of("process", Map.of("cmd", "fallback"))))));
 
-        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), catalog);
+        List<ResolvedStep> resolved = StepWalker.resolve(List.of(step), registry);
         assertThat(resolved).hasSize(1);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.SelectStep.class);
         var sel = (ResolvedStep.SelectStep) resolved.get(0);
@@ -678,7 +665,7 @@ class StepWalkerTest {
         var step = new LinkedHashMap<String, Object>();
         step.put("select", List.of(Map.of("invalid", "branch")));
 
-        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), catalog))
+        assertThatThrownBy(() -> StepWalker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("select branch must contain 'subscribe' or 'wait'");
     }

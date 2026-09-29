@@ -1,12 +1,9 @@
 package io.casehub.platform.expression;
 
 import io.casehub.platform.api.expression.SecretManager;
-import io.casehub.platform.api.expression.SecretNotFoundException;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.ConfigProvider;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -54,28 +51,14 @@ import java.util.Map;
 @ApplicationScoped
 public class MockSecretManager implements SecretManager {
 
-    @Override
-    public Map<String, Object> secret(String secretName) {
-        String prefix = "casehub.platform.secrets." + secretName + ".";
-        Map<String, Object> result = new HashMap<>();
-        for (String name : ConfigProvider.getConfig().getPropertyNames()) {
-            if (name.startsWith(prefix)) {
-                ConfigProvider.getConfig().getOptionalValue(name, String.class)
-                        .ifPresent(v -> put(result, name.substring(prefix.length()), v));
-            }
-        }
-        if (result.isEmpty()) throw new SecretNotFoundException(secretName);
-        return result;
+    private final SecretManagerCore delegate;
+
+    public MockSecretManager() {
+        this.delegate = new SecretManagerCore(new SmallRyePropertySource());
     }
 
-    @SuppressWarnings("unchecked")
-    private static void put(Map<String, Object> map, String key, String value) {
-        int dot = key.indexOf('.');
-        if (dot == -1) { map.put(key, value); return; }
-        String head = key.substring(0, dot);
-        String tail = key.substring(dot + 1);
-        Map<String, Object> nested = (Map<String, Object>)
-                map.computeIfAbsent(head, k -> new HashMap<>());
-        put(nested, tail, value);
+    @Override
+    public Map<String, Object> secret(String secretName) {
+        return delegate.secret(secretName);
     }
 }

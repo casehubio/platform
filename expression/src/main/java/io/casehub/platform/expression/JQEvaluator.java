@@ -1,23 +1,13 @@
 package io.casehub.platform.expression;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.expression.ConfigManager;
 import io.casehub.platform.api.expression.SecretManager;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import net.thisptr.jackson.jq.BuiltinFunctionLoader;
-import net.thisptr.jackson.jq.JsonQuery;
-import net.thisptr.jackson.jq.Scope;
-import net.thisptr.jackson.jq.Versions;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * JQ expression evaluator with $secret and $config scope injection.
@@ -34,73 +24,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 public class JQEvaluator {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     @Inject SecretManager secretManager;
     @Inject ConfigManager configManager;
 
-    private Scope rootScope;
-    private final ConcurrentHashMap<String, JsonQuery> queryCache = new ConcurrentHashMap<>();
+    private JQEvaluatorCore delegate;
 
     @PostConstruct
     void init() {
-        rootScope = Scope.newEmptyScope();
-        BuiltinFunctionLoader.getInstance().loadFunctions(Versions.JQ_1_6, rootScope);
+        delegate = new JQEvaluatorCore(secretManager, configManager);
     }
 
-    /**
-     * Evaluate a JQ expression without secret or config injection.
-     */
     public ValidationResult eval(String jqExpr, JsonNode input) {
-        return eval(jqExpr, input, Set.of(), Set.of());
+        return delegate.eval(jqExpr, input);
     }
 
-    /**
-     * Evaluate a JQ expression with $secret and $config scope variables.
-     *
-     * @param jqExpr       JQ expression
-     * @param input        input JSON node
-     * @param secretNames  secret names to inject (from {@code use.secrets})
-     * @param configMapNames config map names to inject (from {@code use.configMaps})
-     */
     public ValidationResult eval(String jqExpr, JsonNode input,
                                  Set<String> secretNames, Set<String> configMapNames) {
-        try {
-            Scope childScope = Scope.newChildScope(rootScope);
-
-            if (!secretNames.isEmpty()) {
-                Map<String, Object> secretsMap = new HashMap<>();
-                for (String name : secretNames) {
-                    secretsMap.put(name, secretManager.secret(name));
-                }
-                JsonNode secretsNode = MAPPER.valueToTree(secretsMap);
-                childScope.setValue("secret", secretsNode);
-            }
-
-            if (!configMapNames.isEmpty()) {
-                Map<String, Object> configsMap = new HashMap<>();
-                for (String name : configMapNames) {
-                    configsMap.put(name, configManager.configMap(name));
-                }
-                JsonNode configsNode = MAPPER.valueToTree(configsMap);
-                childScope.setValue("config", configsNode);
-            }
-
-            JsonQuery query = queryCache.computeIfAbsent(jqExpr,
-                    expr -> {
-                        try {
-                            return JsonQuery.compile(expr, Versions.JQ_1_6);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-
-            List<JsonNode> out = new ArrayList<>();
-            query.apply(childScope, input, out::add);
-            return ValidationResult.ok(out);
-        } catch (Exception e) {
-            Throwable cause = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
-            return ValidationResult.error(cause.getClass().getSimpleName() + ": " + cause.getMessage());
-        }
+        return delegate.eval(jqExpr, input, secretNames, configMapNames);
     }
 }

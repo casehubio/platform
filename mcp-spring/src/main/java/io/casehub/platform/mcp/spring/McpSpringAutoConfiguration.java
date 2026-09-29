@@ -22,6 +22,7 @@ public class McpSpringAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     SpringModelScanner springModelScanner(ApplicationContext context,
                                            DomainModelRegistry registry,
                                            ApplicationEventPublisher eventPublisher) {
@@ -31,6 +32,7 @@ public class McpSpringAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     SpringOperationDispatcher springOperationDispatcher(DomainModelRegistry registry,
                                                          ApplicationContext context) {
         ObjectMapper mapper = new ObjectMapper();
@@ -39,6 +41,7 @@ public class McpSpringAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     CaseHubToolCallbackProvider caseHubToolCallbackProvider(DomainModelRegistry registry,
                                                              SpringOperationDispatcher dispatcher) {
         return new CaseHubToolCallbackProvider(registry, dispatcher);

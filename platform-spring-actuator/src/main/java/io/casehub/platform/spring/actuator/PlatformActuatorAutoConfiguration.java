@@ -12,6 +12,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,11 +26,13 @@ import java.util.List;
 public class PlatformActuatorAutoConfiguration {
 
     @Bean
+    @ConditionalOnMissingBean
     static MetricsBeanPostProcessor platformMetricsBeanPostProcessor(MeterRegistry meterRegistry) {
         return new MetricsBeanPostProcessor(meterRegistry);
     }
 
     @Bean
+    @ConditionalOnMissingBean
     PlatformGaugeBinder platformGaugeBinder(
             ObjectProvider<ModelRegistry> modelRegistry,
             ObjectProvider<DeliveryChannelRegistry> channelRegistry,
@@ -81,6 +84,7 @@ public class PlatformActuatorAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     PlatformInfoContributor platformInfoContributor(
             ObjectProvider<ModelRegistry> modelRegistry,
             ObjectProvider<List<AgentBackend>> backends) {

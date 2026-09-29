@@ -48,16 +48,19 @@ public class ExpressionSpringAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     public MvelExpressionEngine mvelExpressionEngine() {
         return new MvelExpressionEngine();
     }
 
     @Bean
+    @ConditionalOnMissingBean
     public JQExpressionEngine jqExpressionEngine() {
         return new JQExpressionEngine();
     }
 
     @Bean
+    @ConditionalOnMissingBean
     public JexlExpressionEngine jexlExpressionEngine() {
         return new JexlExpressionEngine();
     }

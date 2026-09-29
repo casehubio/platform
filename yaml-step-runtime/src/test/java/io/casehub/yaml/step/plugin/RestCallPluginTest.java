@@ -3,45 +3,48 @@ package io.casehub.yaml.step.plugin;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
-import com.sun.net.httpserver.HttpServer;
+import io.casehub.yaml.step.testing.infrastructure.HttpMockInfrastructure;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RestCallPluginTest {
 
-    private HttpServer server;
-    private int port;
+    private HttpMockInfrastructure infra;
+    private String baseUrl;
 
     @BeforeEach
-    void startServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(0), 0);
-        port = server.getAddress().getPort();
-        server.createContext("/ok", exchange -> {
-            byte[] body = "{\"status\":\"ok\"}".getBytes();
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
-        server.createContext("/error", exchange -> {
-            byte[] body = "Internal Server Error".getBytes();
-            exchange.sendResponseHeaders(500, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
-        server.start();
+    void startServer() {
+        infra = new HttpMockInfrastructure();
+        infra.start();
+        baseUrl = (String) infra.variableBindings().get("wiremock.url");
+
+        infra.configure(List.of(
+            Map.of(
+                "request", Map.of("method", "GET", "path", "/ok"),
+                "response", Map.of("status", 200,
+                    "body", Map.of("status", "ok"))
+            ),
+            Map.of(
+                "request", Map.of("method", "POST", "path", "/ok"),
+                "response", Map.of("status", 200,
+                    "body", Map.of("status", "ok"))
+            ),
+            Map.of(
+                "request", Map.of("method", "GET", "path", "/error"),
+                "response", Map.of("status", 500)
+            )
+        ));
     }
 
     @AfterEach
     void stopServer() {
-        server.stop(0);
+        if (infra != null) infra.stop();
     }
 
     @Test
@@ -50,7 +53,7 @@ class RestCallPluginTest {
         var registry = new MapServiceRegistry();
 
         Result result = action.execute(
-                Map.of("url", "http://localhost:" + port + "/ok"), registry);
+                Map.of("url", baseUrl + "/ok"), registry);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsEntry("status-code", 200);
@@ -63,7 +66,7 @@ class RestCallPluginTest {
         var registry = new MapServiceRegistry();
 
         Result result = action.execute(
-                Map.of("url", "http://localhost:" + port + "/ok",
+                Map.of("url", baseUrl + "/ok",
                        "method", "POST"), registry);
 
         assertThat(result.isSuccess()).isTrue();
@@ -76,7 +79,7 @@ class RestCallPluginTest {
         var registry = new MapServiceRegistry();
 
         Result result = action.execute(
-                Map.of("url", "http://localhost:" + port + "/error"), registry);
+                Map.of("url", baseUrl + "/error"), registry);
 
         assertThat(result.isSuccess()).isFalse();
     }

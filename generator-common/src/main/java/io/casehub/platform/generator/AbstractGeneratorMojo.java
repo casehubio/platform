@@ -75,7 +75,10 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
         for (Object obj : project.getArtifacts()) {
             Artifact artifact = (Artifact) obj;
             File file = artifact.getFile();
-            if (file != null && file.getName().endsWith(".jar")) {
+            if (file == null) {
+                continue;
+            }
+            if (file.getName().endsWith(".jar")) {
                 try (JarFile jar = new JarFile(file)) {
                     var entry = jar.getEntry("META-INF/jandex.idx");
                     if (entry != null) {
@@ -84,6 +87,14 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
                         }
                     }
                 } catch (IOException ignored) {
+                }
+            } else if (file.isDirectory()) {
+                File dirIndex = new File(file, "META-INF/jandex.idx");
+                if (dirIndex.exists()) {
+                    try (var fis = new FileInputStream(dirIndex)) {
+                        indexes.add(new IndexReader(fis).read());
+                    } catch (IOException ignored) {
+                    }
                 }
             }
         }

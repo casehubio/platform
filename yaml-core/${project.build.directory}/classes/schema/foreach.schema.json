@@ -1,0 +1,28 @@
+{
+  "$id": "https://casehub.io/yaml-core/foreach.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ForEach Expansion",
+  "description": "A forEach directive stamps multiple copies of an element. Can be a string referencing a named iteration group, or an inline map with 'as' (variable name) and 'in' (list of values). Stamped copies get IDs in the format 'originalId.value'. Use ${each.<as>} to reference the iteration variable.",
+  "oneOf": [
+    {
+      "type": "string",
+      "description": "Reference to a named iteration group defined in the 'iterations' section."
+    },
+    {
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "description": "The iteration variable name, referenced as ${each.<as>}."
+        },
+        "in": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of values to iterate over. Values may contain ${prefix.name} variable references."
+        }
+      },
+      "required": ["as", "in"],
+      "additionalProperties": false
+    }
+  ]
+}

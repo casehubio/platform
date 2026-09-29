@@ -1,0 +1,134 @@
+{
+  "$id": "https://casehub.io/yaml-core/module.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YAML Module",
+  "description": "A reusable module declares typed parameters, typed outputs, and named sections. Modules are imported via 'imports' with an alias ('as'), optional condition ('when'), and parameter bindings. Outputs from earlier imports can be referenced in later imports via ${module.<alias>.<output>} syntax.",
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "object",
+      "description": "Module header declaring the module's identity, parameters, and outputs.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique module name."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Typed parameter declarations. Each parameter has a type, optional constraints, and optional default.",
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter"
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "description": "Typed output declarations. Output values are templates resolved from module parameters via ${var.*} references.",
+          "additionalProperties": {
+            "$ref": "#/$defs/output"
+          }
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "imports": {
+      "type": "array",
+      "description": "List of module imports. Order matters — later imports can reference outputs from earlier ones.",
+      "items": {
+        "$ref": "#/$defs/import"
+      }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["STRING", "LIST", "INTEGER", "NUMBER", "BOOLEAN"],
+          "default": "STRING",
+          "description": "Parameter type. STRING is the default. LIST splits on comma (no escape mechanism — elements cannot contain commas)."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the parameter must be provided. A required parameter with a default is satisfied by the default."
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Default value used when the parameter is not provided."
+        },
+        "minLength": {
+          "type": "integer",
+          "description": "Minimum length (STRING) or minimum element count (LIST). Not valid for INTEGER, NUMBER, or BOOLEAN."
+        },
+        "maxLength": {
+          "type": "integer",
+          "description": "Maximum length (STRING) or maximum element count (LIST). Not valid for INTEGER, NUMBER, or BOOLEAN."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern. For STRING: the value must match. For LIST: each element must match. Not valid for INTEGER, NUMBER, or BOOLEAN."
+        },
+        "minimum": {
+          "type": "number",
+          "description": "Minimum numeric value. Only valid for INTEGER and NUMBER."
+        },
+        "maximum": {
+          "type": "number",
+          "description": "Maximum numeric value. Only valid for INTEGER and NUMBER."
+        },
+        "allowedValues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Enumeration of allowed values. For non-STRING types, comparison uses canonical form (e.g. BOOLEAN 'yes' matches allowed value 'true')."
+        },
+        "constraintDescription": {
+          "type": "string",
+          "description": "Human-readable description shown in validation errors instead of the technical message."
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["STRING", "LIST", "INTEGER", "NUMBER", "BOOLEAN"],
+          "description": "Output type. Used for structural type checking when the output is referenced by a later import's parameter."
+        },
+        "value": {
+          "type": "string",
+          "description": "Output value template. May reference module parameters via ${var.*} syntax. Resolved at import time."
+        }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    "import": {
+      "type": "object",
+      "properties": {
+        "module": {
+          "type": "string",
+          "description": "Name of the module to import."
+        },
+        "as": {
+          "type": "string",
+          "description": "Alias for this import. Used to prefix section keys and reference outputs. Must not contain '.'."
+        },
+        "when": {
+          "type": "string",
+          "description": "Conditional import. A variable reference that resolves to a boolean value (true/false/yes/no/on/off/y/n/1/0)."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Parameter bindings for this import. Values may contain ${var.*} or ${module.<alias>.<output>} references.",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["module", "as"],
+      "additionalProperties": false
+    }
+  }
+}

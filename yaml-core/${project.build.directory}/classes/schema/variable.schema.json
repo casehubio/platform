@@ -1,0 +1,8 @@
+{
+  "$id": "https://casehub.io/yaml-core/variable.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Variable Reference",
+  "description": "Variable references use ${prefix.name} syntax. The prefix identifies the variable source (e.g. 'var', 'each', 'step'). Domains register their own prefixes. The special prefix 'each' resolves forEach iteration variables.",
+  "type": "string",
+  "pattern": ".*\\$\\{[a-zA-Z][a-zA-Z0-9]*\\.[^}]+\\}.*"
+}

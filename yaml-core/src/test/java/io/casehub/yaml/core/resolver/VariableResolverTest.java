@@ -438,7 +438,7 @@ class VariableResolverTest {
     @Test
     void forParams_resolves_callerParam() {
         var declared = java.util.Map.of("name", io.casehub.yaml.core.module.YamlModuleParameter.builder()
-                                                                                               .type(io.casehub.yaml.core.module.ParameterType.STRING).required(true).build());
+                                                                                               .type(io.casehub.yaml.plugin.api.ParameterType.STRING).required(true).build());
         var resolver = VariableResolver.forParams(declared, java.util.Map.of("name", "Alice"), java.util.Set.of());
         assertThat(resolver.resolveString("${params.name}", "test")).isEqualTo("Alice");
     }
@@ -446,7 +446,7 @@ class VariableResolverTest {
     @Test
     void forParams_resolves_default() {
         var declared = java.util.Map.of("env", io.casehub.yaml.core.module.YamlModuleParameter.builder()
-                                                                                              .type(io.casehub.yaml.core.module.ParameterType.STRING).defaultValue("prod").build());
+                                                                                              .type(io.casehub.yaml.plugin.api.ParameterType.STRING).defaultValue("prod").build());
         var resolver = VariableResolver.forParams(declared, java.util.Map.of(), java.util.Set.of());
         assertThat(resolver.resolveString("${params.env}", "test")).isEqualTo("prod");
     }
@@ -454,7 +454,7 @@ class VariableResolverTest {
     @Test
     void forParams_caller_overrides_default() {
         var declared = java.util.Map.of("env", io.casehub.yaml.core.module.YamlModuleParameter.builder()
-                                                                                              .type(io.casehub.yaml.core.module.ParameterType.STRING).defaultValue("prod").build());
+                                                                                              .type(io.casehub.yaml.plugin.api.ParameterType.STRING).defaultValue("prod").build());
         var resolver = VariableResolver.forParams(declared, java.util.Map.of("env", "staging"), java.util.Set.of());
         assertThat(resolver.resolveString("${params.env}", "test")).isEqualTo("staging");
     }
@@ -462,7 +462,7 @@ class VariableResolverTest {
     @Test
     void forParams_var_prefix_aliases_params() {
         var declared = java.util.Map.of("x", io.casehub.yaml.core.module.YamlModuleParameter.builder()
-                                                                                            .type(io.casehub.yaml.core.module.ParameterType.STRING).required(true).build());
+                                                                                            .type(io.casehub.yaml.plugin.api.ParameterType.STRING).required(true).build());
         var resolver = VariableResolver.forParams(declared, java.util.Map.of("x", "val"), java.util.Set.of());
         assertThat(resolver.resolveString("${var.x}", "test")).isEqualTo("val");
     }
@@ -470,7 +470,7 @@ class VariableResolverTest {
     @Test
     void forParams_deferred_prefixes_preserved() {
         var declared = java.util.Map.of("x", io.casehub.yaml.core.module.YamlModuleParameter.builder()
-                                                                                            .type(io.casehub.yaml.core.module.ParameterType.STRING).required(true).build());
+                                                                                            .type(io.casehub.yaml.plugin.api.ParameterType.STRING).required(true).build());
         var resolver = VariableResolver.forParams(declared, java.util.Map.of("x", "val"), java.util.Set.of("step"));
         var result   = resolver.resolveString("${step.something}", "test");
         assertThat(result).isEqualTo("${step.something}");

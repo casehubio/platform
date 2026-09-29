@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.casehub.yaml.core.module.ParameterType;
+import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.core.module.YamlModuleFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,7 +93,7 @@ class ParameterTypeCaseInsensitiveTest {
         YamlModuleFile file = mapper.readValue(yaml, YamlModuleFile.class);
 
         assertThat(file.module().parameters().get("a").type()).isEqualTo(ParameterType.STRING);
-        assertThat(file.module().parameters().get("b").type()).isEqualTo(ParameterType.LIST);
+        assertThat(file.module().parameters().get("b").type()).isEqualTo(ParameterType.ARRAY);
         assertThat(file.module().parameters().get("c").type()).isEqualTo(ParameterType.INTEGER);
         assertThat(file.module().parameters().get("d").type()).isEqualTo(ParameterType.NUMBER);
         assertThat(file.module().parameters().get("e").type()).isEqualTo(ParameterType.BOOLEAN);

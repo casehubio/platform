@@ -3,8 +3,8 @@ package io.casehub.yaml.step.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
 import io.casehub.platform.api.process.ProcessCommand;
 import io.casehub.platform.api.process.ProcessExecutionException;
@@ -38,13 +38,13 @@ public class ProcessInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public StepAction create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(StepDefinition definition, InvokeBinding binding) {
         InvokeBinding.Process proc = (InvokeBinding.Process) binding;
         return (params, services) -> executeProcess(proc, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executeProcess(InvokeBinding.Process proc, Map<String, Object> params) {
+    private Result executeProcess(InvokeBinding.Process proc, Map<String, Object> params) {
         List<String> command = new ArrayList<>();
         command.add(proc.command());
         for (String arg : proc.args()) {
@@ -72,7 +72,7 @@ public class ProcessInvokeHandler implements InvokeHandler {
                 String error = result.stdout() != null && !result.stdout().isBlank()
                                ? result.stdout().trim()
                                : "Process exited with code " + result.exitCode();
-                return StepResult.failed(error);
+                return Result.failed(error);
             }
 
             String stdout = result.stdout() != null ? result.stdout() : "";
@@ -84,11 +84,11 @@ public class ProcessInvokeHandler implements InvokeHandler {
                 default -> Map.of("stdout", stdout);
             };
 
-            return StepResult.of(output, metadata);
+            return Result.of(output, metadata);
         } catch (ProcessExecutionException e) {
-            return StepResult.failed("Process execution failed: " + e.getMessage());
+            return Result.failed("Process execution failed: " + e.getMessage());
         } catch (Exception e) {
-            return StepResult.failed("Process execution failed: " + e.getMessage());
+            return Result.failed("Process execution failed: " + e.getMessage());
         }
     }
 

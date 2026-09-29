@@ -1,17 +1,17 @@
-package io.casehub.yaml.core.step;
+package io.casehub.yaml.plugin.api;
 
 import java.util.List;
 
-public record StepParameter(
-        StepParameterType type,
+public record Parameter(
+        ParameterType type,
         boolean required,
         String defaultValue,
         List<String> allowedValues,
         String format,
         String description) {
 
-    public StepParameter {
-        if (type == null) type = StepParameterType.STRING;
+    public Parameter {
+        if (type == null) type = ParameterType.STRING;
         if (allowedValues == null) allowedValues = List.of();
         if (defaultValue != null && !type.isScalar()) {
             throw new IllegalArgumentException(

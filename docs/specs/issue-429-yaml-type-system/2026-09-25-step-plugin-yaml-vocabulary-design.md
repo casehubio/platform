@@ -10,7 +10,7 @@ The step catalog (#433) assembles runtime step registries from YAML definitions,
 
 For operations teams writing playbooks, the step action name should BE the YAML keyword — schema-validated, IDE-completable, first-class vocabulary.
 
-Additionally, the `@StepPlugin` APT generates `StepAction` implementations that call `services.lookup(Type.class)`, but no CDI-backed `ServiceRegistry` exists. And the foundational P1 plugins (process, rest-call, assert) haven't been written.
+Additionally, the `@StepPlugin` APT generates `Action` implementations that call `services.lookup(Type.class)`, but no CDI-backed `ServiceRegistry` exists. And the foundational P1 plugins (process, rest-call, assert) haven't been written.
 
 ## Scope
 
@@ -81,7 +81,7 @@ public sealed interface ResolvedStep {
 }
 ```
 
-`PluginStep` carries the full `CatalogEntry` — both `StepDefinition` (for validation) and `StepAction` (for execution). `InvokeStep` carries the raw invoke spec for resolution via the existing `InvokeHandler` chain.
+`PluginStep` carries the full `CatalogEntry` — both `Declaration` (for validation) and `Action` (for execution). `InvokeStep` carries the raw invoke spec for resolution via the existing `InvokeHandler` chain.
 
 #### Resolution algorithm
 
@@ -161,7 +161,7 @@ This leverages the existing CDI bean landscape — `ProcessExecutor` resolves to
 ### 3. P1 `@StepPlugin` Records (yaml-step-runtime)
 
 Three plugin records in `io.casehub.yaml.step.plugin`. The APT (yaml-plugin-processor) generates for each:
-- `<Plugin>Action` binder class implementing `StepAction`
+- `<Plugin>Action` binder class implementing `Action`
 - `META-INF/yaml-plugins/<name>.schema.json` (JSON Schema)
 - `META-INF/yaml-plugins/<name>.json` (registry manifest)
 

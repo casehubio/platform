@@ -6,7 +6,7 @@ import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepParameter;
 import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.StepCatalog;
 import org.junit.jupiter.api.Test;
@@ -158,7 +158,7 @@ class StepSchemaComposerTest {
 
     private StepCatalog catalogWith(String name, Map<String, StepParameter> inputs) {
         var def = new StepDefinition(name, null, inputs, Map.of(), new InvokeBinding.Mcp(name));
-        var entry = new CatalogEntry(name, def, (p, s) -> StepResult.of(Map.of()));
+        var entry = new CatalogEntry(name, def, (p, s) -> Result.of(Map.of()));
         return new StepCatalog() {
             @Override
             public Optional<CatalogEntry> resolve(String n) {
@@ -173,9 +173,9 @@ class StepSchemaComposerTest {
     private StepCatalog catalogWith(String name1, Map<String, StepParameter> inputs1,
                                      String name2, Map<String, StepParameter> inputs2) {
         var def1 = new StepDefinition(name1, null, inputs1, Map.of(), new InvokeBinding.Mcp(name1));
-        var entry1 = new CatalogEntry(name1, def1, (p, s) -> StepResult.of(Map.of()));
+        var entry1 = new CatalogEntry(name1, def1, (p, s) -> Result.of(Map.of()));
         var def2 = new StepDefinition(name2, null, inputs2, Map.of(), new InvokeBinding.Mcp(name2));
-        var entry2 = new CatalogEntry(name2, def2, (p, s) -> StepResult.of(Map.of()));
+        var entry2 = new CatalogEntry(name2, def2, (p, s) -> Result.of(Map.of()));
         Map<String, CatalogEntry> entries = Map.of(name1, entry1, name2, entry2);
         return new StepCatalog() {
             @Override

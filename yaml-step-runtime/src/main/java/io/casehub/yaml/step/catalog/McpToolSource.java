@@ -1,6 +1,6 @@
 package io.casehub.yaml.step.catalog;
 
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.CatalogSource;
 import io.casehub.yaml.core.step.StepDefinition;
@@ -30,11 +30,11 @@ public class McpToolSource implements CatalogSource {
                     (params, services) -> {
                         try {
                             Map<String, Object> result = toolInvoker.apply(toolName, params);
-                            return StepResult.of(
+                            return Result.of(
                                     result != null ? result : Map.of(),
                                     Map.of("tool", toolName));
                         } catch (Exception ex) {
-                            return StepResult.failed(
+                            return Result.failed(
                                     "MCP tool '" + toolName + "' failed: " + ex.getMessage());
                         }
                     }));

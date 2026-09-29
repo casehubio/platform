@@ -1,6 +1,8 @@
 package io.casehub.yaml.step.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.CatalogEntry;
 import org.junit.jupiter.api.Test;
 
@@ -92,12 +94,12 @@ class AptPluginSourceTest {
         assertThat(entries).containsKey("assert");
     }
 
-    public static class TestAction implements io.casehub.yaml.plugin.api.StepAction {
+    public static class TestAction implements Action {
         @Override
-        public io.casehub.yaml.plugin.api.StepResult execute(
+        public Result execute(
                 Map<String, Object> parameters,
                 io.casehub.yaml.plugin.api.ServiceRegistry services) {
-            return io.casehub.yaml.plugin.api.StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
     }
 }

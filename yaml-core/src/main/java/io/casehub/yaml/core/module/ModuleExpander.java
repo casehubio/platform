@@ -2,6 +2,7 @@ package io.casehub.yaml.core.module;
 
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
+import io.casehub.yaml.plugin.api.ParameterType;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -434,7 +435,7 @@ public final class ModuleExpander {
                     "output." + module.name() + "." + outputName);
 
             try {
-                output.type().parse(resolvedValue);
+                ModuleParameterParser.parse(output.type(), resolvedValue);
             } catch (Exception e) {
                 throw new IllegalArgumentException(
                         "Output '" + outputName + "' in module '" + module.name()

@@ -172,7 +172,7 @@ record Python(String script, String timeout) implements InvokeBinding {
 
 ### 4. StepExecutionEvent Enrichment
 
-The existing `StepExecutionEvent` (fired by `ValidatingStepAction`) gains structured audit fields:
+The existing `StepExecutionEvent` (fired by `ValidatingAction`) gains structured audit fields:
 
 ```java
 public record StepExecutionEvent(
@@ -228,7 +228,7 @@ The platform enforces what trusted definitions can **do** (ProcessExecutor allow
 | `yaml-core/` | `InvokeBinding.Python` — add `timeout` field (default "30s") |
 | `yaml-step-runtime/` | `PythonInvokeHandler` — inject ProcessExecutor, delegate execution, use configurable timeout |
 | `yaml-step-runtime/` | `StepExecutionEvent` — add audit fields (bindingType, actorId, tenancyId, inputHash, etc.) |
-| `yaml-step-runtime/` | `ValidatingStepAction` — populate new audit fields on event emission |
+| `yaml-step-runtime/` | `ValidatingAction` — populate new audit fields on event emission |
 
 ### What does NOT change
 

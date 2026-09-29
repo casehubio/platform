@@ -2,11 +2,11 @@ package io.casehub.yaml.core.step;
 
 import java.util.Map;
 
-public record StepDefinitionFile(
+public record DeclarationFile(
         String namespace,
-        Map<String, StepDefinition> actions) {
+        Map<String, Declaration> actions) {
 
-    public StepDefinitionFile {
+    public DeclarationFile {
         if (namespace == null) namespace = "";
         actions = Map.copyOf(actions);
     }

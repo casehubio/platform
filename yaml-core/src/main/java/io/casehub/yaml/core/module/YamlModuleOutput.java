@@ -1,5 +1,7 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
+
 import java.util.Objects;
 
 public record YamlModuleOutput(ParameterType type, String value) {

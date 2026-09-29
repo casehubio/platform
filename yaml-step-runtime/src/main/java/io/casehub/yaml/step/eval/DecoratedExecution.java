@@ -1,9 +1,9 @@
 package io.casehub.yaml.step.eval;
 
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 
 @FunctionalInterface
 public interface DecoratedExecution {
 
-    StepResult execute(StepContext ctx);
+    Result execute(StepContext ctx);
 }

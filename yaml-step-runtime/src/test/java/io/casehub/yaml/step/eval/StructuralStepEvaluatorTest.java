@@ -5,7 +5,7 @@ import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.step.MatchPattern;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +41,7 @@ class StructuralStepEvaluatorTest {
     }
 
     private StepRunner successRunner(Map<String, Object> output) {
-        return (step, res) -> StepResult.of(output);
+        return (step, res) -> Result.of(output);
     }
 
     private StepRunner trackingRunner(List<String> order) {
@@ -49,7 +49,7 @@ class StructuralStepEvaluatorTest {
             if (step instanceof ResolvedStep.InvokeStep inv) {
                 order.add((String) inv.invokeSpec().get("id"));
             }
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         };
     }
 
@@ -69,7 +69,7 @@ class StructuralStepEvaluatorTest {
         void singleStep_delegatesToRunner() {
             var block = new ResolvedStep.BlockStep(null, List.of(leaf("a")), Map.of());
             var result = evaluator.evaluate(block, resolver,
-                    (step, res) -> StepResult.of(Map.of("key", "value")));
+                    (step, res) -> Result.of(Map.of("key", "value")));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("key", "value");
         }
@@ -92,10 +92,10 @@ class StructuralStepEvaluatorTest {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
                     order.add((String) inv.invokeSpec().get("id"));
                     if ("a".equals(inv.invokeSpec().get("id"))) {
-                        return StepResult.failed("boom");
+                        return Result.failed("boom");
                     }
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isFalse();
             assertThat(order).containsExactly("a");
@@ -107,9 +107,9 @@ class StructuralStepEvaluatorTest {
                     List.of(leaf("a"), leaf("b")), Map.of());
             var result = evaluator.evaluate(block, resolver, (step, res) -> {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
-                    return StepResult.of(Map.of("from", inv.invokeSpec().get("id")));
+                    return Result.of(Map.of("from", inv.invokeSpec().get("id")));
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("from", "b");
@@ -183,7 +183,7 @@ class StructuralStepEvaluatorTest {
             var step = new ResolvedStep.IfElseStep(null, "true",
                     List.of(leaf("then")), null, Map.of());
             var result = evaluator.evaluate(step, resolver,
-                    (s, r) -> StepResult.failed("then failed"));
+                    (s, r) -> Result.failed("then failed"));
             assertThat(result.isSuccess()).isFalse();
         }
 
@@ -301,7 +301,7 @@ class StructuralStepEvaluatorTest {
             var capturedResolver = new VariableResolver[1];
             evaluator.evaluate(step, resolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             String resolved = capturedResolver[0].resolveString("${match.value}", "test");
             assertThat(resolved).isEqualTo("hello");
@@ -319,7 +319,7 @@ class StructuralStepEvaluatorTest {
             var capturedResolver = new VariableResolver[1];
             evaluator.evaluate(step, objResolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             Object matchType = capturedResolver[0].resolve("${match.type}");
             assertThat(matchType).isEqualTo("trade");
@@ -361,7 +361,7 @@ class StructuralStepEvaluatorTest {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
                     order.add((String) inv.invokeSpec().get("id"));
                 }
-                return StepResult.of(Map.of("done", true));
+                return Result.of(Map.of("done", true));
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(order).containsExactly("a");
@@ -379,7 +379,7 @@ class StructuralStepEvaluatorTest {
                 try { latch.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(threadNames).hasSize(2);
         }
@@ -401,13 +401,13 @@ class StructuralStepEvaluatorTest {
                 if (s instanceof ResolvedStep.InvokeStep inv
                         && "fail".equals(inv.invokeSpec().get("id"))) {
                     completed.incrementAndGet();
-                    return StepResult.failed("boom");
+                    return Result.failed("boom");
                 }
                 try { Thread.sleep(50); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 completed.incrementAndGet();
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isFalse();
             assertThat(completed.get()).isEqualTo(2);
@@ -418,7 +418,7 @@ class StructuralStepEvaluatorTest {
             var step = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a"), leaf("b")), Map.of());
             var result = evaluator.evaluate(step, resolver,
-                    (s, r) -> StepResult.failed("fail"));
+                    (s, r) -> Result.failed("fail"));
             assertThat(result.isSuccess()).isFalse();
         }
     }
@@ -452,9 +452,9 @@ class StructuralStepEvaluatorTest {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
                     String id = (String) inv.invokeSpec().get("id");
                     order.add(id);
-                    if ("try1".equals(id)) return StepResult.failed("boom");
+                    if ("try1".equals(id)) return Result.failed("boom");
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(order).containsExactly("try1", "catch1", "finally1");
         }
@@ -471,9 +471,9 @@ class StructuralStepEvaluatorTest {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
                     String id = (String) inv.invokeSpec().get("id");
                     order.add(id);
-                    if ("try1".equals(id)) return StepResult.failed("boom");
+                    if ("try1".equals(id)) return Result.failed("boom");
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(order).containsExactly("try1", "finally1");
         }
@@ -488,9 +488,9 @@ class StructuralStepEvaluatorTest {
             var result = evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv
                         && "try1".equals(inv.invokeSpec().get("id"))) {
-                    return StepResult.failed("boom");
+                    return Result.failed("boom");
                 }
-                return StepResult.of(Map.of("handled", true));
+                return Result.of(Map.of("handled", true));
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("handled", true);
@@ -504,7 +504,7 @@ class StructuralStepEvaluatorTest {
                     null,
                     Map.of());
             var result = evaluator.evaluate(step, resolver,
-                    (s, r) -> StepResult.failed("boom"));
+                    (s, r) -> Result.failed("boom"));
             assertThat(result.isSuccess()).isFalse();
         }
 
@@ -518,9 +518,9 @@ class StructuralStepEvaluatorTest {
             var result = evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv
                         && "finally1".equals(inv.invokeSpec().get("id"))) {
-                    return StepResult.failed("finally boom");
+                    return Result.failed("finally boom");
                 }
-                return StepResult.of(Map.of("ok", true));
+                return Result.of(Map.of("ok", true));
             });
             assertThat(result.isSuccess()).isFalse();
         }
@@ -536,11 +536,11 @@ class StructuralStepEvaluatorTest {
             evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
                     if ("try1".equals(inv.invokeSpec().get("id"))) {
-                        return StepResult.failed("original error");
+                        return Result.failed("original error");
                     }
                     capturedResolver[0] = r;
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             String errorMsg = capturedResolver[0].resolveString("${error.message}", "test");
             assertThat(errorMsg).isEqualTo("original error");
@@ -566,9 +566,9 @@ class StructuralStepEvaluatorTest {
                 if (s instanceof ResolvedStep.InvokeStep inv) {
                     String id = (String) inv.invokeSpec().get("id");
                     order.add(id);
-                    if ("t2".equals(id)) return StepResult.failed("boom");
+                    if ("t2".equals(id)) return Result.failed("boom");
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(order).containsExactly("t1", "t2", "c1");
         }
@@ -639,7 +639,7 @@ class StructuralStepEvaluatorTest {
         void pluginStep_delegatesToRunner() {
             var plugin = new ResolvedStep.PluginStep(null, null, Map.of("x", 1), Map.of());
             var result = evaluator.evaluate(plugin, resolver,
-                    (s, r) -> StepResult.of(Map.of("ran", true)));
+                    (s, r) -> Result.of(Map.of("ran", true)));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("ran", true);
         }
@@ -648,7 +648,7 @@ class StructuralStepEvaluatorTest {
         void invokeStep_delegatesToRunner() {
             var invoke = new ResolvedStep.InvokeStep(null, Map.of("mcp", "tool"), Map.of());
             var result = evaluator.evaluate(invoke, resolver,
-                    (s, r) -> StepResult.of(Map.of("ran", true)));
+                    (s, r) -> Result.of(Map.of("ran", true)));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("ran", true);
         }
@@ -666,7 +666,7 @@ class StructuralStepEvaluatorTest {
             var count = new AtomicInteger(0);
             var result = evaluator.evaluate(block, resolver, (s, r) -> {
                 count.incrementAndGet();
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isZero();
@@ -687,8 +687,8 @@ class StructuralStepEvaluatorTest {
             var parallel = new ResolvedStep.ParallelStep(null, 
                     List.of(leaf("a")), Map.of("retry", 3));
             var result = evaluator.evaluate(parallel, resolver, (s, r) -> {
-                if (count.incrementAndGet() < 3) return StepResult.failed("not yet");
-                return StepResult.of(Map.of("ok", true));
+                if (count.incrementAndGet() < 3) return Result.failed("not yet");
+                return Result.of(Map.of("ok", true));
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(3);
@@ -700,7 +700,7 @@ class StructuralStepEvaluatorTest {
                     List.of(leaf("try1")), List.of(leaf("catch1")), null,
                     Map.of("timeout", "5s"));
             var result = evaluator.evaluate(step, resolver,
-                    (s, r) -> StepResult.of(Map.of("ok", true)));
+                    (s, r) -> Result.of(Map.of("ok", true)));
             assertThat(result.isSuccess()).isTrue();
         }
 
@@ -711,7 +711,7 @@ class StructuralStepEvaluatorTest {
             var count = new AtomicInteger(0);
             var result = evaluator.evaluate(invoke, resolver, (s, r) -> {
                 count.incrementAndGet();
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isZero();
@@ -720,7 +720,7 @@ class StructuralStepEvaluatorTest {
 // ── StepResultStore Recording ──────────────────────────────────
 
     @Nested
-    class StepResultRecordingTests {
+    class ResultRecordingTests {
 
         private DefaultScenarioScope    scope;
         private StructuralStepEvaluator scopedEvaluator;
@@ -736,7 +736,7 @@ class StructuralStepEvaluatorTest {
         void evaluate_namedStep_recordsSuccessToStore() {
             var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
             scopedEvaluator.evaluate(step, resolver,
-                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+                                     (s, r) -> Result.of(Map.of("score", 85)));
 
             assertThat(scope.resultStore().hasCompleted("risk-eval")).isTrue();
             assertThat(scope.resultStore().result("risk-eval"))
@@ -748,7 +748,7 @@ class StructuralStepEvaluatorTest {
         void evaluate_namedStep_recordsFailureToStore() {
             var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
             scopedEvaluator.evaluate(step, resolver,
-                                     (s, r) -> StepResult.failed("connection timeout"));
+                                     (s, r) -> Result.failed("connection timeout"));
 
             assertThat(scope.resultStore().hasCompleted("risk-eval")).isTrue();
             assertThat(scope.resultStore().result("risk-eval")).isNull();
@@ -761,7 +761,7 @@ class StructuralStepEvaluatorTest {
         void evaluate_unnamedStep_doesNotRecord() {
             var step = new ResolvedStep.InvokeStep(null, Map.of("id", "a"), Map.of());
             scopedEvaluator.evaluate(step, resolver,
-                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+                                     (s, r) -> Result.of(Map.of("score", 85)));
 
             assertThat(scope.resultStore().hasCompleted("a")).isFalse();
         }
@@ -770,7 +770,7 @@ class StructuralStepEvaluatorTest {
         void evaluate_noScope_doesNotRecord() {
             var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
             evaluator.evaluate(step, resolver,
-                               (s, r) -> StepResult.of(Map.of("score", 85)));
+                               (s, r) -> Result.of(Map.of("score", 85)));
         }
 
         @Test
@@ -779,8 +779,8 @@ class StructuralStepEvaluatorTest {
             var inner2 = new ResolvedStep.InvokeStep("step-b", Map.of("id", "b"), Map.of());
             var block  = new ResolvedStep.BlockStep(null, List.of(inner1, inner2), Map.of());
             scopedEvaluator.evaluate(block, resolver,
-                                     (s, r) -> StepResult.of(Map.of("id",
-                                                                    ((ResolvedStep.InvokeStep) s).invokeSpec().get("id"))));
+                                     (s, r) -> Result.of(Map.of("id",
+                                                                ((ResolvedStep.InvokeStep) s).invokeSpec().get("id"))));
 
             assertThat(scope.resultStore().hasCompleted("step-a")).isTrue();
             assertThat(scope.resultStore().hasCompleted("step-b")).isTrue();
@@ -792,7 +792,7 @@ class StructuralStepEvaluatorTest {
             var step2    = new ResolvedStep.InvokeStep("eval-b", Map.of("id", "b"), Map.of());
             var parallel = new ResolvedStep.ParallelStep(null, List.of(step1, step2), Map.of());
             scopedEvaluator.evaluate(parallel, resolver,
-                                     (s, r) -> StepResult.of(Map.of("done", true)));
+                                     (s, r) -> Result.of(Map.of("done", true)));
 
             assertThat(scope.resultStore().hasCompleted("eval-a")).isTrue();
             assertThat(scope.resultStore().hasCompleted("eval-b")).isTrue();
@@ -818,13 +818,13 @@ class StructuralStepEvaluatorTest {
         void resultVariable_completedStep_resolvesOutput() {
             var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
             scopedEvaluator.evaluate(step1, resolver,
-                                     (s, r) -> StepResult.of(Map.of("score", 85)));
+                                     (s, r) -> Result.of(Map.of("score", 85)));
 
             var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
             var capturedResolver = new VariableResolver[1];
             scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             Object value = capturedResolver[0].resolve("${result.producer.score}");
@@ -835,13 +835,13 @@ class StructuralStepEvaluatorTest {
         void resultVariable_failedStep_resolvesError() {
             var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
             scopedEvaluator.evaluate(step1, resolver,
-                                     (s, r) -> StepResult.failed("timeout"));
+                                     (s, r) -> Result.failed("timeout"));
 
             var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
             var capturedResolver = new VariableResolver[1];
             scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             Object errorMap = capturedResolver[0].resolve("${result.producer.error}");
@@ -857,7 +857,7 @@ class StructuralStepEvaluatorTest {
             var capturedResolver = new VariableResolver[1];
             scopedEvaluator.evaluate(step, resolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThatThrownBy(() -> capturedResolver[0].resolve("${result.nonexistent}"))
@@ -868,13 +868,13 @@ class StructuralStepEvaluatorTest {
         void resultVariable_soleReference_returnsTypedMap() {
             var step1 = new ResolvedStep.InvokeStep("producer", Map.of("id", "p"), Map.of());
             scopedEvaluator.evaluate(step1, resolver,
-                                     (s, r) -> StepResult.of(Map.of("score", 85, "grade", "A")));
+                                     (s, r) -> Result.of(Map.of("score", 85, "grade", "A")));
 
             var step2            = new ResolvedStep.InvokeStep(null, Map.of("id", "c"), Map.of());
             var capturedResolver = new VariableResolver[1];
             scopedEvaluator.evaluate(step2, resolver, (s, r) -> {
                 capturedResolver[0] = r;
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             Object value = capturedResolver[0].resolve("${result.producer}");
@@ -919,7 +919,7 @@ class StructuralStepEvaluatorTest {
                         Thread.currentThread().interrupt();
                     }
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isTrue();
@@ -940,7 +940,7 @@ class StructuralStepEvaluatorTest {
                 try {Thread.sleep(500);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -957,7 +957,7 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator.preRegisterLatches(List.of(block));
 
             scopedEvaluator.evaluate(block, resolver,
-                                     (step, res) -> StepResult.failed("error"));
+                                     (step, res) -> Result.failed("error"));
 
             assertThat(scope.resultStore().hasCompleted("eval-a")).isTrue();
         }
@@ -984,7 +984,7 @@ class StructuralStepEvaluatorTest {
                     }
                     completed.add(id);
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isTrue();
@@ -1020,7 +1020,7 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator.preRegisterLatches(List.of(parallel));
 
             var result = scopedEvaluator.evaluate(parallel, resolver,
-                                                  (step, res) -> StepResult.of(Map.of("done", true)));
+                                                  (step, res) -> Result.of(Map.of("done", true)));
 
             assertThat(result.isSuccess()).isTrue();
         }
@@ -1037,7 +1037,7 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator.preRegisterLatches(List.of(parallel));
 
             var result = scopedEvaluator.evaluate(parallel, resolver,
-                                                  (step, res) -> StepResult.failed("all fail"));
+                                                  (step, res) -> Result.failed("all fail"));
 
             assertThat(result.isSuccess()).isFalse();
         }
@@ -1056,7 +1056,7 @@ class StructuralStepEvaluatorTest {
                 try {Thread.sleep(500);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -1095,13 +1095,13 @@ class StructuralStepEvaluatorTest {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
                     String id = (String) inv.invokeSpec().get("id");
                     if ("p".equals(id)) {
-                        return StepResult.of(Map.of("score", 95));
+                        return Result.of(Map.of("score", 95));
                     }
                     if ("c".equals(id)) {
                         capturedValue[0] = res.resolve("${result.producer.score}");
                     }
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isTrue();
@@ -1119,7 +1119,7 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator.preRegisterLatches(List.of(block));
 
             var result = scopedEvaluator.evaluate(block, resolver,
-                                                  (step, res) -> StepResult.of(Map.of()));
+                                                  (step, res) -> Result.of(Map.of()));
 
             assertThat(result.isSuccess()).isTrue();
         }
@@ -1135,7 +1135,7 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator.preRegisterLatches(List.of(block));
 
             var result = scopedEvaluator.evaluate(block, resolver,
-                                                  (step, res) -> StepResult.of(Map.of()));
+                                                  (step, res) -> Result.of(Map.of()));
 
             assertThat(result.isSuccess()).isTrue();
         }
@@ -1175,7 +1175,7 @@ class StructuralStepEvaluatorTest {
                 // verify indirectly: if the decorator chain creates a
                 // deadline, a wait inside the timeout would be bounded.
                 capturedDeadlines.add(true);
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(capturedDeadlines).hasSize(2);
@@ -1194,7 +1194,7 @@ class StructuralStepEvaluatorTest {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
                     completed.add((String) inv.invokeSpec().get("id"));
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isTrue();
@@ -1216,7 +1216,7 @@ class StructuralStepEvaluatorTest {
                         Thread.currentThread().interrupt();
                     }
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -1237,9 +1237,9 @@ class StructuralStepEvaluatorTest {
                 if (step instanceof ResolvedStep.InvokeStep inv) {
                     String id = (String) inv.invokeSpec().get("id");
                     order.add(id);
-                    if ("try-step".equals(id)) {return StepResult.failed("deliberate");}
+                    if ("try-step".equals(id)) {return Result.failed("deliberate");}
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isTrue();
@@ -1258,7 +1258,7 @@ class StructuralStepEvaluatorTest {
                 try {Thread.sleep(200);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -1279,7 +1279,7 @@ class StructuralStepEvaluatorTest {
                 try {Thread.sleep(2000);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -1302,7 +1302,7 @@ class StructuralStepEvaluatorTest {
                 try {Thread.sleep(2000);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             });
 
             assertThat(result.isSuccess()).isFalse();
@@ -1316,7 +1316,7 @@ class StructuralStepEvaluatorTest {
                                                    List.of(leaf("a")), Map.of());
 
             var result = scopedEvaluator.evaluate(block, resolver,
-                                                  (step, res) -> StepResult.of(Map.of("ok", true)));
+                                                  (step, res) -> Result.of(Map.of("ok", true)));
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("ok", true);

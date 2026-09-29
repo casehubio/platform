@@ -6,8 +6,8 @@ import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,8 +40,8 @@ class ScriptInvokeHandlerTest {
         var binding = new InvokeBinding.Script("python3", "nonexistent-script.py", "5s", null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of("key", "value"), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of("key", "value"), null);
 
         assertThat(result.isSuccess()).isFalse();
     }
@@ -54,11 +54,11 @@ class ScriptInvokeHandlerTest {
         var binding = new InvokeBinding.Script("python3", "script.py", null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = restrictedHandler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        Action action = restrictedHandler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(((StepResult.Failure) result).message()).contains("not allowed");
+        assertThat(((Result.Failure) result).message()).contains("not allowed");
     }
 
     @Test

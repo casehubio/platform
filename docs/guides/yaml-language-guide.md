@@ -639,7 +639,7 @@ Steps are not hard-coded — they come from a **step catalog** that discovers ac
 
 ### Writing a step plugin
 
-A step plugin is a Java record annotated with `@StepPlugin`. The annotation processor generates JSON Schema, a `StepAction` implementation, and a registry manifest at compile time:
+A step plugin is a Java record annotated with `@StepPlugin`. The annotation processor generates JSON Schema, a `Action` implementation, and a registry manifest at compile time:
 
 ```java
 @StepPlugin(value = "rest-call", description = "Makes an HTTP request")
@@ -666,9 +666,9 @@ public record RestCallPlugin(
 **Field annotations:**
 - `@Required` — parameter must be provided (schema: `required`)
 - `@Optional` — parameter is optional (nullable in the record)
-- `@Execute` — marks the method that runs the step (must return `StepResult`)
+- `@Execute` — marks the method that runs the step (must return `Result`)
 
-**Return types:** `StepResult` is a sealed interface — `StepResult.of(Map)` for success, `StepResult.failed(message)` for failure.
+**Return types:** `Result` is a sealed interface — `StepResult.of(Map)` for success, `StepResult.failed(message)` for failure.
 
 ### Catalog sources
 

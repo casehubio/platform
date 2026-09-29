@@ -1,5 +1,6 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

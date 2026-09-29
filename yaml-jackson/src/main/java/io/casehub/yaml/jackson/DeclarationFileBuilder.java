@@ -3,21 +3,21 @@ package io.casehub.yaml.jackson;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepDefinitionFile;
-import io.casehub.yaml.core.step.StepDefinitionParser;
+import io.casehub.yaml.core.step.Declaration;
+import io.casehub.yaml.core.step.DeclarationFile;
+import io.casehub.yaml.core.step.DeclarationParser;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 @JsonPOJOBuilder(withPrefix = "")
-public class StepDefinitionFileBuilder {
+public class DeclarationFileBuilder {
 
     private String namespace = "";
-    private final Map<String, StepDefinition> actions = new LinkedHashMap<>();
+    private final Map<String, Declaration> actions = new LinkedHashMap<>();
 
     @JsonProperty("namespace")
-    public StepDefinitionFileBuilder namespace(String namespace) {
+    public DeclarationFileBuilder namespace(String namespace) {
         this.namespace = namespace != null ? namespace : "";
         return this;
     }
@@ -26,11 +26,11 @@ public class StepDefinitionFileBuilder {
     @SuppressWarnings("unchecked")
     public void addAction(String name, Object value) {
         if (value instanceof Map) {
-            actions.put(name, StepDefinitionParser.parseAction(name, (Map<String, Object>) value));
+            actions.put(name, DeclarationParser.parseAction(name, (Map<String, Object>) value));
         }
     }
 
-    public StepDefinitionFile build() {
-        return new StepDefinitionFile(namespace, actions);
+    public DeclarationFile build() {
+        return new DeclarationFile(namespace, actions);
     }
 }

@@ -3,8 +3,8 @@ package io.casehub.yaml.step.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
 
 import java.net.URI;
@@ -39,13 +39,13 @@ public class GraphqlInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public StepAction create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(StepDefinition definition, InvokeBinding binding) {
         InvokeBinding.Graphql graphql = (InvokeBinding.Graphql) binding;
         return (params, services) -> executeGraphql(graphql, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executeGraphql(InvokeBinding.Graphql graphql, Map<String, Object> params) {
+    private Result executeGraphql(InvokeBinding.Graphql graphql, Map<String, Object> params) {
         try {
             String query = interpolate(graphql.query(), params);
             Map<String, Object> requestBody = Map.of("query", query);
@@ -65,17 +65,17 @@ public class GraphqlInvokeHandler implements InvokeHandler {
             Map<String, Object> metadata = Map.of("statusCode", response.statusCode(), "durationMs", durationMs);
 
             if (response.statusCode() >= 400) {
-                return StepResult.failed("GraphQL HTTP " + response.statusCode() + ": " + response.body());
+                return Result.failed("GraphQL HTTP " + response.statusCode() + ": " + response.body());
             }
 
             Map<String, Object> responseBody = objectMapper.readValue(response.body(), LinkedHashMap.class);
             Object data = responseBody.get("data");
             if (data instanceof Map) {
-                return StepResult.of((Map<String, Object>) data, metadata);
+                return Result.of((Map<String, Object>) data, metadata);
             }
-            return StepResult.of(responseBody, metadata);
+            return Result.of(responseBody, metadata);
         } catch (Exception e) {
-            return StepResult.failed("GraphQL call failed: " + e.getMessage());
+            return Result.failed("GraphQL call failed: " + e.getMessage());
         }
     }
 

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepParameter;
 import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.plugin.api.StepAction;
+import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.CatalogSource;
 
@@ -130,15 +130,15 @@ public class AptPluginSource implements CatalogSource {
         }
 
         StepDefinition syntheticDef = new StepDefinition(name, null, inputs, Map.of(), null);
-        StepAction action = loadAction(actionClass);
+        Action         action       = loadAction(actionClass);
 
         return new CatalogEntry(name, syntheticDef, action);
     }
 
-    private StepAction loadAction(String className) {
+    private Action loadAction(String className) {
         try {
             Class<?> clazz = Class.forName(className);
-            return (StepAction) clazz.getDeclaredConstructor().newInstance();
+            return (Action) clazz.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to instantiate StepAction: " + className, e);
         }

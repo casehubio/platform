@@ -218,7 +218,7 @@ public final class StepDefinitionParser {
 
 Pure function, zero dependencies beyond yaml-core. Accepts the parsed YAML map (from Jackson or any YAML parser) and produces the typed model. Validates structural correctness (required fields, valid invoke binding types, valid parameter types).
 
-**Relationship to Jackson deserialization:** Both `DeclarationParser` and the Jackson mixins produce the same model types (`DeclarationFile`, `StepDefinition`, etc.). Jackson is the primary path for consumers with Jackson on their classpath. `DeclarationParser` is the zero-dep fallback — needed because yaml-core must remain zero-dependency. This parallels the existing `YamlModuleFile`/`YamlModuleFileMixin` pattern. Contract tests verify both paths produce identical results for the same input.
+**Relationship to Jackson deserialization:** Both `DeclarationParser` and the Jackson mixins produce the same model types (`DeclarationFile`, `Declaration`, etc.). Jackson is the primary path for consumers with Jackson on their classpath. `DeclarationParser` is the zero-dep fallback — needed because yaml-core must remain zero-dependency. This parallels the existing `YamlModuleFile`/`YamlModuleFileMixin` pattern. Contract tests verify both paths produce identical results for the same input.
 
 #### StepValidator
 
@@ -252,7 +252,7 @@ Load-time and runtime validation. Checks:
 
 ### Layer 2: Step catalog SPI (yaml-step-runtime)
 
-`CatalogEntry` and `StepCatalog` live in yaml-step-runtime — not yaml-plugin-api. This preserves yaml-plugin-api's zero-dependency rule (CLAUDE.md: "yaml-plugin-api/ must remain zero-dependency") and keeps plugin authors' classpath clean. CatalogEntry joins `StepDefinition` (from yaml-core) with `StepAction` (from yaml-plugin-api) — it's an integration type, which belongs in the integration module.
+`CatalogEntry` and `StepCatalog` live in yaml-step-runtime — not yaml-plugin-api. This preserves yaml-plugin-api's zero-dependency rule (CLAUDE.md: "yaml-plugin-api/ must remain zero-dependency") and keeps plugin authors' classpath clean. CatalogEntry joins `Declaration` (from yaml-core) with `Action` (from yaml-plugin-api) — it's an integration type, which belongs in the integration module.
 
 ```java
 public record CatalogEntry(
@@ -289,7 +289,7 @@ public interface InvokeHandler {
 }
 ```
 
-Each invoke handler converts an `InvokeBinding` (data) into a `StepAction` (executable). The handler factory pattern lets the composite catalog assemble actions from definitions without knowing which binding type is being used.
+Each invoke handler converts an `InvokeBinding` (data) into a `Action` (executable). The handler factory pattern lets the composite catalog assemble actions from definitions without knowing which binding type is being used.
 
 #### CatalogSource SPI
 
@@ -365,7 +365,7 @@ public sealed interface StepResult permits StepResult.Success, StepResult.Failur
 
 `executionMetadata` is distinct from `output` — output is the step's declared result schema (validated against StepDefinition.outputs()); metadata is execution telemetry (cost, timing, model used). The existing `StepResult.of(output)` factory defaults metadata to `Map.of()` — backwards-compatible for existing `@StepPlugin` implementations.
 
-Handlers populate metadata during `execute()`: AgentInvokeHandler includes `InvocationComplete` fields (tokenCount, cost, model); ProcessInvokeHandler includes exit code and command duration; RestInvokeHandler includes HTTP status code and response time. `ValidatingStepAction` reads `result.executionMetadata()` and includes it in the `StepExecutionEvent`.
+Handlers populate metadata during `execute()`: AgentInvokeHandler includes `InvocationComplete` fields (tokenCount, cost, model); ProcessInvokeHandler includes exit code and command duration; RestInvokeHandler includes HTTP status code and response time. `ValidatingAction` reads `result.executionMetadata()` and includes it in the `StepExecutionEvent`.
 
 **StepExecutionEvent (yaml-step-runtime):**
 
@@ -377,7 +377,7 @@ public record StepExecutionEvent(
         Map<String, Object> metadata) {}
 ```
 
-`ValidatingStepAction` fires `StepExecutionEvent` after each step execution. Consumers (audit loggers, cost trackers, observability) observe this event via CDI `@Observes`.
+`ValidatingAction` fires `StepExecutionEvent` after each step execution. Consumers (audit loggers, cost trackers, observability) observe this event via CDI `@Observes`.
 
 #### Trust model
 
@@ -389,7 +389,7 @@ Further hardening (allow-lists, resource limits, sandboxing) is deferred to #440
 
 #### Validation-wrapping
 
-Each `StepAction` returned by an invoke handler is wrapped with input/output validation and execution event emission:
+Each `Action` returned by an invoke handler is wrapped with input/output validation and execution event emission:
 
 ```java
 class ValidatingStepAction implements StepAction {
@@ -458,9 +458,9 @@ The source count is dynamic — determined by which `CatalogSource` beans are on
 
 Three built-in catalog sources:
 
-**YamlStepDefinitionSource** `priority 100` — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `DeclarationParser`. For each action, resolves the `InvokeBinding` to a `StepAction` via the `InvokeHandler` registry. Wraps with validation.
+**YamlStepDefinitionSource** `priority 100` — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `DeclarationParser`. For each action, resolves the `InvokeBinding` to an `Action` via the `InvokeHandler` registry. Wraps with validation.
 
-**AptPluginSource** `priority 200` — Scans `META-INF/yaml-plugins/*.json` manifests on the classpath (produced by existing `@StepPlugin` APT processor). Loads `StepAction` implementation classes. Reads schema from `META-INF/yaml-plugins/<name>.schema.json` and constructs a synthetic `StepDefinition` from the schema.
+**AptPluginSource** `priority 200` — Scans `META-INF/yaml-plugins/*.json` manifests on the classpath (produced by existing `@StepPlugin` APT processor). Loads `Action` implementation classes. Reads schema from `META-INF/yaml-plugins/<name>.schema.json` and constructs a synthetic `Declaration` from the schema.
 
 **McpToolSource** `priority 300` — Auto-discovers MCP tools registered in the platform's MCP tool registry. Each tool becomes a catalog entry with `InvokeBinding.Mcp(toolName)`. Input schema derived from MCP tool parameter schema. Optional — activated when MCP infrastructure is on classpath.
 

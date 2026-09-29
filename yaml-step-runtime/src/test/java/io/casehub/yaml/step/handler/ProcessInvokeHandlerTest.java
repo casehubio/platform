@@ -5,8 +5,8 @@ import io.casehub.platform.api.process.DefaultProcessExecutor;
 import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,8 +33,8 @@ class ProcessInvokeHandlerTest {
                 "json", "5s", null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsEntry("key", "value");
@@ -49,8 +49,8 @@ class ProcessInvokeHandlerTest {
                 "raw", null, null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsKey("stdout");
@@ -63,8 +63,8 @@ class ProcessInvokeHandlerTest {
                 "lines", null, null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsKey("lines");
@@ -77,8 +77,8 @@ class ProcessInvokeHandlerTest {
                 "raw", null, null, null, "stderr");
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isFalse();
     }
@@ -90,8 +90,8 @@ class ProcessInvokeHandlerTest {
                 "raw", null, null, null, null);
         var def = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        StepAction action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of("greeting", "hello"), null);
+        Action action = handler.create(def, binding);
+        Result result = action.execute(Map.of("greeting", "hello"), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(((String) result.output().get("stdout")).trim()).isEqualTo("hello");

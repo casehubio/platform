@@ -12,7 +12,7 @@ import io.casehub.yaml.core.orchestration.ScenarioScope;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -75,10 +75,10 @@ public final class DecoratorChain {
         return ctx -> {
             try {
                 if (!resolveCondition(condition, ctx.resolver(), "when-guard")) {
-                    return StepResult.of(Map.of());
+                    return Result.of(Map.of());
                 }
             } catch (Exception e) {
-                return StepResult.failed("when guard failed: " + e.getMessage());
+                return Result.failed("when guard failed: " + e.getMessage());
             }
             return inner.execute(ctx);
         };
@@ -90,7 +90,7 @@ public final class DecoratorChain {
 
         LoopDirective directive = LoopDirective.parse(loopVal);
         return ctx -> {
-            StepResult last = StepResult.of(Map.of());
+            Result last = Result.of(Map.of());
             int maxIterations = switch (directive) {
                 case LoopDirective.Count c -> c.count();
                 case LoopDirective.CountUntil cu -> cu.count();
@@ -112,7 +112,7 @@ public final class DecoratorChain {
                             return last;
                         }
                     } catch (Exception e) {
-                        return StepResult.failed("Loop until condition failed: " + e.getMessage());
+                        return Result.failed("Loop until condition failed: " + e.getMessage());
                     }
                 }
             }
@@ -126,21 +126,21 @@ public final class DecoratorChain {
 
         String fallbackStep = String.valueOf(onErrorVal);
         return ctx -> {
-            StepResult result;
+            Result result;
             try {
                 result = inner.execute(ctx);
             } catch (Exception e) {
-                return StepResult.of(Map.of(
+                return Result.of(Map.of(
                                              "on-error.caught", e.getMessage(),
                                              "on-error.fallback", fallbackStep),
-                                     Map.of("on-error.exception", e.getClass().getSimpleName()));
+                                 Map.of("on-error.exception", e.getClass().getSimpleName()));
             }
             if (!result.isSuccess()) {
-                String message = result instanceof StepResult.Failure f ? f.message() : "unknown";
-                return StepResult.of(Map.of(
+                String message = result instanceof Result.Failure f ? f.message() : "unknown";
+                return Result.of(Map.of(
                                              "on-error.caught", message,
                                              "on-error.fallback", fallbackStep),
-                                     Map.of("on-error.handled", true));
+                                 Map.of("on-error.handled", true));
             }
             return result;
         };
@@ -159,18 +159,18 @@ public final class DecoratorChain {
             StepContext deadlineCtx = ctx.withDeadline(adjusted);
 
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                Future<StepResult> future = executor.submit(() -> inner.execute(deadlineCtx));
+                Future<Result> future = executor.submit(() -> inner.execute(deadlineCtx));
                 try {
                     return future.get(adjustedMs, TimeUnit.MILLISECONDS);
                 } catch (TimeoutException e) {
                     future.cancel(true);
-                    return StepResult.failed("Step timeout after " + timeout);
+                    return Result.failed("Step timeout after " + timeout);
                 } catch (java.util.concurrent.ExecutionException e) {
-                    return StepResult.failed("Step execution failed: " + e.getCause().getMessage());
+                    return Result.failed("Step execution failed: " + e.getCause().getMessage());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return StepResult.failed("Step interrupted during timeout");
+                return Result.failed("Step interrupted during timeout");
             }
         };
     }
@@ -194,13 +194,13 @@ public final class DecoratorChain {
                 default -> "fixed";
             };
 
-            StepResult last = null;
+            Result last = null;
             for (int attempt = 0; attempt < max; attempt++) {
                 try {
                     last = inner.execute(ctx);
                     if (last.isSuccess()) {return last;}
                 } catch (Exception e) {
-                    last = StepResult.failed(e.getMessage());
+                    last = Result.failed(e.getMessage());
                 }
 
                 if (attempt < max - 1 && !delay.isZero()) {
@@ -211,7 +211,7 @@ public final class DecoratorChain {
                         Thread.sleep(adjustedMs);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        return StepResult.failed("Retry interrupted");
+                        return Result.failed("Retry interrupted");
                     }
                 }
             }
@@ -243,7 +243,7 @@ public final class DecoratorChain {
                 Thread.sleep(adjustedMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return StepResult.failed("Delay interrupted");
+                return Result.failed("Delay interrupted");
             }
             return inner.execute(ctx);
         };
@@ -254,7 +254,7 @@ public final class DecoratorChain {
         if (transformVal == null) {return inner;}
 
         return ctx -> {
-            StepResult result = inner.execute(ctx);
+            Result result = inner.execute(ctx);
             if (!result.isSuccess()) {return result;}
             return result;
         };
@@ -265,7 +265,7 @@ public final class DecoratorChain {
         Object forEachVal = decorators.get("forEach");
         if (forEachVal == null) {return inner;}
         if (!(forEachVal instanceof Map<?, ?> forEachMap)) {
-            return ctx -> StepResult.failed("forEach must be a map with 'in' and 'as' keys");
+            return ctx -> Result.failed("forEach must be a map with 'in' and 'as' keys");
         }
 
         String inExpr = String.valueOf(forEachMap.get("in"));
@@ -277,9 +277,9 @@ public final class DecoratorChain {
         return ctx -> {
             Object resolved = ctx.resolver().resolve(inExpr);
             if (!(resolved instanceof List<?> items)) {
-                return StepResult.failed("forEach 'in' did not resolve to a list");
+                return Result.failed("forEach 'in' did not resolve to a list");
             }
-            if (items.isEmpty()) {return StepResult.of(Map.of());}
+            if (items.isEmpty()) {return Result.of(Map.of());}
 
             if (parallel) {
                 return executeForEachParallel(items, asName, inner, ctx);
@@ -288,9 +288,9 @@ public final class DecoratorChain {
         };
     }
 
-    private StepResult executeForEachSequential(List<?> items, String as,
-                                                DecoratedExecution inner, StepContext ctx) {
-        StepResult last = StepResult.of(Map.of());
+    private Result executeForEachSequential(List<?> items, String as,
+                                            DecoratedExecution inner, StepContext ctx) {
+        Result last = Result.of(Map.of());
         for (int i = 0; i < items.size(); i++) {
             VariableResolver scoped = pushEachContext(ctx.resolver(), as, items.get(i), i);
             last = inner.execute(ctx.withResolver(scoped));
@@ -299,9 +299,9 @@ public final class DecoratorChain {
         return last;
     }
 
-    private StepResult executeForEachParallel(List<?> items, String as,
-                                              DecoratedExecution inner, StepContext ctx) {
-        var futures = new ArrayList<Future<StepResult>>();
+    private Result executeForEachParallel(List<?> items, String as,
+                                          DecoratedExecution inner, StepContext ctx) {
+        var futures = new ArrayList<Future<Result>>();
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < items.size(); i++) {
                 int    idx  = i;
@@ -311,21 +311,21 @@ public final class DecoratorChain {
                     return inner.execute(ctx.withResolver(scoped));
                 }));
             }
-            var results = new ArrayList<StepResult>(futures.size());
+            var results = new ArrayList<Result>(futures.size());
             for (var f : futures) {
                 try {
                     results.add(f.get());
                 } catch (java.util.concurrent.ExecutionException e) {
-                    results.add(StepResult.failed(e.getCause().getMessage()));
+                    results.add(Result.failed(e.getCause().getMessage()));
                 }
             }
-            for (StepResult r : results) {
+            for (Result r : results) {
                 if (!r.isSuccess()) {return r;}
             }
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return StepResult.failed("forEach parallel interrupted");
+            return Result.failed("forEach parallel interrupted");
         }
     }
 
@@ -345,7 +345,7 @@ public final class DecoratorChain {
     private DecoratedExecution wrapWait(DecoratedExecution inner, Map<String, Object> decorators) {
         Object waitVal = decorators.get("wait");
         if (waitVal == null) {return inner;}
-        if (scope == null) {return ctx -> StepResult.failed("'wait' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'wait' requires a ScenarioScope");}
 
         String signalName = String.valueOf(waitVal);
         return ctx -> {
@@ -354,7 +354,7 @@ public final class DecoratorChain {
                 var remaining = ctx.deadline().remainingTime();
                 if (remaining.isPresent()) {
                     if (!signal.await(remaining.get().toMillis(), TimeUnit.MILLISECONDS)) {
-                        return StepResult.failed(
+                        return Result.failed(
                                 "Wait for signal '" + signalName + "' exceeded deadline");
                     }
                 } else {
@@ -362,7 +362,7 @@ public final class DecoratorChain {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return StepResult.failed("Wait for signal '" + signalName + "' interrupted");
+                return Result.failed("Wait for signal '" + signalName + "' interrupted");
             }
             VariableResolver scoped = ScopeUtils.pushScope(ctx.resolver(), "signal", signal.payload());
             return inner.execute(ctx.withResolver(scoped));
@@ -374,7 +374,7 @@ public final class DecoratorChain {
         Object semVal   = decorators.get("semaphore");
         Object mutexVal = decorators.get("mutex");
         if (semVal == null && mutexVal == null) {return inner;}
-        if (scope == null) {return ctx -> StepResult.failed("'semaphore'/'mutex' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'semaphore'/'mutex' requires a ScenarioScope");}
 
         String name;
         int    permits;
@@ -395,7 +395,7 @@ public final class DecoratorChain {
                 var remaining = ctx.deadline().remainingTime();
                 if (remaining.isPresent()) {
                     if (!semaphore.tryAcquire(remaining.get().toMillis(), TimeUnit.MILLISECONDS)) {
-                        return StepResult.failed(
+                        return Result.failed(
                                 "Semaphore '" + name + "' acquire exceeded deadline");
                     }
                 } else {
@@ -403,7 +403,7 @@ public final class DecoratorChain {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return StepResult.failed("Semaphore '" + name + "' acquire interrupted");
+                return Result.failed("Semaphore '" + name + "' acquire interrupted");
             }
             try {
                 return inner.execute(ctx);
@@ -417,10 +417,10 @@ public final class DecoratorChain {
         Object signalVal  = decorators.get("signal");
         Object publishVal = decorators.get("publish");
         if (signalVal == null && publishVal == null) {return inner;}
-        if (scope == null) {return ctx -> StepResult.failed("'signal'/'publish' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'signal'/'publish' requires a ScenarioScope");}
 
         return ctx -> {
-            StepResult result = inner.execute(ctx);
+            Result result = inner.execute(ctx);
             if (!result.isSuccess()) {return result;}
 
             if (signalVal != null) {
@@ -435,7 +435,7 @@ public final class DecoratorChain {
     }
 
     @SuppressWarnings("unchecked")
-    private void applyPublish(Object publishVal, StepResult result, VariableResolver resolver) {
+    private void applyPublish(Object publishVal, Result result, VariableResolver resolver) {
         if (!(publishVal instanceof Map<?, ?> pubMap)) return;
         String channelName = String.valueOf(pubMap.get("channel"));
         OrcChannel<Object> channel = scope.channel(channelName);
@@ -451,9 +451,9 @@ public final class DecoratorChain {
     private DecoratedExecution wrapTransition(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transVal = decorators.get("transition");
         if (transVal == null) {return inner;}
-        if (scope == null) {return ctx -> StepResult.failed("'transition' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'transition' requires a ScenarioScope");}
         if (!(transVal instanceof Map<?, ?> transMap)) {
-            return ctx -> StepResult.failed("'transition' must be a map with 'machine' and 'event' keys");
+            return ctx -> Result.failed("'transition' must be a map with 'machine' and 'event' keys");
         }
 
         String machineName = String.valueOf(transMap.get("machine"));
@@ -461,12 +461,12 @@ public final class DecoratorChain {
         String targetState = transMap.containsKey("to") ? String.valueOf(transMap.get("to")) : null;
 
         return ctx -> {
-            StepResult result = inner.execute(ctx);
+            Result result = inner.execute(ctx);
             if (!result.isSuccess()) {return result;}
 
             OrcStateMachine<? extends Enum<?>> machine = scope.primitive(machineName, OrcStateMachine.class);
             if (machine == null) {
-                return StepResult.failed("State machine '" + machineName + "' not found");
+                return Result.failed("State machine '" + machineName + "' not found");
             }
             Enum<?> currentState = machine.currentState();
             if (targetState != null) {

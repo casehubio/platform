@@ -49,4 +49,14 @@ public enum ValueType {
         };
     }
 
+    public io.casehub.yaml.plugin.api.ParameterType toParameterType() {
+        return switch (this) {
+            case STRING -> io.casehub.yaml.plugin.api.ParameterType.STRING;
+            case INTEGER -> io.casehub.yaml.plugin.api.ParameterType.INTEGER;
+            case NUMBER -> io.casehub.yaml.plugin.api.ParameterType.NUMBER;
+            case BOOLEAN -> io.casehub.yaml.plugin.api.ParameterType.BOOLEAN;
+        };
+    }
+
+
 }

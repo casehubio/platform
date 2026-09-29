@@ -5,7 +5,7 @@ import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.ScenarioScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 
@@ -40,14 +40,14 @@ public final class StructuralStepEvaluator {
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
     }
 
-    public StepResult evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
+    public Result evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
         StepContext ctx = new StepContext(withResultScope(resolver));
         return evaluateInternal(step, ctx, runner);
     }
 
-    private StepResult evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
+    private Result evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
         Map<String, Object> decorators = step.decorators();
-        StepResult          result;
+        Result              result;
         if (decorators.isEmpty()) {
             result = dispatchStep(step, ctx, runner);
         } else {
@@ -92,7 +92,7 @@ public final class StructuralStepEvaluator {
     }
 
 
-    private StepResult dispatchStep(ResolvedStep step, StepContext ctx, StepRunner runner) {
+    private Result dispatchStep(ResolvedStep step, StepContext ctx, StepRunner runner) {
         return switch (step) {
             case ResolvedStep.BlockStep b -> evaluateBlock(b, ctx, runner);
             case ResolvedStep.IfElseStep i -> evaluateIfElse(i, ctx, runner);
@@ -107,12 +107,12 @@ public final class StructuralStepEvaluator {
         };
     }
 
-    private StepResult evaluateBlock(ResolvedStep.BlockStep block,
-                                     StepContext ctx, StepRunner runner) {
+    private Result evaluateBlock(ResolvedStep.BlockStep block,
+                                 StepContext ctx, StepRunner runner) {
         if (block.steps().isEmpty()) {
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
-        StepResult last = StepResult.of(Map.of());
+        Result last = Result.of(Map.of());
         for (ResolvedStep sub : block.steps()) {
             last = evaluateInternal(sub, ctx, runner);
             if (!last.isSuccess()) {
@@ -122,25 +122,25 @@ public final class StructuralStepEvaluator {
         return last;
     }
 
-    private StepResult evaluateIfElse(ResolvedStep.IfElseStep ifElse,
-                                      StepContext ctx, StepRunner runner) {
+    private Result evaluateIfElse(ResolvedStep.IfElseStep ifElse,
+                                  StepContext ctx, StepRunner runner) {
         boolean condition;
         try {
             String resolved = ctx.resolver().resolveString(ifElse.condition(), "if-condition");
             condition = conditionEvaluator.evaluate(resolved);
         } catch (Exception e) {
-            return StepResult.failed("Condition evaluation failed: " + e.getMessage());
+            return Result.failed("Condition evaluation failed: " + e.getMessage());
         }
 
         List<ResolvedStep> branch = condition ? ifElse.thenSteps() : ifElse.elseSteps();
         if (branch.isEmpty()) {
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
         return evaluateBlock(new ResolvedStep.BlockStep(null, branch, Map.of()), ctx, runner);
     }
 
-    private StepResult evaluateMatch(ResolvedStep.MatchStep match,
-                                     StepContext ctx, StepRunner runner) {
+    private Result evaluateMatch(ResolvedStep.MatchStep match,
+                                 StepContext ctx, StepRunner runner) {
         Object scrutineeValue = ctx.resolver().resolve(match.scrutinee());
 
         for (ResolvedMatchCase mc : match.cases()) {
@@ -154,32 +154,32 @@ public final class StructuralStepEvaluator {
                         continue;
                     }
                 } catch (Exception e) {
-                    return StepResult.failed("Guard evaluation failed: " + e.getMessage());
+                    return Result.failed("Guard evaluation failed: " + e.getMessage());
                 }
             }
             StepContext matchCtx = ctx.withResolver(pushMatchContext(ctx.resolver(), scrutineeValue));
             if (mc.steps().isEmpty()) {
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }
             return evaluateBlock(
                     new ResolvedStep.BlockStep(null, mc.steps(), Map.of()), matchCtx, runner);
         }
-        return StepResult.of(Map.of());
+        return Result.of(Map.of());
     }
 
-    private StepResult evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,
-                                               StepContext ctx, StepRunner runner) {
-        StepResult tryResult;
+    private Result evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,
+                                           StepContext ctx, StepRunner runner) {
+        Result tryResult;
         try {
             tryResult = evaluateBlock(
                     new ResolvedStep.BlockStep(null, tcf.trySteps(), Map.of()), ctx, runner);
         } catch (Exception e) {
-            tryResult = StepResult.failed(e.getMessage());
+            tryResult = Result.failed(e.getMessage());
         }
 
-        StepResult result = tryResult;
+        Result result = tryResult;
         if (!tryResult.isSuccess() && !tcf.catchSteps().isEmpty()) {
-            String errorMessage = tryResult instanceof StepResult.Failure f ? f.message() : "unknown error";
+            String errorMessage = tryResult instanceof Result.Failure f ? f.message() : "unknown error";
             VariableResolver errorResolver = ctx.resolver().withObjectScope("error",
                                                                             name -> switch (name) {
                                                                                 case "message" -> errorMessage;
@@ -190,17 +190,17 @@ public final class StructuralStepEvaluator {
                 result = evaluateBlock(
                         new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), ctx.withResolver(errorResolver), runner);
             } catch (Exception e) {
-                result = StepResult.failed("catch failed: " + e.getMessage());
+                result = Result.failed("catch failed: " + e.getMessage());
             }
         }
 
         if (!tcf.finallySteps().isEmpty()) {
-            StepResult finallyResult;
+            Result finallyResult;
             try {
                 finallyResult = evaluateBlock(
                         new ResolvedStep.BlockStep(null, tcf.finallySteps(), Map.of()), ctx, runner);
             } catch (Exception e) {
-                finallyResult = StepResult.failed("finally failed: " + e.getMessage());
+                finallyResult = Result.failed("finally failed: " + e.getMessage());
             }
             if (!finallyResult.isSuccess()) {
                 return finallyResult;
@@ -210,13 +210,13 @@ public final class StructuralStepEvaluator {
         return result;
     }
 
-    private StepResult evaluateSelect(ResolvedStep.SelectStep select,
-                                      StepContext ctx, StepRunner runner) {
+    private Result evaluateSelect(ResolvedStep.SelectStep select,
+                                  StepContext ctx, StepRunner runner) {
         if (select.branches().isEmpty()) {
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
         if (scope == null) {
-            return StepResult.failed("'select' requires a ScenarioScope");
+            return Result.failed("'select' requires a ScenarioScope");
         }
 
         var winnerIndex   = new AtomicInteger(-1);
@@ -265,17 +265,17 @@ public final class StructuralStepEvaluator {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return StepResult.failed("Select interrupted");
+            return Result.failed("Select interrupted");
         }
 
         int winner = winnerIndex.get();
         if (winner < 0) {
-            return StepResult.failed("No select branch completed");
+            return Result.failed("No select branch completed");
         }
 
         ResolvedStep.SelectBranch winningBranch = select.branches().get(winner);
         if (winningBranch.steps().isEmpty()) {
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
 
         StepContext scoped  = ctx;
@@ -294,15 +294,15 @@ public final class StructuralStepEvaluator {
         return ScopeUtils.pushScope(resolver, "match", value);
     }
 
-    private StepResult evaluateParallel(ResolvedStep.ParallelStep parallel,
-                                        StepContext ctx, StepRunner runner) {
+    private Result evaluateParallel(ResolvedStep.ParallelStep parallel,
+                                    StepContext ctx, StepRunner runner) {
         if (parallel.steps().isEmpty()) {
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         }
 
         int stepCount = parallel.steps().size();
         @SuppressWarnings("unchecked")
-        Future<StepResult>[] futures = new Future[stepCount];
+        Future<Result>[] futures = new Future[stepCount];
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < stepCount; i++) {
@@ -310,16 +310,16 @@ public final class StructuralStepEvaluator {
                 futures[i] = executor.submit(() -> evaluateInternal(sub, ctx, runner));
             }
 
-            var results = new ArrayList<StepResult>(stepCount);
-            for (Future<StepResult> f : futures) {
+            var results = new ArrayList<Result>(stepCount);
+            for (Future<Result> f : futures) {
                 try {
                     results.add(f.get());
                 } catch (ExecutionException e) {
-                    results.add(StepResult.failed(e.getCause().getMessage()));
+                    results.add(Result.failed(e.getCause().getMessage()));
                 }
             }
 
-            for (StepResult r : results) {
+            for (Result r : results) {
                 if (!r.isSuccess()) {
                     return r;
                 }
@@ -327,13 +327,13 @@ public final class StructuralStepEvaluator {
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return StepResult.failed("Parallel execution interrupted");
+            return Result.failed("Parallel execution interrupted");
         }
     }
 
-    private StepResult evaluateBarrier(ResolvedStep.BarrierStep barrier) {
+    private Result evaluateBarrier(ResolvedStep.BarrierStep barrier) {
         if (scope == null) {
-            return StepResult.failed("'barrier' requires a ScenarioScope");
+            return Result.failed("'barrier' requires a ScenarioScope");
         }
         io.casehub.yaml.core.orchestration.OrcLatch latch =
                 scope.latch("barrier:" + barrier.name(), barrier.awaitSteps().size());
@@ -342,21 +342,21 @@ public final class StructuralStepEvaluator {
                 boolean completed = latch.await(
                         barrier.timeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
                 if (!completed) {
-                    return StepResult.failed("Barrier timed out after " + barrier.timeout());
+                    return Result.failed("Barrier timed out after " + barrier.timeout());
                 }
             } else {
                 latch.await();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return StepResult.failed("Barrier interrupted");
+            return Result.failed("Barrier interrupted");
         }
-        return StepResult.of(Map.of());
+        return Result.of(Map.of());
     }
 
-    private StepResult evaluateQuorum(ResolvedStep.QuorumStep quorum) {
+    private Result evaluateQuorum(ResolvedStep.QuorumStep quorum) {
         if (scope == null) {
-            return StepResult.failed("'quorum' requires a ScenarioScope");
+            return Result.failed("'quorum' requires a ScenarioScope");
         }
         io.casehub.yaml.core.orchestration.OrcLatch latch =
                 scope.latch("quorum:" + quorum.name(), quorum.required());
@@ -365,23 +365,23 @@ public final class StructuralStepEvaluator {
                 boolean completed = latch.await(
                         quorum.timeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
                 if (!completed) {
-                    return StepResult.failed("Quorum timed out — "
-                                             + latch.getCount() + " of " + quorum.required() + " still needed");
+                    return Result.failed("Quorum timed out — "
+                                         + latch.getCount() + " of " + quorum.required() + " still needed");
                 }
             } else {
                 latch.await();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return StepResult.failed("Quorum interrupted");
+            return Result.failed("Quorum interrupted");
         }
         QuorumTracker tracker = quorumTrackers.get(quorum.ofSteps().get(0));
         if (tracker != null && tracker.isUnreachable()) {
-            return StepResult.failed("Quorum unreachable — "
-                                     + tracker.failureCount().get() + " of " + quorum.ofSteps().size()
-                                     + " steps failed, " + quorum.required() + " successes required");
+            return Result.failed("Quorum unreachable — "
+                                 + tracker.failureCount().get() + " of " + quorum.ofSteps().size()
+                                 + " steps failed, " + quorum.required() + " successes required");
         }
-        return StepResult.of(Map.of());
+        return Result.of(Map.of());
     }
 
 
@@ -389,13 +389,13 @@ public final class StructuralStepEvaluator {
         return resultSource != null ? resolver.withObjectScope("result", resultSource) : resolver;
     }
 
-    private void recordResult(String stepName, StepResult result) {
+    private void recordResult(String stepName, Result result) {
         if (stepName == null || scope == null) {return;}
         io.casehub.yaml.core.orchestration.StepResultStore store = scope.resultStore();
         if (result.isSuccess()) {
             store.recordSuccess(stepName, result.output());
         } else {
-            String message = result instanceof StepResult.Failure f ? f.message() : "unknown error";
+            String message = result instanceof Result.Failure f ? f.message() : "unknown error";
             store.recordFailure(stepName,
                                 new io.casehub.yaml.core.orchestration.StepError(message, null, null));
         }

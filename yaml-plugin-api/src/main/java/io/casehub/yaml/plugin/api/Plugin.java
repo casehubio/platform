@@ -7,7 +7,10 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface StepPlugin {
+public @interface Plugin {
     String value();
     String description() default "";
+
+    Portability portability() default Portability.JAVA;
+
 }

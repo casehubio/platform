@@ -1,5 +1,7 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
+
 import java.util.List;
 
 public record YamlModuleParameter(
@@ -141,12 +143,12 @@ public record YamlModuleParameter(
                         + ". Did you mean minLength/maxLength?");
             }
             if ((minLength != null || maxLength != null)
-                && type != ParameterType.STRING && type != ParameterType.LIST) {
+                && type != ParameterType.STRING && type != ParameterType.ARRAY) {
                 throw new IllegalArgumentException(
                         "minLength/maxLength constraints are only valid for STRING and LIST parameters, not " + type
                         + ". Did you mean minimum/maximum?");
             }
-            if (pattern != null && type != ParameterType.STRING && type != ParameterType.LIST) {
+            if (pattern != null && type != ParameterType.STRING && type != ParameterType.ARRAY) {
                 throw new IllegalArgumentException(
                         "pattern constraint is only valid for STRING and LIST parameters, not " + type + ".");
             }

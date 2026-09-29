@@ -1,8 +1,8 @@
 package io.casehub.yaml.step.plugin;
 
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +49,7 @@ class RestCallPluginTest {
         var action = loadAction();
         var registry = new MapServiceRegistry();
 
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("url", "http://localhost:" + port + "/ok"), registry);
 
         assertThat(result.isSuccess()).isTrue();
@@ -62,7 +62,7 @@ class RestCallPluginTest {
         var action = loadAction();
         var registry = new MapServiceRegistry();
 
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("url", "http://localhost:" + port + "/ok",
                        "method", "POST"), registry);
 
@@ -75,17 +75,17 @@ class RestCallPluginTest {
         var action = loadAction();
         var registry = new MapServiceRegistry();
 
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("url", "http://localhost:" + port + "/error"), registry);
 
         assertThat(result.isSuccess()).isFalse();
     }
 
-    private StepAction loadAction() {
+    private Action loadAction() {
         try {
             Class<?> clazz = Class.forName(
                     "io.casehub.yaml.step.plugin.RestCallPluginAction");
-            return (StepAction) clazz.getDeclaredConstructor().newInstance();
+            return (Action) clazz.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new AssertionError("APT-generated RestCallPluginAction not found: " + e, e);
         }

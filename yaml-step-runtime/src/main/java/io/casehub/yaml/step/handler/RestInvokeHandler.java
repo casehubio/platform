@@ -3,8 +3,8 @@ package io.casehub.yaml.step.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
 
 import java.net.URI;
@@ -37,13 +37,13 @@ public class RestInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public StepAction create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(StepDefinition definition, InvokeBinding binding) {
         InvokeBinding.Rest rest = (InvokeBinding.Rest) binding;
         return (params, services) -> executeRest(rest, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executeRest(InvokeBinding.Rest rest, Map<String, Object> params) {
+    private Result executeRest(InvokeBinding.Rest rest, Map<String, Object> params) {
         try {
             String url = interpolate(rest.url(), params);
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
@@ -78,18 +78,18 @@ public class RestInvokeHandler implements InvokeHandler {
             Map<String, Object> metadata = Map.of("statusCode", statusCode, "durationMs", durationMs);
 
             if (statusCode >= 400) {
-                return StepResult.failed("HTTP " + statusCode + ": " + response.body());
+                return Result.failed("HTTP " + statusCode + ": " + response.body());
             }
 
             String body = response.body();
             if (body == null || body.isBlank()) {
-                return StepResult.of(Map.of(), metadata);
+                return Result.of(Map.of(), metadata);
             }
 
             Map<String, Object> output = objectMapper.readValue(body, LinkedHashMap.class);
-            return StepResult.of(output, metadata);
+            return Result.of(output, metadata);
         } catch (Exception e) {
-            return StepResult.failed("REST call failed: " + e.getMessage());
+            return Result.failed("REST call failed: " + e.getMessage());
         }
     }
 

@@ -3,18 +3,17 @@ package io.casehub.yaml.step.plugin;
 import io.casehub.yaml.plugin.api.Execute;
 import io.casehub.yaml.plugin.api.Optional;
 import io.casehub.yaml.plugin.api.Required;
-import io.casehub.yaml.plugin.api.StepPlugin;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Plugin;
+import io.casehub.yaml.plugin.api.Result;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@StepPlugin(value = "rest-call", description = "Makes an HTTP request")
+@Plugin(value = "rest-call", description = "Makes an HTTP request")
 public record RestCallPlugin(
         @Required String url,
         @Optional String method,
@@ -27,7 +26,7 @@ public record RestCallPlugin(
     }
 
     @Execute
-    public StepResult run() {
+    public Result run() {
         try {
             HttpClient client = HttpClient.newHttpClient();
 
@@ -57,13 +56,13 @@ public record RestCallPlugin(
             output.put("body", response.body());
 
             if (response.statusCode() >= 400) {
-                return StepResult.failed("HTTP " + response.statusCode()
-                        + (response.body() != null ? ": " + response.body() : ""));
+                return Result.failed("HTTP " + response.statusCode()
+                                     + (response.body() != null ? ": " + response.body() : ""));
             }
 
-            return StepResult.of(output);
+            return Result.of(output);
         } catch (Exception e) {
-            return StepResult.failed("HTTP request failed: " + e.getMessage());
+            return Result.failed("HTTP request failed: " + e.getMessage());
         }
     }
 

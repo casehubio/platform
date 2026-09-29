@@ -7,16 +7,15 @@ public class YamlCoreJacksonModule extends SimpleModule {
 
     public YamlCoreJacksonModule() {
         super("yaml-core");
-        addDeserializer(io.casehub.yaml.core.module.ParameterType.class,
-                        new com.fasterxml.jackson.databind.deser.std.StdDeserializer<io.casehub.yaml.core.module.ParameterType>(
-                                io.casehub.yaml.core.module.ParameterType.class) {
+        addDeserializer(io.casehub.yaml.plugin.api.ParameterType.class,
+                        new com.fasterxml.jackson.databind.deser.std.StdDeserializer<io.casehub.yaml.plugin.api.ParameterType>(
+                                io.casehub.yaml.plugin.api.ParameterType.class) {
                             @Override
-                            public io.casehub.yaml.core.module.ParameterType deserialize(
+                            public io.casehub.yaml.plugin.api.ParameterType deserialize(
                                     com.fasterxml.jackson.core.JsonParser p,
                                     com.fasterxml.jackson.databind.DeserializationContext ctxt)
                                     throws java.io.IOException {
-                                return io.casehub.yaml.core.module.ParameterType.valueOf(
-                                        p.getText().toUpperCase(java.util.Locale.ROOT));
+                                return io.casehub.yaml.plugin.api.ParameterType.fromString(p.getText());
                             }
                         });
         addDeserializer(io.casehub.yaml.core.step.InvokeBinding.class,
@@ -35,8 +34,8 @@ public class YamlCoreJacksonModule extends SimpleModule {
                                     YamlModuleHeaderMixin.class);
         context.setMixInAnnotations(io.casehub.yaml.core.module.YamlModuleParameter.class,
                                     YamlModuleParameterMixin.class);
-        context.setMixInAnnotations(io.casehub.yaml.core.step.StepDefinitionFile.class,
-                                    StepDefinitionFileMixin.class);
+        context.setMixInAnnotations(io.casehub.yaml.core.step.DeclarationFile.class,
+                                    DeclarationFileMixin.class);
         context.setMixInAnnotations(io.casehub.yaml.core.module.YamlImport.class,
                                     YamlImportMixin.class);
     }

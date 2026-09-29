@@ -4,7 +4,7 @@ import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepParameter;
 import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.CatalogEntry;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +54,7 @@ class McpToolSourceTest {
         source.populate(entries);
 
         Map<String, Object> params = Map.of("actorId", "user-1", "resourceId", "case:42");
-        StepResult result = entries.get("acl_canAccess").action().execute(params, null);
+        Result              result = entries.get("acl_canAccess").action().execute(params, null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(captured.get()).containsEntry("actorId", "user-1");
@@ -71,10 +71,10 @@ class McpToolSourceTest {
         Map<String, CatalogEntry> entries = new LinkedHashMap<>();
         source.populate(entries);
 
-        StepResult result = entries.get("bad_tool").action().execute(Map.of(), null);
+        Result result = entries.get("bad_tool").action().execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result).isInstanceOf(StepResult.Failure.class);
+        assertThat(result).isInstanceOf(Result.Failure.class);
     }
 
     @Test
@@ -88,7 +88,7 @@ class McpToolSourceTest {
         Map<String, CatalogEntry> entries = new LinkedHashMap<>();
         entries.put("tool", new CatalogEntry("tool",
                 new StepDefinition("tool", "existing", Map.of(), Map.of(), null),
-                (params, services) -> StepResult.of(Map.of())));
+                (params, services) -> Result.of(Map.of())));
 
         source.populate(entries);
 

@@ -4,8 +4,8 @@ import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepParameter;
 import io.casehub.yaml.core.step.StepParameterType;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -28,10 +28,10 @@ class McpInvokeHandlerTest {
                 Map.of("input", new StepParameter(StepParameterType.STRING, true, null, null, null, null)),
                 Map.of(), new InvokeBinding.Mcp("test.tool"));
 
-        StepAction action = handler.create(def, new InvokeBinding.Mcp("test.tool"));
+        Action action = handler.create(def, new InvokeBinding.Mcp("test.tool"));
         assertThat(action).isNotNull();
 
-        StepResult result = action.execute(Map.of("input", "hello"), null);
+        Result result = action.execute(Map.of("input", "hello"), null);
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.executionMetadata()).containsKey("tool");
     }

@@ -1,8 +1,8 @@
 package io.casehub.yaml.plugin.processor;
 
 import io.casehub.yaml.plugin.api.Execute;
-import io.casehub.yaml.plugin.api.StepPlugin;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Plugin;
+import io.casehub.yaml.plugin.api.Result;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -34,14 +34,14 @@ public class StepPluginProcessor extends AbstractProcessor {
         if (processed || roundEnv.processingOver()) return false;
         processed = true;
 
-        for (Element element : roundEnv.getElementsAnnotatedWith(StepPlugin.class)) {
+        for (Element element : roundEnv.getElementsAnnotatedWith(Plugin.class)) {
             if (element.getKind() != ElementKind.RECORD) {
                 error(element, "@StepPlugin must be applied to a record");
                 continue;
             }
             TypeElement typeElement = (TypeElement) element;
-            StepPlugin annotation = typeElement.getAnnotation(StepPlugin.class);
-            PluginModel model = validate(typeElement, annotation);
+            Plugin      annotation  = typeElement.getAnnotation(Plugin.class);
+            PluginModel model       = validate(typeElement, annotation);
             if (model != null) {
                 generate(model);
             }
@@ -49,7 +49,7 @@ public class StepPluginProcessor extends AbstractProcessor {
         return false;
     }
 
-    private PluginModel validate(TypeElement typeElement, StepPlugin annotation) {
+    private PluginModel validate(TypeElement typeElement, Plugin annotation) {
         List<ExecutableElement> executeMethods = new ArrayList<>();
         for (Element enclosed : typeElement.getEnclosedElements()) {
             if (enclosed.getAnnotation(Execute.class) != null) {
@@ -68,7 +68,7 @@ public class StepPluginProcessor extends AbstractProcessor {
 
         ExecutableElement executeMethod = executeMethods.get(0);
         TypeMirror returnType = executeMethod.getReturnType();
-        if (!returnType.toString().equals(StepResult.class.getCanonicalName())) {
+        if (!returnType.toString().equals(Result.class.getCanonicalName())) {
             error(executeMethod, "@Execute method must return StepResult, found " + returnType);
             return null;
         }

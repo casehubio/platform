@@ -7,16 +7,15 @@ import io.casehub.platform.api.process.ProcessResult;
 import io.casehub.yaml.plugin.api.Execute;
 import io.casehub.yaml.plugin.api.Optional;
 import io.casehub.yaml.plugin.api.Required;
-import io.casehub.yaml.plugin.api.StepPlugin;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Plugin;
+import io.casehub.yaml.plugin.api.Result;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@StepPlugin(value = "process", description = "Executes a system process via ProcessExecutor")
+@Plugin(value = "process", description = "Executes a system process via ProcessExecutor")
 public record ProcessPlugin(
         @Required String command,
         @Optional List<String> args,
@@ -30,7 +29,7 @@ public record ProcessPlugin(
     }
 
     @Execute
-    public StepResult run(ProcessExecutor executor) {
+    public Result run(ProcessExecutor executor) {
         try {
             List<String> fullCommand = new ArrayList<>();
             fullCommand.add(command);
@@ -59,12 +58,12 @@ public record ProcessPlugin(
                 String error = result.stderr() != null && !result.stderr().isBlank()
                         ? result.stderr().trim()
                         : "Process exited with code " + result.exitCode();
-                return StepResult.failed(error);
+                return Result.failed(error);
             }
 
-            return StepResult.of(output, Map.of("durationMs", durationMs));
+            return Result.of(output, Map.of("durationMs", durationMs));
         } catch (ProcessExecutionException e) {
-            return StepResult.failed("Process execution failed: " + e.getMessage());
+            return Result.failed("Process execution failed: " + e.getMessage());
         }
     }
 

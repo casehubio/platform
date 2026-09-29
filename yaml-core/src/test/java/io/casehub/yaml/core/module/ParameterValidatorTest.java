@@ -1,5 +1,6 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -49,7 +50,7 @@ class ParameterValidatorTest {
     @Test
     void minLength_list_counts_elements() {
         var declared = Map.of("tags", new YamlModuleParameter(
-                ParameterType.LIST, false, null, 3, null, null, null, null, List.of(), null));
+                ParameterType.ARRAY, false, null, 3, null, null, null, null, List.of(), null));
         var violations = ParameterValidator.validate(declared, Map.of("tags", "a,b"));
         assertThat(violations).hasSize(1);
         assertThat(violations.get(0).constraint()).isEqualTo("minLength");
@@ -58,7 +59,7 @@ class ParameterValidatorTest {
     @Test
     void maxLength_list_counts_elements() {
         var declared = Map.of("tags", new YamlModuleParameter(
-                ParameterType.LIST, false, null, null, 2, null, null, null, List.of(), null));
+                ParameterType.ARRAY, false, null, null, 2, null, null, null, List.of(), null));
         var violations = ParameterValidator.validate(declared, Map.of("tags", "a,b,c"));
         assertThat(violations).hasSize(1);
         assertThat(violations.get(0).constraint()).isEqualTo("maxLength");

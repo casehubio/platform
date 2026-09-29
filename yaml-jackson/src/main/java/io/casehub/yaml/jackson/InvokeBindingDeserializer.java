@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinitionParser;
+import io.casehub.yaml.core.step.DeclarationParser;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -22,6 +22,6 @@ public class InvokeBindingDeserializer extends StdDeserializer<InvokeBinding> {
     public InvokeBinding deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         JsonNode node = p.getCodec().readTree(p);
         Map<String, Object> map = p.getCodec().treeToValue(node, LinkedHashMap.class);
-        return StepDefinitionParser.parseInvoke(map);
+        return DeclarationParser.parseInvoke(map);
     }
 }

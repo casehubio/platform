@@ -2,7 +2,7 @@ package io.casehub.yaml.step.catalog;
 
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.CatalogSource;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ class CompositeStepCatalogTest {
         var def = new StepDefinition(name, null, Map.of(), Map.of(),
                 new InvokeBinding.Mcp(name));
         return new CatalogEntry(name, def,
-                (params, services) -> StepResult.of(Map.of()));
+                (params, services) -> Result.of(Map.of()));
     }
 
     @Test

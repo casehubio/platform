@@ -1,5 +1,7 @@
 package io.casehub.yaml.core.step;
 
+import io.casehub.yaml.plugin.api.Parameter;
+
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -7,33 +9,33 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public final class StepValidator {
+public final class Validator {
 
-    private StepValidator() {}
+    private Validator() {}
 
     public static List<String> validateStep(
             String actionName,
             Map<String, Object> params,
-            StepDefinition definition) {
+            Declaration definition) {
         return validateParams(actionName, params, definition.inputs(), "input");
     }
 
     public static List<String> validateOutputs(
             Map<String, Object> outputs,
-            StepDefinition definition) {
+            Declaration definition) {
         return validateParams(definition.name(), outputs, definition.outputs(), "output");
     }
 
     private static List<String> validateParams(
             String actionName,
             Map<String, Object> values,
-            Map<String, StepParameter> declarations,
+            Map<String, Parameter> declarations,
             String direction) {
         List<String> errors = new ArrayList<>();
 
         for (var entry : declarations.entrySet()) {
             String paramName = entry.getKey();
-            StepParameter param = entry.getValue();
+            Parameter param = entry.getValue();
             Object value = values.get(paramName);
 
             if (value == null) {

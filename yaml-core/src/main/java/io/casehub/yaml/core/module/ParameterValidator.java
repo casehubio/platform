@@ -39,7 +39,7 @@ public final class ParameterValidator {
 
             ParsedValue parsed;
             try {
-                parsed = param.type().parse(value);
+                parsed = ModuleParameterParser.parse(param.type(), value);
             } catch (Exception e) {
                 violations.add(createViolation(name, "type",
                         "Parameter '" + name + "': expected " + param.type()

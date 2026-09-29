@@ -3,10 +3,10 @@ package io.casehub.yaml.jackson;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.yaml.core.step.InvokeBinding;
-import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.core.step.StepDefinitionFile;
-import io.casehub.yaml.core.step.StepDefinitionParser;
-import io.casehub.yaml.core.step.StepParameterType;
+import io.casehub.yaml.core.step.Declaration;
+import io.casehub.yaml.core.step.DeclarationFile;
+import io.casehub.yaml.core.step.DeclarationParser;
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class StepDefinitionFileDeserializationTest {
+class DeclarationFileDeserializationTest {
 
     private ObjectMapper yamlMapper;
 
@@ -51,21 +51,21 @@ class StepDefinitionFileDeserializationTest {
             """;
 
     @Test
-    void deserializesStepDefinitionFile() throws Exception {
-        StepDefinitionFile file = yamlMapper.readValue(STEP_YAML, StepDefinitionFile.class);
+    void deserializesDeclarationFile() throws Exception {
+        DeclarationFile file = yamlMapper.readValue(STEP_YAML, DeclarationFile.class);
 
         assertThat(file.namespace()).isEqualTo("fsi");
         assertThat(file.actions()).hasSize(2);
 
-        StepDefinition assessRisk = file.actions().get("assess-risk");
+        Declaration assessRisk = file.actions().get("assess-risk");
         assertThat(assessRisk.name()).isEqualTo("assess-risk");
         assertThat(assessRisk.description()).isEqualTo("Evaluate risk");
-        assertThat(assessRisk.inputs().get("instrumentId").type()).isEqualTo(StepParameterType.STRING);
+        assertThat(assessRisk.inputs().get("instrumentId").type()).isEqualTo(ParameterType.STRING);
         assertThat(assessRisk.inputs().get("instrumentId").required()).isTrue();
         assertThat(assessRisk.outputs().get("level").allowedValues()).containsExactly("LOW", "MEDIUM", "HIGH");
         assertThat(assessRisk.invoke()).isInstanceOf(InvokeBinding.Mcp.class);
 
-        StepDefinition notify = file.actions().get("notify");
+        Declaration notify = file.actions().get("notify");
         assertThat(notify.invoke()).isInstanceOf(InvokeBinding.Rest.class);
         InvokeBinding.Rest rest = (InvokeBinding.Rest) notify.invoke();
         assertThat(rest.method()).isEqualTo("POST");
@@ -75,7 +75,7 @@ class StepDefinitionFileDeserializationTest {
     @Test
     @SuppressWarnings("unchecked")
     void jacksonAndParserProduceSameModel() throws Exception {
-        StepDefinitionFile fromJackson = yamlMapper.readValue(STEP_YAML, StepDefinitionFile.class);
+        DeclarationFile fromJackson = yamlMapper.readValue(STEP_YAML, DeclarationFile.class);
 
         Map<String, Object> rawMap = yamlMapper.readValue(STEP_YAML, Map.class);
         Map<String, Object> actionsMap = new java.util.LinkedHashMap<>();
@@ -87,14 +87,14 @@ class StepDefinitionFileDeserializationTest {
         Map<String, Object> parserInput = Map.of(
                 "namespace", rawMap.getOrDefault("namespace", ""),
                 "actions", actionsMap);
-        StepDefinitionFile fromParser = StepDefinitionParser.parse(parserInput);
+        DeclarationFile fromParser = DeclarationParser.parse(parserInput);
 
         assertThat(fromJackson.namespace()).isEqualTo(fromParser.namespace());
         assertThat(fromJackson.actions().keySet()).isEqualTo(fromParser.actions().keySet());
 
         for (String actionName : fromJackson.actions().keySet()) {
-            StepDefinition jacksonDef = fromJackson.actions().get(actionName);
-            StepDefinition parserDef = fromParser.actions().get(actionName);
+            Declaration jacksonDef = fromJackson.actions().get(actionName);
+            Declaration parserDef = fromParser.actions().get(actionName);
 
             assertThat(jacksonDef.name()).isEqualTo(parserDef.name());
             assertThat(jacksonDef.description()).isEqualTo(parserDef.description());
@@ -115,7 +115,7 @@ class StepDefinitionFileDeserializationTest {
                       structured-output: true
                 """;
 
-        StepDefinitionFile file = yamlMapper.readValue(yaml, StepDefinitionFile.class);
+        DeclarationFile file = yamlMapper.readValue(yaml, DeclarationFile.class);
         InvokeBinding.Agent agent = (InvokeBinding.Agent) file.actions().get("analyse").invoke();
         assertThat(agent.descriptor()).isEqualTo("trade-analyst");
         assertThat(agent.model()).isEqualTo("claude-sonnet-5");
@@ -137,7 +137,7 @@ class StepDefinitionFileDeserializationTest {
                       working-dir: /opt/build
                 """;
 
-        StepDefinitionFile file = yamlMapper.readValue(yaml, StepDefinitionFile.class);
+        DeclarationFile file = yamlMapper.readValue(yaml, DeclarationFile.class);
         InvokeBinding.Process proc = (InvokeBinding.Process) file.actions().get("calc").invoke();
         assertThat(proc.command()).isEqualTo("/opt/calc");
         assertThat(proc.args()).containsExactly("--mode", "fast");
@@ -153,7 +153,7 @@ class StepDefinitionFileDeserializationTest {
                     mcp: test.tool
                 """;
 
-        StepDefinitionFile file = yamlMapper.readValue(yaml, StepDefinitionFile.class);
+        DeclarationFile file = yamlMapper.readValue(yaml, DeclarationFile.class);
         assertThat(file.namespace()).isEmpty();
     }
 }

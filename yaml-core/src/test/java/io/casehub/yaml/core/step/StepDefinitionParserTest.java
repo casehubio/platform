@@ -1,5 +1,7 @@
 package io.casehub.yaml.core.step;
 
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -25,15 +27,15 @@ class StepDefinitionParserTest {
                                                 "enum", List.of("LOW", "MEDIUM", "HIGH"))),
                                 "invoke", Map.of("mcp", "fsi.risk.assess"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile file = DeclarationParser.parse(yaml);
         assertThat(file.namespace()).isEqualTo("fsi");
         assertThat(file.actions()).hasSize(1);
 
-        StepDefinition def = file.actions().get("assess-risk");
+        Declaration def = file.actions().get("assess-risk");
         assertThat(def.name()).isEqualTo("assess-risk");
         assertThat(def.description()).isEqualTo("Evaluate risk");
         assertThat(def.inputs()).containsKey("instrumentId");
-        assertThat(def.inputs().get("instrumentId").type()).isEqualTo(StepParameterType.STRING);
+        assertThat(def.inputs().get("instrumentId").type()).isEqualTo(ParameterType.STRING);
         assertThat(def.inputs().get("instrumentId").required()).isTrue();
         assertThat(def.outputs().get("level").allowedValues()).containsExactly("LOW", "MEDIUM", "HIGH");
         assertThat(def.invoke()).isInstanceOf(InvokeBinding.Mcp.class);
@@ -50,7 +52,7 @@ class StepDefinitionParserTest {
                                         "url", "/api/notifications",
                                         "body", Map.of("message", "${message}"))))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile    file = DeclarationParser.parse(yaml);
         InvokeBinding.Rest rest = (InvokeBinding.Rest) file.actions().get("notify").invoke();
         assertThat(rest.method()).isEqualTo("POST");
         assertThat(rest.url()).isEqualTo("/api/notifications");
@@ -68,7 +70,7 @@ class StepDefinitionParserTest {
                                         "output", "json",
                                         "timeout", "30s")))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile       file = DeclarationParser.parse(yaml);
         InvokeBinding.Process proc = (InvokeBinding.Process) file.actions().get("calc").invoke();
         assertThat(proc.command()).isEqualTo("/opt/risk-engine/calc");
         assertThat(proc.args()).containsExactly("--portfolio", "${portfolio}");
@@ -85,7 +87,7 @@ class StepDefinitionParserTest {
                                         "model", "claude-sonnet-5",
                                         "structured-output", true)))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile     file  = DeclarationParser.parse(yaml);
         InvokeBinding.Agent agent = (InvokeBinding.Agent) file.actions().get("analyse").invoke();
         assertThat(agent.descriptor()).isEqualTo("trade-analyst");
         assertThat(agent.model()).isEqualTo("claude-sonnet-5");
@@ -99,7 +101,7 @@ class StepDefinitionParserTest {
                         "sentiment", Map.of(
                                 "invoke", Map.of("python", "steps/sentiment.py"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile      file   = DeclarationParser.parse(yaml);
         InvokeBinding.Script script = (InvokeBinding.Script) file.actions().get("sentiment").invoke();
         assertThat(script.runtime()).isEqualTo("python3");
         assertThat(script.script()).isEqualTo("steps/sentiment.py");
@@ -112,8 +114,8 @@ class StepDefinitionParserTest {
                         "position", Map.of(
                                 "invoke", Map.of("graphql", "{ position(symbol: \"${symbol}\") { quantity } }"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
-        InvokeBinding.Graphql gql = (InvokeBinding.Graphql) file.actions().get("position").invoke();
+        DeclarationFile       file = DeclarationParser.parse(yaml);
+        InvokeBinding.Graphql gql  = (InvokeBinding.Graphql) file.actions().get("position").invoke();
         assertThat(gql.query()).contains("position(symbol:");
     }
 
@@ -124,7 +126,7 @@ class StepDefinitionParserTest {
                         "bad", Map.of("invoke", Map.of("unknown", "value"))));
 
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> StepDefinitionParser.parse(yaml))
+                .isThrownBy(() -> DeclarationParser.parse(yaml))
                 .withMessageContaining("Unknown invoke binding type");
     }
 
@@ -134,7 +136,7 @@ class StepDefinitionParserTest {
                 "actions", Map.of(
                         "test", Map.of("invoke", Map.of("mcp", "test"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile file = DeclarationParser.parse(yaml);
         assertThat(file.namespace()).isEmpty();
     }
 
@@ -147,8 +149,8 @@ class StepDefinitionParserTest {
                                         "date", mapOf("type", "string", "format", "date", "default", "2026-01-01")),
                                 "invoke", Map.of("mcp", "test"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
-        StepParameter param = file.actions().get("test").inputs().get("date");
+        DeclarationFile file  = DeclarationParser.parse(yaml);
+        Parameter   param = file.actions().get("test").inputs().get("date");
         assertThat(param.format()).isEqualTo("date");
         assertThat(param.defaultValue()).isEqualTo("2026-01-01");
     }
@@ -164,7 +166,7 @@ class StepDefinitionParserTest {
                                         "working-dir", "/opt/build",
                                         "on-error", "exit-code")))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile       file = DeclarationParser.parse(yaml);
         InvokeBinding.Process proc = (InvokeBinding.Process) file.actions().get("build").invoke();
         assertThat(proc.env()).containsEntry("CC", "gcc");
         assertThat(proc.workingDir()).isEqualTo("/opt/build");
@@ -177,8 +179,8 @@ class StepDefinitionParserTest {
                 "actions", Map.of(
                         "ping", Map.of("invoke", Map.of("mcp", "system.ping"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
-        StepDefinition def = file.actions().get("ping");
+        DeclarationFile file = DeclarationParser.parse(yaml);
+        Declaration     def  = file.actions().get("ping");
         assertThat(def.inputs()).isEmpty();
         assertThat(def.outputs()).isEmpty();
     }
@@ -192,7 +194,7 @@ class StepDefinitionParserTest {
                                         "name", Map.of("type", "string")),
                                 "invoke", Map.of("mcp", "test"))));
 
-        StepDefinitionFile file = StepDefinitionParser.parse(yaml);
+        DeclarationFile file = DeclarationParser.parse(yaml);
         assertThat(file.actions().get("test").inputs().get("name").required()).isFalse();
     }
 

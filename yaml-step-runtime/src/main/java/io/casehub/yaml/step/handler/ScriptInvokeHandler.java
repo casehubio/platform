@@ -8,8 +8,8 @@ import io.casehub.platform.api.process.ProcessExecutor;
 import io.casehub.platform.api.process.ProcessResult;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
 
 import java.time.Duration;
@@ -32,13 +32,13 @@ public class ScriptInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public StepAction create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(StepDefinition definition, InvokeBinding binding) {
         InvokeBinding.Script script = (InvokeBinding.Script) binding;
         return (params, services) -> executeScript(script, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executeScript(InvokeBinding.Script script, Map<String, Object> params) {
+    private Result executeScript(InvokeBinding.Script script, Map<String, Object> params) {
         try {
             byte[] jsonInput = objectMapper.writeValueAsBytes(params);
 
@@ -62,20 +62,20 @@ public class ScriptInvokeHandler implements InvokeHandler {
                 String error = result.stderr() != null && !result.stderr().isBlank()
                                ? result.stderr().trim()
                                : "Script exited with code " + result.exitCode();
-                return StepResult.failed(error);
+                return Result.failed(error);
             }
 
             String stdout = result.stdout() != null ? result.stdout().trim() : "";
             Map<String, Object> output = objectMapper.readValue(stdout, LinkedHashMap.class);
-            return StepResult.of(output, Map.of("durationMs", durationMs,
-                    "script", script.script(), "runtime", script.runtime()));
+            return Result.of(output, Map.of("durationMs", durationMs,
+                                            "script", script.script(), "runtime", script.runtime()));
 
         } catch (CommandNotAllowedException e) {
-            return StepResult.failed("Script not allowed: " + e.getMessage());
+            return Result.failed("Script not allowed: " + e.getMessage());
         } catch (ProcessExecutionException e) {
-            return StepResult.failed("Script execution failed: " + e.getMessage());
+            return Result.failed("Script execution failed: " + e.getMessage());
         } catch (Exception e) {
-            return StepResult.failed("Script execution failed: " + e.getMessage());
+            return Result.failed("Script execution failed: " + e.getMessage());
         }
     }
 

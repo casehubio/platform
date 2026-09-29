@@ -6,11 +6,11 @@ import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepDefinitionFile;
 import io.casehub.yaml.core.step.StepDefinitionParser;
-import io.casehub.yaml.plugin.api.StepAction;
+import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.step.CatalogEntry;
 import io.casehub.yaml.step.CatalogSource;
 import io.casehub.yaml.step.InvokeHandler;
-import io.casehub.yaml.step.ValidatingStepAction;
+import io.casehub.yaml.step.ValidatingAction;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -83,8 +83,8 @@ public class YamlStepDefinitionSource implements CatalogSource {
             StepDefinition def     = entry.getValue();
             InvokeBinding  binding = def.invoke();
 
-            StepAction action    = resolveHandler(binding).create(def, binding);
-            StepAction validated = new ValidatingStepAction(def, action, eventSink);
+            Action action    = resolveHandler(binding).create(def, binding);
+            Action validated = new ValidatingAction(def, action, eventSink);
 
             String qualifiedName = def.qualifiedName(defFile.namespace());
             entries.putIfAbsent(qualifiedName, new CatalogEntry(qualifiedName, def, validated));

@@ -1,5 +1,6 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -82,11 +83,11 @@ class YamlModuleParameterTest {
     @Test
     void builder_list_with_length_constraints() {
         var param = YamlModuleParameter.builder()
-                .type(ParameterType.LIST)
+                .type(ParameterType.ARRAY)
                 .minLength(1)
                 .maxLength(10)
                 .build();
-        assertThat(param.type()).isEqualTo(ParameterType.LIST);
+        assertThat(param.type()).isEqualTo(ParameterType.ARRAY);
         assertThat(param.minLength()).isEqualTo(1);
     }
 
@@ -118,12 +119,12 @@ class YamlModuleParameterTest {
     @Test
     void coherence_maximum_on_list_throws() {
         assertThatThrownBy(() -> YamlModuleParameter.builder()
-                .type(ParameterType.LIST)
+                .type(ParameterType.ARRAY)
                 .maximum(10)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("minimum/maximum")
-                .hasMessageContaining("LIST");
+                .hasMessageContaining("ARRAY");
     }
 
     @Test
@@ -195,7 +196,7 @@ class YamlModuleParameterTest {
     @Test
     void coherence_pattern_on_list_passes() {
         var param = YamlModuleParameter.builder()
-                .type(ParameterType.LIST)
+                .type(ParameterType.ARRAY)
                 .pattern("^[a-z]+$")
                 .build();
         assertThat(param.pattern()).isEqualTo("^[a-z]+$");

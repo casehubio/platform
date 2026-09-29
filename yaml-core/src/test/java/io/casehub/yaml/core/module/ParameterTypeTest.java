@@ -1,60 +1,12 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ParameterTypeTest {
-
-    @Test
-    void string_returns_value() {
-        assertThat(ParameterType.STRING.parse("hello").raw()).isEqualTo("hello");
-    }
-
-    @Test
-    void list_splits_on_comma() {
-        assertThat(ParameterType.LIST.parse("a, b, c").raw()).isEqualTo(List.of("a", "b", "c"));
-    }
-
-    @Test
-    void list_single_value() {
-        assertThat(ParameterType.LIST.parse("only").raw()).isEqualTo(List.of("only"));
-    }
-
-    @Test
-    void integer_parses() {
-        assertThat(ParameterType.INTEGER.parse("42").raw()).isEqualTo(42);
-    }
-
-    @Test
-    void integer_invalid_throws() {
-        assertThatThrownBy(() -> ParameterType.INTEGER.parse("abc"))
-                .isInstanceOf(NumberFormatException.class);
-    }
-
-    @Test
-    void number_parses() {
-        assertThat(ParameterType.NUMBER.parse("3.14").raw()).isEqualTo(3.14);
-    }
-
-    @Test
-    void number_invalid_throws() {
-        assertThatThrownBy(() -> ParameterType.NUMBER.parse("abc"))
-                .isInstanceOf(NumberFormatException.class);
-    }
-
-    @Test
-    void boolean_parses_truthy() {
-        assertThat(ParameterType.BOOLEAN.parse("yes").raw()).isEqualTo(true);
-    }
-
-    @Test
-    void boolean_parses_falsy() {
-        assertThat(ParameterType.BOOLEAN.parse("no").raw()).isEqualTo(false);
-    }
 
     @Test
     void canAccept_same_type_always_true() {
@@ -73,8 +25,8 @@ class ParameterTypeTest {
     }
 
     @Test
-    void canAccept_string_rejects_list() {
-        assertThat(ParameterType.STRING.canAccept(ParameterType.LIST)).isFalse();
+    void canAccept_string_rejects_array() {
+        assertThat(ParameterType.STRING.canAccept(ParameterType.ARRAY)).isFalse();
     }
 
     @Test
@@ -86,7 +38,7 @@ class ParameterTypeTest {
     void canAccept_number_rejects_others() {
         assertThat(ParameterType.NUMBER.canAccept(ParameterType.STRING)).isFalse();
         assertThat(ParameterType.NUMBER.canAccept(ParameterType.BOOLEAN)).isFalse();
-        assertThat(ParameterType.NUMBER.canAccept(ParameterType.LIST)).isFalse();
+        assertThat(ParameterType.NUMBER.canAccept(ParameterType.ARRAY)).isFalse();
     }
 
     @Test
@@ -99,17 +51,16 @@ class ParameterTypeTest {
         assertThat(ParameterType.BOOLEAN.canAccept(ParameterType.STRING)).isFalse();
         assertThat(ParameterType.BOOLEAN.canAccept(ParameterType.INTEGER)).isFalse();
         assertThat(ParameterType.BOOLEAN.canAccept(ParameterType.NUMBER)).isFalse();
-        assertThat(ParameterType.BOOLEAN.canAccept(ParameterType.LIST)).isFalse();
+        assertThat(ParameterType.BOOLEAN.canAccept(ParameterType.ARRAY)).isFalse();
     }
 
     @Test
-    void canAccept_list_rejects_non_list() {
-        assertThat(ParameterType.LIST.canAccept(ParameterType.STRING)).isFalse();
-        assertThat(ParameterType.LIST.canAccept(ParameterType.INTEGER)).isFalse();
-        assertThat(ParameterType.LIST.canAccept(ParameterType.NUMBER)).isFalse();
-        assertThat(ParameterType.LIST.canAccept(ParameterType.BOOLEAN)).isFalse();
+    void canAccept_array_rejects_non_array() {
+        assertThat(ParameterType.ARRAY.canAccept(ParameterType.STRING)).isFalse();
+        assertThat(ParameterType.ARRAY.canAccept(ParameterType.INTEGER)).isFalse();
+        assertThat(ParameterType.ARRAY.canAccept(ParameterType.NUMBER)).isFalse();
+        assertThat(ParameterType.ARRAY.canAccept(ParameterType.BOOLEAN)).isFalse();
     }
-
 
     @Test
     void fromString_standard_names() {
@@ -117,7 +68,8 @@ class ParameterTypeTest {
         assertThat(ParameterType.fromString("integer")).isEqualTo(ParameterType.INTEGER);
         assertThat(ParameterType.fromString("number")).isEqualTo(ParameterType.NUMBER);
         assertThat(ParameterType.fromString("boolean")).isEqualTo(ParameterType.BOOLEAN);
-        assertThat(ParameterType.fromString("list")).isEqualTo(ParameterType.LIST);
+        assertThat(ParameterType.fromString("list")).isEqualTo(ParameterType.ARRAY);
+        assertThat(ParameterType.fromString("array")).isEqualTo(ParameterType.ARRAY);
     }
 
     @Test
@@ -137,28 +89,14 @@ class ParameterTypeTest {
     void fromString_unknown_throws() {
         assertThatThrownBy(() -> ParameterType.fromString("blob"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("blob")
-                .hasMessageContaining("STRING");
+                .hasMessageContaining("blob");
     }
 
     @Test
-    void scalarType_maps_scalars_to_valueType() {
-        assertThat(ParameterType.STRING.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.STRING);
-        assertThat(ParameterType.INTEGER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.INTEGER);
-        assertThat(ParameterType.NUMBER.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.NUMBER);
-        assertThat(ParameterType.BOOLEAN.scalarType()).isEqualTo(io.casehub.yaml.core.type.ValueType.BOOLEAN);
-    }
-
-    @Test
-    void scalarType_list_returns_null() {
-        assertThat(ParameterType.LIST.scalarType()).isNull();
-    }
-
-    @Test
-    void fromValueType_maps_all_scalars() {
-        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.STRING)).isEqualTo(ParameterType.STRING);
-        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.INTEGER)).isEqualTo(ParameterType.INTEGER);
-        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.NUMBER)).isEqualTo(ParameterType.NUMBER);
-        assertThat(ParameterType.fromValueType(io.casehub.yaml.core.type.ValueType.BOOLEAN)).isEqualTo(ParameterType.BOOLEAN);
+    void valueType_toParameterType_maps_all_scalars() {
+        assertThat(io.casehub.yaml.core.type.ValueType.STRING.toParameterType()).isEqualTo(ParameterType.STRING);
+        assertThat(io.casehub.yaml.core.type.ValueType.INTEGER.toParameterType()).isEqualTo(ParameterType.INTEGER);
+        assertThat(io.casehub.yaml.core.type.ValueType.NUMBER.toParameterType()).isEqualTo(ParameterType.NUMBER);
+        assertThat(io.casehub.yaml.core.type.ValueType.BOOLEAN.toParameterType()).isEqualTo(ParameterType.BOOLEAN);
     }
 }

@@ -4,38 +4,38 @@ import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
 import io.casehub.yaml.core.step.StepValidator;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class ValidatingStepAction implements StepAction {
+public class ValidatingAction implements Action {
 
-    private final StepDefinition definition;
-    private final StepAction delegate;
+    private final StepDefinition               definition;
+    private final Action                       delegate;
     private final Consumer<StepExecutionEvent> eventSink;
 
-    public ValidatingStepAction(StepDefinition definition,
-                                StepAction delegate,
-                                Consumer<StepExecutionEvent> eventSink) {
+    public ValidatingAction(StepDefinition definition,
+                            Action delegate,
+                            Consumer<StepExecutionEvent> eventSink) {
         this.definition = definition;
         this.delegate = delegate;
         this.eventSink = eventSink;
     }
 
     @Override
-    public StepResult execute(Map<String, Object> params, ServiceRegistry services) {
+    public Result execute(Map<String, Object> params, ServiceRegistry services) {
         List<String> inputErrors = StepValidator.validateStep(
                 definition.name(), params, definition);
         if (!inputErrors.isEmpty()) {
-            return StepResult.failed("Input validation: " + String.join("; ", inputErrors));
+            return Result.failed("Input validation: " + String.join("; ", inputErrors));
         }
 
-        long start = System.nanoTime();
-        StepResult result = delegate.execute(params, services);
-        long durationMs = (System.nanoTime() - start) / 1_000_000;
+        long   start      = System.nanoTime();
+        Result result     = delegate.execute(params, services);
+        long   durationMs = (System.nanoTime() - start) / 1_000_000;
 
         if (result.isSuccess()) {
             List<String> outputErrors = StepValidator.validateOutputs(
@@ -43,13 +43,13 @@ public class ValidatingStepAction implements StepAction {
             if (!outputErrors.isEmpty()) {
                 fireEvent(durationMs, false, Map.of("error",
                         "Output validation: " + String.join("; ", outputErrors)));
-                return StepResult.failed("Output validation: " + String.join("; ", outputErrors));
+                return Result.failed("Output validation: " + String.join("; ", outputErrors));
             }
         }
 
         Map<String, Object> metadata = result.isSuccess()
                 ? result.executionMetadata()
-                : Map.of("error", ((StepResult.Failure) result).message());
+                : Map.of("error", ((Result.Failure) result).message());
         fireEvent(durationMs, result.isSuccess(), metadata);
 
         return result;

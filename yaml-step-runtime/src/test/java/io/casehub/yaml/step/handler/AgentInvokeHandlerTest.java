@@ -3,7 +3,7 @@ package io.casehub.yaml.step.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -63,8 +63,8 @@ class AgentInvokeHandlerTest {
         var binding = new InvokeBinding.Agent("analyst", null, "30s", false);
         var def     = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        var        action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of("input", "data"), null);
+        var    action = handler.create(def, binding);
+        Result result = action.execute(Map.of("input", "data"), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsKey("response");
@@ -93,8 +93,8 @@ class AgentInvokeHandlerTest {
         var binding = new InvokeBinding.Agent("trade-analyst", null, null, false);
         var def     = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        var        action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        var    action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat((String) result.output().get("response")).isEqualTo("analysis done");
@@ -110,8 +110,8 @@ class AgentInvokeHandlerTest {
         var binding = new InvokeBinding.Agent("analyst", null, null, true);
         var def     = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        var        action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        var    action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output()).containsEntry("level", "HIGH");
@@ -124,10 +124,10 @@ class AgentInvokeHandlerTest {
         var binding = new InvokeBinding.Agent("analyst", null, null, false);
         var def     = new StepDefinition("test", null, Map.of(), Map.of(), binding);
 
-        var        action = handler.create(def, binding);
-        StepResult result = action.execute(Map.of(), null);
+        var    action = handler.create(def, binding);
+        Result result = action.execute(Map.of(), null);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(((StepResult.Failure) result).message()).contains("AgentProvider");
+        assertThat(((Result.Failure) result).message()).contains("AgentProvider");
     }
 }

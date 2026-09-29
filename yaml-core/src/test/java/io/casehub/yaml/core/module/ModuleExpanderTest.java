@@ -1,5 +1,6 @@
 package io.casehub.yaml.core.module;
 
+import io.casehub.yaml.plugin.api.ParameterType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -442,8 +443,8 @@ class ModuleExpanderTest {
 
     @Test
     void list_to_string_rejected() {
-        var listOutput = new YamlModuleOutput(ParameterType.LIST, "${var.items}");
-        var listParam = new YamlModuleParameter(ParameterType.LIST, true, null,
+        var listOutput = new YamlModuleOutput(ParameterType.ARRAY, "${var.items}");
+        var listParam = new YamlModuleParameter(ParameterType.ARRAY, true, null,
                                                 null, null, null, null, null, List.of(), null);
         var producer = new YamlModule("producer",
                                       Map.of("items", listParam),

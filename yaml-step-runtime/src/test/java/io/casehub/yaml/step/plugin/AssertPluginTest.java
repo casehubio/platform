@@ -4,8 +4,8 @@ import io.casehub.platform.api.expression.CompiledExpression;
 import io.casehub.platform.api.expression.ExpressionContext;
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -25,7 +25,7 @@ class AssertPluginTest {
                 .register(ExpressionEngineRegistry.class, engines);
 
         var action = loadAction();
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("expression", "1 == 1"), registry);
 
         assertThat(result.isSuccess()).isTrue();
@@ -39,11 +39,11 @@ class AssertPluginTest {
                 .register(ExpressionEngineRegistry.class, engines);
 
         var action = loadAction();
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("expression", "1 == 2"), registry);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(((StepResult.Failure) result).message())
+        assertThat(((Result.Failure) result).message())
                 .contains("1 == 2");
     }
 
@@ -54,11 +54,11 @@ class AssertPluginTest {
                 .register(ExpressionEngineRegistry.class, engines);
 
         var action = loadAction();
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("expression", "false", "message", "Deploy check failed"), registry);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(((StepResult.Failure) result).message())
+        assertThat(((Result.Failure) result).message())
                 .isEqualTo("Deploy check failed");
     }
 
@@ -70,7 +70,7 @@ class AssertPluginTest {
                 .register(ExpressionEngineRegistry.class, engines);
 
         var action = loadAction();
-        StepResult result = action.execute(
+        Result result = action.execute(
                 Map.of("expression", "true"), registry);
 
         assertThat(result.isSuccess()).isFalse();
@@ -87,11 +87,11 @@ class AssertPluginTest {
         return engines;
     }
 
-    private StepAction loadAction() {
+    private Action loadAction() {
         try {
             Class<?> clazz = Class.forName(
                     "io.casehub.yaml.step.plugin.AssertPluginAction");
-            return (StepAction) clazz.getDeclaredConstructor().newInstance();
+            return (Action) clazz.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new AssertionError("APT-generated AssertPluginAction not found: " + e, e);
         }

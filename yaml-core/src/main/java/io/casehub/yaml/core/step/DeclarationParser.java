@@ -1,51 +1,54 @@
 package io.casehub.yaml.core.step;
 
+import io.casehub.yaml.plugin.api.Parameter;
+import io.casehub.yaml.plugin.api.ParameterType;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class StepDefinitionParser {
+public final class DeclarationParser {
 
-    private StepDefinitionParser() {}
+    private DeclarationParser() {}
 
     @SuppressWarnings("unchecked")
-    public static StepDefinitionFile parse(Map<String, Object> yaml) {
+    public static DeclarationFile parse(Map<String, Object> yaml) {
         String namespace = (String) yaml.getOrDefault("namespace", "");
         Map<String, Object> actions = (Map<String, Object>) yaml.get("actions");
         if (actions == null) {
-            return new StepDefinitionFile(namespace, Map.of());
+            return new DeclarationFile(namespace, Map.of());
         }
 
-        Map<String, StepDefinition> parsed = new LinkedHashMap<>();
+        Map<String, Declaration> parsed = new LinkedHashMap<>();
         for (var entry : actions.entrySet()) {
             parsed.put(entry.getKey(),
                     parseAction(entry.getKey(), (Map<String, Object>) entry.getValue()));
         }
-        return new StepDefinitionFile(namespace, parsed);
+        return new DeclarationFile(namespace, parsed);
     }
 
     @SuppressWarnings("unchecked")
-    public static StepDefinition parseAction(String name, Map<String, Object> raw) {
+    public static Declaration parseAction(String name, Map<String, Object> raw) {
         String description = (String) raw.get("description");
 
-        Map<String, StepParameter> inputs = Map.of();
+        Map<String, Parameter> inputs = Map.of();
         if (raw.containsKey("inputs")) {
             inputs = parseParameters((Map<String, Object>) raw.get("inputs"));
         }
 
-        Map<String, StepParameter> outputs = Map.of();
+        Map<String, Parameter> outputs = Map.of();
         if (raw.containsKey("outputs")) {
             outputs = parseParameters((Map<String, Object>) raw.get("outputs"));
         }
 
         InvokeBinding invoke = parseInvoke(raw.get("invoke"));
 
-        return new StepDefinition(name, description, inputs, outputs, invoke);
+        return new Declaration(name, description, inputs, outputs, invoke);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, StepParameter> parseParameters(Map<String, Object> raw) {
-        Map<String, StepParameter> params = new LinkedHashMap<>();
+    private static Map<String, Parameter> parseParameters(Map<String, Object> raw) {
+        Map<String, Parameter> params = new LinkedHashMap<>();
         for (var entry : raw.entrySet()) {
             params.put(entry.getKey(), parseParameter((Map<String, Object>) entry.getValue()));
         }
@@ -53,9 +56,9 @@ public final class StepDefinitionParser {
     }
 
     @SuppressWarnings("unchecked")
-    static StepParameter parseParameter(Map<String, Object> raw) {
+    static Parameter parseParameter(Map<String, Object> raw) {
         String typeStr = (String) raw.get("type");
-        StepParameterType type = typeStr != null ? StepParameterType.fromString(typeStr) : null;
+        ParameterType type = typeStr != null ? ParameterType.fromString(typeStr) : null;
 
         Boolean required = (Boolean) raw.get("required");
         Object defaultRaw = raw.get("default");
@@ -65,7 +68,7 @@ public final class StepDefinitionParser {
         String format = (String) raw.get("format");
         String description = (String) raw.get("description");
 
-        return new StepParameter(type, required != null && required,
+        return new Parameter(type, required != null && required,
                 defaultValue, allowedValues, format, description);
     }
 

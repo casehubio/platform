@@ -8,8 +8,8 @@ import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.StepDefinition;
-import io.casehub.yaml.plugin.api.StepAction;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Action;
+import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
 
 import java.time.Duration;
@@ -46,16 +46,16 @@ public class AgentInvokeHandler implements InvokeHandler {
     }
 
     @Override
-    public StepAction create(StepDefinition definition, InvokeBinding binding) {
+    public Action create(StepDefinition definition, InvokeBinding binding) {
         InvokeBinding.Agent agent = (InvokeBinding.Agent) binding;
         return (params, services) -> executeAgent(agent, definition, params);
     }
 
     @SuppressWarnings("unchecked")
-    private StepResult executeAgent(InvokeBinding.Agent agent, StepDefinition definition,
-                                    Map<String, Object> params) {
+    private Result executeAgent(InvokeBinding.Agent agent, StepDefinition definition,
+                                Map<String, Object> params) {
         if (agentProvider == null) {
-            return StepResult.failed("AgentProvider not available");
+            return Result.failed("AgentProvider not available");
         }
 
         try {
@@ -100,17 +100,17 @@ public class AgentInvokeHandler implements InvokeHandler {
 
             if (agent.structuredOutput()) {
                 Map<String, Object> parsed = objectMapper.readValue(responseText, LinkedHashMap.class);
-                return StepResult.of(parsed, metadata);
+                return Result.of(parsed, metadata);
             }
 
-            return StepResult.of(Map.of("response", responseText), metadata);
+            return Result.of(Map.of("response", responseText), metadata);
 
         } catch (io.casehub.platform.agent.AgentTimeoutException e) {
-            return StepResult.failed("Agent timed out: " + e.getMessage());
+            return Result.failed("Agent timed out: " + e.getMessage());
         } catch (io.casehub.platform.agent.AgentProcessException e) {
-            return StepResult.failed("Agent process error: " + e.getMessage());
+            return Result.failed("Agent process error: " + e.getMessage());
         } catch (Exception e) {
-            return StepResult.failed("Agent invocation failed: " + e.getMessage());
+            return Result.failed("Agent invocation failed: " + e.getMessage());
         }
     }
 

@@ -5,7 +5,7 @@ import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
-import io.casehub.yaml.plugin.api.StepResult;
+import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -32,17 +32,17 @@ class DecoratorChainTest {
     }
 
     private DecoratedExecution success(Map<String, Object> output) {
-        return ctx -> StepResult.of(output);
+        return ctx -> Result.of(output);
     }
 
     private DecoratedExecution failure(String msg) {
-        return ctx -> StepResult.failed(msg);
+        return ctx -> Result.failed(msg);
     }
 
     private DecoratedExecution counting(AtomicInteger counter) {
         return ctx -> {
             counter.incrementAndGet();
-            return StepResult.of(Map.of());
+            return Result.of(Map.of());
         };
     }
 
@@ -118,7 +118,7 @@ class DecoratorChainTest {
                     Map.of("until", "${var.done}", "count", 10));
             var result = chain.apply(decorators, ctx -> {
                 int n = count.incrementAndGet();
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(new VariableResolver(
                     Map.of("var", (VariableSource) name ->
                             "done".equals(name) ? String.valueOf(count.get() >= 3) : null),
@@ -131,8 +131,8 @@ class DecoratorChainTest {
             var count = new AtomicInteger(0);
             var decorators = Map.<String, Object>of("loop", 5);
             var result = chain.apply(decorators, ctx -> {
-                if (count.incrementAndGet() == 3) return StepResult.failed("boom");
-                return StepResult.of(Map.of());
+                if (count.incrementAndGet() == 3) return Result.failed("boom");
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
             assertThat(count.get()).isEqualTo(3);
@@ -144,7 +144,7 @@ class DecoratorChainTest {
             var decorators = Map.<String, Object>of("loop", 3);
             var result = chain.apply(decorators, ctx -> {
                 int n = count.incrementAndGet();
-                return StepResult.of(Map.of("iteration", n));
+                return Result.of(Map.of("iteration", n));
             }).execute(new StepContext(resolver));
             assertThat(result.output()).containsEntry("iteration", 3);
         }
@@ -205,7 +205,7 @@ class DecoratorChainTest {
                 try { Thread.sleep(200); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
         }
@@ -216,7 +216,7 @@ class DecoratorChainTest {
             var captured   = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
             chain.apply(decorators, ctx -> {
                 captured.set(ctx.deadline());
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
 
             assertThat(captured.get()).isNotNull();
@@ -233,7 +233,7 @@ class DecoratorChainTest {
                 var innerDecorators = Map.<String, Object>of("timeout", "2s");
                 return chain.apply(innerDecorators, innerCtx -> {
                     captured.set(innerCtx.deadline());
-                    return StepResult.of(Map.of());
+                    return Result.of(Map.of());
                 }).execute(outerCtx);
             }).execute(new StepContext(resolver));
 
@@ -249,7 +249,7 @@ class DecoratorChainTest {
                 var innerDecorators = Map.<String, Object>of("timeout", "10s");
                 return chain.apply(innerDecorators, innerCtx -> {
                     captured.set(innerCtx.deadline());
-                    return StepResult.of(Map.of());
+                    return Result.of(Map.of());
                 }).execute(outerCtx);
             }).execute(new StepContext(resolver));
 
@@ -262,7 +262,7 @@ class DecoratorChainTest {
             var captured = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
             chain.apply(Map.of(), ctx -> {
                 captured.set(ctx.deadline());
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
 
             assertThat(captured.get().hasDeadline()).isFalse();
@@ -282,7 +282,7 @@ class DecoratorChainTest {
             var decorators = Map.<String, Object>of("retry", 3);
             var result = chain.apply(decorators, ctx -> {
                 count.incrementAndGet();
-                return StepResult.of(Map.of("ok", true));
+                return Result.of(Map.of("ok", true));
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(1);
@@ -293,8 +293,8 @@ class DecoratorChainTest {
             var count = new AtomicInteger(0);
             var decorators = Map.<String, Object>of("retry", 3);
             var result = chain.apply(decorators, ctx -> {
-                if (count.incrementAndGet() < 3) return StepResult.failed("not yet");
-                return StepResult.of(Map.of("ok", true));
+                if (count.incrementAndGet() < 3) return Result.failed("not yet");
+                return Result.of(Map.of("ok", true));
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(3);
@@ -306,7 +306,7 @@ class DecoratorChainTest {
             var decorators = Map.<String, Object>of("retry", 2);
             var result = chain.apply(decorators, ctx -> {
                 count.incrementAndGet();
-                return StepResult.failed("still failing");
+                return Result.failed("still failing");
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isFalse();
             assertThat(count.get()).isEqualTo(2);
@@ -318,8 +318,8 @@ class DecoratorChainTest {
             var decorators = Map.<String, Object>of("retry",
                     Map.of("max", 3, "backoff", "fixed", "delay", "10ms"));
             var result = chain.apply(decorators, ctx -> {
-                if (count.incrementAndGet() < 3) return StepResult.failed("not yet");
-                return StepResult.of(Map.of("ok", true));
+                if (count.incrementAndGet() < 3) return Result.failed("not yet");
+                return Result.of(Map.of("ok", true));
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(3);
@@ -331,7 +331,7 @@ class DecoratorChainTest {
             var decorators = Map.<String, Object>of("retry", 3);
             var result = chain.apply(decorators, ctx -> {
                 if (count.incrementAndGet() < 3) throw new RuntimeException("transient");
-                return StepResult.of(Map.of("ok", true));
+                return Result.of(Map.of("ok", true));
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(3);
@@ -401,8 +401,8 @@ class DecoratorChainTest {
             decorators.put("retry", 2);
             var result = chain.apply(decorators, ctx -> {
                 int n = totalCalls.incrementAndGet();
-                if (n % 2 == 1) return StepResult.failed("transient");
-                return StepResult.of(Map.of());
+                if (n % 2 == 1) return Result.failed("transient");
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(totalCalls.get()).isEqualTo(4);
@@ -417,7 +417,7 @@ class DecoratorChainTest {
                 try { Thread.sleep(200); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(resolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
@@ -451,7 +451,7 @@ class DecoratorChainTest {
             chain.apply(decorators, ctx -> {
                 Object idx = ctx.resolver().resolve("${each.index}");
                 seen.add(String.valueOf(idx));
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(listResolver));
             assertThat(seen).containsExactly("0", "1", "2");
         }
@@ -478,7 +478,7 @@ class DecoratorChainTest {
             var count = new AtomicInteger(0);
             var result = chain.apply(decorators, ctx -> {
                 count.incrementAndGet();
-                return StepResult.of(Map.of());
+                return Result.of(Map.of());
             }).execute(new StepContext(listResolver));
             assertThat(result.isSuccess()).isTrue();
             assertThat(count.get()).isEqualTo(3);
@@ -493,8 +493,8 @@ class DecoratorChainTest {
                     Map.of("in", "${var.items}", "as", "item"));
             var count = new AtomicInteger(0);
             var result = chain.apply(decorators, ctx -> {
-                if (count.incrementAndGet() == 2) return StepResult.failed("boom");
-                return StepResult.of(Map.of());
+                if (count.incrementAndGet() == 2) return Result.failed("boom");
+                return Result.of(Map.of());
             }).execute(new StepContext(listResolver));
             assertThat(result.isSuccess()).isFalse();
             assertThat(count.get()).isEqualTo(2);
@@ -573,7 +573,7 @@ class DecoratorChainTest {
                 var result = scopedChain.apply(decorators, success(Map.of("ok", true)))
                                         .execute(ctx);
                 assertThat(result.isSuccess()).isFalse();
-                assertThat(((StepResult.Failure) result).message()).contains("exceeded deadline");
+                assertThat(((Result.Failure) result).message()).contains("exceeded deadline");
             }
         }
 
@@ -615,7 +615,7 @@ class DecoratorChainTest {
                 var result = scopedChain.apply(decorators, success(Map.of("ok", true)))
                                         .execute(ctx);
                 assertThat(result.isSuccess()).isFalse();
-                assertThat(((StepResult.Failure) result).message()).contains("exceeded deadline");
+                assertThat(((Result.Failure) result).message()).contains("exceeded deadline");
             }
         }
 
@@ -633,7 +633,7 @@ class DecoratorChainTest {
                 });
                 var result = scopedChain.apply(decorators, ctx -> {
                     done.set(true);
-                    return StepResult.of(Map.of());
+                    return Result.of(Map.of());
                 }).execute(new StepContext(resolver));
                 assertThat(result.isSuccess()).isTrue();
                 assertThat(done.get()).isTrue();

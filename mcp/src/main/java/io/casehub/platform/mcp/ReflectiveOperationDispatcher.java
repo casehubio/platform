@@ -52,8 +52,43 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
             }
         }
 
-        return method.invoke(resolverBean, args);
+        try {
+            return method.invoke(resolverBean, args);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof io.casehub.platform.api.mcp.McpCapabilityException capEx) {
+                return io.casehub.platform.api.mcp.McpOperationResult.from(capEx, domain, operation);
+            }
+            io.casehub.platform.api.mcp.McpOperationResult capResult =
+                    tryExtractCapabilityResult(cause, domain, operation);
+            if (capResult != null) {
+                return capResult;
+            }
+            if (cause instanceof RuntimeException re) {throw re;}
+            if (cause instanceof Exception ex) {throw ex;}
+            throw e;
+        }
     }
+
+    @SuppressWarnings("unchecked")
+    private io.casehub.platform.api.mcp.McpOperationResult tryExtractCapabilityResult(
+            Throwable cause, String domain, String operation) {
+        try {
+            String capability = (String) cause.getClass().getMethod("capability").invoke(cause);
+            String provider   = (String) cause.getClass().getMethod("provider").invoke(cause);
+            List<String> supported = (List<String>) cause.getClass()
+                                                         .getMethod("supportedCapabilities").invoke(cause);
+            return new io.casehub.platform.api.mcp.McpOperationResult(
+                    io.casehub.platform.api.mcp.OperationOutcome.UNSUPPORTED,
+                    domain, operation, capability, provider,
+                    supported != null ? supported : List.of(), cause.getMessage());
+        } catch (NoSuchMethodException e) {
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 
     private void validateParams(OperationDescriptor op, Map<String, Object> params) {
         List<String> errors = new ArrayList<>();

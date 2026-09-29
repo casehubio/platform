@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @QuarkusTest
 class DynamicToolRegistrarTest {
@@ -137,10 +136,13 @@ class DynamicToolRegistrarTest {
     }
 
     @Test
-    void dispatch_mcpCapabilityException_propagatesFromDispatcher() {
-        assertThatThrownBy(() -> dispatcher.dispatch("cap-test", "search", java.util.Map.of("query", "test")))
-                .isInstanceOf(java.lang.reflect.InvocationTargetException.class)
-                .hasCauseInstanceOf(io.casehub.platform.api.mcp.McpCapabilityException.class);
+    void dispatch_mcpCapabilityException_returnsStructuredResult() throws Exception {
+        Object result = dispatcher.dispatch("cap-test", "search", java.util.Map.of("query", "test"));
+        assertThat(result).isInstanceOf(io.casehub.platform.api.mcp.McpOperationResult.class);
+        var opResult = (io.casehub.platform.api.mcp.McpOperationResult) result;
+        assertThat(opResult.outcome()).isEqualTo(io.casehub.platform.api.mcp.OperationOutcome.UNSUPPORTED);
+        assertThat(opResult.capability()).isEqualTo("SearchOperations");
+        assertThat(opResult.provider()).isEqualTo("s3");
     }
 
     @Test

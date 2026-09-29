@@ -1,7 +1,6 @@
 package io.casehub.platform.spring.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.PreferenceStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +57,18 @@ class SpringBootCompositionTest {
         assertThat(context.getBean("springDeliveryAttemptStore")).isNotNull();
         assertThat(context.getBean("springSubjectViewStore")).isNotNull();
     }
+
+    @Test
+    void agentBeansRegistered() {
+        assertThat(context.getBean(io.casehub.platform.agent.runtime.SubprocessRuntime.class)).isNotNull();
+    }
+
+    @Test
+    void streamsBeansRegistered() {
+        assertThat(io.casehub.platform.streams.kafka.KafkaStreamProcessorCore.class).isNotNull();
+        assertThat(io.casehub.platform.streams.poll.PollStreamProcessorCore.class).isNotNull();
+    }
+
 
     @Test
     void healthCheckReturnsUp() throws Exception {

@@ -2,14 +2,17 @@ package io.casehub.platform.mcp.spring;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.casehub.platform.api.mcp.McpResourceRegistry;
 import io.casehub.platform.mcp.DomainModelRegistry;
+import io.modelcontextprotocol.server.McpSyncServer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 
-@AutoConfiguration
+@AutoConfiguration(afterName = "org.springframework.ai.autoconfigure.mcp.server.McpServerAutoConfiguration")
 public class McpSpringAutoConfiguration {
 
     @Bean
@@ -39,5 +42,21 @@ public class McpSpringAutoConfiguration {
     CaseHubToolCallbackProvider caseHubToolCallbackProvider(DomainModelRegistry registry,
                                                              SpringOperationDispatcher dispatcher) {
         return new CaseHubToolCallbackProvider(registry, dispatcher);
+    }
+
+    @Bean
+    @ConditionalOnBean(McpSyncServer.class)
+    SpringMcpResourceRegistryBridge springMcpResourceRegistryBridge(
+            McpSyncServer server,
+            ApplicationEventPublisher eventPublisher) {
+        return new SpringMcpResourceRegistryBridge(server, eventPublisher);
+    }
+
+    @Bean
+    @ConditionalOnBean(McpSyncServer.class)
+    SpringDomainResourceRegistrar springDomainResourceRegistrar(
+            McpResourceRegistry resourceRegistry,
+            DomainModelRegistry domainModelRegistry) {
+        return new SpringDomainResourceRegistrar(resourceRegistry, domainModelRegistry);
     }
 }

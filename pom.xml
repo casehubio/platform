@@ -39,6 +39,7 @@
         <module>oidc</module>
         <module>expression-core</module>
         <module>expression</module>
+        <module>expression-spring</module>
         <module>persistence-jpa-common</module>
         <module>persistence-jpa</module>
         <module>persistence-spring-jpa</module>

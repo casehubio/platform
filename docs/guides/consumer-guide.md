@@ -643,6 +643,19 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `%prod.quarkus.kubernetes-config.config-maps` | Kubernetes ConfigMaps to read | -- |
 | `%prod.quarkus.kubernetes-config.secrets` | Kubernetes Secrets to read | -- |
 
+#### Spring Boot Kubernetes Configuration
+
+For Spring Boot deployments, add `spring-cloud-kubernetes-fabric8-config` to your application's classpath to enable Kubernetes ConfigMap and Secret reading:
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `spring.cloud.kubernetes.config.enabled` | Enable Kubernetes ConfigMap integration | false |
+| `spring.cloud.kubernetes.config.sources[0].name` | Kubernetes ConfigMap name to read | -- |
+| `spring.cloud.kubernetes.secrets.enabled` | Enable Kubernetes Secret integration | false |
+| `spring.cloud.kubernetes.secrets.sources[0].name` | Kubernetes Secret name to read | -- |
+
+ConfigMap and Secret format is identical to the Quarkus examples above. The `ConfigManager` and `SecretManager` SPIs read from Spring's `Environment` — any property source that feeds into `Environment` (including `spring-cloud-kubernetes`) is automatically available.
+
 ### Simulation
 
 | Property | Purpose | Default |

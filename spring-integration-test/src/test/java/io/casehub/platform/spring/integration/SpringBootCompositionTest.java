@@ -40,6 +40,9 @@ class SpringBootCompositionTest {
         assertThat(context.getBean(io.casehub.platform.api.acl.AccessControlProvider.class)).isNotNull();
         assertThat(context.getBean(io.casehub.platform.api.endpoints.EndpointRegistry.class)).isNotNull();
         assertThat(context.getBean(io.casehub.platform.api.expression.ExpressionEngineRegistry.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.expression.ConfigManager.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.expression.SecretManager.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.expression.JQEvaluatorCore.class)).isNotNull();
         assertThat(context.getBean(io.casehub.platform.governance.PolicyEnforcer.class)).isNotNull();
     }
 

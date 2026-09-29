@@ -20,5 +20,6 @@ public record ResolvedOperation(
         int restStatusOverride,
         List<String> rolesAllowed,
         boolean paginated,
-        String totalCountMethod
+        String totalCountMethod,
+        String[] webhookConsumes
 ) {}

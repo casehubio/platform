@@ -40,6 +40,7 @@ public class SpringDomainRestControllerWriter {
     private static final ClassName ROLES_ALLOWED = ClassName.get("jakarta.annotation.security", "RolesAllowed");
     private static final ClassName SSE_EMITTER = ClassName.get("org.springframework.web.servlet.mvc.method.annotation", "SseEmitter");
     private static final ClassName VALID = ClassName.get("jakarta.validation", "Valid");
+    private static final ClassName REQUEST_HEADER = ClassName.get("org.springframework.web.bind.annotation", "RequestHeader");
 
     public JavaFile generate(DomainScanResult domain, String targetPackage) {
         String className = GeneratorUtils.toPascalCase(domain.domainName()) + "RestController";
@@ -76,6 +77,8 @@ public class SpringDomainRestControllerWriter {
         for (ResolvedOperation op : domain.operations()) {
             if (op.type() == OperationType.STREAM) {
                 classBuilder.addMethod(buildStreamMethod(op, fieldName));
+            } else if (op.type() == OperationType.WEBHOOK) {
+                classBuilder.addMethod(buildWebhookMethod(op, fieldName));
             } else {
                 classBuilder.addMethod(buildRestMethod(op, fieldName));
             }
@@ -156,6 +159,10 @@ public class SpringDomainRestControllerWriter {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
                 paramBuilder.addAnnotation(AnnotationSpec.builder(PATH_VARIABLE)
                         .addMember("value", "$S", pathName).build());
+            } else if (p.isHeaderParam()) {
+                String headerName = p.headerParamName() != null ? p.headerParamName() : p.name();
+                paramBuilder.addAnnotation(AnnotationSpec.builder(REQUEST_HEADER)
+                        .addMember("value", "$S", headerName).build());
             } else if (i == bodyParamIndex) {
                 paramBuilder.addAnnotation(REQUEST_BODY);
             } else {
@@ -241,6 +248,92 @@ public class SpringDomainRestControllerWriter {
         builder.addStatement("$L.$L($L).subscribe().with(item -> { try { emitter.send(item); } catch (Exception e) { emitter.completeWithError(e); } }, emitter::completeWithError, emitter::complete)",
                 fieldName, op.methodName(), args);
         builder.addStatement("return emitter");
+
+        return builder.build();
+    }
+
+    private MethodSpec buildWebhookMethod(ResolvedOperation op, String fieldName) {
+        List<String> pathParams = new ArrayList<>();
+        Set<Integer> pathParamPositions = new HashSet<>();
+        int bodyParamIndex = -1;
+
+        for (int i = 0; i < op.params().size(); i++) {
+            ResolvedParam p = op.params().get(i);
+            if (p.isPathParam()) {
+                pathParams.add(p.pathParamName() != null ? p.pathParamName() : p.name());
+                pathParamPositions.add(i);
+            } else if (!p.isContextParam() && !p.isHeaderParam() && !p.isSimpleType() && bodyParamIndex < 0) {
+                bodyParamIndex = i;
+            }
+        }
+
+        StringBuilder pathSuffix = new StringBuilder();
+        pathSuffix.append("/").append(GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName()));
+        String resolvedPath = GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName());
+        for (String pp : pathParams) {
+            if (!resolvedPath.contains("{" + pp + "}")) {
+                pathSuffix.append("/{").append(pp).append("}");
+            }
+        }
+
+        AnnotationSpec.Builder mappingBuilder = AnnotationSpec.builder(POST_MAPPING)
+                .addMember("value", "$S", pathSuffix.toString());
+        if (op.webhookConsumes() != null && op.webhookConsumes().length > 0) {
+            for (String ct : op.webhookConsumes()) {
+                mappingBuilder.addMember("consumes", "$S", ct);
+            }
+        }
+
+        TypeName returnType = ParameterizedTypeName.get(RESPONSE_ENTITY, ClassName.OBJECT);
+
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(op.methodName())
+                .addModifiers(Modifier.PUBLIC)
+                .returns(returnType)
+                .addAnnotation(mappingBuilder.build());
+
+        if (!op.rolesAllowed().isEmpty()) {
+            AnnotationSpec.Builder ra = AnnotationSpec.builder(ROLES_ALLOWED);
+            for (String role : op.rolesAllowed()) {
+                ra.addMember("value", "$S", role);
+            }
+            builder.addAnnotation(ra.build());
+        }
+
+        for (int i = 0; i < op.params().size(); i++) {
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) { continue; }
+            ParameterSpec.Builder paramBuilder = ParameterSpec.builder(p.typeName(), p.name());
+
+            if (p.hasValid()) {
+                paramBuilder.addAnnotation(VALID);
+            }
+
+            if (pathParamPositions.contains(i)) {
+                String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
+                paramBuilder.addAnnotation(AnnotationSpec.builder(PATH_VARIABLE)
+                        .addMember("value", "$S", pathName).build());
+            } else if (p.isHeaderParam()) {
+                String headerName = p.headerParamName() != null ? p.headerParamName() : p.name();
+                paramBuilder.addAnnotation(AnnotationSpec.builder(REQUEST_HEADER)
+                        .addMember("value", "$S", headerName).build());
+            } else if (i == bodyParamIndex) {
+                paramBuilder.addAnnotation(REQUEST_BODY);
+            } else {
+                String qpName = p.restName() != null ? p.restName() : p.name();
+                paramBuilder.addAnnotation(AnnotationSpec.builder(REQUEST_PARAM)
+                        .addMember("value", "$S", qpName).build());
+            }
+
+            builder.addParameter(paramBuilder.build());
+        }
+
+        String args = op.params().stream()
+                .map(p -> p.isContextParam() ? contextParamResolution(p.contextParamKey()) : p.name())
+                .reduce((a, b) -> a + ", " + b).orElse("");
+        String delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
+
+        builder.addCode(generateResponseCode(op.returnTypeStr(), delegateCall, false,
+                op.restStatusOverride(), !pathParams.isEmpty()));
 
         return builder.build();
     }

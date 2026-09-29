@@ -14,5 +14,7 @@ public record ResolvedParam(
         boolean isContextParam,
         String contextParamKey,
         boolean hasValid,
-        String defaultValue
+        String defaultValue,
+        boolean isHeaderParam,
+        String headerParamName
 ) {}

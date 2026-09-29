@@ -9,6 +9,7 @@ import com.palantir.javapoet.ParameterSpec;
 import com.palantir.javapoet.TypeSpec;
 import io.casehub.platform.generator.DomainScanResult;
 import io.casehub.platform.generator.GeneratorUtils;
+import io.casehub.platform.generator.OperationType;
 import io.casehub.platform.generator.ResolvedOperation;
 import io.casehub.platform.generator.ResolvedParam;
 
@@ -51,6 +52,7 @@ public class SpringGraphqlControllerWriter {
         classBuilder.addMethod(ctorBuilder.build());
 
         for (ResolvedOperation op : domain.operations()) {
+            if (op.type() == OperationType.WEBHOOK) { continue; }
             classBuilder.addMethod(buildMethod(op, fieldName));
         }
 
@@ -62,6 +64,7 @@ public class SpringGraphqlControllerWriter {
             case QUERY -> QUERY_MAPPING;
             case MUTATION -> MUTATION_MAPPING;
             case STREAM -> SUBSCRIPTION_MAPPING;
+            case WEBHOOK -> throw new IllegalStateException("WEBHOOK operations should be filtered before buildMethod");
         };
 
         MethodSpec.Builder builder = MethodSpec.methodBuilder(op.methodName())

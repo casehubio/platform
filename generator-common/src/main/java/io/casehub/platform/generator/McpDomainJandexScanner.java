@@ -29,6 +29,8 @@ public class McpDomainJandexScanner {
     private static final DotName PLATFORM_QUERY = DotName.createSimple("io.casehub.platform.api.mcp.PlatformQuery");
     private static final DotName PLATFORM_MUTATION = DotName.createSimple("io.casehub.platform.api.mcp.PlatformMutation");
     private static final DotName PLATFORM_STREAM = DotName.createSimple("io.casehub.platform.api.mcp.PlatformStream");
+    private static final DotName PLATFORM_WEBHOOK = DotName.createSimple("io.casehub.platform.api.mcp.PlatformWebhook");
+    private static final DotName HEADER_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.HeaderParam");
     private static final DotName PATH_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.PathParam");
     private static final DotName REST_METHOD_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestMethod");
     private static final DotName REST_PATH_ANN = DotName.createSimple("io.casehub.platform.api.mcp.RestPath");
@@ -87,13 +89,21 @@ public class McpDomainJandexScanner {
                 AnnotationInstance queryAnn = method.annotation(PLATFORM_QUERY);
                 AnnotationInstance mutAnn = method.annotation(PLATFORM_MUTATION);
                 AnnotationInstance streamAnn = method.annotation(PLATFORM_STREAM);
+                AnnotationInstance webhookAnn = method.annotation(PLATFORM_WEBHOOK);
 
-                if (queryAnn == null && mutAnn == null && streamAnn == null) { continue; }
+                if (queryAnn == null && mutAnn == null && streamAnn == null && webhookAnn == null) { continue; }
 
-                OperationType opType = streamAnn != null ? OperationType.STREAM
+                OperationType opType = webhookAnn != null ? OperationType.WEBHOOK
+                        : streamAnn != null ? OperationType.STREAM
                         : queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
-                AnnotationInstance descAnn = streamAnn != null ? streamAnn : queryAnn != null ? queryAnn : mutAnn;
+                AnnotationInstance descAnn = webhookAnn != null ? webhookAnn
+                        : streamAnn != null ? streamAnn : queryAnn != null ? queryAnn : mutAnn;
                 String desc = descAnn.value() != null ? descAnn.value().asString() : "";
+
+                String[] webhookConsumes = null;
+                if (webhookAnn != null && webhookAnn.value("consumes") != null) {
+                    webhookConsumes = webhookAnn.value("consumes").asStringArray();
+                }
 
                 String restMethodOverride = extractStringAnnotation(method, REST_METHOD_ANN);
                 String restPathOverride = extractStringAnnotation(method, REST_PATH_ANN);
@@ -152,8 +162,12 @@ public class McpDomainJandexScanner {
                     AnnotationInstance dvAnn = findParameterAnnotation(method, i, DEFAULT_VALUE_ANN);
                     String defaultValue = (dvAnn != null && dvAnn.value() != null) ? dvAnn.value().asString() : null;
 
+                    AnnotationInstance hpAnn = findParameterAnnotation(method, i, HEADER_PARAM_ANN);
+                    boolean isHeaderParam = hpAnn != null;
+                    String headerParamName = (hpAnn != null && hpAnn.value() != null) ? hpAnn.value().asString() : null;
+
                     boolean simple = GeneratorUtils.isSimpleType(typeFqcn, index);
-                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue));
+                    params.add(new ResolvedParam(paramName, typeStr, typeFqcn, paramTypeName, isPathParam, pathParamName, simple, restName, isContextParam, contextParamKey, hasValid, defaultValue, isHeaderParam, headerParamName));
                 }
 
                 typeImports.add(classInfo.name().toString());
@@ -162,7 +176,7 @@ public class McpDomainJandexScanner {
                         method.name(), returnTypeStr, returnTypeName, params, typeImports,
                         classInfo.name().toString(), classInfo.simpleName(),
                         opType, desc, restMethodOverride, restPathOverride, restStatusOverride,
-                        rolesAllowed, paginated, totalCountMethod));
+                        rolesAllowed, paginated, totalCountMethod, webhookConsumes));
             }
         }
 

@@ -633,16 +633,16 @@ All decorators apply uniformly to all step types:
 
 ---
 
-## 10. Step Plugins and the Catalog
+## 10. Plugins and the Registry
 
-Steps are not hard-coded — they come from a **step catalog** that discovers actions at startup from multiple sources. Each source contributes step definitions with typed parameters and an execution binding.
+Steps are not hard-coded — they come from a **plugin registry** that discovers actions at startup from multiple sources. Each source contributes definitions with typed parameters and an execution binding.
 
-### Writing a step plugin
+### Writing a plugin
 
-A step plugin is a Java record annotated with `@StepPlugin`. The annotation processor generates JSON Schema, a `Action` implementation, and a registry manifest at compile time:
+A plugin is a Java record annotated with `@Plugin`. The CDI `PluginScanner` discovers `@Plugin` records at startup and registers them into the `PluginRegistry`. Optionally, the annotation processor generates JSON Schema, an `Action` implementation, and a registry manifest at compile time:
 
 ```java
-@StepPlugin(value = "rest-call", description = "Makes an HTTP request")
+@Plugin(value = "rest-call", description = "Makes an HTTP request")
 public record RestCallPlugin(
         @Required String url,
         @Optional String method,
@@ -651,37 +651,40 @@ public record RestCallPlugin(
         @Optional String timeout) {
 
     @Execute
-    public StepResult run() {
+    public Result run() {
         // implementation
-        return StepResult.of(Map.of("status-code", 200, "body", "..."));
+        return Result.of(Map.of("status-code", 200, "body", "..."));
     }
 }
 ```
 
-**What the annotation processor generates:**
+**Discovery paths (all converge on `PluginRegistry.register(Definition)`):**
+- **CDI scanner (default):** `PluginScanner` discovers `@Plugin` records as CDI beans at startup — no annotation processor needed
+- **APT codegen (optional):** annotation processor generates `Action` implementation + JSON Schema + manifest for ahead-of-time compilation
+
+**What the annotation processor generates (when used):**
 - `META-INF/yaml-plugins/rest-call.schema.json` — JSON Schema from the record fields
-- `RestCallPluginAction implements StepAction` — wraps the record instantiation + `@Execute` method
-- `META-INF/yaml-plugins/rest-call.json` — manifest linking name → action class → schema
+- `RestCallPluginAction implements Action` — wraps the record instantiation + `@Execute` method
+- `META-INF/yaml-plugins/rest-call.json` — manifest linking name → action class → schema → portability
 
 **Field annotations:**
 - `@Required` — parameter must be provided (schema: `required`)
 - `@Optional` — parameter is optional (nullable in the record)
 - `@Execute` — marks the method that runs the step (must return `Result`)
 
-**Return types:** `Result` is a sealed interface — `StepResult.of(Map)` for success, `StepResult.failed(message)` for failure.
+**Return types:** `Result` is a sealed interface — `Result.of(Map)` for success, `Result.failed(message)` for failure.
 
-### Catalog sources
+### Registration sources
 
-The `CompositeStepCatalog` discovers steps from multiple `CatalogSource` implementations, merged by priority (lower priority number = higher precedence):
+All sources register `Definition` objects into the `CompositePluginRegistry`. First registration wins on name collision:
 
-| Source | What it discovers | Priority |
-|--------|-------------------|----------|
-| `AptPluginSource` | `@StepPlugin` records via `META-INF/yaml-plugins/` manifests on the classpath | 0 (highest) |
-| `McpToolSource` | MCP tool definitions — each tool becomes an action with a tool invoker binding | 10 |
-| `ScriptSource` | Script files (`.py`, `.js`, `.mjs`) with companion `.schema.yaml` files on the filesystem | 20 |
-| `YamlStepDefinitionSource` | YAML step definition files — declarative step definitions with typed parameters and invoke bindings | 30 |
-
-Higher-precedence sources shadow lower ones — an `AptPluginSource` action named `process` takes priority over an `McpToolSource` action with the same name.
+| Source | What it discovers | Registration |
+|--------|-------------------|--------------|
+| `PluginScanner` | `@Plugin` records discovered as CDI beans | CDI startup scan |
+| `AptPluginSource` | `@Plugin` records via `META-INF/yaml-plugins/` manifests on the classpath | Startup populate |
+| `McpToolSource` | MCP tool definitions — each tool becomes an action with a tool invoker binding | Event-driven |
+| `ScriptSource` | Script files (`.py`, `.js`, `.mjs`) with companion `.schema.yaml` files on the filesystem | Startup populate |
+| `YamlStepDefinitionSource` | YAML step definition files — declarative step definitions with typed parameters and invoke bindings | Startup populate |
 
 ### Script auto-discovery
 
@@ -772,7 +775,7 @@ Every step definition has an `InvokeBinding` that determines how it executes:
 
 The step catalog enforces type safety at two levels:
 
-1. **Parse-time:** `StepWalker` resolves step maps against the catalog. Unknown action keys are rejected with the list of available actions. Parameter types are checked against the `StepParameter` definitions.
+1. **Parse-time:** `StepWalker` resolves step maps against the registry. Unknown action keys are rejected with the list of available actions. Parameter types are checked against the `Parameter` definitions.
 
 2. **Schema composition:** `StepSchemaComposer` generates a composed JSON Schema covering all discovered actions. Each action becomes a `oneOf` variant with its parameters schema. Structural step types (block, if/else, match, parallel) are included as additional variants. This schema can be served to editors for validation and auto-complete.
 

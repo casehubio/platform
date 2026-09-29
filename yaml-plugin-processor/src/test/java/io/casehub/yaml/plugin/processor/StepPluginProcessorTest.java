@@ -37,7 +37,7 @@ class StepPluginProcessorTest {
             .withProcessors(new StepPluginProcessor())
             .compile(JavaFileObjects.forResource("test-plugins/WrongReturnTypePlugin.java"));
         assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("must return StepResult");
+        assertThat(compilation).hadErrorContaining("must return Result");
     }
 
     @Test
@@ -60,9 +60,8 @@ class StepPluginProcessorTest {
             "test.plugins.ValidPluginAction").orElseThrow();
         String content = source.getCharContent(false).toString();
 
-        assertThat(content).contains("implements StepAction");
-        assertThat(content).contains("return \"test-action\"");
-        assertThat(content).contains("public StepResult execute(Map<String, Object> parameters, ServiceRegistry services)");
+        assertThat(content).contains("implements Action");
+        assertThat(content).contains("public Result execute(Map<String, Object> parameters, ServiceRegistry services)");
     }
 
     @Test

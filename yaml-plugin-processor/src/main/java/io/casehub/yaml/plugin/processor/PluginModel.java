@@ -8,6 +8,7 @@ import java.util.List;
 record PluginModel(
     String name,
     String description,
+    String portability,
     TypeElement pluginClass,
     List<RecordComponentElement> fields,
     ExecutableElement executeMethod,

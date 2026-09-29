@@ -21,6 +21,7 @@ class RegistryEmitter {
             w.println("  \"description\": \"" + model.description() + "\",");
             w.println("  \"pluginClass\": \"" + model.pluginClass().getQualifiedName() + "\",");
             w.println("  \"actionClass\": \"" + actionFqcn + "\",");
+            w.println("  \"portability\": \"" + model.portability() + "\",");
             w.println("  \"schemaResource\": \"META-INF/yaml-plugins/" + model.name() + ".schema.json\"");
             w.println("}");
         }

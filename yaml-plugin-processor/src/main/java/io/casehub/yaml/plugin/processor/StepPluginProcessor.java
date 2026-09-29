@@ -36,7 +36,7 @@ public class StepPluginProcessor extends AbstractProcessor {
 
         for (Element element : roundEnv.getElementsAnnotatedWith(Plugin.class)) {
             if (element.getKind() != ElementKind.RECORD) {
-                error(element, "@StepPlugin must be applied to a record");
+                error(element, "@Plugin must be applied to a record");
                 continue;
             }
             TypeElement typeElement = (TypeElement) element;
@@ -58,18 +58,18 @@ public class StepPluginProcessor extends AbstractProcessor {
         }
 
         if (executeMethods.isEmpty()) {
-            error(typeElement, "@StepPlugin class must have exactly one @Execute method");
+            error(typeElement, "@Plugin class must have exactly one @Execute method");
             return null;
         }
         if (executeMethods.size() > 1) {
-            error(typeElement, "@StepPlugin class must have exactly one @Execute method, found " + executeMethods.size());
+            error(typeElement, "@Plugin class must have exactly one @Execute method, found " + executeMethods.size());
             return null;
         }
 
         ExecutableElement executeMethod = executeMethods.get(0);
         TypeMirror returnType = executeMethod.getReturnType();
         if (!returnType.toString().equals(Result.class.getCanonicalName())) {
-            error(executeMethod, "@Execute method must return StepResult, found " + returnType);
+            error(executeMethod, "@Execute method must return Result, found " + returnType);
             return null;
         }
 
@@ -82,6 +82,7 @@ public class StepPluginProcessor extends AbstractProcessor {
         }
 
         return new PluginModel(annotation.value(), annotation.description(),
+            annotation.portability().name(),
             typeElement, fields, executeMethod, serviceParams);
     }
 
@@ -92,7 +93,7 @@ public class StepPluginProcessor extends AbstractProcessor {
             new RegistryEmitter().emit(model, processingEnv.getFiler());
         } catch (Exception e) {
             error(model.pluginClass(),
-                "Code generation failed for @StepPlugin '" + model.name() + "': " + e.getMessage());
+                "Code generation failed for @Plugin '" + model.name() + "': " + e.getMessage());
         }
     }
 

@@ -75,7 +75,9 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
                 descriptors = descriptors.stream()
                         .filter(d -> {
                             boolean excluded = manualBeanTypes.contains(d.returnTypeSimpleName())
-                                    || manualBeanTypes.contains(d.effectiveReturnTypeSimpleName());
+                                    || manualBeanTypes.contains(d.effectiveReturnTypeSimpleName())
+                                    || manualBeanTypes.contains(d.returnType())
+                                    || manualBeanTypes.contains(d.effectiveReturnType());
                             if (excluded) {
                                 getLog().info("Skipping " + d.effectiveReturnTypeSimpleName()
                                         + " — already defined in manual config");

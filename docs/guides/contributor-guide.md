@@ -30,7 +30,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `testing/` | `casehub-platform-testing` | `@Alternative @Priority(200)` | `FixedCurrentPrincipal`, `InMemoryGroupMembershipProvider` |
 | `config/` | `casehub-platform-config` | `@ApplicationScoped` | Scope-aware YAML + SmallRye Config |
 | `oidc/` | `casehub-platform-oidc` | `@Alternative @Priority(100) @RequestScoped` | OIDC-backed `CurrentPrincipal` |
-| `expression/` | `casehub-platform-expression` | `@ApplicationScoped` | JQ + MVEL3 + JEXL3 expression engines; `DefaultExpressionEngineRegistry`; `JQEvaluator`; `ConfigManager`; `SecretManager` |
+| `expression/` | `casehub-platform-expression` | `@DefaultBean` / `@ApplicationScoped` | Quarkus CDI wiring -- `MockConfigManager`, `MockSecretManager` (delegate to core via `SmallRyePropertySource`), `JQEvaluator` (delegates to `JQEvaluatorCore`), `ExpressionBeans` (@Produces engines). Optional `quarkus-kubernetes-config` |
 | `persistence-jpa/` | `casehub-platform-persistence-jpa` | `@ApplicationScoped` | JPA `PreferenceProvider` + `PreferenceStore` -- Flyway, scope-aware hierarchy |
 | `persistence-mongodb/` | `casehub-platform-persistence-mongodb` | `@Alternative @Priority(1)` | MongoDB `PreferenceProvider` + `PreferenceStore` -- beats JPA when co-deployed |
 | `datasource-alpha/` | `casehub-platform-datasource-alpha` | (library) | Rete alpha network -- `AlphaDataSource`, TypeNode, FilterNode, FanOutProcessor |
@@ -87,7 +87,8 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `spring-testing/` | `casehub-platform-spring-testing` | (none) | Spring test support -- test fixtures for Spring-based consumers |
 | `platform-view-core/` | `casehub-platform-view-core` | (none) | Framework-neutral view evaluation POJOs |
 | `platform-view-spring/` | `casehub-platform-view-spring` | Spring `@AutoConfiguration` | Spring auto-config for subject views |
-| `expression-core/` | `casehub-platform-expression-core` | (none) | Framework-neutral expression engine POJOs |
+| `expression-core/` | `casehub-platform-expression-core` | (none) | Framework-neutral expression engine POJOs -- `PropertySource` (config abstraction), `ConfigManagerCore`, `SecretManagerCore`, `JQEvaluatorCore`, `PropertyMapBuilder`, expression engines (MVEL, JQ, JEXL) |
+| `expression-spring/` | `casehub-platform-expression-spring` | Spring `@AutoConfiguration` | Spring auto-config for expression engines, `ConfigManager`, `SecretManager`, `JQEvaluatorCore` -- `EnvironmentPropertySource` wraps Spring `Environment`. Included in `spring-boot-starter` |
 | `governance-core/` | `casehub-platform-governance-core` | (none) | Framework-neutral policy enforcer POJOs |
 | `identity-core/` | `casehub-platform-identity-core` | (none) | Framework-neutral identity resolution POJOs |
 | `mcp/` | `casehub-platform-mcp` | `@ApplicationScoped` | MCP hierarchical model -- `GraphQLModelScanner` (auto-discovers domains from `@GraphQLApi`, class-based `@McpDomain`, or interface `@McpDomain`; also discovers `DomainReportProvider` beans), `DynamicToolRegistrar` (McpCapabilityException interception → McpOperationResult success response; auto-registers `<domain>_report` tools from DomainReportProvider), `LandscapeReportService @McpDomain("landscape")` (parallel fan-out aggregator), `McpResourceRegistryBridge`, `DomainResourceRegistrar` |
@@ -248,9 +249,9 @@ Same composite pattern for `ActorDIDProvider` -- `ConfiguredActorDIDProvider` (@
 
 `LambdaExpression<C, R>` wraps `Function<C, R>` -- implements both `ExpressionEvaluator` and `CompiledExpression`. Type key `"lambda"`. Intentionally outside the registry flow -- no engine exists for it.
 
-**ConfigManager** (`@DefaultBean` in expression module): Delegates to SmallRye Config (MicroProfile Config API). `configMap(name)` sweeps properties with `{name}.` prefix, builds nested maps from dotted keys. Kubernetes ConfigMap integration via optional `quarkus-kubernetes-config` dependency.
+**ConfigManager** (`ConfigManagerCore` in expression-core): Framework-neutral implementation using `PropertySource` abstraction. `configMap(name)` sweeps properties with `{name}.` prefix, builds nested maps via `PropertyMapBuilder`. Quarkus: `MockConfigManager @DefaultBean` wraps with `SmallRyePropertySource` + optional `quarkus-kubernetes-config`. Spring: `ExpressionSpringAutoConfiguration` wraps with `EnvironmentPropertySource` + optional `spring-cloud-kubernetes-fabric8-config`.
 
-**SecretManager** (`@DefaultBean` in expression module): Reads secrets from config properties with prefix `casehub.platform.secrets.{secretName}.{property}`. Same Kubernetes Secret integration pattern.
+**SecretManager** (`SecretManagerCore` in expression-core): Framework-neutral implementation using `PropertySource`. Reads secrets from properties with prefix `casehub.platform.secrets.{secretName}.{property}`. Same dual-framework pattern as ConfigManager.
 
 ### Agent Configuration Manifest
 

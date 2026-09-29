@@ -43,6 +43,7 @@
         <module>persistence-jpa</module>
         <module>persistence-spring-jpa</module>
         <module>persistence-mongodb</module>
+        <module>persistence-spring-mongodb</module>
         <module>endpoints-memory-core</module>
         <module>endpoints-memory</module>
         <module>endpoints-config-core</module>

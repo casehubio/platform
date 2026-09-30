@@ -35,7 +35,7 @@ Structural constructs (decorators) remain the runtime engine's fixed vocabulary 
 | Structural decorators (how steps compose) | Fixed engine vocabulary | Closed set — issue-386 | loop, retry, forEach, when, timeout, delay, on-error, trigger, transform, signal, publish, transition, parallel, semaphore, barrier, quorum, race |
 | Conditions (boolean predicates) | `Condition` functional interface + `ConditionEvaluator` + `ExpressionEngine` | Extensible via expression engines (MVEL, JQ) — not via plugins | `when: ${regime} == 'MEAN_REVERTING'` |
 
-Step action plugins execute at **position 10** (the "action" position) in the decorator evaluation order. The plugin receives typed parameters and returns `Result`. It has no awareness of the decorator chain wrapping it — decorators are the runtime engine's concern.
+Step action plugins execute at **position 10** (the "action" position) in the decorator evaluation order. The plugin receives typed parameters and returns `StepResult`. It has no awareness of the decorator chain wrapping it — decorators are the runtime engine's concern.
 
 ### Plugin annotation
 
@@ -85,7 +85,7 @@ public record PaginateSpec(
 
 | Annotation | Return type | Use case |
 |---|---|---|
-| `@StepPlugin("name")` | `Result` | Leaf actions: rest-call, assert, process-execute, compute |
+| `@StepPlugin("name")` | `StepResult` | Leaf actions: rest-call, assert, process-execute, compute |
 
 ### YAML surface syntax
 
@@ -176,14 +176,14 @@ Generates per plugin:
    - Plugin name must be kebab-case (`[a-z][a-z0-9-]*`). Empty, whitespace, or non-kebab names are rejected: `"ERROR: @StepPlugin 'My Step!': name must be kebab-case (lowercase letters, digits, hyphens)"`
    - Plugin class has exactly one `@Execute` method
    - `@Execute` method must be `public`
-   - `@Execute` return type is `Result`
+   - `@Execute` return type is `StepResult`
    - `@Optional` fields must use reference types, not primitives (`Integer` not `int`, `Boolean` not `boolean`). Primitives cannot represent absent: `"ERROR: @StepPlugin 'my-step': @Optional field 'count' must use Integer, not int"`
    - Field types are schema-representable (String, Integer, Long, Boolean, Duration, List, Map, enums, nested records)
    - Service parameters on `@Execute` must be interface types resolvable on the plugin's compilation classpath (the processor verifies the type element is an interface — not a class, enum, or annotation; resolution failure is a compile error from the plugin project's dependency graph, not from the processor)
 
 ### StepResult — new type
 
-`Result` is a new sealed interface in `yaml-plugin-api` that provides a typed return value for step action execution. It integrates with the existing `StepResultStore` (which stores results as `Map<String, Object>` via `recordSuccess`/`recordFailure`).
+`StepResult` is a new sealed interface in `yaml-plugin-api` that provides a typed return value for step action execution. It integrates with the existing `StepResultStore` (which stores results as `Map<String, Object>` via `recordSuccess`/`recordFailure`).
 
 ```java
 public sealed interface StepResult permits StepResult.Success, StepResult.Failure {
@@ -289,7 +289,7 @@ This separation is intentional: the plugin receives resolved, typed parameters a
    a. Look up action name in plugin registry (`HashMap.get()`)
    b. Binder constructs typed record from resolved YAML parameters
    c. Binder resolves services from ServiceRegistry
-   d. Binder calls `@Execute` method → `Result`
+   d. Binder calls `@Execute` method → `StepResult`
    e. Engine records result in `StepResultStore`
 
 Plugin lookup is a `HashMap.get()`. Binder invocation is a direct method call on generated code — no `Method.invoke()`, no reflective method dispatch. Plugin discovery at startup uses standard class loading from `META-INF` registry entries (`Class.forName()` for the generated binder class), which is the same mechanism used by `ServiceLoader` and Jandex-based discovery elsewhere in the platform.
@@ -349,7 +349,7 @@ The runtime orchestration spec (issue-386) defines structural constructs as **st
 - `semaphore` is inside `retry` — permits re-acquired per attempt
 - `retry` delegates to `PolicyEnforcer.execute(policy, action)` — existing governance infrastructure
 
-The plugin model does NOT replace or extend this decorator stack. Step action plugins execute at position 10 (the "action" position) within the decorator chain. The plugin receives resolved parameters and returns `Result`. It has no awareness of or interaction with the decorator evaluation order.
+The plugin model does NOT replace or extend this decorator stack. Step action plugins execute at position 10 (the "action" position) within the decorator chain. The plugin receives resolved parameters and returns `StepResult`. It has no awareness of or interaction with the decorator evaluation order.
 
 `LoopDirective`, `RetryDirective`, and `ForEachExpander` remain as they are:
 - `LoopDirective` — sealed interface (configuration record parsed from YAML, evaluated by `LoopEvaluator`)
@@ -385,7 +385,7 @@ yaml-core is constrained to be J2CL-compatible (issue-247):
 
 `yaml-plugin-api` is a zero-dep module at the same tier as yaml-core. Its types are J2CL-safe:
 - `@StepPlugin`, `@Execute`, `@Required`, `@Optional` — annotations (J2CL-safe)
-- `Result` — sealed interface with records (J2CL-safe)
+- `StepResult` — sealed interface with records (J2CL-safe)
 - `ServiceRegistry` — interface with no implementation (J2CL-safe)
 
 The `yaml-plugin-processor` (APT) is build-time only and does not need to be J2CL-compatible.

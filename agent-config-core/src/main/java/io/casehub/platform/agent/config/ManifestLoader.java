@@ -2,8 +2,8 @@ package io.casehub.platform.agent.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.api.identity.DIDResolver;
+import io.casehub.yaml.jackson.YamlMappers;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.signing.SignatureVerifier;
 import io.casehub.platform.api.signing.VerificationOutcome;
@@ -52,7 +52,7 @@ public class ManifestLoader {
     public ManifestLoader(ManifestCredentialResolver credentialResolver,
                           DIDResolver didResolver,
                           ManifestSecurityConfig securityConfig) {
-        this.mapper = new ObjectMapper(new YAMLFactory())
+        this.mapper = YamlMappers.create()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.credentialResolver = credentialResolver;
         this.didResolver = didResolver;

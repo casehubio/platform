@@ -1,8 +1,8 @@
 package io.casehub.platform.simulation.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.simulation.DataRealism;
+import io.casehub.yaml.jackson.YamlMappers;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.ProfileSource;
@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
-    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper YAML_MAPPER = YamlMappers.create();
 
     private final String defaultTenancyId;
     private final Map<String, MethodConfig> methods;

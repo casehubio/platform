@@ -80,7 +80,7 @@ class PrimitiveFactoryTest {
             public <T> OrcChannel<T> createChannel(String name, int capacity)                                                         {return delegate.createChannel(name, capacity);}
 
             @Override
-            public <S extends Enum<S>> BlockingOrcStateMachine<S> createStateMachine(String name, Class<S> stateType, S initialState) {return delegate.createStateMachine(name, stateType, initialState);}
+            public <S> BlockingOrcStateMachine<S> createStateMachine(String name, Class<S> stateType, S initialState) {return delegate.createStateMachine(name, stateType, initialState);}
 
             @Override
             public OrcCounter createCounter(String name)                                                                              {return delegate.createCounter(name);}

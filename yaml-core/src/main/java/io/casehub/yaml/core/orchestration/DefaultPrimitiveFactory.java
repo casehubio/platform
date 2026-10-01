@@ -48,7 +48,7 @@ public final class DefaultPrimitiveFactory implements PrimitiveFactory {
     }
 
     @Override
-    public <S extends Enum<S>> BlockingOrcStateMachine<S> createStateMachine(
+    public <S> BlockingOrcStateMachine<S> createStateMachine(
             String name, Class<S> stateType, S initialState) {
         var delegate = DefaultOrcStateMachine.builder(name, stateType, initialState).build();
         return new DefaultBlockingOrcStateMachine<>(delegate, speedMultiplier);

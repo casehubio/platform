@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-public final class DefaultBlockingOrcStateMachine<S extends Enum<S>> implements BlockingOrcStateMachine<S> {
+public final class DefaultBlockingOrcStateMachine<S> implements BlockingOrcStateMachine<S> {
 
     private final OrcStateMachine<S> delegate;
     private final SpeedMultiplier speedMultiplier;

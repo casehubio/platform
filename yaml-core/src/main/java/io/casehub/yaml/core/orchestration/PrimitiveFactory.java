@@ -17,7 +17,7 @@ public interface PrimitiveFactory {
 
     <T> OrcChannel<T> createChannel(String name, int capacity);
 
-    <S extends Enum<S>> BlockingOrcStateMachine<S> createStateMachine(
+    <S> BlockingOrcStateMachine<S> createStateMachine(
             String name, Class<S> stateType, S initialState);
 
     OrcCounter createCounter(String name);

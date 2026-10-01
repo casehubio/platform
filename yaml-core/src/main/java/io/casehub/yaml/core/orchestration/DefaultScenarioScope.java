@@ -77,7 +77,7 @@ public class DefaultScenarioScope implements ScenarioScope {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <S extends Enum<S>> BlockingOrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState) {
+    public <S> BlockingOrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState) {
         return (BlockingOrcStateMachine<S>) getOrCreate(name, BlockingOrcStateMachine.class, () -> factory.createStateMachine(name, stateType, initialState));
     }
 

@@ -3,7 +3,7 @@ package io.casehub.yaml.core.orchestration;
 import java.time.Duration;
 import java.util.Set;
 
-public interface BlockingOrcStateMachine<S extends Enum<S>> extends OrcStateMachine<S> {
+public interface BlockingOrcStateMachine<S> extends OrcStateMachine<S> {
 
     void awaitState(S target) throws InterruptedException;
 

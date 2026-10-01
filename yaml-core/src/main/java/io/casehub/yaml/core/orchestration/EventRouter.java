@@ -5,7 +5,7 @@ import io.casehub.yaml.core.step.MatchPattern;
 import java.util.List;
 import java.util.function.Predicate;
 
-public class EventRouter<S extends Enum<S>> {
+public class EventRouter<S> {
     private final OrcStateMachine<S>    target;
     private final List<EventMapping<S>> mappings;
 
@@ -20,7 +20,7 @@ public class EventRouter<S extends Enum<S>> {
 
     public boolean fire(Object event, Object context) {
         S      current     = target.currentState();
-        String currentName = current.name();
+        String currentName = String.valueOf(current);
         for (var m : mappings) {
             if (m.onPattern().matches(event) && m.fromPattern().matches(currentName)) {
                 if (m.guard() == null || m.guard().test(context)) {

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.api.identity.DIDResolver;
 import io.casehub.platform.api.model.ModelDescriptor;
+import io.casehub.platform.api.signing.SignatureVerifier;
+import io.casehub.platform.api.signing.VerificationOutcome;
 import org.jboss.logging.Logger;
 
 import java.io.ByteArrayOutputStream;
@@ -151,7 +153,12 @@ public class ManifestLoader {
 
         // Step 3: Build request
         var requestBuilder = HttpRequest.newBuilder().uri(uri).timeout(FETCH_TIMEOUT).GET();
-        if (source.auth() != null && credentialResolver != null) {
+        if (source.auth() != null && credentialResolver == null) {
+            LOG.errorf("Auth declared for source %s but no credential resolver configured (ref: %s)",
+                    source.uri(), source.auth().credential());
+            return null;
+        }
+        if (source.auth() != null) {
             try {
                 var ref = CredentialRef.parse(source.auth().credential());
                 var value = credentialResolver.resolve(ref);
@@ -268,12 +275,12 @@ public class ManifestLoader {
         }
 
         var sigBytes = Base64.getUrlDecoder().decode(signatureB64);
-        io.casehub.platform.api.signing.VerificationOutcome lastOutcome = null;
+        VerificationOutcome lastOutcome = null;
 
         for (var vm : verificationMethods) {
-            var outcome = io.casehub.platform.api.signing.SignatureVerifier.verify(
+            var outcome = SignatureVerifier.verify(
                     bodyBytes, sigBytes, vm.publicKeyBytes());
-            if (outcome == io.casehub.platform.api.signing.VerificationOutcome.VALID) {
+            if (outcome == VerificationOutcome.VALID) {
                 return true;
             }
             lastOutcome = outcome;

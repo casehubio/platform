@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -203,7 +204,18 @@ public class ManifestLoader {
                 var bodyBytes = readBounded(body, MAX_BODY_SIZE, source.uri());
                 if (bodyBytes == null) return null;
 
-                // Steps 9-10 (digest/signature verification) added in Task 4
+                // Step 9: Digest verification
+                if (source.integrity() != null
+                        && !verifyDigest(bodyBytes, source.integrity().digest(), source.uri())) {
+                    return null;
+                }
+
+                // Step 10: Signature verification
+                if (source.integrity() != null
+                        && !verifySignature(bodyBytes, source.integrity().signature(),
+                                source.integrity().signer(), didResolver, source.uri())) {
+                    return null;
+                }
 
                 // Step 11: Parse
                 return mapper.readValue(bodyBytes, Manifest.class);
@@ -212,6 +224,64 @@ public class ManifestLoader {
             LOG.warnf("Failed to fetch remote source %s: %s", source.uri(), e.getMessage());
             return null;
         }
+    }
+
+    static boolean verifyDigest(byte[] bodyBytes, String declaredDigest, String uri) {
+        if (declaredDigest == null) return true;
+        try {
+            var hex = declaredDigest.substring("sha256:".length());
+            var actual = HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(bodyBytes));
+            if (!actual.equalsIgnoreCase(hex)) {
+                LOG.errorf("Digest mismatch for source %s: expected sha256:%s, actual sha256:%s",
+                        uri, hex, actual);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            LOG.errorf("Digest verification error for source %s: %s", uri, e.getMessage());
+            return false;
+        }
+    }
+
+    static boolean verifySignature(byte[] bodyBytes, String signatureB64, String signerDid,
+                                    DIDResolver didResolver, String uri) {
+        if (signatureB64 == null) return true;
+
+        if (didResolver == null) {
+            LOG.errorf("Signature declared for source %s but no DID resolver configured (signer: %s)",
+                    uri, signerDid);
+            return false;
+        }
+
+        var didDoc = didResolver.resolve(null, signerDid);
+        if (didDoc.isEmpty()) {
+            LOG.errorf("DID unresolvable: %s for source %s", signerDid, uri);
+            return false;
+        }
+
+        var verificationMethods = didDoc.get().verificationMethods();
+        if (verificationMethods.isEmpty()) {
+            LOG.errorf("No verification methods in DID document for signer: %s (source %s)",
+                    signerDid, uri);
+            return false;
+        }
+
+        var sigBytes = Base64.getUrlDecoder().decode(signatureB64);
+        io.casehub.platform.api.signing.VerificationOutcome lastOutcome = null;
+
+        for (var vm : verificationMethods) {
+            var outcome = io.casehub.platform.api.signing.SignatureVerifier.verify(
+                    bodyBytes, sigBytes, vm.publicKeyBytes());
+            if (outcome == io.casehub.platform.api.signing.VerificationOutcome.VALID) {
+                return true;
+            }
+            lastOutcome = outcome;
+        }
+
+        LOG.errorf("Signature verification failed for source %s (signer: %s, outcome: %s)",
+                uri, signerDid, lastOutcome);
+        return false;
     }
 
     private static boolean isPrivateAddress(URI uri) {

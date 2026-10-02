@@ -22,6 +22,7 @@ public class SpringGraphqlControllerWriter {
     private static final ClassName MUTATION_MAPPING = ClassName.get("org.springframework.graphql.data.method.annotation", "MutationMapping");
     private static final ClassName SUBSCRIPTION_MAPPING = ClassName.get("org.springframework.graphql.data.method.annotation", "SubscriptionMapping");
     private static final ClassName ARGUMENT = ClassName.get("org.springframework.graphql.data.method.annotation", "Argument");
+    private static final ClassName ROLES_ALLOWED = ClassName.get("jakarta.annotation.security", "RolesAllowed");
 
     public JavaFile generate(DomainScanResult domain, String targetPackage) {
         String className = GeneratorUtils.toPascalCase(domain.domainName()) + "GraphqlController";
@@ -71,6 +72,14 @@ public class SpringGraphqlControllerWriter {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(op.returnTypeName())
                 .addAnnotation(mappingAnnotation);
+
+        if (!op.rolesAllowed().isEmpty()) {
+            AnnotationSpec.Builder ra = AnnotationSpec.builder(ROLES_ALLOWED);
+            for (String role : op.rolesAllowed()) {
+                ra.addMember("value", "$S", role);
+            }
+            builder.addAnnotation(ra.build());
+        }
 
         for (ResolvedParam param : op.params()) {
             if (param.isContextParam()) { continue; }

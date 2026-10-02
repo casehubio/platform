@@ -14,9 +14,9 @@
     <packaging>jar</packaging>
     <name>CaseHub Platform :: Spring :: Agent</name>
     <description>Consolidated Spring Boot auto-configuration for all agent backends.
-        Generated from 9 Quarkus agent modules via spring-generator,
+        Generated from 10 Quarkus agent modules via spring-generator,
         plus hand-written agent-gate BeanPostProcessor.
-        Replaces 10 individual agent-*-spring modules.</description>
+        Replaces 11 individual agent-*-spring modules.</description>
 
     <dependencies>
         <!-- Core modules (compile) -->
@@ -53,6 +53,11 @@
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-agent-langchain4j-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-ollama-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -119,6 +124,12 @@
         </dependency>
         <dependency>
             <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-ollama</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-agent-openai</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
@@ -177,6 +188,7 @@
                                 <quarkusModule>${project.basedir}/../agent-gemini</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-gemini-cli</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-langchain4j</quarkusModule>
+                                <quarkusModule>${project.basedir}/../agent-ollama</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-openai</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-router</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-runtime</quarkusModule>
@@ -195,6 +207,7 @@
                                 <quarkusModule>${project.basedir}/../agent-gemini</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-gemini-cli</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-langchain4j</quarkusModule>
+                                <quarkusModule>${project.basedir}/../agent-ollama</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-openai</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-router</quarkusModule>
                                 <quarkusModule>${project.basedir}/../agent-runtime</quarkusModule>

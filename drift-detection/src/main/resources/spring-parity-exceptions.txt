@@ -85,8 +85,6 @@ callback-client
 # Hand-written callback-spring handles this (BeanPostProcessor pattern)
 callback
 
-# Agent — no -core extraction yet; local inference only, not a deployment blocker (platform#508)
-agent-ollama
 
 # Streams webhook — covered by rest-spring-generator in platform-spring
 streams-webhook

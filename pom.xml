@@ -63,6 +63,7 @@
         <module>agent-claude</module>
         <module>agent-openai-core</module>
         <module>agent-openai</module>
+        <module>agent-ollama-core</module>
         <module>agent-ollama</module>
         <module>agent-codex-core</module>
         <module>agent-codex</module>

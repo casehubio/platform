@@ -4,19 +4,15 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.openai.AbstractOpenAiSdkBackend;
 import io.smallrye.mutiny.Multi;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.time.Duration;
 import java.util.function.Function;
 
-@ApplicationScoped
 public class OllamaAgentBackend extends AbstractOpenAiSdkBackend {
 
     private final OllamaAgentProperties properties;
     private final com.openai.client.OpenAIClient openAiClient;
 
-    @Inject
     public OllamaAgentBackend(OllamaAgentProperties properties) {
         super(properties.maxConcurrentSessions(), null);
         this.properties = properties;

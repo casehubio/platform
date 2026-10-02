@@ -194,7 +194,7 @@ C4Container
   }
   Container_Boundary(l5, "L5: Preference Persistence") {
     Container(jpaPrefs, "casehub-platform-persistence-jpa", "Hibernate + Flyway", "@ApplicationScoped JpaPreferenceProvider")
-    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "Panache MongoDB", "@Alternative @Priority(1) MongoPreferenceProvider")
+    Container(mongoPrefs, "casehub-platform-persistence-mongodb", "MongoDB Client + POJO codec", "@Alternative @Priority(1) MongoPreferenceProvider")
   }
   Container_Boundary(l6, "L6: Memory Adapters — mutually exclusive per priority tier") {
     Container(memInmem, "casehub-platform-memory-inmem", "Java", "@Alternative @Priority(10) InMemoryMemoryStore")

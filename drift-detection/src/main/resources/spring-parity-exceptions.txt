@@ -53,8 +53,6 @@ graphql
 # GraphQL client — Quarkus SmallRye-specific
 graphql-client
 
-# Admin ACL REST — @RolesAllowed on mutations needs @PreAuthorize Spring mapping (platform#506)
-acl-admin
 # Worker credential JAX-RS filter — needs hand-written Spring Filter equivalent (platform#507)
 acl-worker
 # Quarkus-specific NoSQL persistence (Panache removed — uses MongoClient API, but CDI wiring remains)

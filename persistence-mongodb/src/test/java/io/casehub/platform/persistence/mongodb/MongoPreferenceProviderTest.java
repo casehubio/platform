@@ -19,7 +19,18 @@ class MongoPreferenceProviderTest {
 
     private static final String TENANT = io.casehub.platform.api.identity.TenancyConstants.DEFAULT_TENANT_ID;
 
-    @Inject PreferenceProvider preferenceProvider;
+    @Inject
+    PreferenceProvider             preferenceProvider;
+    @Inject
+    com.mongodb.client.MongoClient mongoClient;
+
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.mongodb.database")
+    String database;
+
+    private com.mongodb.client.MongoCollection<MongoPreferenceDocument> collection() {
+        return mongoClient.getDatabase(database)
+                          .getCollection(MongoPreferenceDocument.COLLECTION, MongoPreferenceDocument.class);
+    }
 
     record Count(int value) implements SingleValuePreference {
         static final PreferenceKey<Count> KEY = new PreferenceKey<>(
@@ -40,7 +51,7 @@ class MongoPreferenceProviderTest {
 
     @BeforeEach
     void clear() {
-        MongoPreferenceDocument.deleteAll();
+        collection().deleteMany(new org.bson.Document());
     }
 
     @Test
@@ -106,7 +117,7 @@ class MongoPreferenceProviderTest {
         final Preferences prefs = preferenceProvider.resolve(SettingsScope.of(TENANT, io.casehub.platform.api.path.Path.of("casehubio", "devtown")));
 
         assertEquals(100, prefs.get(Threshold.KEY, "senior").value());
-        assertEquals(10,  prefs.get(Threshold.KEY, "junior").value());
+        assertEquals(10, prefs.get(Threshold.KEY, "junior").value());
         assertNull(prefs.get(Threshold.KEY, "absent"));
     }
 
@@ -168,6 +179,6 @@ class MongoPreferenceProviderTest {
         doc.name      = name;
         doc.subKey    = subKey;
         doc.value     = value;
-        doc.persist();
+        collection().insertOne(doc);
     }
 }

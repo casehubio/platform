@@ -14,30 +14,39 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * MongoDB-backed {@link PreferenceProvider}.
- *
- * <p>Resolves preferences by walking the scope hierarchy from root to most specific —
- * child scopes override parent scopes. {@code effectiveAt} from {@link SettingsScope}
- * is intentionally ignored: all documents are considered current. Time-travel support
- * requires a versioned write model (preferences-editor, issue #8).
- *
- * <p>{@code @Alternative @Priority(1)} beats the plain {@code @ApplicationScoped}
- * {@code JpaPreferenceProvider} when both modules are on the classpath, following the
- * persistence-backend CDI priority ladder (casehubio/parent#44).
- *
- * <p>Consumers add {@code casehub-platform-persistence-mongodb} as a compile-scope
- * dependency to activate — no further configuration required.
- */
 @ApplicationScoped
 @Alternative
 @Priority(1)
 public class MongoPreferenceProvider implements PreferenceProvider {
 
+    private final com.mongodb.client.MongoClient mongoClient;
+    private final String                         database;
+
+    @jakarta.inject.Inject
+    MongoPreferenceProvider(com.mongodb.client.MongoClient mongoClient,
+                            @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.mongodb.database") String database) {
+        this.mongoClient = mongoClient;
+        this.database    = database;
+    }
+
+    private com.mongodb.client.MongoCollection<MongoPreferenceDocument> collection() {
+        return mongoClient.getDatabase(database)
+                          .getCollection(MongoPreferenceDocument.COLLECTION, MongoPreferenceDocument.class);
+    }
+
     @Override
     public Preferences resolve(final SettingsScope scope) {
-        final List<String>                  ancestors = ancestors(scope.scope());
-        final List<MongoPreferenceDocument> docs      = new ArrayList<>(MongoPreferenceDocument.findByScopes(scope.tenancyId(), ancestors));
+        final List<String> ancestors = ancestors(scope.scope());
+
+        final List<MongoPreferenceDocument> docs;
+        if (ancestors.isEmpty()) {
+            docs = java.util.Collections.emptyList();
+        } else {
+            docs = new ArrayList<>();
+            collection().find(com.mongodb.client.model.Filters.and(
+                    com.mongodb.client.model.Filters.eq("tenancyId", scope.tenancyId()),
+                    com.mongodb.client.model.Filters.in("scope", ancestors))).into(docs);
+        }
 
         final Map<String, Integer> scopeOrder = new HashMap<>();
         for (int i = 0; i < ancestors.size(); i++) {
@@ -55,19 +64,16 @@ public class MongoPreferenceProvider implements PreferenceProvider {
             merged.put(mapKey, doc.value);
         }
 
-        return new MapPreferences(merged);}
+        return new MapPreferences(merged);
+    }
 
-    /** Returns ancestor scope strings shortest-first (root first), ending with the target scope. */
     private static List<String> ancestors(final Path path) {
-        final List<String> result = new ArrayList<>();
-        Path current = path;
+        final List<String> result  = new ArrayList<>();
+        Path               current = path;
         while (current != null) {
             result.add(0, current.value());
             current = current.parent();
         }
-        // Root scope ("") is always the base ancestor — preferences stored there apply universally.
-        // Path.parent() returns null for single-segment paths (not root), so root is not naturally
-        // reached by the walk above for non-root paths.
         if (path.depth() > 0) {
             result.add(0, Path.root().value());
         }

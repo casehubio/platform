@@ -53,11 +53,11 @@ graphql
 # GraphQL client — Quarkus SmallRye-specific
 graphql-client
 
-# Quarkus-specific admin — @RolesAllowed REST endpoints
+# Admin ACL REST — @RolesAllowed on mutations needs @PreAuthorize Spring mapping (platform#506)
 acl-admin
-# Quarkus-specific worker auth filter — @Provider JAX-RS filter
+# Worker credential JAX-RS filter — needs hand-written Spring Filter equivalent (platform#507)
 acl-worker
-# Quarkus-specific NoSQL persistence
+# Quarkus-specific NoSQL persistence (Panache removed — uses MongoClient API, but CDI wiring remains)
 persistence-mongodb
 # IS the Spring module itself
 persistence-spring-mongodb
@@ -85,7 +85,7 @@ callback-client
 # Hand-written callback-spring handles this (BeanPostProcessor pattern)
 callback
 
-# Agent — no Spring counterpart yet
+# Agent — no -core extraction yet; local inference only, not a deployment blocker (platform#508)
 agent-ollama
 
 # Streams webhook — covered by rest-spring-generator in platform-spring

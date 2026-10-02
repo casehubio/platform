@@ -9,16 +9,14 @@ import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
-import org.jboss.logging.Logger;
 
 @Provider
 @Priority(Priorities.AUTHENTICATION - 10)
 public class WorkerCredentialFilter implements ContainerRequestFilter {
 
-    private static final Logger LOG = Logger.getLogger(WorkerCredentialFilter.class);
     private static final String HEADER = "X-Worker-Credential";
 
-    private final WorkerCredentialStore credentialStore;
+    private final WorkerCredentialValidator validator;
     private final WorkerScopeExtractor scopeExtractor;
     private final CurrentPrincipal currentPrincipal;
 
@@ -27,7 +25,7 @@ public class WorkerCredentialFilter implements ContainerRequestFilter {
             WorkerCredentialStore credentialStore,
             WorkerScopeExtractor scopeExtractor,
             CurrentPrincipal currentPrincipal) {
-        this.credentialStore = credentialStore;
+        this.validator = new WorkerCredentialValidator(credentialStore);
         this.scopeExtractor = scopeExtractor;
         this.currentPrincipal = currentPrincipal;
     }
@@ -39,37 +37,14 @@ public class WorkerCredentialFilter implements ContainerRequestFilter {
             return;
         }
 
-        var credential = credentialStore.lookup(token);
-        if (credential.isEmpty()) {
-            ctx.abortWith(Response.status(401).entity("Invalid worker credential").build());
-            return;
-        }
-
-        var cred = credential.get();
-        if (cred.isExpired()) {
-            ctx.abortWith(Response.status(401).entity("Worker credential expired").build());
-            return;
-        }
-
-        String requestTenancy = currentPrincipal.tenancyId();
-        if (!cred.tenancyId().equals(requestTenancy)) {
-            LOG.warnf("Worker credential tenancy violation: credential=%s request=%s",
-                cred.tenancyId(), requestTenancy);
-            ctx.abortWith(Response.status(403)
-                .entity("Credential not scoped for this tenant").build());
-            return;
-        }
-
         var requestResource = scopeExtractor.extractResourceId(ctx);
-        if (requestResource.isPresent()
-                && !cred.resourceId().equals(requestResource.get())) {
-            LOG.warnf("Worker credential scope violation: credential=%s request=%s",
-                cred.resourceId(), requestResource.get());
-            ctx.abortWith(Response.status(403)
-                .entity("Credential not scoped for this resource").build());
-            return;
-        }
+        var result = validator.validate(token, currentPrincipal.tenancyId(), requestResource);
 
-        ctx.setProperty("workerCredential", cred);
+        switch (result) {
+            case ValidationResult.Rejected r ->
+                ctx.abortWith(Response.status(r.status()).entity(r.message()).build());
+            case ValidationResult.Accepted a ->
+                ctx.setProperty("workerCredential", a.credential());
+        }
     }
 }

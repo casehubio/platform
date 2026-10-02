@@ -53,8 +53,6 @@ graphql
 # GraphQL client — Quarkus SmallRye-specific
 graphql-client
 
-# Worker credential JAX-RS filter — needs hand-written Spring Filter equivalent (platform#507)
-acl-worker
 # Quarkus-specific NoSQL persistence (Panache removed — uses MongoClient API, but CDI wiring remains)
 persistence-mongodb
 # IS the Spring module itself

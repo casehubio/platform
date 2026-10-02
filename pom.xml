@@ -79,7 +79,9 @@
         <module>acl-jpa</module>
         <module>acl-spring-jpa</module>
         <module>acl-admin</module>
+        <module>acl-worker-core</module>
         <module>acl-worker</module>
+        <module>acl-worker-spring</module>
         <module>notifications-inmem-core</module>
         <module>notifications-inmem</module>
         <module>notifications-jpa-common</module>

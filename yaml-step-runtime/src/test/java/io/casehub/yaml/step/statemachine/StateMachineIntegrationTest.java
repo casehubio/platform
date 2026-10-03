@@ -83,8 +83,8 @@ class StateMachineIntegrationTest {
         var scope = new DefaultExecutionScope();
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
-                log.add(ps.definition().name());
-                if ("failing-step".equals(ps.definition().name())) {
+                log.add(ps.actionName());
+                if ("failing-step".equals(ps.actionName())) {
                     return Result.failed("step failed");
                 }
             }
@@ -167,10 +167,10 @@ class StateMachineIntegrationTest {
         var scope = new DefaultExecutionScope();
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
-                if ("producer".equals(ps.definition().name())) {
+                if ("producer".equals(ps.actionName())) {
                     return Result.of(Map.of("value", "hello-world"));
                 }
-                if ("consumer".equals(ps.definition().name())) {
+                if ("consumer".equals(ps.actionName())) {
                     Object val = resolver.resolve("${result.producer.value}");
                     captured.add(String.valueOf(val));
                     return Result.of(Map.of());
@@ -227,7 +227,7 @@ class StateMachineIntegrationTest {
     private StepRunner loggingRunner(CopyOnWriteArrayList<String> log) {
         return (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
-                log.add(ps.definition().name());
+                log.add(ps.actionName());
             }
             return Result.of(Map.of());
         };

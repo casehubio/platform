@@ -9,6 +9,8 @@ import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.config.ManifestResult;
 import io.casehub.platform.api.FactoryMethod;
+import io.casehub.platform.api.model.ModelAvailabilityFilter;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRef;
@@ -17,6 +19,8 @@ import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,23 +32,33 @@ public class RoutingAgentProvider implements AgentProvider {
     private final String                  defaultBackendKey;
     private final ModelRegistry           modelRegistry;
     private final Map<String, ModelQuery> aliases;
+    private final ModelAvailabilityFilter availabilityFilter;
 
     private record ResolvedRoute(AgentBackend backend, String apiModelId) {}
 
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry) {
-        this(registry, defaultBackendKey, modelRegistry, Map.of());
+        this(registry, defaultBackendKey, modelRegistry, Map.of(), ModelAvailabilityFilter.ALWAYS_AVAILABLE);
     }
 
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry,
                                 Map<String, ModelQuery> aliases) {
-        this.registry          = registry;
-        this.defaultBackendKey = defaultBackendKey;
-        this.modelRegistry     = modelRegistry;
-        this.aliases           = aliases != null ? Map.copyOf(aliases) : Map.of();
+        this(registry, defaultBackendKey, modelRegistry, aliases, ModelAvailabilityFilter.ALWAYS_AVAILABLE);
+    }
+
+    public RoutingAgentProvider(BackendInstanceRegistry registry,
+                                String defaultBackendKey,
+                                ModelRegistry modelRegistry,
+                                Map<String, ModelQuery> aliases,
+                                ModelAvailabilityFilter availabilityFilter) {
+        this.registry            = registry;
+        this.defaultBackendKey   = defaultBackendKey;
+        this.modelRegistry       = modelRegistry;
+        this.aliases             = aliases != null ? Map.copyOf(aliases) : Map.of();
+        this.availabilityFilter  = availabilityFilter != null ? availabilityFilter : ModelAvailabilityFilter.ALWAYS_AVAILABLE;
         LOG.infof("Agent router initialized with registry, default=%s, aliases=%d",
                   defaultBackendKey, this.aliases.size());
     }
@@ -67,7 +81,7 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
-        var route = config.modelQuery() != null ? resolveQuery(config.modelQuery()) : resolve(config.model());
+        var route = resolveFromConfig(config);
         var rewritten = new AgentSessionConfig(
                 config.systemPrompt(), config.userPrompt(), config.mcpServers(),
                 config.timeout(), config.correlationId(), route.apiModelId());
@@ -76,11 +90,56 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public AgentSession openSession(AgentSessionInit init) {
-        var route = init.modelQuery() != null ? resolveQuery(init.modelQuery()) : resolve(init.model());
+        var route = resolveFromInit(init);
         var rewritten = new AgentSessionInit(
                 init.systemPrompt(), init.mcpServers(),
                 init.timeout(), init.correlationId(), route.apiModelId());
         return route.backend().openSession(rewritten);
+    }
+
+    private ResolvedRoute resolveFromConfig(AgentSessionConfig config) {
+        if (config.modelChain() != null && !config.modelChain().isEmpty()) {
+            return resolveChain(config.modelChain(), availabilityFilter);
+        }
+        return config.modelQuery() != null
+               ? resolveQuery(config.modelQuery())
+               : resolve(config.model());
+    }
+
+    private ResolvedRoute resolveFromInit(AgentSessionInit init) {
+        if (init.modelChain() != null && !init.modelChain().isEmpty()) {
+            return resolveChain(init.modelChain(), availabilityFilter);
+        }
+        return init.modelQuery() != null
+               ? resolveQuery(init.modelQuery())
+               : resolve(init.model());
+    }
+
+    private ResolvedRoute resolveChain(ModelChain chain, ModelAvailabilityFilter filter) {
+        List<ModelChain.ModelChainEntry> attempted = new ArrayList<>();
+        for (var entry : chain.entries()) {
+            attempted.add(entry);
+            try {
+                ResolvedRoute route = switch (entry) {
+                    case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef());
+                    case ModelChain.ModelChainEntry.Queried q -> resolveQuery(q.query());
+                };
+
+                if (route.apiModelId() == null) return route;
+                var descriptor = modelRegistry.resolveById(route.apiModelId());
+                if (descriptor.isPresent() && !filter.isAvailable(descriptor.get())) {
+                    LOG.debugf("Chain entry %s resolved but unavailable, trying next", entry);
+                    continue;
+                }
+
+                LOG.infof("Chain resolved to %s after %d attempt(s) (fallback=%s)",
+                           route.apiModelId(), attempted.size(), attempted.size() > 1);
+                return route;
+            } catch (IllegalArgumentException e) {
+                LOG.debugf("Chain entry %s failed resolution: %s", entry, e.getMessage());
+            }
+        }
+        throw new ModelChainExhaustedException(chain, attempted);
     }
 
     private ResolvedRoute resolveQuery(ModelQuery query) {

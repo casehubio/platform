@@ -22,6 +22,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.smallrye.mutiny.helpers.test.AssertSubscriber;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -93,7 +96,10 @@ class RoutingAgentProviderChainTest {
         var provider = new RoutingAgentProvider(backendRegistry(claudeBackend), "claude", registry,
                 Map.of(), ModelAvailabilityFilter.ALWAYS_AVAILABLE);
         var config = AgentSessionConfig.of("sys", "user").withModelChain(ModelChain.of("opus", "sonnet"));
-        assertThatThrownBy(() -> provider.invoke(config))
+        var subscriber = provider.invoke(config)
+                .subscribe().withSubscriber(AssertSubscriber.create(10));
+        subscriber.awaitFailure();
+        assertThat(subscriber.getFailure())
                 .isInstanceOf(ModelChainExhaustedException.class)
                 .hasMessageContaining("2");
     }

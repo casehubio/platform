@@ -3,6 +3,7 @@ package io.casehub.platform.agent.router;
 import io.casehub.platform.agent.AgentBackend;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
+import io.casehub.platform.agent.AgentRateLimitException;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
@@ -81,11 +82,55 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+        if (config.modelChain() != null && !config.modelChain().isEmpty()) {
+            return resolveAndInvokeWithRetry(config);
+        }
         var route = resolveFromConfig(config);
         var rewritten = new AgentSessionConfig(
                 config.systemPrompt(), config.userPrompt(), config.mcpServers(),
                 config.timeout(), config.correlationId(), route.apiModelId());
         return route.backend().invoke(rewritten);
+    }
+
+    private Multi<AgentEvent> resolveAndInvokeWithRetry(AgentSessionConfig config) {
+        var entries = config.modelChain().entries();
+
+        Multi<AgentEvent> chain = Multi.createFrom().failure(
+            new ModelChainExhaustedException(config.modelChain(), entries));
+
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            var entry = entries.get(i);
+            final Multi<AgentEvent> fallback = chain;
+            chain = Multi.createFrom().deferred(() -> attemptInvoke(entry, config))
+                .onFailure(ModelChainRetryableException.class)
+                .recoverWithMulti(fallback);
+        }
+        return chain;
+    }
+
+    private Multi<AgentEvent> attemptInvoke(ModelChain.ModelChainEntry entry, AgentSessionConfig config) {
+        ResolvedRoute route;
+        try {
+            route = switch (entry) {
+                case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef());
+                case ModelChain.ModelChainEntry.Queried q -> resolveQuery(q.query());
+            };
+        } catch (IllegalArgumentException e) {
+            return Multi.createFrom().failure(new ModelChainRetryableException(entry, e));
+        }
+
+        var rewritten = new AgentSessionConfig(
+                config.systemPrompt(), config.userPrompt(), config.mcpServers(),
+                config.timeout(), config.correlationId(), route.apiModelId());
+        return route.backend().invoke(rewritten)
+            .onFailure(this::isRetryableApiError)
+            .recoverWithMulti(err -> Multi.createFrom().failure(
+                new ModelChainRetryableException(entry, err)));
+    }
+
+    private boolean isRetryableApiError(Throwable t) {
+        return t instanceof AgentRateLimitException
+            || t instanceof java.net.ConnectException;
     }
 
     @Override

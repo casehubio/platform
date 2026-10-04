@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pool-declaration",
+  "description": "Declarative agent pool definition within a platform manifest",
+  "type": "object",
+  "required": ["agent-id"],
+  "properties": {
+    "agent-id": {
+      "type": "string",
+      "description": "Agent definition identifier"
+    },
+    "backend": {
+      "type": "string",
+      "description": "Which backend provisions this pool (e.g. claudony)"
+    },
+    "min-active": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Minimum active pool members"
+    },
+    "max-active": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "Maximum active pool members"
+    },
+    "working-dir": {
+      "type": "string",
+      "description": "Filesystem path for agent working directories"
+    },
+    "scaling": {
+      "type": "object",
+      "description": "Scaling configuration — consumer-interpreted (e.g. target-tracking, step, demand-pressure)"
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Consumer-specific configuration (e.g. model-chain, budget, eviction)"
+    }
+  },
+  "additionalProperties": false
+}

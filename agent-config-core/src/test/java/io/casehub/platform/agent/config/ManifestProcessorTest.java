@@ -7,6 +7,8 @@ import io.casehub.platform.api.model.ModelLocality;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelTier;
 import io.casehub.platform.api.model.MutableModelRegistry;
+import org.junit.jupiter.api.Test;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,7 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ManifestProcessorTest {
@@ -35,7 +37,7 @@ class ManifestProcessorTest {
         var manifest = new Manifest(
                 List.of(),
                 List.of(new ProviderDeclaration("anthropic", "env:ANTHROPIC_API_KEY", null)),
-                List.of(), Map.of(), List.of(), null);
+                List.of(), Map.of(), List.of(), null, Map.of());
 
         var envResolver = new ManifestCredentialResolver(ref -> Map.of()) {
             @Override
@@ -54,7 +56,7 @@ class ManifestProcessorTest {
     @Test
     void processRegistersModelsAtPriority8() {
         var model = testModel("custom-model", ModelTier.STANDARD);
-        var manifest = new Manifest(List.of(model), List.of(), List.of(), Map.of(), List.of(), null);
+        var manifest = new Manifest(List.of(model), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
 
         processor(Map.of()).process(manifest);
 
@@ -66,7 +68,7 @@ class ManifestProcessorTest {
     @Test
     void processConvertsAliasToModelQuery() {
         var alias = new AliasDeclaration("FLAGSHIP", List.of("reasoning", "code"), null, "HIGH", 128000, null, "anthropic");
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of("reasoning-heavy", alias), List.of(), null);
+        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of("reasoning-heavy", alias), List.of(), null, Map.of());
 
         var result = processor(Map.of()).process(manifest);
 
@@ -82,14 +84,14 @@ class ManifestProcessorTest {
     @Test
     void processReturnsDefaultBackend() {
         var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(),
-                new ManifestDefaults("ollama"));
+                new ManifestDefaults("ollama"), Map.of());
         var result = processor(Map.of()).process(manifest);
         assertThat(result.defaultBackendKey()).isEqualTo("ollama");
     }
 
     @Test
     void processReturnsNullDefaultWhenNotSet() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null);
+        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
         var result = processor(Map.of()).process(manifest);
         assertThat(result.defaultBackendKey()).isNull();
     }
@@ -97,7 +99,7 @@ class ManifestProcessorTest {
     @Test
     void processCallsReconcilerForLocalModels() {
         var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(),
-                List.of(new LocalModelDeclaration("llama-4-scout", "present")), null);
+                List.of(new LocalModelDeclaration("llama-4-scout", "present")), null, Map.of());
         processor(Map.of()).process(manifest);
         assertThat(reconciledModels).containsExactly("llama-4-scout");
     }
@@ -105,7 +107,7 @@ class ManifestProcessorTest {
     @Test
     void processSkipsLocalModelWithoutEnsurePresent() {
         var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(),
-                List.of(new LocalModelDeclaration("llama-4-scout", null)), null);
+                List.of(new LocalModelDeclaration("llama-4-scout", null)), null, Map.of());
         processor(Map.of()).process(manifest);
         assertThat(reconciledModels).isEmpty();
     }
@@ -114,9 +116,30 @@ class ManifestProcessorTest {
     void processHandlesProviderWithNoCredential() {
         var manifest = new Manifest(List.of(),
                 List.of(new ProviderDeclaration("ollama", null, "localhost:11434")),
-                List.of(), Map.of(), List.of(), null);
+                List.of(), Map.of(), List.of(), null, Map.of());
         processor(Map.of("ollama", List.of())).process(manifest);
         assertThat(credStore.listRefs("platform")).isEmpty();
+    }
+
+
+    @Test
+    void processPassesPoolsToResult() {
+        var pool = new PoolDeclaration("review-pool", "code-reviewer", "claudony",
+                                       2, 8, "~/reviews", Map.of("type", "target-tracking"), Map.of());
+        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                                    Map.of("review-pool", pool));
+
+        var result = processor(Map.of()).process(manifest);
+        assertThat(result.pools()).hasSize(1);
+        assertThat(result.pools().get(0).name()).isEqualTo("review-pool");
+        assertThat(result.pools().get(0).agentId()).isEqualTo("code-reviewer");
+    }
+
+    @Test
+    void processEmptyPoolsReturnsEmptyList() {
+        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
+        var result   = processor(Map.of()).process(manifest);
+        assertThat(result.pools()).isEmpty();
     }
 
     private ModelDescriptor testModel(String id, ModelTier tier) {

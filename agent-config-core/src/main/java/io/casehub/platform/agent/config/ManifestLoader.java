@@ -346,6 +346,7 @@ public class ManifestLoader {
         var aliases = new LinkedHashMap<String, AliasDeclaration>();
         var localModels = new LinkedHashMap<String, LocalModelDeclaration>();
         var sources = new LinkedHashMap<String, SourceDeclaration>();
+        var pools = new LinkedHashMap<String, PoolDeclaration>();
         ManifestDefaults defaults = null;
 
         for (var entry : entries) {
@@ -355,6 +356,7 @@ public class ManifestLoader {
             for (var alias : m.aliases().entrySet()) aliases.put(alias.getKey(), alias.getValue());
             for (var local : m.localModels()) localModels.put(local.id(), local);
             for (var source : m.sources()) sources.put(source.uri(), source);
+            pools.putAll(m.pools());
             if (m.defaults() != null) defaults = m.defaults();
         }
 
@@ -364,12 +366,13 @@ public class ManifestLoader {
                 new ArrayList<>(sources.values()),
                 aliases,
                 new ArrayList<>(localModels.values()),
-                defaults
+                defaults,
+                pools
         );
     }
 
     private static Manifest emptyManifest() {
-        return new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null);
+        return new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
     }
 
     record PrioritizedManifest(Manifest manifest, int priority) {}

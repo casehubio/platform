@@ -2,6 +2,7 @@ package io.casehub.platform.agent.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.casehub.platform.api.model.ModelDescriptor;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -11,7 +12,8 @@ public record Manifest(
         List<SourceDeclaration> sources,
         Map<String, AliasDeclaration> aliases,
         @JsonProperty("local-models") List<LocalModelDeclaration> localModels,
-        ManifestDefaults defaults
+        ManifestDefaults defaults,
+        Map<String, PoolDeclaration> pools
 ) {
     public Manifest {
         models = models != null ? List.copyOf(models) : List.of();
@@ -19,5 +21,17 @@ public record Manifest(
         sources = sources != null ? List.copyOf(sources) : List.of();
         aliases = aliases != null ? Map.copyOf(aliases) : Map.of();
         localModels = localModels != null ? List.copyOf(localModels) : List.of();
+        if (pools != null) {
+            var injected = new LinkedHashMap<String, PoolDeclaration>();
+            for (var e : pools.entrySet()) {
+                var p = e.getValue();
+                injected.put(e.getKey(), new PoolDeclaration(
+                        e.getKey(), p.agentId(), p.backend(), p.minActive(), p.maxActive(),
+                        p.workingDir(), p.scaling(), p.extensions()));
+            }
+            pools = Map.copyOf(injected);
+        } else {
+            pools = Map.of();
+        }
     }
 }

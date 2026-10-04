@@ -4,6 +4,9 @@ import io.casehub.platform.api.model.CostTier;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
 import io.casehub.platform.api.model.ModelTier;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -12,8 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ManifestLoaderTest {
@@ -91,8 +93,8 @@ class ManifestLoaderTest {
         var lm1 = new LocalModelDeclaration("llama-4-scout", "present");
         var lm2 = new LocalModelDeclaration("codestral", "present");
 
-        var m1 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm1), null);
-        var m2 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm2), null);
+        var m1 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm1), null, Map.of());
+        var m2 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm2), null, Map.of());
 
         var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
         entries.add(new ManifestLoader.PrioritizedManifest(m1, 10));
@@ -106,9 +108,9 @@ class ManifestLoaderTest {
     void mergeDefaultsLastWriterWins() {
         var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
         entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("claude")), 10));
+                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("claude"), Map.of()), 10));
         entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("ollama")), 30));
+                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("ollama"), Map.of()), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.defaults().backend()).isEqualTo("ollama");
@@ -176,6 +178,69 @@ class ManifestLoaderTest {
         assertThat(manifest.defaults().backend()).isEqualTo("claude");
     }
 
+
+    @Test
+    void loadFileParsesPools(@TempDir Path tempDir) throws IOException {
+        var file = tempDir.resolve("agent-config.yaml");
+        Files.writeString(file, """
+                                pools:
+                                  review-pool:
+                                    agent-id: code-reviewer
+                                    backend: claudony
+                                    min-active: 2
+                                    max-active: 8
+                                    working-dir: ~/workspace/reviews
+                                    scaling:
+                                      type: target-tracking
+                                      target: 0.7
+                                """);
+        var manifest = loader.loadFile(file);
+        assertThat(manifest).isNotNull();
+        assertThat(manifest.pools()).hasSize(1);
+        assertThat(manifest.pools()).containsKey("review-pool");
+        var pool = manifest.pools().get("review-pool");
+        assertThat(pool.name()).isEqualTo("review-pool");
+        assertThat(pool.agentId()).isEqualTo("code-reviewer");
+        assertThat(pool.backend()).isEqualTo("claudony");
+        assertThat(pool.minActive()).isEqualTo(2);
+        assertThat(pool.maxActive()).isEqualTo(8);
+        assertThat(pool.workingDir()).isEqualTo("~/workspace/reviews");
+        assertThat(pool.scaling()).containsEntry("type", "target-tracking");
+    }
+
+    @Test
+    void loadFileNoPoolsSectionReturnsEmptyMap(@TempDir Path tempDir) throws IOException {
+        var file = tempDir.resolve("agent-config.yaml");
+        Files.writeString(file, """
+                                providers:
+                                  - vendor: openai
+                                    credential: env:OPENAI_KEY
+                                """);
+        var manifest = loader.loadFile(file);
+        assertThat(manifest).isNotNull();
+        assertThat(manifest.pools()).isEmpty();
+    }
+
+    @Test
+    void mergeHigherPriorityWinsForPools() {
+        var p1 = new PoolDeclaration("review-pool", "agent-a", "claudony", 1, 4, null, null, null);
+        var p2 = new PoolDeclaration("review-pool", "agent-b", "claudony", 2, 8, null, null, null);
+        var p3 = new PoolDeclaration("other-pool", "agent-c", "claudony", 0, 2, null, null, null);
+
+        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
+        entries.add(new ManifestLoader.PrioritizedManifest(
+                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                             Map.of("review-pool", p1, "other-pool", p3)), 10));
+        entries.add(new ManifestLoader.PrioritizedManifest(
+                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                             Map.of("review-pool", p2)), 30));
+
+        var merged = loader.merge(entries);
+        assertThat(merged.pools()).hasSize(2);
+        assertThat(merged.pools().get("review-pool").agentId()).isEqualTo("agent-b");
+        assertThat(merged.pools().get("other-pool").agentId()).isEqualTo("agent-c");
+    }
+
     private ModelDescriptor testModel(String id, ModelTier tier) {
         return new ModelDescriptor(id, id, "backend", null, "vendor", "fam", id, tier,
                 Set.of("text"), 200000, 16384, ModelLocality.CLOUD, CostTier.MEDIUM, "api-key", Map.of());
@@ -183,6 +248,6 @@ class ManifestLoaderTest {
 
     private Manifest manifestWith(List<ModelDescriptor> models, List<ProviderDeclaration> providers,
                                   Map<String, AliasDeclaration> aliases) {
-        return new Manifest(models, providers, List.of(), aliases, List.of(), null);
+        return new Manifest(models, providers, List.of(), aliases, List.of(), null, Map.of());
     }
 }

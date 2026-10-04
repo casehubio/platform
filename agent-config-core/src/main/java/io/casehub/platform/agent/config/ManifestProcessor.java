@@ -113,9 +113,10 @@ public class ManifestProcessor {
         }
 
         String defaultBackend = manifest.defaults() != null ? manifest.defaults().backend() : null;
-        LOG.infof("Manifest processed: %d aliases, default backend: %s",
-                aliases.size(), defaultBackend != null ? defaultBackend : "(not set)");
-        return new ManifestResult(aliases, defaultBackend);
+        var pools = new java.util.ArrayList<>(manifest.pools().values());
+        LOG.infof("Manifest processed: %d aliases, %d pools, default backend: %s",
+                aliases.size(), pools.size(), defaultBackend != null ? defaultBackend : "(not set)");
+        return new ManifestResult(aliases, defaultBackend, pools);
     }
 
     static ModelQuery toModelQuery(AliasDeclaration alias) {

@@ -323,11 +323,11 @@ class SimulationRuntimeTest {
         final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
         final var overlay = runtime.pushOverlay(MapSimulationConfig.of(Map.of()));
 
-        runtime.recordJournal(QN, "tenant-1", "input", "output", true);
+        runtime.recordJournal(QN, "tenant-1", "input", "output", DataRealism.DOMAIN_PLAUSIBLE);
 
         final var journal = runtime.journal(overlay);
         assertThat(journal).hasSize(1);
-        assertThat(journal.get(0).simulated()).isTrue();
+        assertThat(journal.get(0).dataRealism()).isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
     }
 
     @Test
@@ -335,7 +335,7 @@ class SimulationRuntimeTest {
         final var baseConfig = stubConfig(Optional.empty(), false, Optional.empty());
         final var runtime = new SimulationRuntime(baseConfig, new NoOpSimulationCorpus<>());
 
-        runtime.recordJournal(QN, "tenant-1", "input", "output", false);
+        runtime.recordJournal(QN, "tenant-1", "input", "output", null);
     }
 
     @Test

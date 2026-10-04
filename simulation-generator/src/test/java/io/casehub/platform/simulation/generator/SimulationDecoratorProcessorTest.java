@@ -190,21 +190,30 @@ class SimulationDecoratorProcessorTest {
     }
 
     @Test
-    void journalRecordingForSimulatedPathUsesTrue() {
+    void journalRecordingForSimulatedPathUsesStrategyDataRealism() {
         final var processor = new SimulationDecoratorProcessor();
         final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
         final String code = findSource(sources, "TestSimpleService");
 
-        assertThat(code).contains("simResult, true)");
+        assertThat(code).contains("simResult, strategy.get().dataRealism())");
     }
 
     @Test
-    void journalRecordingForDelegatePathUsesFalse() {
+    void journalRecordingForDelegatePathUsesNull() {
         final var processor = new SimulationDecoratorProcessor();
         final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
         final String code = findSource(sources, "TestSimpleService");
 
-        assertThat(code).contains("result, false)");
+        assertThat(code).contains("result, null)");
+    }
+
+    @Test
+    void generatedDecoratorImportsDataRealism() {
+        final var processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
+        final String code = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("import io.casehub.platform.simulation.DataRealism;");
     }
 
     // --- listing file support ---

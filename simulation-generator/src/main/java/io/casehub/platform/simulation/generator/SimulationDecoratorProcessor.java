@@ -155,6 +155,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("import jakarta.annotation.Priority;\n");
         sb.append("import jakarta.inject.Inject;\n");
         sb.append("import io.casehub.platform.simulation.SimulationRuntime;\n");
+        sb.append("import io.casehub.platform.simulation.DataRealism;\n");
         sb.append("import io.casehub.platform.simulation.SimulationStrategy;\n");
         sb.append("import io.casehub.platform.api.identity.CurrentPrincipal;\n");
         sb.append("import ").append(spiFullName).append(";\n");
@@ -388,24 +389,24 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append(indent).append("    if (strategy.isPresent() && strategy.get().canResolve(").append(inputExpr).append(")) {\n");
         if (isVoid) {
             sb.append(indent).append("        strategy.get().resolve(").append(inputExpr).append(");\n");
-            sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, true);\n");
+            sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, strategy.get().dataRealism());\n");
             sb.append(indent).append("        return;\n");
         } else {
             sb.append(indent).append("        Object simResult = strategy.get().resolve(").append(inputExpr).append(");\n");
-            sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", simResult, true);\n");
+            sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", simResult, strategy.get().dataRealism());\n");
             sb.append(indent).append("        return (").append(returnType).append(") simResult;\n");
         }
         sb.append(indent).append("    }\n");
 
         if (isVoid) {
             sb.append(indent).append("    delegate.").append(method.name()).append("(").append(args).append(");\n");
-            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, false);\n");
+            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, null);\n");
             sb.append(indent).append("    if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append(indent).append("        simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", null);\n");
             sb.append(indent).append("    }\n");
         } else {
             sb.append(indent).append("    ").append(returnType).append(" result = delegate.").append(method.name()).append("(").append(args).append(");\n");
-            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", result, false);\n");
+            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", result, null);\n");
             sb.append(indent).append("    if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append(indent).append("        simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", result);\n");
             sb.append(indent).append("    }\n");

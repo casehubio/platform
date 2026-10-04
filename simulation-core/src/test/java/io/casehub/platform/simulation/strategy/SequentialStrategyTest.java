@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.NoOpSimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
@@ -105,5 +106,12 @@ class SequentialStrategyTest {
 
         assertThatThrownBy(() -> strategy.resolve("any"))
                 .isInstanceOf(SimulationExhaustedException.class);
+    }
+
+    @Test
+    void dataRealismReturnsStructurallyValid() {
+        var corpus   = ListBackedCorpus.of(entry("k1", "in", "out"));
+        var strategy = new SequentialStrategy<String, String>(corpus, QN, ExhaustionPolicy.WRAP);
+        assertThat(strategy.dataRealism()).isEqualTo(DataRealism.STRUCTURALLY_VALID);
     }
 }

@@ -8,5 +8,5 @@ public record JournalEntry(
     Object input,
     Object output,
     Instant timestamp,
-    boolean simulated
+    DataRealism dataRealism
 ) {}

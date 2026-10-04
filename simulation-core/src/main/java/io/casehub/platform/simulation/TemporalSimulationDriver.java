@@ -147,7 +147,7 @@ public class TemporalSimulationDriver<E> {
                         if (simulation != null) {
                             simulation.recordJournal(effectiveQN,
                                                      profile.tenancyId(), entry.label(),
-                                                     entry.event(), true);
+                                                     entry.event(), DataRealism.DOMAIN_PLAUSIBLE);
                         }
                     } catch (Exception e) {
                         failureCount++;

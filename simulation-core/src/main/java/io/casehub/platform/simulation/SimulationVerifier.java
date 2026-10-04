@@ -70,7 +70,7 @@ public final class SimulationVerifier {
             JournalEntry e = entries.get(i);
             sb.append("  ").append(i + 1).append(". ").append(e.qualifiedName())
               .append(" tenant=").append(e.tenancyId())
-              .append(" simulated=").append(e.simulated())
+              .append(" dataRealism=").append(e.dataRealism())
               .append(" at=").append(e.timestamp()).append("\n");
         }
         return sb.toString();

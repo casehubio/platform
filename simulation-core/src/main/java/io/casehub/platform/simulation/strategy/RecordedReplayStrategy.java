@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.KeyExtractor;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
@@ -42,5 +43,10 @@ public final class RecordedReplayStrategy<I, O> implements SimulationStrategy<I,
     @Override
     public boolean canResolve(final I input) {
         return corpus.size(qualifiedName) > 0;
+    }
+
+    @Override
+    public DataRealism dataRealism() {
+        return DataRealism.RECORDED_REAL;
     }
 }

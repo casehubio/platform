@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.NoOpSimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
 import org.junit.jupiter.api.Test;
@@ -80,5 +81,12 @@ class RecordedReplayStrategyTest {
 
         assertThatThrownBy(() -> strategy.resolve("any"))
                 .isInstanceOf(SimulationExhaustedException.class);
+    }
+
+    @Test
+    void dataRealismReturnsRecordedReal() {
+        var corpus   = ListBackedCorpus.of(entry("k1", "in", "out"));
+        var strategy = new RecordedReplayStrategy<String, String>(corpus, QN, input -> input);
+        assertThat(strategy.dataRealism()).isEqualTo(DataRealism.RECORDED_REAL);
     }
 }

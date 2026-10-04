@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.SimilarityScorer;
 import io.casehub.platform.simulation.SimulationNoMatchException;
 import org.junit.jupiter.api.Test;
@@ -95,5 +96,13 @@ class NearestMatchStrategyTest {
         var strategy = new NearestMatchStrategy<>(corpus, QN, scorer, 0.0);
 
         assertThat(strategy.canResolve("anything")).isFalse();
+    }
+
+    @Test
+    void dataRealismReturnsDomainPlausible() {
+        var                      corpus   = ListBackedCorpus.of(entry("k1", "in", "out"));
+        SimilarityScorer<String> scorer   = (q, c) -> 1.0;
+        var                      strategy = new NearestMatchStrategy<>(corpus, QN, scorer, 0.0);
+        assertThat(strategy.dataRealism()).isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
     }
 }

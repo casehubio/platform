@@ -81,7 +81,7 @@ public final class MethodVerification {
                 "Expected \"" + qualifiedName + "\" to have simulated calls, but no calls found."
                 + context());
         }
-        long nonSimulated = entries.stream().filter(e -> !e.simulated()).count();
+        long nonSimulated = entries.stream().filter(e -> e.dataRealism() == null).count();
         if (nonSimulated > 0) {
             throw new AssertionError(
                 "Expected all calls to \"" + qualifiedName + "\" to be simulated, but "
@@ -97,7 +97,7 @@ public final class MethodVerification {
                 "Expected \"" + qualifiedName + "\" to have non-simulated calls, but no calls found."
                 + context());
         }
-        long simulated = entries.stream().filter(JournalEntry::simulated).count();
+        long simulated = entries.stream().filter(e -> e.dataRealism() != null).count();
         if (simulated > 0) {
             throw new AssertionError(
                 "Expected no calls to \"" + qualifiedName + "\" to be simulated, but "
@@ -130,7 +130,7 @@ public final class MethodVerification {
             JournalEntry e = entries.get(i);
             sb.append("  ").append(i + 1).append(". tenant=").append(e.tenancyId())
               .append(" input=").append(e.input())
-              .append(" simulated=").append(e.simulated())
+              .append(" dataRealism=").append(e.dataRealism())
               .append(" at=").append(e.timestamp()).append("\n");
         }
         return sb.toString();

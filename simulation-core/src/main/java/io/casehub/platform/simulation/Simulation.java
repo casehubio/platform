@@ -36,7 +36,7 @@ public final class Simulation {
                 .orElseThrow(() -> new SimulationConfigException(
                         "No strategy configured for '" + qualifiedName + "'"));
         O output = strategy.resolve(input);
-        runtime.recordJournal(qualifiedName, null, input, output, true);
+        runtime.recordJournal(qualifiedName, null, input, output, strategy.dataRealism());
         return output;
     }
 

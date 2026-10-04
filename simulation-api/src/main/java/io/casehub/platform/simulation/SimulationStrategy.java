@@ -5,4 +5,8 @@ public interface SimulationStrategy<I, O> {
     O resolve(I input);
 
     boolean canResolve(I input);
+
+    default DataRealism dataRealism() {
+        return DataRealism.DOMAIN_PLAUSIBLE;
+    }
 }

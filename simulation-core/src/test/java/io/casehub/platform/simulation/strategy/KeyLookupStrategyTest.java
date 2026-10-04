@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.SimulationKeyNotFoundException;
 import org.junit.jupiter.api.Test;
 
@@ -66,5 +67,12 @@ class KeyLookupStrategyTest {
                 corpus, QN, String::toUpperCase);
 
         assertThat(strategy.resolve("hello")).isEqualTo("uppercase-match");
+    }
+
+    @Test
+    void dataRealismReturnsDomainPlausible() {
+        var corpus   = ListBackedCorpus.of(entry("k1", "in", "out"));
+        var strategy = new KeyLookupStrategy<String, String>(corpus, QN, input -> input);
+        assertThat(strategy.dataRealism()).isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
     }
 }

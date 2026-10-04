@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
 import io.casehub.platform.simulation.SimulationStrategy;
@@ -46,5 +47,10 @@ public final class RandomStrategy<I, O> implements SimulationStrategy<I, O> {
             return true;
         }
         return corpus.size(qualifiedName) > 0;
+    }
+
+    @Override
+    public DataRealism dataRealism() {
+        return DataRealism.STRUCTURALLY_VALID;
     }
 }

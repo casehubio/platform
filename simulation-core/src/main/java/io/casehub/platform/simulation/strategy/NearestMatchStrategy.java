@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.SimilarityScorer;
 import io.casehub.platform.simulation.SimulationCorpus;
@@ -42,4 +43,9 @@ public final class NearestMatchStrategy<I, O> implements SimulationStrategy<I, O
     }
 
     private record ScoredMatch<I, O>(InvocationRecord<I, O> record, double score) {}
+
+    @Override
+    public DataRealism dataRealism() {
+        return DataRealism.DOMAIN_PLAUSIBLE;
+    }
 }

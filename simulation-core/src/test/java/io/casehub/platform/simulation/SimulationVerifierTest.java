@@ -16,7 +16,7 @@ class SimulationVerifierTest {
     }
 
     private JournalEntry entry(String qn) {
-        return new JournalEntry(qn, "t1", "in", "out", Instant.now(), true);
+        return new JournalEntry(qn, "t1", "in", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE);
     }
 
     // --- Count assertions ---
@@ -80,9 +80,9 @@ class SimulationVerifierTest {
     @Test
     void forTenant_filters_by_tenancy() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "in1", "out1", Instant.now(), true),
-            new JournalEntry("spi.a", "t2", "in2", "out2", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "in3", "out3", Instant.now(), true)
+            new JournalEntry("spi.a", "t1", "in1", "out1", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t2", "in2", "out2", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "in3", "out3", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE)
         );
         SimulationVerifier.on(journal).method("spi.a").forTenant("t1").wasCalled(2);
         SimulationVerifier.on(journal).method("spi.a").forTenant("t2").wasCalled(1);
@@ -91,9 +91,9 @@ class SimulationVerifierTest {
     @Test
     void matching_filters_by_predicate() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "beta", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), true)
+            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "beta", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE)
         );
         SimulationVerifier.on(journal).method("spi.a")
             .matching(e -> "alpha".equals(e.input()))
@@ -103,9 +103,9 @@ class SimulationVerifierTest {
     @Test
     void chained_filters_apply_with_and_semantics() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t2", "alpha", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "beta", "out", Instant.now(), true)
+            new JournalEntry("spi.a", "t1", "alpha", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t2", "alpha", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "beta", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE)
         );
         SimulationVerifier.on(journal).method("spi.a")
             .forTenant("t1")
@@ -161,8 +161,8 @@ class SimulationVerifierTest {
     @Test
     void allSimulated_passes_when_all_simulated() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "in2", "out2", Instant.now(), true)
+            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "in2", "out2", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE)
         );
         SimulationVerifier.on(journal).method("spi.a").allSimulated();
     }
@@ -170,8 +170,8 @@ class SimulationVerifierTest {
     @Test
     void allSimulated_fails_when_some_not_simulated() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), true),
-            new JournalEntry("spi.a", "t1", "in2", "out2", Instant.now(), false)
+            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE),
+            new JournalEntry("spi.a", "t1", "in2", "out2", Instant.now(), null)
         );
         assertThatThrownBy(() ->
             SimulationVerifier.on(journal).method("spi.a").allSimulated()
@@ -181,7 +181,7 @@ class SimulationVerifierTest {
     @Test
     void noneSimulated_passes_when_all_passthrough() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), false)
+            new JournalEntry("spi.a", "t1", "in", "out", Instant.now(), null)
         );
         SimulationVerifier.on(journal).method("spi.a").noneSimulated();
     }
@@ -191,7 +191,7 @@ class SimulationVerifierTest {
     @Test
     void error_message_includes_actual_calls() {
         var journal = journalWith(
-            new JournalEntry("spi.a", "t1", "input-val", "out", Instant.now(), true)
+            new JournalEntry("spi.a", "t1", "input-val", "out", Instant.now(), DataRealism.DOMAIN_PLAUSIBLE)
         );
         assertThatThrownBy(() ->
             SimulationVerifier.on(journal).method("spi.a").wasCalled(5)

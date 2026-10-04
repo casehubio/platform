@@ -139,12 +139,12 @@ public class SimulationRuntime {
 
 
     public void recordJournal(final String qualifiedName, final String tenancyId,
-                               final Object input, final Object output, final boolean simulated) {
+                               final Object input, final Object output, final DataRealism dataRealism) {
         final var stack = overlayStack;
         if (stack.isEmpty()) return;
         final var topOverlay = stack.get(stack.size() - 1);
         topOverlay.journal().record(new JournalEntry(qualifiedName, tenancyId, input, output,
-                Instant.now(), simulated));
+                Instant.now(), dataRealism));
     }
 
     static String resolveAlias(final String name) {

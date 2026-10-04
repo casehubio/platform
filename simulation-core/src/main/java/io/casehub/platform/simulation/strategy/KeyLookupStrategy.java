@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.KeyExtractor;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationKeyNotFoundException;
@@ -30,5 +31,10 @@ public final class KeyLookupStrategy<I, O> implements SimulationStrategy<I, O> {
     public boolean canResolve(final I input) {
         final String key = keyExtractor.extract(input);
         return corpus.lookupByKey(qualifiedName, key).isPresent();
+    }
+
+    @Override
+    public DataRealism dataRealism() {
+        return DataRealism.DOMAIN_PLAUSIBLE;
     }
 }

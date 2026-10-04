@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
@@ -49,5 +50,10 @@ public final class SequentialStrategy<I, O> implements SimulationStrategy<I, O> 
             return index.get() < size;
         }
         return true;
+    }
+
+    @Override
+    public DataRealism dataRealism() {
+        return DataRealism.STRUCTURALLY_VALID;
     }
 }

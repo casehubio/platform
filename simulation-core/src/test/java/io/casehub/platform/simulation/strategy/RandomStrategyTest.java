@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.strategy;
 
+import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.NoOpSimulationCorpus;
 import io.casehub.platform.simulation.SimulationExhaustedException;
 import org.junit.jupiter.api.Test;
@@ -85,5 +86,12 @@ class RandomStrategyTest {
 
         assertThatThrownBy(() -> strategy.resolve("any"))
                 .isInstanceOf(SimulationExhaustedException.class);
+    }
+
+    @Test
+    void dataRealismReturnsStructurallyValid() {
+        var corpus   = ListBackedCorpus.of(entry("k1", "in", "out"));
+        var strategy = new RandomStrategy<String, String>(corpus, QN, new Random(), null);
+        assertThat(strategy.dataRealism()).isEqualTo(DataRealism.STRUCTURALLY_VALID);
     }
 }

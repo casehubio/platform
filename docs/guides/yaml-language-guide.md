@@ -1,4 +1,4 @@
-# CaseHub YAML Language Guide
+# CaseHub Playbook YAML Language Guide
 
 yaml-core is a composable meta-language that layers on top of any YAML structure. It provides variables, conditions, iteration, data, modules, typed expansion, and inline control flow — constructs that a host application can adopt individually or together. The host owns the YAML schema; yaml-core owns the dynamic behaviour.
 

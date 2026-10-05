@@ -37,7 +37,7 @@ class ShowcaseBarrierQuorumTest {
 
     @Test
     void barrier_awaitsAllParallelSteps() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var barrier = scope.latch("await-all", 3);
         var results = scope.resultStore();
         var allDone = new CountDownLatch(3);
@@ -76,7 +76,7 @@ class ShowcaseBarrierQuorumTest {
 
     @Test
     void quorum_proceedsAfterTwoOfThree() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var quorum = scope.latch("consensus", 2); // required: 2
         var results = scope.resultStore();
 

@@ -1,6 +1,6 @@
 package io.casehub.yaml.step.statemachine;
 
-import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
+import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import io.casehub.yaml.step.eval.StepRunner;
@@ -27,7 +27,7 @@ class StateMachineCompilerTest {
         states.put("C", StateDefinition.terminal("C", List.of()));
 
         var def = new StateMachineDefinition("test", states);
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
 
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
@@ -55,7 +55,7 @@ class StateMachineCompilerTest {
                 List.of(Map.of("error-handler", Map.of()))));
 
         var def = new StateMachineDefinition("test", states);
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
 
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
@@ -82,7 +82,7 @@ class StateMachineCompilerTest {
         states.put("DONE", StateDefinition.terminal("DONE", List.of()));
 
         var def = new StateMachineDefinition("test", states);
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
 
         StepRunner runner = (step, resolver) -> Result.of(Map.of());
 
@@ -100,7 +100,7 @@ class StateMachineCompilerTest {
         states.put("B", StateDefinition.terminal("B", List.of()));
 
         var def = new StateMachineDefinition("test", states);
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
 
         StepRunner runner = (step, resolver) -> Result.failed("boom");
 
@@ -122,7 +122,7 @@ class StateMachineCompilerTest {
         states.put("DONE", StateDefinition.terminal("DONE", List.of()));
 
         var def = new StateMachineDefinition("test", states);
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
 
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {

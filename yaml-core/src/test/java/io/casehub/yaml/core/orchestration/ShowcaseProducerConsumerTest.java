@@ -36,7 +36,7 @@ class ShowcaseProducerConsumerTest {
 
     @Test
     void producerConsumer_withRateLimitedChannel() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcChannel<String> channel = scope.channel("events");
         var semaphore = scope.semaphore("event-rate", 5);
         var consumed = new ArrayList<String>();

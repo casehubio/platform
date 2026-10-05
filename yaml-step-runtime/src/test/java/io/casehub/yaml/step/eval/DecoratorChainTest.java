@@ -1,7 +1,7 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
-import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
+import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -508,7 +508,7 @@ class DecoratorChainTest {
 
         @Test
         void semaphore_acquiresAndReleases() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("semaphore",
@@ -522,7 +522,7 @@ class DecoratorChainTest {
 
         @Test
         void mutex_sugar_equivalentToPermitsOne() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("mutex", "exclusive");
@@ -534,7 +534,7 @@ class DecoratorChainTest {
 
         @Test
         void semaphore_releasesOnFailure() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("semaphore",
@@ -554,7 +554,7 @@ class DecoratorChainTest {
 
         @Test
         void semaphore_withDeadline_exceedsDeadline_returnsFailure() throws Exception {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var semaphore = scope.semaphore("exhausted", 1);
@@ -586,7 +586,7 @@ class DecoratorChainTest {
 
         @Test
         void wait_blocksUntilSignalled() throws InterruptedException {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("wait", "ready");
@@ -607,7 +607,7 @@ class DecoratorChainTest {
 
         @Test
         void wait_withDeadline_exceedsDeadline_returnsFailure() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("wait", "never-signalled");
@@ -621,7 +621,7 @@ class DecoratorChainTest {
 
         @Test
         void wait_withoutDeadline_blocksIndefinitely() throws InterruptedException {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("wait", "ready");
@@ -649,7 +649,7 @@ class DecoratorChainTest {
 
         @Test
         void signal_firesAfterAction() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("signal", "done");
@@ -663,7 +663,7 @@ class DecoratorChainTest {
 
         @Test
         void signal_notFiredOnFailure() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("signal", "done");
@@ -681,7 +681,7 @@ class DecoratorChainTest {
 
         @Test
         void publish_sendsToChannel() throws InterruptedException {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var decorators = Map.<String, Object>of("publish",

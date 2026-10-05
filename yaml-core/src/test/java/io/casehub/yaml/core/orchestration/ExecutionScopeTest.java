@@ -8,11 +8,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ScenarioScopeTest {
+class ExecutionScopeTest {
 
     @Test
     void semaphore_sameNameReturnsSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var s1 = scope.semaphore("api", 3);
         var s2 = scope.semaphore("api", 3);
         assertThat(s1).isSameAs(s2);
@@ -21,7 +21,7 @@ class ScenarioScopeTest {
 
     @Test
     void semaphore_differentNameReturnsDifferentInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var s1 = scope.semaphore("api", 3);
         var s2 = scope.semaphore("db", 5);
         assertThat(s1).isNotSameAs(s2);
@@ -30,7 +30,7 @@ class ScenarioScopeTest {
 
     @Test
     void latch_createdWithCorrectCount() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var latch = scope.latch("barrier", 3);
         assertThat(latch.getCount()).isEqualTo(3);
         scope.close();
@@ -38,7 +38,7 @@ class ScenarioScopeTest {
 
     @Test
     void signal_createdAndRetrievable() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var signal = scope.signal("ready");
         assertThat(signal).isNotNull();
         assertThat(signal.isSignalled()).isFalse();
@@ -49,7 +49,7 @@ class ScenarioScopeTest {
 
     @Test
     void channel_unboundedByDefault() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcChannel<String> ch = scope.channel("events");
         for (int i = 0; i < 100; i++) {
             ch.send("item-" + i);
@@ -60,7 +60,7 @@ class ScenarioScopeTest {
 
     @Test
     void channel_boundedWithCapacity() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcChannel<String> ch = scope.channel("bounded", 5);
         for (int i = 0; i < 5; i++) {
             ch.send("item-" + i);
@@ -70,7 +70,7 @@ class ScenarioScopeTest {
 
     @Test
     void close_disposesAllPrimitives() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var latch = scope.latch("wait", 1);
         var signal = scope.signal("notify");
         OrcChannel<String> ch = scope.channel("data");
@@ -94,14 +94,14 @@ class ScenarioScopeTest {
 
     @Test
     void resultStore_returnsSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         assertThat(scope.resultStore()).isSameAs(scope.resultStore());
         scope.close();
     }
 
     @Test
     void primitive_genericLookup() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         scope.semaphore("test", 2);
         var found = scope.primitive("test", OrcSemaphore.class);
         assertThat(found).isNotNull();
@@ -110,7 +110,7 @@ class ScenarioScopeTest {
 
     @Test
     void concurrentAccess_sameNameSameInstance() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var refs = new AtomicReference[10];
         var done = new CountDownLatch(10);
 

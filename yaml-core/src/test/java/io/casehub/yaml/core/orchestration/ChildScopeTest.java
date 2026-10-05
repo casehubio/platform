@@ -12,7 +12,7 @@ class ChildScopeTest {
 
     @Test
     void childScope_inheritsPrimitiveNamespace() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var counter = parent.counter("events");
         counter.increment();
 
@@ -26,7 +26,7 @@ class ChildScopeTest {
 
     @Test
     void childScope_closingParent_closesChild() throws InterruptedException {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var child = parent.childScope("sub");
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
@@ -44,7 +44,7 @@ class ChildScopeTest {
 
     @Test
     void childScope_nestedChildScopes() throws InterruptedException {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var child = parent.childScope("level-1");
         var grandchild = child.childScope("level-2");
 
@@ -64,7 +64,7 @@ class ChildScopeTest {
 
     @Test
     void childScope_childCanCreateOwnPrimitives() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var child = parent.childScope("sub");
 
         var childCounter = child.counter("child-only");
@@ -77,7 +77,7 @@ class ChildScopeTest {
 
     @Test
     void childScope_sharedChannel_parentAndChildCommunicate() throws InterruptedException {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         OrcChannel<String> ch = parent.channel("shared");
         var child = parent.childScope("sub");
         var received = new AtomicBoolean(false);

@@ -81,11 +81,11 @@
 - Platform-first design, pages retrofit — creates asymmetric constraints shaped by Java's type system (enums, j.u.c, AtomicReference CAS). TypeScript has dynamic objects as its natural abstraction; a Java-first format would feel foreign.
 - Pages-first design — same asymmetry in the other direction
 - Independent specs per platform — drift, inconsistency, maintenance burden
-**Rationale:** yaml-core already spans both platforms — `OrcStateMachine`, `ScenarioScope`, `VariableResolver`, and `MatchPattern` all have both Java and TypeScript implementations. The YAML state machine format is a natural extension of yaml-core's cross-platform role. Defining the format in yaml-core ensures both platforms design from the same specification, avoiding platform-specific bias.
-**Trade-offs:** Changes to the format require cross-platform coordination. The pages issue becomes a dependency for full cross-platform consistency.
-**Exploration:** quick
-**Revised from:** R1-07 — elevated from action item to design decision. Format ownership explicitly placed in yaml-core.
-**Status:** revised
+  **Rationale:** yaml-core already spans both platforms — `OrcStateMachine`, `ExecutionScope`, `VariableResolver`, and `MatchPattern` all have both Java and TypeScript implementations. The YAML state machine format is a natural extension of yaml-core's cross-platform role. Defining the format in yaml-core ensures both platforms design from the same specification, avoiding platform-specific bias.
+  **Trade-offs:** Changes to the format require cross-platform coordination. The pages issue becomes a dependency for full cross-platform consistency.
+  **Exploration:** quick
+  **Revised from:** R1-07 — elevated from action item to design decision. Format ownership explicitly placed in yaml-core.
+  **Status:** revised
 
 ## D7: Lifecycle Protocol exemption — YAML state machines are operational workflow coordinators
 

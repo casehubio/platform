@@ -3,7 +3,7 @@ package io.casehub.yaml.step.eval;
 import io.casehub.yaml.core.condition.ConditionEvaluator;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
-import io.casehub.yaml.core.orchestration.ScenarioScope;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
@@ -21,8 +21,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class StructuralStepEvaluator {
 
     private final ConditionEvaluator conditionEvaluator;
-    private final ScenarioScope scope;
-    private final DecoratorChain decoratorChain;
+    private final ExecutionScope     scope;
+    private final DecoratorChain     decoratorChain;
     private final io.casehub.yaml.core.resolver.ObjectVariableSource resultSource;
     private final java.util.concurrent.ConcurrentHashMap<String, java.util.List<io.casehub.yaml.core.orchestration.OrcLatch>> stepLatches = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
@@ -32,7 +32,7 @@ public final class StructuralStepEvaluator {
         this(conditionEvaluator, null);
     }
 
-    public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ScenarioScope scope) {
+    public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
         this.decoratorChain     = new DecoratorChain(conditionEvaluator,
@@ -216,7 +216,7 @@ public final class StructuralStepEvaluator {
             return Result.of(Map.of());
         }
         if (scope == null) {
-            return Result.failed("'select' requires a ScenarioScope");
+            return Result.failed("'select' requires an ExecutionScope");
         }
 
         var winnerIndex   = new AtomicInteger(-1);
@@ -333,7 +333,7 @@ public final class StructuralStepEvaluator {
 
     private Result evaluateBarrier(ResolvedStep.BarrierStep barrier) {
         if (scope == null) {
-            return Result.failed("'barrier' requires a ScenarioScope");
+            return Result.failed("'barrier' requires an ExecutionScope");
         }
         io.casehub.yaml.core.orchestration.OrcLatch latch =
                 scope.latch("barrier:" + barrier.name(), barrier.awaitSteps().size());
@@ -356,7 +356,7 @@ public final class StructuralStepEvaluator {
 
     private Result evaluateQuorum(ResolvedStep.QuorumStep quorum) {
         if (scope == null) {
-            return Result.failed("'quorum' requires a ScenarioScope");
+            return Result.failed("'quorum' requires an ExecutionScope");
         }
         io.casehub.yaml.core.orchestration.OrcLatch latch =
                 scope.latch("quorum:" + quorum.name(), quorum.required());

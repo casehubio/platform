@@ -327,7 +327,7 @@ class BlockingOrcStateMachineTest {
 
     @Test
     void scenarioScope_stateMachine_returnsBlockingVariant() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var sm    = scope.stateMachine("lifecycle", State.class, State.IDLE);
         assertThat(sm).isInstanceOf(BlockingOrcStateMachine.class);
         scope.close();

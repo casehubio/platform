@@ -1,7 +1,7 @@
 package io.casehub.yaml.step.statemachine;
 
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
-import io.casehub.yaml.core.orchestration.ScenarioScope;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.eval.StepRunner;
@@ -11,7 +11,7 @@ import java.util.Map;
 
 public record CompiledStateMachine(
         OrcStateMachine<String> stateMachine,
-        ScenarioScope scope,
+        ExecutionScope scope,
         StateMachineDefinition definition,
         VariableResolver resolver,
         StepRunner runner,

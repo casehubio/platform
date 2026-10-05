@@ -34,7 +34,7 @@ class ShowcaseSignalRaceTest {
 
     @Test
     void signalWait_producerConsumerCoordination() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var signal = scope.signal("data-ready");
         var results = scope.resultStore();
         var consumerResult = new AtomicReference<>();
@@ -65,7 +65,7 @@ class ShowcaseSignalRaceTest {
 
     @Test
     void race_firstFeedWins() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var primarySignal = scope.signal("primary-feed");
         var backupSignal = scope.signal("backup-feed");
         var winner = new AtomicReference<String>();

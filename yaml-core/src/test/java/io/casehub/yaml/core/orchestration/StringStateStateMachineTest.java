@@ -92,7 +92,7 @@ class StringStateStateMachineTest {
 
     @Test
     void stringStates_scenarioScope_createsStateMachine() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         String IDLE = "IDLE".intern();
         var sm = scope.stateMachine("test", String.class, IDLE);
         assertThat(sm).isNotNull();

@@ -55,7 +55,7 @@ class OrcPrimitiveTest {
 
     @Test
     void scopeClose_usesPolymorphicDispatch() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var latch = scope.latch("test", 5);
         var signal = scope.signal("test-sig");
         scope.close();

@@ -8,15 +8,15 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class DefaultScenarioScope implements ScenarioScope {
+public class DefaultExecutionScope implements ExecutionScope {
 
     private final    ConcurrentHashMap<String, Object> primitives      = new ConcurrentHashMap<>();
     private final    DefaultStepResultStore            resultStore     = new DefaultStepResultStore();
     private final    PrimitiveFactory                  factory;
     private final    SpeedMultiplier                   speedMultiplier;
-    private final    DefaultScenarioScope              parent;
-    private final    List<DefaultSpawnedTask>           spawnedTasks    = new CopyOnWriteArrayList<>();
-    private final    List<DefaultScenarioScope>         children        = new CopyOnWriteArrayList<>();
+    private final    DefaultExecutionScope             parent;
+    private final    List<DefaultSpawnedTask>          spawnedTasks    = new CopyOnWriteArrayList<>();
+    private final    List<DefaultExecutionScope>       children        = new CopyOnWriteArrayList<>();
     private volatile boolean                           closed          = false;
     private volatile boolean                           deadlineExpired = false;
     private volatile long                              deadlineRemainingNanos;
@@ -24,22 +24,22 @@ public class DefaultScenarioScope implements ScenarioScope {
 
     private static final long JOIN_TIMEOUT_MS = 5000;
 
-    public DefaultScenarioScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier) {
+    public DefaultExecutionScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier) {
         this(factory, speedMultiplier, null);
     }
 
-    DefaultScenarioScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier,
-                         DefaultScenarioScope parent) {
+    DefaultExecutionScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier,
+                          DefaultExecutionScope parent) {
         this.factory = factory;
         this.speedMultiplier = speedMultiplier;
         this.parent = parent;
     }
 
-    public DefaultScenarioScope(PrimitiveFactory factory) {
+    public DefaultExecutionScope(PrimitiveFactory factory) {
         this(factory, SpeedMultiplier.identity());
     }
 
-    public DefaultScenarioScope() {
+    public DefaultExecutionScope() {
         this(new DefaultPrimitiveFactory());
     }
 
@@ -134,9 +134,9 @@ public class DefaultScenarioScope implements ScenarioScope {
     }
 
     @Override
-    public ScenarioScope childScope(String name) {
+    public ExecutionScope childScope(String name) {
         if (closed) {throw new IllegalStateException("Cannot create child scope on a closed scope");}
-        var child = new DefaultScenarioScope(factory, speedMultiplier, this);
+        var child = new DefaultExecutionScope(factory, speedMultiplier, this);
         children.add(child);
         return child;
     }
@@ -148,7 +148,7 @@ public class DefaultScenarioScope implements ScenarioScope {
 
         if (deadlineThread != null) {deadlineThread.interrupt();}
 
-        for (DefaultScenarioScope child : children) {
+        for (DefaultExecutionScope child : children) {
             child.close();
         }
         children.clear();
@@ -188,14 +188,14 @@ public class DefaultScenarioScope implements ScenarioScope {
     }
 
     @Override
-    public ScenarioScope withDeadline(Duration deadline) {
+    public ExecutionScope withDeadline(Duration deadline) {
         return withDeadline(deadline, null);
     }
 
     @Override
-    public ScenarioScope withDeadline(Duration deadline, Runnable onDeadline) {
+    public ExecutionScope withDeadline(Duration deadline, Runnable onDeadline) {
         if (closed) {throw new IllegalStateException("Cannot set deadline on closed scope");}
-        DefaultScenarioScope child = (DefaultScenarioScope) childScope("deadline");
+        DefaultExecutionScope child = (DefaultExecutionScope) childScope("deadline");
         child.startDeadlineWatcher(deadline, onDeadline);
         return child;
     }
@@ -222,16 +222,16 @@ public class DefaultScenarioScope implements ScenarioScope {
     }
 
 
-    private void startDeadlineWatcher(Duration scenarioDeadline, Runnable onDeadline) {
+    private void startDeadlineWatcher(Duration executionDeadline, Runnable onDeadline) {
         SpeedMultiplier speed = this.speedMultiplier;
-        deadlineRemainingNanos = scenarioDeadline.toNanos();
+        deadlineRemainingNanos = executionDeadline.toNanos();
 
         deadlineThread = Thread.ofVirtual().name("deadline-watcher").start(() -> {
-            double remainingScenario = scenarioDeadline.toNanos();
+            double remainingExecution = executionDeadline.toNanos();
 
-            while (remainingScenario > 0 && !closed) {
+            while (remainingExecution > 0 && !closed) {
                 double currentSpeed   = Math.max(speed.currentSpeed(), 0.001);
-                long   realSleepNanos = (long) (remainingScenario / currentSpeed);
+                long   realSleepNanos = (long) (remainingExecution / currentSpeed);
                 long   maxSleep       = 1_000_000_000L;
                 long   actualSleep    = Math.min(realSleepNanos, maxSleep);
 
@@ -244,8 +244,8 @@ public class DefaultScenarioScope implements ScenarioScope {
                     return;
                 }
                 long elapsedReal = System.nanoTime() - beforeNanos;
-                remainingScenario -= elapsedReal * currentSpeed;
-                deadlineRemainingNanos = (long) remainingScenario;
+                remainingExecution -= elapsedReal * currentSpeed;
+                deadlineRemainingNanos = (long) remainingExecution;
             }
 
             if (!closed) {

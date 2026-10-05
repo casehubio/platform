@@ -50,10 +50,10 @@ public final class CorrelationScope<K, V> implements OrcPrimitive, AutoCloseable
     }
 
     public static <K, V> CorrelationScope<K, V> forScope(
-            ScenarioScope scope, String name, Function<V, K> keyExtractor) {
-        if (!(scope instanceof DefaultScenarioScope dss)) {
+            ExecutionScope scope, String name, Function<V, K> keyExtractor) {
+        if (!(scope instanceof DefaultExecutionScope dss)) {
             throw new IllegalArgumentException(
-                "forScope() requires DefaultScenarioScope. Use the OrcChannel constructor for custom implementations.");
+                "forScope() requires DefaultExecutionScope. Use the OrcChannel constructor for custom implementations.");
         }
         OrcChannel<V> channel = scope.channel(name + ".correlation");
         CorrelationScope<K, V> cs = new CorrelationScope<>(channel, keyExtractor, scope.speedMultiplier());

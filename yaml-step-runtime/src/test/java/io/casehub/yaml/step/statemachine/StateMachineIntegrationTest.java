@@ -1,6 +1,6 @@
 package io.casehub.yaml.step.statemachine;
 
-import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
+import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import io.casehub.yaml.step.eval.StepRunner;
@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ScenarioIntegrationTest {
+class StateMachineIntegrationTest {
 
     @Test
     void linearIncidentLifecycle_endToEnd() {
@@ -48,7 +48,7 @@ class ScenarioIntegrationTest {
         assertThat(errors).isEmpty();
 
         var log = new CopyOnWriteArrayList<String>();
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = loggingRunner(log);
 
         var compiled = StateMachineCompiler.compile(def, scope, runner);
@@ -80,7 +80,7 @@ class ScenarioIntegrationTest {
         var def = StateMachineParser.parse("incident", root);
 
         var log = new CopyOnWriteArrayList<String>();
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
                 log.add(ps.definition().name());
@@ -115,7 +115,7 @@ class ScenarioIntegrationTest {
         var def = StateMachineParser.parse("order", root);
 
         var log = new CopyOnWriteArrayList<String>();
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = loggingRunner(log);
 
         var compiled = StateMachineCompiler.compile(def, scope, runner);
@@ -136,7 +136,7 @@ class ScenarioIntegrationTest {
         var root = Map.<String, Object>of("states", states);
         var def = StateMachineParser.parse("bad", root);
 
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = loggingRunner(new CopyOnWriteArrayList<>());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> StateMachineCompiler.compile(def, scope, runner))
@@ -164,7 +164,7 @@ class ScenarioIntegrationTest {
         var def = StateMachineParser.parse("pipeline", root);
 
         var captured = new CopyOnWriteArrayList<String>();
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = (step, resolver) -> {
             if (step instanceof ResolvedStep.PluginStep ps) {
                 if ("producer".equals(ps.definition().name())) {
@@ -195,7 +195,7 @@ class ScenarioIntegrationTest {
         var def = StateMachineParser.parse("cleanup-test", root);
 
         var log = new CopyOnWriteArrayList<String>();
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = loggingRunner(log);
 
         var compiled = StateMachineCompiler.compile(def, scope, runner);
@@ -215,7 +215,7 @@ class ScenarioIntegrationTest {
         var root = Map.<String, Object>of("states", states);
         var def = StateMachineParser.parse("unhandled", root);
 
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         StepRunner runner = (step, resolver) -> Result.failed("boom");
 
         var compiled = StateMachineCompiler.compile(def, scope, runner);

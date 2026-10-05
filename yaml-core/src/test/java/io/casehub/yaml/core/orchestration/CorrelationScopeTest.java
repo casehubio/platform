@@ -254,7 +254,7 @@ class CorrelationScopeTest {
 
     @Test
     void forScope_registersAsPrimitive() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var cs    = CorrelationScope.<String, String>forScope(scope, "test-corr", v -> v);
 
         assertThat(scope.primitive("test-corr", CorrelationScope.class)).isSameAs(cs);
@@ -265,7 +265,7 @@ class CorrelationScopeTest {
 
     @Test
     void forScope_scopeClose_cascadesToCorrelationScope() throws Exception {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var cs    = CorrelationScope.<String, String>forScope(scope, "test-corr", v -> v);
 
         cs.expectResponse("key", Duration.ofSeconds(30));

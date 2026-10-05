@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,7 +13,7 @@ class SpawnTest {
 
     @Test
     void spawn_startsVirtualThread_isDoneOnCompletion() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var completed = new AtomicBoolean(false);
 
         SpawnedTask task = scope.spawn("worker", () -> completed.set(true));
@@ -28,7 +27,7 @@ class SpawnTest {
 
     @Test
     void spawn_failedTask_reportsException() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var error = new RuntimeException("boom");
 
         SpawnedTask task = scope.spawn("failing", () -> { throw error; });
@@ -42,7 +41,7 @@ class SpawnTest {
 
     @Test
     void spawn_join_blocksUntilCompletion() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var started = new CountDownLatch(1);
 
         SpawnedTask task = scope.spawn("slow", () -> {
@@ -58,7 +57,7 @@ class SpawnTest {
 
     @Test
     void spawn_joinWithTimeout_returnsFalseOnTimeout() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var blocker = new CountDownLatch(1);
 
         SpawnedTask task = scope.spawn("blocked", () -> {
@@ -72,7 +71,7 @@ class SpawnTest {
 
     @Test
     void close_interruptsSpawnedTasks() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
 
@@ -93,7 +92,7 @@ class SpawnTest {
 
     @Test
     void close_interruptsChannelReceive() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
         OrcChannel<String> ch = scope.channel("data");
@@ -116,7 +115,7 @@ class SpawnTest {
 
     @Test
     void spawn_name_isAccessible() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         SpawnedTask task = scope.spawn("my-worker", () -> {});
         assertThat(task.name()).isEqualTo("my-worker");
         scope.close();
@@ -124,7 +123,7 @@ class SpawnTest {
 
     @Test
     void multipleSpawns_allInterruptedOnClose() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var count = new java.util.concurrent.atomic.AtomicInteger(0);
         var allStarted = new CountDownLatch(3);
 

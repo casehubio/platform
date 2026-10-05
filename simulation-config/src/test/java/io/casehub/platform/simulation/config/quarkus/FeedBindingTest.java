@@ -1,7 +1,7 @@
 package io.casehub.platform.simulation.config.quarkus;
 
 import io.casehub.platform.simulation.TemporalEventSink;
-import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
+import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +11,7 @@ class FeedBindingTest {
 
     @Test
     void activate_createsSinkThatSendsToChannel() throws InterruptedException {
-        var scope   = new DefaultScenarioScope();
+        var scope   = new DefaultExecutionScope();
         var binding = new FeedBinding("flash-crash", "trades");
 
         TemporalEventSink<String> sink = binding.activate(scope);
@@ -26,7 +26,7 @@ class FeedBindingTest {
 
     @Test
     void activate_channelCreatedOnDemand() throws InterruptedException {
-        var scope   = new DefaultScenarioScope();
+        var scope   = new DefaultExecutionScope();
         var binding = new FeedBinding("profile", "new-channel");
 
         TemporalEventSink<Integer> sink = binding.activate(scope);

@@ -8,7 +8,7 @@ import io.casehub.yaml.core.orchestration.OrcSemaphore;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.RetryDirective;
-import io.casehub.yaml.core.orchestration.ScenarioScope;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -27,13 +27,13 @@ public final class DecoratorChain {
 
     private final ConditionEvaluator conditionEvaluator;
     private final SpeedMultiplier speedMultiplier;
-    private final ScenarioScope scope;
+    private final ExecutionScope  scope;
 
     public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier) {
         this(conditionEvaluator, speedMultiplier, null);
     }
 
-    public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier, ScenarioScope scope) {
+    public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier, ExecutionScope scope) {
         this.conditionEvaluator = conditionEvaluator;
         this.speedMultiplier = speedMultiplier;
         this.scope = scope;
@@ -345,7 +345,7 @@ public final class DecoratorChain {
     private DecoratedExecution wrapWait(DecoratedExecution inner, Map<String, Object> decorators) {
         Object waitVal = decorators.get("wait");
         if (waitVal == null) {return inner;}
-        if (scope == null) {return ctx -> Result.failed("'wait' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'wait' requires an ExecutionScope");}
 
         String signalName = String.valueOf(waitVal);
         return ctx -> {
@@ -374,7 +374,7 @@ public final class DecoratorChain {
         Object semVal   = decorators.get("semaphore");
         Object mutexVal = decorators.get("mutex");
         if (semVal == null && mutexVal == null) {return inner;}
-        if (scope == null) {return ctx -> Result.failed("'semaphore'/'mutex' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'semaphore'/'mutex' requires an ExecutionScope");}
 
         String name;
         int    permits;
@@ -417,7 +417,7 @@ public final class DecoratorChain {
         Object signalVal  = decorators.get("signal");
         Object publishVal = decorators.get("publish");
         if (signalVal == null && publishVal == null) {return inner;}
-        if (scope == null) {return ctx -> Result.failed("'signal'/'publish' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'signal'/'publish' requires an ExecutionScope");}
 
         return ctx -> {
             Result result = inner.execute(ctx);
@@ -451,7 +451,7 @@ public final class DecoratorChain {
     private DecoratedExecution wrapTransition(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transVal = decorators.get("transition");
         if (transVal == null) {return inner;}
-        if (scope == null) {return ctx -> Result.failed("'transition' requires a ScenarioScope");}
+        if (scope == null) {return ctx -> Result.failed("'transition' requires an ExecutionScope");}
         if (!(transVal instanceof Map<?, ?> transMap)) {
             return ctx -> Result.failed("'transition' must be a map with 'machine' and 'event' keys");
         }

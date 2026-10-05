@@ -11,7 +11,7 @@ class DeadlineTest {
 
     @Test
     void childScope_parentPrimitivesAccessibleViaChain() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var channel = parent.channel("shared");
         var child = parent.childScope("child");
         assertThat(child.channel("shared")).isSameAs(channel);
@@ -20,7 +20,7 @@ class DeadlineTest {
 
     @Test
     void childScope_close_doesNotReleaseParentPrimitives() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var latch = parent.latch("shared", 3);
         var child = parent.childScope("child");
         child.close();
@@ -30,7 +30,7 @@ class DeadlineTest {
 
     @Test
     void childScope_localPrimitiveCreation_notVisibleToParent() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var child = parent.childScope("child");
         child.counter("local-only");
         assertThat(parent.primitive("local-only", OrcCounter.class)).isNull();
@@ -39,7 +39,7 @@ class DeadlineTest {
 
     @Test
     void deadline_expiresAfterDuration_closesScope() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var expired = new AtomicBoolean(false);
         var deadlined = scope.withDeadline(Duration.ofMillis(100), () -> expired.set(true));
         Thread.sleep(400);
@@ -50,7 +50,7 @@ class DeadlineTest {
 
     @Test
     void deadline_respectsSpeedMultiplier() throws InterruptedException {
-        var scope = new DefaultScenarioScope(new DefaultPrimitiveFactory(), () -> 10.0);
+        var scope = new DefaultExecutionScope(new DefaultPrimitiveFactory(), () -> 10.0);
         var expired = new AtomicBoolean(false);
         scope.withDeadline(Duration.ofSeconds(1), () -> expired.set(true));
         Thread.sleep(400);
@@ -60,7 +60,7 @@ class DeadlineTest {
 
     @Test
     void deadline_remainingTime_decreases() throws InterruptedException {
-        var scope = new DefaultScenarioScope(new DefaultPrimitiveFactory(), () -> 100.0);
+        var scope = new DefaultExecutionScope(new DefaultPrimitiveFactory(), () -> 100.0);
         var deadlined = scope.withDeadline(Duration.ofSeconds(5));
         Thread.sleep(200);
         var remaining = deadlined.remainingTime();
@@ -71,14 +71,14 @@ class DeadlineTest {
 
     @Test
     void deadline_remainingTime_emptyWhenNoDeadline() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         assertThat(scope.remainingTime()).isEmpty();
         scope.close();
     }
 
     @Test
     void deadline_isDeadlineExpired_falseBeforeExpiry() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofSeconds(60));
         assertThat(deadlined.isDeadlineExpired()).isFalse();
         scope.close();
@@ -86,7 +86,7 @@ class DeadlineTest {
 
     @Test
     void deadline_scopeClosedExternally_watcherExits() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var expired = new AtomicBoolean(false);
         var deadlined = scope.withDeadline(Duration.ofSeconds(60), () -> expired.set(true));
         deadlined.close();
@@ -97,7 +97,7 @@ class DeadlineTest {
 
     @Test
     void deadline_withHandler_handlerThrows_scopeStillCloses() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofMillis(50), () -> {
             throw new RuntimeException("handler failure");
         });
@@ -108,7 +108,7 @@ class DeadlineTest {
 
     @Test
     void deadline_isDeadlineExpired_childReportsParentDeadline() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
         var child = deadlined.childScope("nested");
         Thread.sleep(400);
@@ -118,7 +118,7 @@ class DeadlineTest {
 
     @Test
     void childScope_parentPrimitivesCreatedAfterChild_visible() {
-        var parent = new DefaultScenarioScope();
+        var parent = new DefaultExecutionScope();
         var child  = parent.childScope("child");
         parent.counter("late-created");
         assertThat(child.primitive("late-created", OrcCounter.class)).isNotNull();
@@ -127,7 +127,7 @@ class DeadlineTest {
 
     @Test
     void deadline_blockedChannelReceive_interruptedOnExpiry() throws InterruptedException {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
         OrcChannel<String> channel = deadlined.channel("data");
 
@@ -147,7 +147,7 @@ class DeadlineTest {
 
     @Test
     void deadline_spawnedThreads_interruptedOnExpiry() throws InterruptedException {
-        var scope     = new DefaultScenarioScope();
+        var scope     = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
 
         var interrupted = new AtomicBoolean(false);
@@ -167,7 +167,7 @@ class DeadlineTest {
 
     @Test
     void deadline_primitivesCleaned_viaOrcPrimitive() throws InterruptedException {
-        var scope     = new DefaultScenarioScope();
+        var scope     = new DefaultExecutionScope();
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
         var latch     = deadlined.latch("gate", 5);
         var signal    = deadlined.signal("notify");
@@ -181,7 +181,7 @@ class DeadlineTest {
 
     @Test
     void deadline_childShorterDeadline_childClosesFirst() throws InterruptedException {
-        var scope        = new DefaultScenarioScope();
+        var scope        = new DefaultExecutionScope();
         var parent       = scope.withDeadline(Duration.ofSeconds(60));
         var childExpired = new AtomicBoolean(false);
         parent.withDeadline(Duration.ofMillis(100), () -> childExpired.set(true));
@@ -194,7 +194,7 @@ class DeadlineTest {
 
     @Test
     void deadline_parentDeadline_childClosesWithParent() throws InterruptedException {
-        var scope         = new DefaultScenarioScope();
+        var scope         = new DefaultExecutionScope();
         var parentExpired = new AtomicBoolean(false);
         var parent        = scope.withDeadline(Duration.ofMillis(100), () -> parentExpired.set(true));
         var childLatch    = parent.latch("child-gate", 3);
@@ -207,7 +207,7 @@ class DeadlineTest {
 
     @Test
     void deadline_nestedDeadlines_childReportsOwnDeadline() throws InterruptedException {
-        var scope  = new DefaultScenarioScope(new DefaultPrimitiveFactory(), () -> 10.0);
+        var scope  = new DefaultExecutionScope(new DefaultPrimitiveFactory(), () -> 10.0);
         var parent = scope.withDeadline(Duration.ofSeconds(60));
         var child  = parent.withDeadline(Duration.ofSeconds(30));
 

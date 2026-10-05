@@ -1,6 +1,6 @@
 package io.casehub.yaml.core.orchestration;
 
-public interface ScenarioScope extends AutoCloseable {
+public interface ExecutionScope extends AutoCloseable {
     OrcSemaphore semaphore(String name, int permits);
 
     OrcSemaphore semaphore(String name, int permits, java.time.Duration window);
@@ -32,11 +32,11 @@ public interface ScenarioScope extends AutoCloseable {
 
     SpawnedTask spawn(String name, Runnable task);
 
-    ScenarioScope childScope(String name);
+    ExecutionScope childScope(String name);
 
-    ScenarioScope withDeadline(java.time.Duration deadline);
+    ExecutionScope withDeadline(java.time.Duration deadline);
 
-    ScenarioScope withDeadline(java.time.Duration deadline, Runnable onDeadline);
+    ExecutionScope withDeadline(java.time.Duration deadline, Runnable onDeadline);
 
     boolean isDeadlineExpired();
 

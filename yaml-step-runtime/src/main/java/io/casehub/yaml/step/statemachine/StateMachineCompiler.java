@@ -1,7 +1,7 @@
 package io.casehub.yaml.step.statemachine;
 
 import io.casehub.yaml.core.orchestration.DefaultOrcStateMachine;
-import io.casehub.yaml.core.orchestration.ScenarioScope;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.step.eval.StepRunner;
 
@@ -13,11 +13,11 @@ public final class StateMachineCompiler {
 
     private StateMachineCompiler() {}
 
-    public static CompiledStateMachine compile(StateMachineDefinition definition, ScenarioScope scope, StepRunner runner) {
+    public static CompiledStateMachine compile(StateMachineDefinition definition, ExecutionScope scope, StepRunner runner) {
         return compile(definition, scope, runner, new VariableResolver(Map.of(), java.util.Set.of()));
     }
 
-    public static CompiledStateMachine compile(StateMachineDefinition definition, ScenarioScope scope,
+    public static CompiledStateMachine compile(StateMachineDefinition definition, ExecutionScope scope,
                                                StepRunner runner, VariableResolver resolver) {
         var errors = StateMachineValidator.validate(definition);
         if (!errors.isEmpty()) {

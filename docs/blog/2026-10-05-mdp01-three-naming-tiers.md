@@ -40,7 +40,7 @@ moved from `io.casehub.yaml.step.scenario` to `io.casehub.yaml.step.statemachine
 
 The model is clean: Playbook is what the user writes. Steps are what the playbook
 executes. State machine is the specific execution topology for playbooks that use
-states and transitions. `ScenarioScope` stays as a runtime orchestration primitive —
+states and transitions. `ExecutionScope` stays as a runtime orchestration primitive —
 that's consistent with the epic's explicit scoping.
 
 The terminology sweep (#519) was two files. "CaseHub YAML" → "CaseHub Playbook YAML"

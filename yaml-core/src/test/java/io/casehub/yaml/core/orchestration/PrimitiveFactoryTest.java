@@ -10,7 +10,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void counter_sameNameSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var c1 = scope.counter("events");
         var c2 = scope.counter("events");
         assertThat(c1).isSameAs(c2);
@@ -19,7 +19,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void gauge_sameNameSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcGauge<String> g1 = scope.gauge("state");
         OrcGauge<String> g2 = scope.gauge("state");
         assertThat(g1).isSameAs(g2);
@@ -28,7 +28,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void flag_sameNameSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var f1 = scope.flag("ready");
         var f2 = scope.flag("ready");
         assertThat(f1).isSameAs(f2);
@@ -37,7 +37,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void accumulator_sameNameSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var a1 = scope.accumulator("total", Double::sum, 0.0);
         var a2 = scope.accumulator("total", Double::sum, 0.0);
         assertThat(a1).isSameAs(a2);
@@ -46,7 +46,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void map_sameNameSameInstance() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcMap<String, Integer> m1 = scope.map("positions");
         OrcMap<String, Integer> m2 = scope.map("positions");
         assertThat(m1).isSameAs(m2);
@@ -98,7 +98,7 @@ class PrimitiveFactoryTest {
             public <K, V> OrcMap<K, V> createMap(String name)                                                                         {return delegate.createMap(name);}
         };
 
-        var                scope = new DefaultScenarioScope(custom);
+        var                scope = new DefaultExecutionScope(custom);
         OrcChannel<String> ch1   = scope.channel("test");
         OrcChannel<String> ch2   = scope.channel("test");
 
@@ -109,7 +109,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void counter_usable_afterCreation() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         var counter = scope.counter("events");
         counter.increment();
         counter.increment();
@@ -119,7 +119,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void map_usable_afterCreation() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         OrcMap<String, Integer> map = scope.map("positions");
         map.put("AAPL", 100);
         assertThat(map.get("AAPL")).isEqualTo(100);
@@ -128,7 +128,7 @@ class PrimitiveFactoryTest {
 
     @Test
     void primitive_lookupFindsNewTypes() {
-        var scope = new DefaultScenarioScope();
+        var scope = new DefaultExecutionScope();
         scope.counter("events");
         var found = scope.primitive("events", OrcCounter.class);
         assertThat(found).isNotNull();

@@ -1,7 +1,7 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
-import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
+import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.core.step.MatchPattern;
@@ -596,7 +596,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void select_signalBranchWins() {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedEval = new StructuralStepEvaluator(
                         new ConditionEvaluator(null), scope);
                 var signal = scope.signal("fast");
@@ -614,7 +614,7 @@ class StructuralStepEvaluatorTest {
 
         @Test
         void select_channelBranchWins() throws InterruptedException {
-            try (var scope = new DefaultScenarioScope()) {
+            try (var scope = new DefaultExecutionScope()) {
                 var scopedEval = new StructuralStepEvaluator(
                         new ConditionEvaluator(null), scope);
                 var channel = scope.<Object>channel("quotes");
@@ -722,12 +722,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class ResultRecordingTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
@@ -804,12 +804,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class ResultVariableResolutionTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
@@ -889,12 +889,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class BarrierTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
@@ -997,12 +997,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class QuorumTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
@@ -1068,12 +1068,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class CompositionTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
@@ -1151,12 +1151,12 @@ class StructuralStepEvaluatorTest {
     @Nested
     class DeadlinePropagationTests {
 
-        private DefaultScenarioScope    scope;
+        private DefaultExecutionScope   scope;
         private StructuralStepEvaluator scopedEvaluator;
 
         @BeforeEach
         void setUp() {
-            scope = new DefaultScenarioScope();
+            scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }

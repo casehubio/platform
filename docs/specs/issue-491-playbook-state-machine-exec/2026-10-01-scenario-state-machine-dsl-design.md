@@ -9,7 +9,7 @@
 
 ## Problem
 
-The platform provides orchestration primitives — `OrcStateMachine`, `ScenarioScope`, `StructuralStepEvaluator`, `DeadlineContext`, `EventRouter`, `MatchPattern` — that fully support state-machine-driven scenarios. But composing them requires Java code: builder calls, handler registrations, deadline wiring, error transition setup. There is no declarative way to define a state-machine-driven scenario in YAML.
+The platform provides orchestration primitives — `OrcStateMachine`, `ExecutionScope`, `StructuralStepEvaluator`, `DeadlineContext`, `EventRouter`, `MatchPattern` — that fully support state-machine-driven scenarios. But composing them requires Java code: builder calls, handler registrations, deadline wiring, error transition setup. There is no declarative way to define a state-machine-driven scenario in YAML.
 
 The incident lifecycle pattern — DETECTED → TRIAGING → RESPONDING → RESOLVED with deadline fallbacks and cleanup guarantees — is cross-domain. Trading (flash crash), SOC (security incident response), clinical (patient care escalation), AML (investigation lifecycle) all follow the same shape. Each domain would write the same Java boilerplate to wire the same primitives.
 
@@ -55,7 +55,7 @@ OrcStateMachine          ← builder calls (states, transitions, terminal states
   + event routing        ← EventRouter for on: event mappings
 ```
 
-`ScenarioScope` gains a new overload: `stateMachine(String name, String initialState, StateMatchingStrategy)`.
+`ExecutionScope` gains a new overload: `stateMachine(String name, String initialState, StateMatchingStrategy)`.
 
 ### Format ownership — yaml-core (D6)
 

@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.ScenarioScope;
@@ -9,10 +9,10 @@ import io.casehub.yaml.step.eval.StepRunner;
 import java.util.List;
 import java.util.Map;
 
-public record CompiledScenario(
+public record CompiledStateMachine(
         OrcStateMachine<String> stateMachine,
         ScenarioScope scope,
-        ScenarioDefinition definition,
+        StateMachineDefinition definition,
         VariableResolver resolver,
         StepRunner runner,
         Map<String, List<Map<String, Object>>> stateSteps) {

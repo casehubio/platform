@@ -1,13 +1,12 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 
-public record ScenarioDefinition(String name, LinkedHashMap<String, StateDefinition> states) {
+public record StateMachineDefinition(String name, LinkedHashMap<String, StateDefinition> states) {
 
-    public ScenarioDefinition {
+    public StateMachineDefinition {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Scenario name must not be blank");
+            throw new IllegalArgumentException("Name must not be blank");
         }
         if (states == null || states.isEmpty()) {
             throw new IllegalArgumentException("Scenario must have at least one state");

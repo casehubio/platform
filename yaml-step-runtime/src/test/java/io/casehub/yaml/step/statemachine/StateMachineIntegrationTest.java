@@ -1,7 +1,6 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import io.casehub.yaml.core.orchestration.DefaultScenarioScope;
-import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import io.casehub.yaml.step.eval.StepRunner;
@@ -44,15 +43,15 @@ class ScenarioIntegrationTest {
         ));
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("incident", root);
-        var errors = ScenarioValidator.validate(def);
+        var def = StateMachineParser.parse("incident", root);
+        var errors = StateMachineValidator.validate(def);
         assertThat(errors).isEmpty();
 
         var log = new CopyOnWriteArrayList<String>();
         var scope = new DefaultScenarioScope();
         StepRunner runner = loggingRunner(log);
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         var result = compiled.execute();
 
         assertThat(result.isSuccess()).isTrue();
@@ -78,7 +77,7 @@ class ScenarioIntegrationTest {
         ));
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("incident", root);
+        var def = StateMachineParser.parse("incident", root);
 
         var log = new CopyOnWriteArrayList<String>();
         var scope = new DefaultScenarioScope();
@@ -92,7 +91,7 @@ class ScenarioIntegrationTest {
             return Result.of(Map.of());
         };
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         var result = compiled.execute();
 
         assertThat(result.isSuccess()).isTrue();
@@ -113,13 +112,13 @@ class ScenarioIntegrationTest {
         states.put("REJECTED", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("order", root);
+        var def = StateMachineParser.parse("order", root);
 
         var log = new CopyOnWriteArrayList<String>();
         var scope = new DefaultScenarioScope();
         StepRunner runner = loggingRunner(log);
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         var result = compiled.execute();
 
         assertThat(result.isSuccess()).isTrue();
@@ -135,12 +134,12 @@ class ScenarioIntegrationTest {
         states.put("B", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("bad", root);
+        var def = StateMachineParser.parse("bad", root);
 
         var scope = new DefaultScenarioScope();
         StepRunner runner = loggingRunner(new CopyOnWriteArrayList<>());
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ScenarioCompiler.compile(def, scope, runner))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> StateMachineCompiler.compile(def, scope, runner))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("NONEXISTENT");
     }
@@ -162,7 +161,7 @@ class ScenarioIntegrationTest {
         states.put("DONE", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("pipeline", root);
+        var def = StateMachineParser.parse("pipeline", root);
 
         var captured = new CopyOnWriteArrayList<String>();
         var scope = new DefaultScenarioScope();
@@ -180,7 +179,7 @@ class ScenarioIntegrationTest {
             return Result.of(Map.of());
         };
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         compiled.execute();
 
         assertThat(captured).containsExactly("hello-world");
@@ -193,13 +192,13 @@ class ScenarioIntegrationTest {
         states.put("END", List.<Object>of(Map.of("terminal", true), Map.of("cleanup", Map.of())));
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("cleanup-test", root);
+        var def = StateMachineParser.parse("cleanup-test", root);
 
         var log = new CopyOnWriteArrayList<String>();
         var scope = new DefaultScenarioScope();
         StepRunner runner = loggingRunner(log);
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         var result = compiled.execute();
 
         assertThat(result.isSuccess()).isTrue();
@@ -214,12 +213,12 @@ class ScenarioIntegrationTest {
         states.put("B", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        var def = ScenarioParser.parse("unhandled", root);
+        var def = StateMachineParser.parse("unhandled", root);
 
         var scope = new DefaultScenarioScope();
         StepRunner runner = (step, resolver) -> Result.failed("boom");
 
-        var compiled = ScenarioCompiler.compile(def, scope, runner);
+        var compiled = StateMachineCompiler.compile(def, scope, runner);
         var result = compiled.execute();
 
         assertThat(result.isSuccess()).isFalse();

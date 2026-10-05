@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import io.casehub.yaml.core.orchestration.DefaultOrcStateMachine;
 import io.casehub.yaml.core.orchestration.ScenarioScope;
@@ -9,19 +9,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class ScenarioCompiler {
+public final class StateMachineCompiler {
 
-    private ScenarioCompiler() {}
+    private StateMachineCompiler() {}
 
-    public static CompiledScenario compile(ScenarioDefinition definition, ScenarioScope scope, StepRunner runner) {
+    public static CompiledStateMachine compile(StateMachineDefinition definition, ScenarioScope scope, StepRunner runner) {
         return compile(definition, scope, runner, new VariableResolver(Map.of(), java.util.Set.of()));
     }
 
-    public static CompiledScenario compile(ScenarioDefinition definition, ScenarioScope scope,
-                                            StepRunner runner, VariableResolver resolver) {
-        var errors = ScenarioValidator.validate(definition);
+    public static CompiledStateMachine compile(StateMachineDefinition definition, ScenarioScope scope,
+                                               StepRunner runner, VariableResolver resolver) {
+        var errors = StateMachineValidator.validate(definition);
         if (!errors.isEmpty()) {
-            throw new IllegalArgumentException("Invalid scenario '" + definition.name() + "': " + String.join("; ", errors));
+            throw new IllegalArgumentException("Invalid state machine '" + definition.name() + "': " + String.join("; ", errors));
         }
 
         var initialState = definition.initialState().intern();
@@ -50,7 +50,7 @@ public final class ScenarioCompiler {
             }
 
             if (stateDef.deadline() != null) {
-                var deadlineTarget = ScenarioValidator.parseDeadlineTarget(stateDef.deadline());
+                var deadlineTarget = StateMachineValidator.parseDeadlineTarget(stateDef.deadline());
                 if (deadlineTarget != null) {
                     builder.transition(stateName, deadlineTarget.intern());
                 }
@@ -66,7 +66,7 @@ public final class ScenarioCompiler {
         var resultResolver = resolver.withObjectScope("result",
                 name -> scope.resultStore().hasCompleted(name) ? scope.resultStore().result(name) : null);
 
-        return new CompiledScenario(sm, scope, definition, resultResolver, runner, Map.copyOf(stateSteps));
+        return new CompiledStateMachine(sm, scope, definition, resultResolver, runner, Map.copyOf(stateSteps));
     }
 
     private static void registerEventTransitions(DefaultOrcStateMachine.Builder<String> builder,

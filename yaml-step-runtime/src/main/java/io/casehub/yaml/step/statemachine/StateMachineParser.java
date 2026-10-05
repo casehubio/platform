@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -6,17 +6,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public final class ScenarioParser {
+public final class StateMachineParser {
 
     private static final Set<String> STATE_METADATA_KEYS = Set.of("next", "on-failure", "deadline", "on", "terminal");
 
-    private ScenarioParser() {}
+    private StateMachineParser() {}
 
     @SuppressWarnings("unchecked")
-    public static ScenarioDefinition parse(String name, Map<String, Object> root) {
+    public static StateMachineDefinition parse(String name, Map<String, Object> root) {
         var statesRaw = (Map<String, Object>) root.get("states");
         if (statesRaw == null) {
-            throw new IllegalArgumentException("Scenario must have a 'states' key");
+            throw new IllegalArgumentException("State machine definition must have a 'states' key");
         }
 
         var states = new LinkedHashMap<String, StateDefinition>();
@@ -24,7 +24,7 @@ public final class ScenarioParser {
             states.put(entry.getKey(), parseState(entry.getKey(), entry.getValue()));
         }
 
-        return new ScenarioDefinition(name, states);
+        return new StateMachineDefinition(name, states);
     }
 
     @SuppressWarnings("unchecked")

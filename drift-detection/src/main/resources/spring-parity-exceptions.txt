@@ -66,6 +66,8 @@ llm-config-bedrock
 llm-config-vertex
 
 # CDI wiring generated into platform-spring via -core deps
+acl-admin
+# CDI wiring generated into platform-spring via -core deps
 endpoints-config
 # CDI wiring generated into platform-spring via -core deps
 preferences-editor

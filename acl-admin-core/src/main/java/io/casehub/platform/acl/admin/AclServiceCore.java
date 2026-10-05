@@ -10,21 +10,15 @@ import io.casehub.platform.api.acl.AclQuery;
 import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.PlatformRoles;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.BadRequestException;
-import jakarta.ws.rs.ForbiddenException;
 
 import java.util.List;
 
-@ApplicationScoped
-public class AclService implements AclApi {
+public class AclServiceCore implements AclApi {
 
     private final AccessControlProvider acl;
     private final CurrentPrincipal principal;
 
-    @Inject
-    public AclService(AccessControlProvider acl, CurrentPrincipal principal) {
+    public AclServiceCore(AccessControlProvider acl, CurrentPrincipal principal) {
         this.acl = acl;
         this.principal = principal;
     }
@@ -90,21 +84,24 @@ public class AclService implements AclApi {
     }
 
     @Override
-    public AclPage accessible(String actorId, String resourceType, AclAction action, String cursor, Integer limit) {
+    public AclPage accessible(String actorId, String resourceType, AclAction action,
+                              String cursor, Integer limit) {
         requireNonNull(actorId, resourceType, action);
         requireAdminOrSelf(actorId);
-        return acl.accessibleResources(new AclQuery(actorId, resourceType, action, cursor, limit != null ? limit : 100));
+        return acl.accessibleResources(
+                new AclQuery(actorId, resourceType, action, cursor, limit != null ? limit : 100));
     }
 
     private void requireAdminOrSelf(String actorId) {
-        if (!principal.groups().contains(PlatformRoles.ADMIN) && !principal.actorId().equals(actorId)) {
-            throw new ForbiddenException("Access denied");
+        if (!principal.groups().contains(PlatformRoles.ADMIN)
+                && !principal.actorId().equals(actorId)) {
+            throw new SecurityException("Access denied");
         }
     }
 
     private static void requireNonNull(Object... args) {
         for (Object arg : args) {
-            if (arg == null) throw new BadRequestException("Required parameter is null");
+            if (arg == null) throw new IllegalArgumentException("Required parameter is null");
         }
     }
 }

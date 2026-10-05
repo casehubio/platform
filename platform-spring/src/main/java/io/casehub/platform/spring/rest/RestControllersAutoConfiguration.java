@@ -1,6 +1,8 @@
 package io.casehub.platform.spring.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.acl.admin.AclServiceCore;
+import io.casehub.platform.api.acl.AccessControlProvider;
 import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.EngagementCallbackHandler;
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
@@ -69,4 +71,13 @@ public class RestControllersAutoConfiguration {
     public CallbackDispatcher callbackDispatcher(ObjectMapper objectMapper) {
         return new CallbackDispatcher(objectMapper);
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(AccessControlProvider.class)
+    public AclServiceCore aclServiceCore(AccessControlProvider acl, CurrentPrincipal principal) {
+        return new AclServiceCore(acl, principal);
+    }
+
+
 }

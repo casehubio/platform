@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import java.util.List;
 import java.util.Map;

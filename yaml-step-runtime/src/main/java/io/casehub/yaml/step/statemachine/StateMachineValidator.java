@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -6,11 +6,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-public final class ScenarioValidator {
+public final class StateMachineValidator {
 
-    private ScenarioValidator() {}
+    private StateMachineValidator() {}
 
-    public static List<String> validate(ScenarioDefinition def) {
+    public static List<String> validate(StateMachineDefinition def) {
         var errors = new ArrayList<String>();
         var stateNames = def.states().keySet();
 
@@ -64,7 +64,7 @@ public final class ScenarioValidator {
         }
     }
 
-    private static void validateReachability(ScenarioDefinition def, List<String> errors) {
+    private static void validateReachability(StateMachineDefinition def, List<String> errors) {
         Set<String> reachable = new HashSet<>();
         var queue = new LinkedList<String>();
         queue.add(def.initialState());

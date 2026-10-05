@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,7 +8,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ScenarioParserTest {
+class StateMachineParserTest {
 
     @Test
     void parseLinearScenario_extractsMetadataAndSteps() {
@@ -30,7 +30,7 @@ class ScenarioParserTest {
 
         var root = Map.<String, Object>of("states", states);
 
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         assertThat(def.initialState()).isEqualTo("DETECTED");
         assertThat(def.states().get("DETECTED").next()).isEqualTo("TRIAGING");
@@ -53,7 +53,7 @@ class ScenarioParserTest {
         states.put("REJECTED", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         assertThat(def.states().get("PENDING").events()).containsKey("approve");
         assertThat(def.states().get("PENDING").events().get("approve"))
@@ -79,7 +79,7 @@ class ScenarioParserTest {
         states.put("CANCELLED", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         var shipEvent = def.states().get("APPROVED").events().get("ship");
         assertThat(shipEvent).isInstanceOf(EventTransition.Guarded.class);
@@ -104,7 +104,7 @@ class ScenarioParserTest {
         states.put("ESCALATED", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         assertThat(def.states().get("DETECTED").deadline())
                 .isEqualTo("${config.sla.timeout} -> ESCALATED");
@@ -122,7 +122,7 @@ class ScenarioParserTest {
         states.put("ESCALATED", escalated);
 
         var root = Map.<String, Object>of("states", states);
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         assertThat(def.states().get("ESCALATED").isTerminal()).isTrue();
         assertThat(def.states().get("ESCALATED").steps()).hasSize(1);
@@ -147,7 +147,7 @@ class ScenarioParserTest {
         states.put("STANDARD", "terminal");
 
         var root = Map.<String, Object>of("states", states);
-        ScenarioDefinition def = ScenarioParser.parse("test", root);
+        StateMachineDefinition def = StateMachineParser.parse("test", root);
 
         var assessEvent = def.states().get("DETECTED").events().get("assess");
         assertThat(assessEvent).isInstanceOf(EventTransition.MatchBased.class);

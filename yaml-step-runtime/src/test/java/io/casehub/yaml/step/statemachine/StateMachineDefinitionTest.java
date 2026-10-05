@@ -1,4 +1,4 @@
-package io.casehub.yaml.step.scenario;
+package io.casehub.yaml.step.statemachine;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +9,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ScenarioDefinitionTest {
+class StateMachineDefinitionTest {
 
     @Test
     void validLinearScenario_constructsSuccessfully() {
@@ -24,7 +24,7 @@ class ScenarioDefinitionTest {
         states.put("ESCALATED", StateDefinition.terminal("ESCALATED",
                 List.of(Map.of("notify.escalation", Map.of("severity", "critical")))));
 
-        var def = new ScenarioDefinition("incident", states);
+        var def = new StateMachineDefinition("incident", states);
         assertThat(def.initialState()).isEqualTo("DETECTED");
         assertThat(def.states()).hasSize(4);
         assertThat(def.states().get("RESOLVED").isTerminal()).isTrue();
@@ -38,13 +38,13 @@ class ScenarioDefinitionTest {
                 List.of(), "SECOND", null, null));
         states.put("SECOND", StateDefinition.terminal("SECOND", List.of()));
 
-        var def = new ScenarioDefinition("test", states);
+        var def = new StateMachineDefinition("test", states);
         assertThat(def.initialState()).isEqualTo("FIRST");
     }
 
     @Test
     void emptyStates_throws() {
-        assertThatThrownBy(() -> new ScenarioDefinition("test", new LinkedHashMap<>()))
+        assertThatThrownBy(() -> new StateMachineDefinition("test", new LinkedHashMap<>()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("at least one state");
     }
@@ -62,7 +62,7 @@ class ScenarioDefinitionTest {
         states.put("APPROVED", StateDefinition.terminal("APPROVED", List.of()));
         states.put("REJECTED", StateDefinition.terminal("REJECTED", List.of()));
 
-        var def = new ScenarioDefinition("order", states);
+        var def = new StateMachineDefinition("order", states);
         assertThat(def.states().get("PENDING").events()).containsKey("approve");
         assertThat(def.states().get("PENDING").events().get("approve").target()).isEqualTo("APPROVED");
     }

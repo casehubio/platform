@@ -9,9 +9,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
-public final class Walker {
+public final class StepWalker {
 
-    private static final Logger LOG = Logger.getLogger(Walker.class.getName());
+    private static final Logger LOG = Logger.getLogger(StepWalker.class.getName());
 
     private static final Set<String> RESERVED_KEYS = Set.of(
             "step", "invoke",
@@ -27,7 +27,7 @@ public final class Walker {
     static final         int         MAX_DEPTH             = 32;
 
 
-    private Walker() {}
+    private StepWalker() {}
 
     private static Map<String, Object> stripKeys(
             Map<String, Object> map, Set<String> keysToStrip) {

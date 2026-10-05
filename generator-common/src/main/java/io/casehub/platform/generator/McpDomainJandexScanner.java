@@ -207,9 +207,10 @@ public class McpDomainJandexScanner {
         return switch (type.kind()) {
             case VOID -> "void";
             case PRIMITIVE -> type.asPrimitiveType().primitive().name().toLowerCase();
-            case CLASS -> type.asClassType().name().local();
+            case CLASS -> type.asClassType().name().local().replace('$', '.');
             case PARAMETERIZED_TYPE -> {
-                StringBuilder sb = new StringBuilder(type.asParameterizedType().name().local());
+                StringBuilder sb = new StringBuilder(
+                        type.asParameterizedType().name().local().replace('$', '.'));
                 sb.append("<");
                 List<Type> args = type.asParameterizedType().arguments();
                 for (int i = 0; i < args.size(); i++) {

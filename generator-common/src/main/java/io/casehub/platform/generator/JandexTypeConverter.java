@@ -6,6 +6,7 @@ import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.WildcardTypeName;
 import org.jboss.jandex.ArrayType;
+import org.jboss.jandex.DotName;
 import org.jboss.jandex.ParameterizedType;
 import org.jboss.jandex.PrimitiveType;
 import org.jboss.jandex.Type;
@@ -19,10 +20,10 @@ public final class JandexTypeConverter {
         return switch (jandexType.kind()) {
             case VOID -> TypeName.VOID;
             case PRIMITIVE -> toPrimitive((PrimitiveType) jandexType);
-            case CLASS -> ClassName.bestGuess(jandexType.name().toString());
+            case CLASS -> classNameFromDotName(jandexType.name());
             case PARAMETERIZED_TYPE -> {
                 ParameterizedType pt = jandexType.asParameterizedType();
-                ClassName rawType = ClassName.bestGuess(pt.name().toString());
+                ClassName rawType = classNameFromDotName(pt.name());
                 TypeName[] typeArgs = pt.arguments().stream()
                         .map(JandexTypeConverter::toTypeName)
                         .toArray(TypeName[]::new);
@@ -42,8 +43,24 @@ public final class JandexTypeConverter {
                 }
                 yield WildcardTypeName.subtypeOf(ClassName.bestGuess("java.lang.Object"));
             }
-            default -> ClassName.bestGuess(jandexType.name().toString());
+            default -> classNameFromDotName(jandexType.name());
         };
+    }
+
+    static ClassName classNameFromDotName(DotName dotName) {
+        String fqcn = dotName.toString();
+        if (!fqcn.contains("$")) {
+            return ClassName.bestGuess(fqcn);
+        }
+        int dollarIndex = fqcn.indexOf('$');
+        String outerFqcn = fqcn.substring(0, dollarIndex);
+        ClassName outer = ClassName.bestGuess(outerFqcn);
+        String[] nested = fqcn.substring(dollarIndex + 1).split("\\$");
+        ClassName result = outer;
+        for (String n : nested) {
+            result = result.nestedClass(n);
+        }
+        return result;
     }
 
     private static TypeName toPrimitive(PrimitiveType pt) {

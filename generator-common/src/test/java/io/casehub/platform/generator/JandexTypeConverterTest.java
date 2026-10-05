@@ -20,6 +20,10 @@ class JandexTypeConverterTest {
     static void buildIndex() throws Exception {
         var indexer = new Indexer();
         indexer.indexClass(SampleTypes.class);
+        indexer.indexClass(SampleTypes.Inner.class);
+        indexer.indexClass(SampleTypes.Outer.class);
+        indexer.indexClass(SampleTypes.Outer.Nested.class);
+        indexer.indexClass(SampleTypes.Outer.Nested.Deep.class);
         index = indexer.complete();
     }
 
@@ -67,4 +71,42 @@ class JandexTypeConverterTest {
         TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("arrayReturn"));
         assertThat(result.toString()).isEqualTo("java.lang.String[]");
     }
+
+    @Test
+    void convertsInnerClass() {
+        TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("innerClass"));
+        assertThat(result).isInstanceOf(ClassName.class);
+        assertThat(result.toString()).isEqualTo(
+                "io.casehub.platform.generator.SampleTypes.Inner");
+    }
+
+    @Test
+    void convertsNestedInnerClass() {
+        TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("nestedInnerClass"));
+        assertThat(result.toString()).isEqualTo(
+                "io.casehub.platform.generator.SampleTypes.Outer.Nested");
+    }
+
+    @Test
+    void convertsDeeplyNestedInnerClass() {
+        TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("deeplyNestedInnerClass"));
+        assertThat(result.toString()).isEqualTo(
+                "io.casehub.platform.generator.SampleTypes.Outer.Nested.Deep");
+    }
+
+    @Test
+    void convertsListOfInnerClass() {
+        TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("listOfInnerClass"));
+        assertThat(result.toString()).isEqualTo(
+                "java.util.List<io.casehub.platform.generator.SampleTypes.Inner>");
+    }
+
+    @Test
+    void convertsMapWithInnerClassValue() {
+        TypeName result = JandexTypeConverter.toTypeName(returnTypeOf("mapWithInnerClassValue"));
+        assertThat(result.toString()).isEqualTo(
+                "java.util.Map<java.lang.String, io.casehub.platform.generator.SampleTypes.Inner>");
+    }
+
+
 }

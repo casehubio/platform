@@ -33,6 +33,7 @@
         <module>authn-core</module>
         <module>authn-inmem</module>
         <module>authn-webauthn-core</module>
+        <module>authn-social-core</module>
         <module>platform-spring</module>
         <module>testing</module>
         <module>agent-runtime-core</module>

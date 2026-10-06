@@ -2,13 +2,13 @@ package io.casehub.platform.agent.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.casehub.yaml.jackson.YamlMappers;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SourceDeclarationTest {
 
-    private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+    private final ObjectMapper mapper = YamlMappers.create()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Test

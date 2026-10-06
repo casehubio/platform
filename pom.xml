@@ -30,6 +30,7 @@
         <module>platform-observability</module>
         <module>platform-core</module>
         <module>platform</module>
+        <module>authn-core</module>
         <module>platform-spring</module>
         <module>testing</module>
         <module>agent-runtime-core</module>

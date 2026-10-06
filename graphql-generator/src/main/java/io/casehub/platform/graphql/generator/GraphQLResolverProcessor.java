@@ -99,8 +99,15 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 index != null ? scanAnnotatedDomains(index) : new HashMap<>();
         Map<String, DomainOperations> roundEnvDomains = scanRoundEnvironment(roundEnv);
 
-        Map<String, DomainOperations> allDomains = new HashMap<>(roundEnvDomains);
-        allDomains.putAll(jandexDomains);
+        Map<String, DomainOperations> allDomains = new HashMap<>(jandexDomains);
+        for (var roundEntry : roundEnvDomains.entrySet()) {
+            if (jandexDomains.containsKey(roundEntry.getKey())) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        "GraphQL generator: local domain '" + roundEntry.getKey()
+                        + "' overrides Jandex definition from dependency");
+            }
+        }
+        allDomains.putAll(roundEnvDomains);
 
         if (allDomains.isEmpty()) {
             return false;
@@ -315,6 +322,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         for (AnnotationInstance ann : index.getAnnotations(MCP_DOMAIN)) {
             if (ann.target().kind() != AnnotationTarget.Kind.CLASS) {continue;}
             ClassInfo classInfo = ann.target().asClass();
+
+            if (classInfo.hasAnnotation(GRAPHQL_API) || classInfo.hasAnnotation(PATH)) {
+                continue;
+            }
 
             String domain = ann.value().asString();
             DomainOperations ops = domains.computeIfAbsent(domain,

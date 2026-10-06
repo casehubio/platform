@@ -1727,9 +1727,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private void addTypeImport(Set<String> imports, Type type) {
         switch (type.kind()) {
-            case CLASS -> imports.add(type.name().toString());
+            case CLASS -> {
+                String fqcn = type.name().toString();
+                imports.add(fqcn.contains("$") ? fqcn.substring(0, fqcn.indexOf('$')) : fqcn);
+            }
             case PARAMETERIZED_TYPE -> {
-                imports.add(type.asParameterizedType().name().toString());
+                String fqcn = type.asParameterizedType().name().toString();
+                imports.add(fqcn.contains("$") ? fqcn.substring(0, fqcn.indexOf('$')) : fqcn);
                 for (Type arg : type.asParameterizedType().arguments()) {
                     addTypeImport(imports, arg);
                 }
@@ -1743,9 +1747,23 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return switch (type.kind()) {
             case VOID -> "void";
             case PRIMITIVE -> type.asPrimitiveType().primitive().name().toLowerCase();
-            case CLASS -> type.asClassType().name().local();
+            case CLASS -> {
+                String fqcn = type.asClassType().name().toString();
+                if (fqcn.contains("$")) {
+                    String outerSimple = fqcn.substring(fqcn.lastIndexOf('.') + 1).replace('$', '.');
+                    yield outerSimple;
+                }
+                yield type.asClassType().name().local();
+            }
             case PARAMETERIZED_TYPE -> {
-                StringBuilder sb = new StringBuilder(type.asParameterizedType().name().local());
+                String fqcn = type.asParameterizedType().name().toString();
+                String baseName;
+                if (fqcn.contains("$")) {
+                    baseName = fqcn.substring(fqcn.lastIndexOf('.') + 1).replace('$', '.');
+                } else {
+                    baseName = type.asParameterizedType().name().local();
+                }
+                StringBuilder sb = new StringBuilder(baseName);
                 sb.append("<");
                 List<Type> args = type.asParameterizedType().arguments();
                 for (int i = 0; i < args.size(); i++) {

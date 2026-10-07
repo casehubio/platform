@@ -1,15 +1,11 @@
 package io.casehub.platform.authn.social;
 
 import io.casehub.platform.api.authn.OAuthTokenRecord;
-import io.casehub.platform.api.authn.OAuthTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,15 +15,15 @@ class OAuthTokenManagerCoreTest {
     private static final String TENANT = "tenant-1";
     private static final String PROVIDER = "google";
 
-    private InMemOAuthTokenStore tokenStore;
+    private OAuthTestFixtures.InMemOAuthTokenStore tokenStore;
     private StubRefreshClient refreshClient;
     private OAuthTokenManagerCore manager;
 
     @BeforeEach
     void setUp() {
-        tokenStore = new InMemOAuthTokenStore();
+        tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         refreshClient = new StubRefreshClient();
-        manager = new OAuthTokenManagerCore(tokenStore, refreshClient, new io.casehub.platform.api.authn.AuthenticationEventListener() {});
+        manager = new OAuthTokenManagerCore(tokenStore, refreshClient, OAuthTestFixtures.NO_OP_LISTENER);
     }
 
     @Test
@@ -155,42 +151,6 @@ class OAuthTokenManagerCoreTest {
             }
             return nextResponse;
         }
-    }
-
-    private static class InMemOAuthTokenStore implements OAuthTokenStore {
-        final ConcurrentHashMap<String, OAuthTokenRecord> stored = new ConcurrentHashMap<>();
-
-        @Override
-        public void store(OAuthTokenRecord record) {
-            stored.put(key(record.actorId(), record.provider(), record.tenancyId()), record);
-        }
-
-        @Override
-        public Optional<OAuthTokenRecord> findByActorId(String actorId, String provider, String tenancyId) {
-            return Optional.ofNullable(stored.get(key(actorId, provider, tenancyId)));
-        }
-
-        @Override
-        public List<OAuthTokenRecord> findAllByActorId(String actorId, String tenancyId) {
-            return stored.values().stream()
-                    .filter(r -> r.actorId().equals(actorId) && r.tenancyId().equals(tenancyId))
-                    .toList();
-        }
-
-        @Override
-        public void delete(String actorId, String provider, String tenancyId) {
-            stored.remove(key(actorId, provider, tenancyId));
-        }
-
-        @Override
-        public void updateTokens(String actorId, String provider, String tenancyId,
-                                  String accessToken, String refreshToken, Instant expiresAt) {
-            stored.computeIfPresent(key(actorId, provider, tenancyId),
-                    (k, old) -> new OAuthTokenRecord(actorId, tenancyId, provider,
-                            accessToken, refreshToken, old.grantedScopes(), expiresAt, old.createdAt()));
-        }
-
-        private static String key(String a, String p, String t) { return a + ":" + p + ":" + t; }
     }
 
     private static class CapturingEventListener implements io.casehub.platform.api.authn.AuthenticationEventListener {

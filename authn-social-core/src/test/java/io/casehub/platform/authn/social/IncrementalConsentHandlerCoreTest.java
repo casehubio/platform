@@ -2,20 +2,16 @@ package io.casehub.platform.authn.social;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.ChallengeResponse;
-import io.casehub.platform.api.authn.IdentityBinding;
-import io.casehub.platform.api.authn.IdentityBindingStore;
-import io.casehub.platform.api.authn.OAuthTokenRecord;
-import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.ProviderUnavailableException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class IncrementalConsentHandlerCoreTest {
 
@@ -31,21 +27,21 @@ class IncrementalConsentHandlerCoreTest {
                 "actor1", "google", "tenant1",
                 Set.of("calendar.readonly"));
 
-        assertEquals("google", result.provider());
-        assertEquals(Set.of("calendar.readonly"), result.requestedScopes());
-        assertNotNull(result.authorizationUrl());
-        assertNotNull(result.state());
+        assertThat(result.provider()).isEqualTo("google");
+        assertThat(result.requestedScopes()).isEqualTo(Set.of("calendar.readonly"));
+        assertThat(result.authorizationUrl()).isNotNull();
+        assertThat(result.state()).isNotNull();
     }
 
     @Test
     void requestForUnknownProviderThrows() {
         var handler = new IncrementalConsentHandlerCore(Map.of());
 
-        var ex = assertThrows(ProviderUnavailableException.class, () ->
-                handler.requestAdditionalScopes(
+        assertThatThrownBy(() -> handler.requestAdditionalScopes(
                         "actor1", "unknown", "tenant1",
-                        Set.of("some.scope")));
-        assertEquals("unknown", ex.method());
+                        Set.of("some.scope")))
+                .isInstanceOf(ProviderUnavailableException.class)
+                .satisfies(ex -> assertThat(((ProviderUnavailableException) ex).method()).isEqualTo("unknown"));
     }
 
     @Test
@@ -59,13 +55,12 @@ class IncrementalConsentHandlerCoreTest {
                 "actor1", "github", "tenant1",
                 Set.of("repo", "user:email"));
 
-        assertNotNull(capturingProvider.lastContext);
+        assertThat(capturingProvider.lastContext).isNotNull();
         var hints = capturingProvider.lastContext.hints();
-        assertTrue(hints.containsKey("additionalScopes"));
+        assertThat(hints).containsKey("additionalScopes");
         @SuppressWarnings("unchecked")
         var scopes = (Set<String>) hints.get("additionalScopes");
-        assertTrue(scopes.contains("repo"));
-        assertTrue(scopes.contains("user:email"));
+        assertThat(scopes).contains("repo", "user:email");
     }
 
     private static AbstractOAuthAuthenticationProvider createStubProvider(String method, String authUrl) {
@@ -92,10 +87,10 @@ class IncrementalConsentHandlerCoreTest {
         private final boolean useRealInitiate;
 
         TestProvider(String method, String authUrl, boolean useRealInitiate) {
-            super(new StubOAuthConfig(), new StubOAuthHttpClient(),
-                    new StubOAuthTokenStore(), new StubIdentityBindingStore(),
+            super(new StubOAuthConfig(), new OAuthTestFixtures.StubOAuthHttpClient(),
+                    new OAuthTestFixtures.InMemOAuthTokenStore(), new OAuthTestFixtures.InMemIdentityBindingStore(),
                     (email, tenancyId) -> Optional.empty(),
-                    new io.casehub.platform.api.authn.AuthenticationEventListener() {});
+                    OAuthTestFixtures.NO_OP_LISTENER);
             this.method = method;
             this.authUrl = authUrl;
             this.useRealInitiate = useRealInitiate;
@@ -122,23 +117,4 @@ class IncrementalConsentHandlerCoreTest {
         @Override public String redirectUri() { return "https://example.com/callback"; }
     }
 
-    private static class StubOAuthHttpClient implements OAuthHttpClient {
-        @Override public OAuthTokenResponse exchangeCode(String e, Map<String, String> p) { return null; }
-        @Override public Map<String, Object> fetchUserInfo(String e, String t) { return Map.of(); }
-    }
-
-    private static class StubOAuthTokenStore implements OAuthTokenStore {
-        @Override public void store(OAuthTokenRecord r) {}
-        @Override public Optional<OAuthTokenRecord> findByActorId(String a, String p, String t) { return Optional.empty(); }
-        @Override public List<OAuthTokenRecord> findAllByActorId(String a, String t) { return List.of(); }
-        @Override public void delete(String a, String p, String t) {}
-        @Override public void updateTokens(String a, String p, String t, String at, String rt, Instant e) {}
-    }
-
-    private static class StubIdentityBindingStore implements IdentityBindingStore {
-        @Override public void bind(IdentityBinding b) {}
-        @Override public Optional<IdentityBinding> findByExternalId(String p, String e, String t) { return Optional.empty(); }
-        @Override public Optional<IdentityBinding> findByActorId(String a, String p, String t) { return Optional.empty(); }
-        @Override public void unbind(String p, String e, String t) {}
-    }
 }

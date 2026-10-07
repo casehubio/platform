@@ -1,8 +1,6 @@
 package io.casehub.platform.authn.social;
 
-import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.OAuthTokenRecord;
-import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.ScopeRegistry;
 import io.casehub.platform.api.authn.ServiceConnectionException;
 import io.casehub.platform.api.authn.ServiceConnectionStatus;
@@ -11,28 +9,27 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ServiceConnectionProviderCoreTest {
 
-    private InMemoryTokenStore tokenStore;
+    private OAuthTestFixtures.InMemOAuthTokenStore tokenStore;
     private StubScopeRegistry scopeRegistry;
     private OAuthTokenManagerCore tokenManager;
     private ServiceConnectionProviderCore provider;
 
     @BeforeEach
     void setUp() {
-        tokenStore = new InMemoryTokenStore();
+        tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         scopeRegistry = new StubScopeRegistry();
         OAuthTokenManagerCore.TokenRefreshClient noOpRefresh = r -> {
             throw new UnsupportedOperationException();
         };
-        tokenManager = new OAuthTokenManagerCore(tokenStore, noOpRefresh, new AuthenticationEventListener() {});
+        tokenManager = new OAuthTokenManagerCore(tokenStore, noOpRefresh, OAuthTestFixtures.NO_OP_LISTENER);
         provider = new ServiceConnectionProviderCore(tokenStore, tokenManager, scopeRegistry);
     }
 
@@ -40,8 +37,8 @@ class ServiceConnectionProviderCoreTest {
     void getConnectionReturnsDisconnectedWhenNoToken() {
         scopeRegistry.register("google", Set.of("drive"), Object.class);
         var conn = provider.getConnection("actor1", "google", "tenant1");
-        assertEquals(ServiceConnectionStatus.DISCONNECTED, conn.status());
-        assertEquals(Set.of("drive"), conn.missingScopes());
+        assertThat(conn.status()).isEqualTo(ServiceConnectionStatus.DISCONNECTED);
+        assertThat(conn.missingScopes()).isEqualTo(Set.of("drive"));
     }
 
     @Test
@@ -51,8 +48,8 @@ class ServiceConnectionProviderCoreTest {
             "token", "refresh", Set.of("openid", "drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
         var conn = provider.getConnection("actor1", "google", "tenant1");
-        assertEquals(ServiceConnectionStatus.CONNECTED, conn.status());
-        assertTrue(conn.missingScopes().isEmpty());
+        assertThat(conn.status()).isEqualTo(ServiceConnectionStatus.CONNECTED);
+        assertThat(conn.missingScopes()).isEmpty();
     }
 
     @Test
@@ -62,8 +59,8 @@ class ServiceConnectionProviderCoreTest {
             "token", "refresh", Set.of("openid", "drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
         var conn = provider.getConnection("actor1", "google", "tenant1");
-        assertEquals(ServiceConnectionStatus.PARTIAL, conn.status());
-        assertEquals(Set.of("calendar"), conn.missingScopes());
+        assertThat(conn.status()).isEqualTo(ServiceConnectionStatus.PARTIAL);
+        assertThat(conn.missingScopes()).isEqualTo(Set.of("calendar"));
     }
 
     @Test
@@ -72,16 +69,19 @@ class ServiceConnectionProviderCoreTest {
             "token123", "refresh", Set.of("drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
         var accessToken = provider.getAccessToken("actor1", "google", "tenant1");
-        assertEquals("token123", accessToken.accessToken());
+        assertThat(accessToken.accessToken()).isEqualTo("token123");
     }
 
     @Test
     void getAccessTokenThrowsWhenNoConnection() {
         scopeRegistry.register("google", Set.of("drive"), Object.class);
-        var ex = assertThrows(ServiceConnectionException.class,
-            () -> provider.getAccessToken("actor1", "google", "tenant1"));
-        assertEquals("google", ex.provider());
-        assertEquals(Set.of("drive"), ex.requiredScopes());
+        assertThatThrownBy(() -> provider.getAccessToken("actor1", "google", "tenant1"))
+                .isInstanceOf(ServiceConnectionException.class)
+                .satisfies(ex -> {
+                    var sce = (ServiceConnectionException) ex;
+                    assertThat(sce.provider()).isEqualTo("google");
+                    assertThat(sce.requiredScopes()).isEqualTo(Set.of("drive"));
+                });
     }
 
     @Test
@@ -90,7 +90,7 @@ class ServiceConnectionProviderCoreTest {
             "token", "refresh", Set.of("drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
         provider.disconnect("actor1", "google", "tenant1");
-        assertTrue(tokenStore.findByActorId("actor1", "google", "tenant1").isEmpty());
+        assertThat(tokenStore.findByActorId("actor1", "google", "tenant1")).isEmpty();
     }
 
     @Test
@@ -101,11 +101,11 @@ class ServiceConnectionProviderCoreTest {
             "token", "refresh", Set.of("openid", "drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
         var connections = provider.listConnections("actor1", "tenant1");
-        assertEquals(2, connections.size());
+        assertThat(connections).hasSize(2);
         var google = connections.stream().filter(c -> c.provider().equals("google")).findFirst().orElseThrow();
         var github = connections.stream().filter(c -> c.provider().equals("github")).findFirst().orElseThrow();
-        assertEquals(ServiceConnectionStatus.CONNECTED, google.status());
-        assertEquals(ServiceConnectionStatus.DISCONNECTED, github.status());
+        assertThat(google.status()).isEqualTo(ServiceConnectionStatus.CONNECTED);
+        assertThat(github.status()).isEqualTo(ServiceConnectionStatus.DISCONNECTED);
     }
 
     @Test
@@ -114,18 +114,7 @@ class ServiceConnectionProviderCoreTest {
         tokenStore.store(new OAuthTokenRecord("actor1", "tenant1", "google",
             "token", "refresh", Set.of("drive"),
             Instant.now().plusSeconds(3600), Instant.now()));
-        assertEquals(Set.of("calendar"), provider.missingScopes("actor1", "google", "tenant1"));
-    }
-
-    private static class InMemoryTokenStore implements OAuthTokenStore {
-        private final ConcurrentHashMap<String, OAuthTokenRecord> store = new ConcurrentHashMap<>();
-        private String key(String a, String p, String t) { return a + ":" + p + ":" + t; }
-        @Override public void store(OAuthTokenRecord r) { store.put(key(r.actorId(), r.provider(), r.tenancyId()), r); }
-        @Override public Optional<OAuthTokenRecord> findByActorId(String a, String p, String t) { return Optional.ofNullable(store.get(key(a, p, t))); }
-        @Override public List<OAuthTokenRecord> findAllByActorId(String a, String t) { return store.values().stream().filter(r -> r.actorId().equals(a) && r.tenancyId().equals(t)).toList(); }
-        @Override public void delete(String a, String p, String t) { store.remove(key(a, p, t)); }
-        @Override public void updateTokens(String a, String p, String t, String at, String rt, Instant e) {}
-        @Override public void updateScopes(String a, String p, String t, Set<String> s) {}
+        assertThat(provider.missingScopes("actor1", "google", "tenant1")).isEqualTo(Set.of("calendar"));
     }
 
     private static class StubScopeRegistry implements ScopeRegistry {

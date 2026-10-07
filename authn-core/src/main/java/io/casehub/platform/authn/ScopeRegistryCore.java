@@ -14,8 +14,11 @@ public class ScopeRegistryCore implements ScopeRegistry {
 
     @Override
     public void register(String provider, Set<String> scopes, Class<?> consumer) {
+        java.util.Objects.requireNonNull(provider, "provider");
+        java.util.Objects.requireNonNull(scopes, "scopes");
+        java.util.Objects.requireNonNull(consumer, "consumer");
         registrations.computeIfAbsent(provider, k -> new CopyOnWriteArrayList<>())
-                .add(new ScopeRegistration(scopes, consumer));
+                     .add(new ScopeRegistration(scopes, consumer));
     }
 
     @Override
@@ -44,13 +47,15 @@ public class ScopeRegistryCore implements ScopeRegistry {
 
     @Override
     public boolean satisfies(String provider, Set<String> grantedScopes) {
+        java.util.Objects.requireNonNull(grantedScopes, "grantedScopes");
         return grantedScopes.containsAll(requiredScopes(provider));
     }
 
     @Override
     public Set<String> missingScopes(String provider, Set<String> grantedScopes) {
+        java.util.Objects.requireNonNull(grantedScopes, "grantedScopes");
         var required = requiredScopes(provider);
-        var missing = new HashSet<>(required);
+        var missing  = new HashSet<>(required);
         missing.removeAll(grantedScopes);
         return Set.copyOf(missing);
     }

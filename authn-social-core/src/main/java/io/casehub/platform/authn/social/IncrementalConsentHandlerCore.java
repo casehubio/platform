@@ -4,7 +4,6 @@ import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.ConsentRequest;
 import io.casehub.platform.api.authn.IncrementalConsentHandler;
 import io.casehub.platform.api.authn.ProviderUnavailableException;
-import io.casehub.platform.api.identity.PrincipalId;
 
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +22,10 @@ public class IncrementalConsentHandlerCore implements IncrementalConsentHandler 
     public ConsentRequest requestAdditionalScopes(
             String actorId, String provider, String tenancyId,
             Set<String> missingScopes) {
+        java.util.Objects.requireNonNull(missingScopes, "missingScopes");
+        if (missingScopes.isEmpty()) {
+            throw new IllegalArgumentException("missingScopes must not be empty");
+        }
         var authProvider = providers.get(provider);
         if (authProvider == null) {
             throw new ProviderUnavailableException(provider, "No OAuth provider registered for: " + provider);
@@ -30,13 +33,18 @@ public class IncrementalConsentHandlerCore implements IncrementalConsentHandler 
 
         var context = new AuthenticationContext(
                 provider, tenancyId, "incremental-consent",
-                Optional.of(PrincipalId.human(actorId)),
+                Optional.of(io.casehub.platform.api.identity.PrincipalId.human(actorId)),
                 Map.of("additionalScopes", missingScopes));
 
-        var challenge = (OAuthChallengeResponse) authProvider.initiate(context);
+        var challenge = authProvider.initiate(context);
+        if (!(challenge instanceof OAuthChallengeResponse oauthChallenge)) {
+            throw new IllegalStateException(
+                    "Provider " + provider + " returned " + challenge.getClass().getSimpleName()
+                    + " instead of OAuthChallengeResponse");
+        }
 
         return new ConsentRequest(
-                challenge.authorizationUrl(),
-                provider, missingScopes, challenge.challengeId());
+                oauthChallenge.authorizationUrl(),
+                provider, missingScopes, oauthChallenge.challengeId());
     }
 }

@@ -1,5 +1,6 @@
 package io.casehub.platform.api.authn;
 
+import java.util.Objects;
 import java.util.Set;
 
 public class InsufficientScopesException extends RuntimeException {
@@ -14,13 +15,13 @@ public class InsufficientScopesException extends RuntimeException {
             String provider, String actorId,
             Set<String> requiredScopes, Set<String> grantedScopes,
             Set<String> missingScopes) {
-        super(provider + ": missing scopes " + missingScopes
-              + ", granted " + grantedScopes);
+        super(Objects.requireNonNull(provider, "provider")
+              + ": missing scopes " + missingScopes + ", granted " + grantedScopes);
         this.provider = provider;
-        this.actorId = actorId;
-        this.requiredScopes = Set.copyOf(requiredScopes);
-        this.grantedScopes = Set.copyOf(grantedScopes);
-        this.missingScopes = Set.copyOf(missingScopes);
+        this.actorId = Objects.requireNonNull(actorId, "actorId");
+        this.requiredScopes = Set.copyOf(Objects.requireNonNull(requiredScopes, "requiredScopes"));
+        this.grantedScopes = Set.copyOf(Objects.requireNonNull(grantedScopes, "grantedScopes"));
+        this.missingScopes = Set.copyOf(Objects.requireNonNull(missingScopes, "missingScopes"));
     }
 
     public String getProvider() { return provider; }

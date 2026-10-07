@@ -32,4 +32,9 @@ public class NoOpOAuthTokenStore implements OAuthTokenStore {
     @Override
     public void updateTokens(String actorId, String provider, String tenancyId,
                              String accessToken, String refreshToken, Instant expiresAt) {}
+
+    @Override
+    public void updateScopes(String actorId, String provider, String tenancyId,
+                             java.util.Set<String> grantedScopes) {}
+
 }

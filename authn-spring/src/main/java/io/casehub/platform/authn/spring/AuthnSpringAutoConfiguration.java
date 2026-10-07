@@ -133,12 +133,12 @@ public class AuthnSpringAutoConfiguration {
         var beans = applicationContext.getBeansWithAnnotation(
                 io.casehub.platform.api.authn.RequiresScopes.class);
         for (var entry : beans.entrySet()) {
-            var beanClass = entry.getValue().getClass();
-            var annotation = beanClass.getAnnotation(
-                    io.casehub.platform.api.authn.RequiresScopes.class);
+            var targetClass = org.springframework.aop.support.AopUtils.getTargetClass(entry.getValue());
+            var annotation = org.springframework.core.annotation.AnnotationUtils.findAnnotation(
+                    targetClass, io.casehub.platform.api.authn.RequiresScopes.class);
             if (annotation != null) {
                 registry.register(annotation.provider(),
-                                  Set.of(annotation.scopes()), beanClass);
+                                  Set.of(annotation.scopes()), targetClass);
             }
         }
         return registry;

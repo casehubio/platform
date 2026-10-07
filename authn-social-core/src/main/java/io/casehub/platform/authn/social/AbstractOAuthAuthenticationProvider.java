@@ -53,14 +53,20 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
 
     @Override
     public ChallengeResponse initiate(AuthenticationContext context) {
-        String state = UUID.randomUUID().toString();
+        String  state     = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(config.challengeTimeoutSeconds());
 
         pendingStates.put(state, context.tenancyId());
 
-        Set<String> scopes = config.scopes();
-        Object additionalScopes = context.hints().get("additionalScopes");
-        if (additionalScopes instanceof String s && !s.isBlank()) {
+        Set<String> scopes           = config.scopes();
+        Object      additionalScopes = context.hints().get("additionalScopes");
+        if (additionalScopes instanceof Set<?> scopeSet) {
+            var combined = new java.util.LinkedHashSet<>(scopes);
+            for (Object s : scopeSet) {
+                if (s instanceof String str) {combined.add(str);}
+            }
+            scopes = combined;
+        } else if (additionalScopes instanceof String s && !s.isBlank()) {
             var combined = new java.util.LinkedHashSet<>(scopes);
             combined.addAll(Set.of(s.split("[\\s,]+")));
             scopes = combined;

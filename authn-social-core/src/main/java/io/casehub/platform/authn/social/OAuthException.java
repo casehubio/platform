@@ -8,7 +8,6 @@ public class OAuthException extends AuthenticationException {
     }
 
     public OAuthException(String message, Throwable cause) {
-        super("oauth", message);
-        initCause(cause);
+        super("oauth", message, cause);
     }
 }

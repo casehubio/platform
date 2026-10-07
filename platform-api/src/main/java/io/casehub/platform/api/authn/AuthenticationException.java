@@ -8,5 +8,11 @@ public abstract class AuthenticationException extends RuntimeException {
         this.method = method;
     }
 
+    protected AuthenticationException(String method, String message, Throwable cause) {
+        super(message, cause);
+        this.method = method;
+    }
+
+
     public String method() { return method; }
 }

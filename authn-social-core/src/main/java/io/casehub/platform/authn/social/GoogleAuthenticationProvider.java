@@ -1,16 +1,11 @@
 package io.casehub.platform.authn.social;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
 
-import io.casehub.platform.api.authn.AuthenticationContext;
-
-import java.io.IOException;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,8 +16,6 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
     private static final String TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
     private static final String USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
     private static final Set<String> DEFAULT_SCOPES = Set.of("openid", "email", "profile");
-    private static final ObjectMapper JSON = new ObjectMapper();
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final OAuthHttpClient httpClient;
 
@@ -68,7 +61,7 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
     }
 
     private OAuthIdentity extractFromIdToken(String idToken) {
-        Map<String, Object> claims = parseJwtPayload(idToken);
+        Map<String, Object> claims = JwtUtils.parsePayload(idToken);
 
         String sub = (String) claims.get("sub");
         if (sub == null) {
@@ -103,18 +96,7 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
         return new OAuthIdentity(sub, email, name);
     }
 
-    private static Map<String, Object> parseJwtPayload(String jwt) {
-        String[] parts = jwt.split("\\.");
-        if (parts.length < 2) {
-            throw new OAuthException("Invalid JWT format: expected 3 parts, got " + parts.length);
-        }
-        try {
-            byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
-            return JSON.readValue(payload, MAP_TYPE);
-        } catch (IOException e) {
-            throw new OAuthException("Failed to parse JWT payload: " + e.getMessage(), e);
-        }
-    }
+
 
     public record GoogleConfig(
         String clientId,

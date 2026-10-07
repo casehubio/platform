@@ -119,7 +119,9 @@ public class AuthnSpringAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore) {
-        OAuthTokenManagerCore.TokenRefreshClient noOpClient = refreshToken -> null;
+        OAuthTokenManagerCore.TokenRefreshClient noOpClient = refreshToken -> {
+            throw new UnsupportedOperationException("No token refresh client configured");
+        };
         return new OAuthTokenManagerCore(tokenStore, noOpClient);
     }
 }

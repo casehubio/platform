@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @ApplicationScoped
 public class JpaOAuthTokenStore implements OAuthTokenStore {
@@ -67,4 +68,16 @@ public class JpaOAuthTokenStore implements OAuthTokenStore {
             entity.expiresAt = expiresAt;
         }
     }
+
+    @Override
+    @Transactional
+    public void updateScopes(String actorId, String provider, String tenancyId,
+                             Set<String> grantedScopes) {
+        OAuthTokenEntity entity = em.find(OAuthTokenEntity.class,
+                                          new OAuthTokenId(actorId, provider, tenancyId));
+        if (entity != null) {
+            entity.grantedScopesJson = OAuthTokenEntity.scopesToString(grantedScopes);
+        }
+    }
+
 }

@@ -6,6 +6,7 @@ import io.casehub.platform.api.authn.OAuthTokenStore;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class InMemoryOAuthTokenStore implements OAuthTokenStore {
@@ -41,6 +42,16 @@ public class InMemoryOAuthTokenStore implements OAuthTokenStore {
                 new OAuthTokenRecord(r.actorId(), r.tenancyId(), r.provider(),
                         accessToken, refreshToken, r.grantedScopes(), expiresAt, r.createdAt()));
     }
+
+    @Override
+    public void updateScopes(String actorId, String provider, String tenancyId,
+                             Set<String> grantedScopes) {
+        tokens.computeIfPresent(key(actorId, provider, tenancyId), (k, r) ->
+                                                                           new OAuthTokenRecord(r.actorId(), r.tenancyId(), r.provider(),
+                                                                                                r.accessToken(), r.refreshToken(), Set.copyOf(grantedScopes),
+                                                                                                r.expiresAt(), r.createdAt()));
+    }
+
 
     private static String key(String actorId, String provider, String tenancyId) {
         return actorId + "|" + provider + "|" + tenancyId;

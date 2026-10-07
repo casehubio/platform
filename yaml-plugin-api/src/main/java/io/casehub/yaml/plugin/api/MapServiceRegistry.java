@@ -15,11 +15,6 @@ public class MapServiceRegistry implements ServiceRegistry {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T lookup(Class<T> serviceType) {
-        T service = (T) services.get(serviceType);
-        if (service == null) {
-            throw new IllegalArgumentException(
-                "No service registered for: " + serviceType.getName());
-        }
-        return service;
+        return (T) services.get(serviceType);
     }
 }

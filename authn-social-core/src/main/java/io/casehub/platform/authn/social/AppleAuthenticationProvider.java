@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.ChallengeResponse;
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
@@ -12,12 +13,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.time.Instant;
-import java.util.stream.Collectors;
 
 public class AppleAuthenticationProvider extends AbstractOAuthAuthenticationProvider {
 
@@ -31,11 +28,12 @@ public class AppleAuthenticationProvider extends AbstractOAuthAuthenticationProv
     private final AppleConfig appleConfig;
 
     public AppleAuthenticationProvider(AppleConfig config,
-                                        OAuthHttpClient httpClient,
-                                        OAuthTokenStore tokenStore,
-                                        IdentityBindingStore bindingStore,
-                                        UserResolver userResolver) {
-        super(config, httpClient, tokenStore, bindingStore, userResolver);
+                                       OAuthHttpClient httpClient,
+                                       OAuthTokenStore tokenStore,
+                                       IdentityBindingStore bindingStore,
+                                       UserResolver userResolver,
+                                       AuthenticationEventListener eventListener) {
+        super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener);
         this.appleConfig = config;
     }
 

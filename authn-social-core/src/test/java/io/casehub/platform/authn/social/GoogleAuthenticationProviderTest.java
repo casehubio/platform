@@ -43,7 +43,7 @@ class GoogleAuthenticationProviderTest {
         var config = new GoogleAuthenticationProvider.GoogleConfig(
                 "google-client-id", "google-client-secret",
                 "https://example.com/callback");
-        provider = new GoogleAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver);
+        provider = new GoogleAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver, new io.casehub.platform.api.authn.AuthenticationEventListener() {});
     }
 
     @Test

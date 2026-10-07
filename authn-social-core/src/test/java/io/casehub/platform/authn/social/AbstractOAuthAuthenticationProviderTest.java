@@ -1,7 +1,6 @@
 package io.casehub.platform.authn.social;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
-import io.casehub.platform.api.authn.AuthenticationResult;
 import io.casehub.platform.api.authn.ChallengeRecord;
 import io.casehub.platform.api.authn.IdentityBinding;
 import io.casehub.platform.api.authn.IdentityBindingStore;
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -184,7 +182,8 @@ class AbstractOAuthAuthenticationProviderTest {
         TestOAuthProvider(OAuthConfig config, OAuthHttpClient httpClient,
                           OAuthTokenStore tokenStore, IdentityBindingStore bindingStore,
                           UserResolver userResolver) {
-            super(config, httpClient, tokenStore, bindingStore, userResolver);
+            super(config, httpClient, tokenStore, bindingStore, userResolver,
+                  new io.casehub.platform.api.authn.AuthenticationEventListener() {});
         }
 
         @Override

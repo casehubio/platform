@@ -45,7 +45,7 @@ class AppleAuthenticationProviderTest {
                 "key-id-abc",
                 "fake-private-key",
                 "https://example.com/callback");
-        provider = new AppleAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver);
+        provider = new AppleAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver, new io.casehub.platform.api.authn.AuthenticationEventListener() {});
     }
 
     @Test

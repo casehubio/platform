@@ -94,7 +94,8 @@ class IncrementalConsentHandlerCoreTest {
         TestProvider(String method, String authUrl, boolean useRealInitiate) {
             super(new StubOAuthConfig(), new StubOAuthHttpClient(),
                     new StubOAuthTokenStore(), new StubIdentityBindingStore(),
-                    (email, tenancyId) -> Optional.empty());
+                    (email, tenancyId) -> Optional.empty(),
+                    new io.casehub.platform.api.authn.AuthenticationEventListener() {});
             this.method = method;
             this.authUrl = authUrl;
             this.useRealInitiate = useRealInitiate;

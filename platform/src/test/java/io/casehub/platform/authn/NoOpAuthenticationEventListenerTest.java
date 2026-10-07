@@ -11,6 +11,17 @@ class NoOpAuthenticationEventListenerTest {
 
     private final AuthenticationEventListener listener = new NoOpAuthenticationEventListener();
 
+
+    @Test
+    void onAuthenticationSuccessIsNoOp() {
+        listener.onAuthenticationSuccess(new io.casehub.platform.api.authn.AuthenticationSuccess("actor-1", "tenant-1", "webauthn"));
+    }
+
+    @Test
+    void onAuthenticationFailureIsNoOp() {
+        listener.onAuthenticationFailure(new io.casehub.platform.api.authn.AuthenticationFailure("webauthn", "invalid credential"));
+    }
+
     @Test
     void onSocialLoginCompletedIsNoOp() {
         listener.onSocialLoginCompleted(new SocialLoginCompleted("google", "actor-1", "tenant-1", Set.of("openid"), true));

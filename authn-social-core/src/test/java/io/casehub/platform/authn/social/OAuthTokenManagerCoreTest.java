@@ -7,13 +7,11 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OAuthTokenManagerCoreTest {
 
@@ -29,7 +27,7 @@ class OAuthTokenManagerCoreTest {
     void setUp() {
         tokenStore = new InMemOAuthTokenStore();
         refreshClient = new StubRefreshClient();
-        manager = new OAuthTokenManagerCore(tokenStore, refreshClient);
+        manager = new OAuthTokenManagerCore(tokenStore, refreshClient, new io.casehub.platform.api.authn.AuthenticationEventListener() {});
     }
 
     @Test
@@ -116,6 +114,27 @@ class OAuthTokenManagerCoreTest {
         assertThat(tokenStore.findByActorId(ACTOR, PROVIDER, TENANT)).isEmpty();
     }
 
+    @Test
+    void refreshFailureFiresOAuthTokenRefreshFailedEvent() {
+        var capturing = new CapturingEventListener();
+        var mgr       = new OAuthTokenManagerCore(tokenStore, refreshClient, capturing);
+
+        var expired = new OAuthTokenRecord(
+                ACTOR, TENANT, PROVIDER, "old-token", "refresh-token",
+                Set.of("openid"), Instant.now().minusSeconds(60), Instant.now());
+        tokenStore.store(expired);
+
+        refreshClient.failOnRefresh = true;
+        mgr.getValidToken(ACTOR, PROVIDER, TENANT);
+
+        assertThat(capturing.lastEvent).isNotNull();
+        assertThat(capturing.lastEvent.actorId()).isEqualTo(ACTOR);
+        assertThat(capturing.lastEvent.tenancyId()).isEqualTo(TENANT);
+        assertThat(capturing.lastEvent.provider()).isEqualTo(PROVIDER);
+        assertThat(capturing.lastEvent.reason()).contains("Refresh failed");
+    }
+
+
     // --- stubs ---
 
     interface RefreshClient {
@@ -172,5 +191,14 @@ class OAuthTokenManagerCoreTest {
         }
 
         private static String key(String a, String p, String t) { return a + ":" + p + ":" + t; }
+    }
+
+    private static class CapturingEventListener implements io.casehub.platform.api.authn.AuthenticationEventListener {
+        io.casehub.platform.api.authn.OAuthTokenRefreshFailed lastEvent;
+
+        @Override
+        public void onOAuthTokenRefreshFailed(io.casehub.platform.api.authn.OAuthTokenRefreshFailed event) {
+            this.lastEvent = event;
+        }
     }
 }

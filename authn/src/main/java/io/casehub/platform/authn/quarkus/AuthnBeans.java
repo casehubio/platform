@@ -1,5 +1,6 @@
 package io.casehub.platform.authn.quarkus;
 
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.AuthenticationProvider;
 import io.casehub.platform.api.authn.ChallengeStore;
 import io.casehub.platform.api.authn.IdentityBindingStore;
@@ -62,16 +63,26 @@ public class AuthnBeans {
             OAuthHttpClient httpClient,
             OAuthTokenStore tokenStore,
             IdentityBindingStore bindingStore,
-            UserResolver userResolver) {
+            UserResolver userResolver,
+            AuthenticationEventListener eventListener) {
         var providers = new ArrayList<AuthenticationProvider>();
 
         config.webauthn().ifPresent(wc -> {
             WebAuthnConfig webAuthnConfig = new WebAuthnConfig() {
-                @Override public String rpId() { return wc.rpId(); }
-                @Override public String rpName() { return wc.rpName(); }
-                @Override public Set<String> allowedOrigins() { return wc.allowedOrigins(); }
-                @Override public long challengeTimeoutSeconds() { return wc.challengeTimeoutSeconds(); }
-                @Override public int challengeLength() { return wc.challengeLength(); }
+                @Override
+                public String rpId()                  {return wc.rpId();}
+
+                @Override
+                public String rpName()                {return wc.rpName();}
+
+                @Override
+                public Set<String> allowedOrigins()   {return wc.allowedOrigins();}
+
+                @Override
+                public long challengeTimeoutSeconds() {return wc.challengeTimeoutSeconds();}
+
+                @Override
+                public int challengeLength()          {return wc.challengeLength();}
             };
             providers.add(new WebAuthnAuthenticationProvider(webAuthnConfig, credentialStore, userResolver));
         });
@@ -82,14 +93,14 @@ public class AuthnBeans {
             providers.add(new GoogleAuthenticationProvider(
                     new GoogleAuthenticationProvider.GoogleConfig(
                             sc.clientId(), sc.clientSecret(), sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
         if (social.containsKey("github")) {
             var sc = social.get("github");
             providers.add(new GitHubAuthenticationProvider(
                     new GitHubAuthenticationProvider.GitHubConfig(
                             sc.clientId(), sc.clientSecret(), sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
         if (social.containsKey("apple")) {
             var sc = social.get("apple");
@@ -100,7 +111,7 @@ public class AuthnBeans {
                             sc.keyId().orElse(""),
                             sc.privateKey().orElse(""),
                             sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
 
         return List.copyOf(providers);
@@ -110,17 +121,19 @@ public class AuthnBeans {
     @ApplicationScoped
     public AuthenticationRouterCore authenticationRouterCore(
             List<AuthenticationProvider> providers,
-            ChallengeStore challengeStore) {
-        return new AuthenticationRouterCore(providers, challengeStore);
+            ChallengeStore challengeStore,
+            AuthenticationEventListener eventListener) {
+        return new AuthenticationRouterCore(providers, challengeStore, eventListener);
     }
 
     @Produces
     @ApplicationScoped
-    public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore) {
+    public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore,
+                                                       AuthenticationEventListener eventListener) {
         OAuthTokenManagerCore.TokenRefreshClient noOpClient = refreshToken -> {
             throw new UnsupportedOperationException("No token refresh client configured");
         };
-        return new OAuthTokenManagerCore(tokenStore, noOpClient);
+        return new OAuthTokenManagerCore(tokenStore, noOpClient, eventListener);
     }
 
     @Produces

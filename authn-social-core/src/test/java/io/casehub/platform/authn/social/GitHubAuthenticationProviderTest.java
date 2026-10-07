@@ -40,7 +40,7 @@ class GitHubAuthenticationProviderTest {
         var config = new GitHubAuthenticationProvider.GitHubConfig(
                 "github-client-id", "github-client-secret",
                 "https://example.com/callback");
-        provider = new GitHubAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver);
+        provider = new GitHubAuthenticationProvider(config, httpClient, tokenStore, bindingStore, userResolver, new io.casehub.platform.api.authn.AuthenticationEventListener() {});
     }
 
     @Test

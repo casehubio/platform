@@ -1,6 +1,7 @@
 package io.casehub.platform.authn;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.AuthenticationProvider;
 import io.casehub.platform.api.authn.AuthenticationResult;
 import io.casehub.platform.api.authn.ChallengeRecord;
@@ -24,11 +25,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthenticationRouterCoreTest {
 
     private final InMemChallengeStore challengeStore = new InMemChallengeStore();
+    private final AuthenticationEventListener noOpListener = new AuthenticationEventListener() {};
 
     @Test
     void initiateDispatchesToCorrectProviderAndStoresChallenge() {
         var provider = stubProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300));
-        var router = new AuthenticationRouterCore(List.of(provider), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(provider), challengeStore, noOpListener);
 
         var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
         var response = router.initiate(context);
@@ -41,7 +43,7 @@ class AuthenticationRouterCoreTest {
     void verifyConsumesAndDelegatesToProvider() {
         var principal = PrincipalId.human("user-1");
         var provider = stubProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300), principal);
-        var router = new AuthenticationRouterCore(List.of(provider), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(provider), challengeStore, noOpListener);
 
         var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
         router.initiate(context);
@@ -56,7 +58,7 @@ class AuthenticationRouterCoreTest {
     @Test
     void verifyThrowsOnUnknownChallenge() {
         var provider = stubProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300));
-        var router = new AuthenticationRouterCore(List.of(provider), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(provider), challengeStore, noOpListener);
 
         assertThatThrownBy(() -> router.verify("webauthn", "nonexistent", Map.of()))
                 .isInstanceOf(InvalidChallengeException.class)
@@ -66,7 +68,7 @@ class AuthenticationRouterCoreTest {
     @Test
     void verifyThrowsOnExpiredChallenge() {
         var provider = stubProvider("webauthn", "challenge-1", Instant.now().minusSeconds(1));
-        var router = new AuthenticationRouterCore(List.of(provider), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(provider), challengeStore, noOpListener);
 
         var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
         router.initiate(context);
@@ -80,7 +82,7 @@ class AuthenticationRouterCoreTest {
     void verifyThrowsOnMethodMismatch() {
         var webauthn = stubProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300));
         var password = stubProvider("password", "challenge-2", Instant.now().plusSeconds(300));
-        var router = new AuthenticationRouterCore(List.of(webauthn, password), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(webauthn, password), challengeStore, noOpListener);
 
         var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
         router.initiate(context);
@@ -92,7 +94,7 @@ class AuthenticationRouterCoreTest {
 
     @Test
     void initiateThrowsOnUnknownMethod() {
-        var router = new AuthenticationRouterCore(List.of(), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(), challengeStore, noOpListener);
         var context = new AuthenticationContext("unknown", "tenant-1", "https://example.com", Optional.empty(), Map.of());
 
         assertThatThrownBy(() -> router.initiate(context))
@@ -103,16 +105,53 @@ class AuthenticationRouterCoreTest {
     void availableMethodsReturnsRegisteredMethods() {
         var webauthn = stubProvider("webauthn", "c-1", Instant.now().plusSeconds(300));
         var google = stubProvider("google", "c-2", Instant.now().plusSeconds(300));
-        var router = new AuthenticationRouterCore(List.of(webauthn, google), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(webauthn, google), challengeStore, noOpListener);
 
         assertThat(router.availableMethods()).containsExactlyInAnyOrder("webauthn", "google");
     }
 
     @Test
     void availableMethodsEmptyWithNoProviders() {
-        var router = new AuthenticationRouterCore(List.of(), challengeStore);
+        var router = new AuthenticationRouterCore(List.of(), challengeStore, noOpListener);
         assertThat(router.availableMethods()).isEmpty();
     }
+
+    @Test
+    void verifyFiresAuthenticationSuccessEvent() {
+        var principal = PrincipalId.human("user-1");
+        var provider  = stubProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300), principal);
+        var capturing = new CapturingEventListener();
+        var router    = new AuthenticationRouterCore(List.of(provider), challengeStore, capturing);
+
+        var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
+        router.initiate(context);
+        router.verify("webauthn", "challenge-1", Map.of());
+
+        assertThat(capturing.lastSuccess).isNotNull();
+        assertThat(capturing.lastSuccess.actorId()).isEqualTo("user-1");
+        assertThat(capturing.lastSuccess.tenancyId()).isEqualTo("tenant-1");
+        assertThat(capturing.lastSuccess.method()).isEqualTo("webauthn");
+        assertThat(capturing.lastFailure).isNull();
+    }
+
+    @Test
+    void verifyFiresAuthenticationFailureEventOnException() {
+        var failingProvider = new FailingProvider("webauthn", "challenge-1", Instant.now().plusSeconds(300));
+        var capturing       = new CapturingEventListener();
+        var router          = new AuthenticationRouterCore(List.of(failingProvider), challengeStore, capturing);
+
+        var context = new AuthenticationContext("webauthn", "tenant-1", "https://example.com", Optional.empty(), Map.of());
+        router.initiate(context);
+
+        assertThatThrownBy(() -> router.verify("webauthn", "challenge-1", Map.of()))
+                .isInstanceOf(InvalidChallengeException.class);
+
+        assertThat(capturing.lastFailure).isNotNull();
+        assertThat(capturing.lastFailure.method()).isEqualTo("webauthn");
+        assertThat(capturing.lastFailure.reason()).contains("bad credential");
+        assertThat(capturing.lastSuccess).isNull();
+    }
+
 
     private static StubProvider stubProvider(String method, String challengeId, Instant expiresAt) {
         return stubProvider(method, challengeId, expiresAt, PrincipalId.human("default-actor"));
@@ -154,4 +193,46 @@ class AuthenticationRouterCoreTest {
             return new AuthenticationResult(principal, challenge.tenancyId(), Set.of(), method, Map.of());
         }
     }
+
+    private static class FailingProvider implements AuthenticationProvider {
+        private final String  method;
+        private final String  challengeId;
+        private final Instant expiresAt;
+
+        FailingProvider(String method, String challengeId, Instant expiresAt) {
+            this.method      = method;
+            this.challengeId = challengeId;
+            this.expiresAt   = expiresAt;
+        }
+
+        @Override
+        public String method() {return method;}
+
+        @Override
+        public ChallengeResponse initiate(AuthenticationContext context) {
+            return new StubChallengeResponse(challengeId, expiresAt);
+        }
+
+        @Override
+        public AuthenticationResult verify(ChallengeRecord challenge, Map<String, Object> data) {
+            throw new InvalidChallengeException(method, "bad credential");
+        }
+    }
+
+
+    private static class CapturingEventListener implements io.casehub.platform.api.authn.AuthenticationEventListener {
+        io.casehub.platform.api.authn.AuthenticationSuccess lastSuccess;
+        io.casehub.platform.api.authn.AuthenticationFailure lastFailure;
+
+        @Override
+        public void onAuthenticationSuccess(io.casehub.platform.api.authn.AuthenticationSuccess event) {
+            this.lastSuccess = event;
+        }
+
+        @Override
+        public void onAuthenticationFailure(io.casehub.platform.api.authn.AuthenticationFailure event) {
+            this.lastFailure = event;
+        }
+    }
+
 }

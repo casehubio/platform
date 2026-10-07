@@ -1,5 +1,6 @@
 package io.casehub.platform.authn.spring;
 
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.AuthenticationProvider;
 import io.casehub.platform.api.authn.ChallengeStore;
 import io.casehub.platform.api.authn.IdentityBindingStore;
@@ -32,6 +33,12 @@ import java.util.Set;
 @AutoConfiguration
 @EnableConfigurationProperties(AuthnSpringProperties.class)
 public class AuthnSpringAutoConfiguration {
+    @Bean
+    @ConditionalOnMissingBean
+    public AuthenticationEventListener authenticationEventListener() {
+        return new AuthenticationEventListener() {};
+    }
+
 
     @Bean
     @ConditionalOnMissingBean
@@ -63,17 +70,27 @@ public class AuthnSpringAutoConfiguration {
             OAuthHttpClient httpClient,
             OAuthTokenStore tokenStore,
             IdentityBindingStore bindingStore,
-            UserResolver userResolver) {
+            UserResolver userResolver,
+            AuthenticationEventListener eventListener) {
         var providers = new ArrayList<AuthenticationProvider>();
 
         var wc = props.getWebauthn();
         if (wc != null && wc.getRpId() != null) {
             WebAuthnConfig webAuthnConfig = new WebAuthnConfig() {
-                @Override public String rpId() { return wc.getRpId(); }
-                @Override public String rpName() { return wc.getRpName(); }
-                @Override public Set<String> allowedOrigins() { return wc.getAllowedOrigins(); }
-                @Override public long challengeTimeoutSeconds() { return wc.getChallengeTimeoutSeconds(); }
-                @Override public int challengeLength() { return wc.getChallengeLength(); }
+                @Override
+                public String rpId()                  {return wc.getRpId();}
+
+                @Override
+                public String rpName()                {return wc.getRpName();}
+
+                @Override
+                public Set<String> allowedOrigins()   {return wc.getAllowedOrigins();}
+
+                @Override
+                public long challengeTimeoutSeconds() {return wc.getChallengeTimeoutSeconds();}
+
+                @Override
+                public int challengeLength()          {return wc.getChallengeLength();}
             };
             providers.add(new WebAuthnAuthenticationProvider(webAuthnConfig, credentialStore, userResolver));
         }
@@ -84,14 +101,14 @@ public class AuthnSpringAutoConfiguration {
             providers.add(new GoogleAuthenticationProvider(
                     new GoogleAuthenticationProvider.GoogleConfig(
                             sc.getClientId(), sc.getClientSecret(), sc.getRedirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
         if (social.containsKey("github")) {
             var sc = social.get("github");
             providers.add(new GitHubAuthenticationProvider(
                     new GitHubAuthenticationProvider.GitHubConfig(
                             sc.getClientId(), sc.getClientSecret(), sc.getRedirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
         if (social.containsKey("apple")) {
             var sc = social.get("apple");
@@ -102,7 +119,7 @@ public class AuthnSpringAutoConfiguration {
                             sc.getKeyId() != null ? sc.getKeyId() : "",
                             sc.getPrivateKey() != null ? sc.getPrivateKey() : "",
                             sc.getRedirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
         }
 
         return List.copyOf(providers);
@@ -112,17 +129,19 @@ public class AuthnSpringAutoConfiguration {
     @ConditionalOnMissingBean
     public AuthenticationRouterCore authenticationRouterCore(
             List<AuthenticationProvider> providers,
-            ChallengeStore challengeStore) {
-        return new AuthenticationRouterCore(providers, challengeStore);
+            ChallengeStore challengeStore,
+            AuthenticationEventListener eventListener) {
+        return new AuthenticationRouterCore(providers, challengeStore, eventListener);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore) {
+    public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore,
+                                                       AuthenticationEventListener eventListener) {
         OAuthTokenManagerCore.TokenRefreshClient noOpClient = refreshToken -> {
             throw new UnsupportedOperationException("No token refresh client configured");
         };
-        return new OAuthTokenManagerCore(tokenStore, noOpClient);
+        return new OAuthTokenManagerCore(tokenStore, noOpClient, eventListener);
     }
 
     @Bean

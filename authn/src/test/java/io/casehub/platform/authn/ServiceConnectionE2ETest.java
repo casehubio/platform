@@ -271,7 +271,8 @@ class ServiceConnectionE2ETest {
             super(new StubConfig(), new StubHttpClient(),
                     new InMemoryOAuthTokenStore(),
                     new StubBindingStore(),
-                    (email, tenancyId) -> Optional.empty());
+                    (email, tenancyId) -> Optional.empty(),
+                    new io.casehub.platform.api.authn.AuthenticationEventListener() {});
         }
 
         @Override public String method() { return "google"; }

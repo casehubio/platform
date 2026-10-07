@@ -1,6 +1,7 @@
 package io.casehub.platform.authn.social;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.AuthenticationProvider;
 import io.casehub.platform.api.authn.AuthenticationResult;
 import io.casehub.platform.api.authn.ChallengeRecord;
@@ -10,6 +11,7 @@ import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.InvalidChallengeException;
 import io.casehub.platform.api.authn.OAuthTokenRecord;
 import io.casehub.platform.api.authn.OAuthTokenStore;
+import io.casehub.platform.api.authn.SocialLoginCompleted;
 import io.casehub.platform.api.authn.UserResolver;
 import io.casehub.platform.api.identity.PrincipalId;
 
@@ -26,23 +28,26 @@ import java.util.stream.Collectors;
 
 public abstract class AbstractOAuthAuthenticationProvider implements AuthenticationProvider {
 
-    private final OAuthConfig config;
-    private final OAuthHttpClient httpClient;
-    private final OAuthTokenStore tokenStore;
-    private final IdentityBindingStore bindingStore;
-    private final UserResolver userResolver;
+    private final OAuthConfig                       config;
+    private final OAuthHttpClient                   httpClient;
+    private final OAuthTokenStore                   tokenStore;
+    private final IdentityBindingStore              bindingStore;
+    private final UserResolver                      userResolver;
+    private final AuthenticationEventListener       eventListener;
     private final ConcurrentHashMap<String, String> pendingStates = new ConcurrentHashMap<>();
 
     protected AbstractOAuthAuthenticationProvider(OAuthConfig config,
-                                                   OAuthHttpClient httpClient,
-                                                   OAuthTokenStore tokenStore,
-                                                   IdentityBindingStore bindingStore,
-                                                   UserResolver userResolver) {
-        this.config = Objects.requireNonNull(config, "config");
-        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
-        this.tokenStore = Objects.requireNonNull(tokenStore, "tokenStore");
-        this.bindingStore = Objects.requireNonNull(bindingStore, "bindingStore");
-        this.userResolver = Objects.requireNonNull(userResolver, "userResolver");
+                                                  OAuthHttpClient httpClient,
+                                                  OAuthTokenStore tokenStore,
+                                                  IdentityBindingStore bindingStore,
+                                                  UserResolver userResolver,
+                                                  AuthenticationEventListener eventListener) {
+        this.config        = Objects.requireNonNull(config, "config");
+        this.httpClient    = Objects.requireNonNull(httpClient, "httpClient");
+        this.tokenStore    = Objects.requireNonNull(tokenStore, "tokenStore");
+        this.bindingStore  = Objects.requireNonNull(bindingStore, "bindingStore");
+        this.userResolver  = Objects.requireNonNull(userResolver, "userResolver");
+        this.eventListener = Objects.requireNonNull(eventListener, "eventListener");
     }
 
     protected abstract String authorizationEndpoint();
@@ -92,16 +97,16 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
         tokenParams.put("client_id", config.clientId());
         tokenParams.put("client_secret", config.clientSecret());
 
-        OAuthTokenResponse tokens = httpClient.exchangeCode(tokenEndpoint(), tokenParams);
-        OAuthIdentity identity = extractIdentity(tokens);
+        OAuthTokenResponse tokens   = httpClient.exchangeCode(tokenEndpoint(), tokenParams);
+        OAuthIdentity      identity = extractIdentity(tokens);
 
-        String tenancyId = challenge.tenancyId();
-        var existingBinding = bindingStore.findByExternalId(method(), identity.externalId(), tenancyId);
+        String tenancyId       = challenge.tenancyId();
+        var    existingBinding = bindingStore.findByExternalId(method(), identity.externalId(), tenancyId);
 
-        String actorId;
+        String  actorId;
         boolean firstLogin;
         if (existingBinding.isPresent()) {
-            actorId = existingBinding.get().actorId();
+            actorId    = existingBinding.get().actorId();
             firstLogin = false;
         } else {
             actorId = resolveOrCreateActorId(identity, tenancyId);
@@ -112,17 +117,25 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
         }
 
         Set<String> grantedScopes = tokens.scope() != null
-                ? Set.of(tokens.scope().split("\\s+"))
-                : config.scopes();
+                                    ? Set.of(tokens.scope().split("\\s+"))
+                                    : config.scopes();
 
         tokenStore.store(new OAuthTokenRecord(
                 actorId, tenancyId, method(),
                 tokens.accessToken(), tokens.refreshToken(),
                 grantedScopes,
                 tokens.expiresIn() > 0
-                        ? Instant.now().plusSeconds(tokens.expiresIn())
-                        : null,
+                ? Instant.now().plusSeconds(tokens.expiresIn())
+                : null,
                 Instant.now()));
+
+        try {
+            eventListener.onSocialLoginCompleted(new SocialLoginCompleted(
+                    method(), actorId, tenancyId, grantedScopes, firstLogin));
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger(AbstractOAuthAuthenticationProvider.class.getName())
+                    .log(java.util.logging.Level.WARNING, "Authentication event listener failed", ex);
+        }
 
         return new AuthenticationResult(
                 PrincipalId.human(actorId),
@@ -153,9 +166,9 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
         params.put("state", state);
 
         String query = params.entrySet().stream()
-                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
-                        + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
-                .collect(Collectors.joining("&"));
+                             .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
+                                       + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                             .collect(Collectors.joining("&"));
 
         return authorizationEndpoint() + "?" + query;
     }

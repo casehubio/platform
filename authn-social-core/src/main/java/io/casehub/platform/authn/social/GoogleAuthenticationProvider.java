@@ -2,6 +2,7 @@ package io.casehub.platform.authn.social;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
@@ -24,11 +25,12 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
     private final OAuthHttpClient httpClient;
 
     public GoogleAuthenticationProvider(GoogleConfig config,
-                                         OAuthHttpClient httpClient,
-                                         OAuthTokenStore tokenStore,
-                                         IdentityBindingStore bindingStore,
-                                         UserResolver userResolver) {
-        super(config, httpClient, tokenStore, bindingStore, userResolver);
+                                        OAuthHttpClient httpClient,
+                                        OAuthTokenStore tokenStore,
+                                        IdentityBindingStore bindingStore,
+                                        UserResolver userResolver,
+                                        AuthenticationEventListener eventListener) {
+        super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener);
         this.httpClient = httpClient;
     }
 

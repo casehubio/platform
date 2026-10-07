@@ -59,4 +59,10 @@ public class ScopeRegistryCore implements ScopeRegistry {
         missing.removeAll(grantedScopes);
         return Set.copyOf(missing);
     }
+
+    @Override
+    public Set<String> registeredProviders() {
+        return Set.copyOf(registrations.keySet());
+    }
+
 }

@@ -14,7 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
-import java.util.Map;
 
 @AutoConfiguration
 @AutoConfigureBefore(name = "io.casehub.platform.spring.PlatformAutoConfiguration")
@@ -35,6 +34,13 @@ public class PlatformDefaultsManualConfig {
     public MockPreferenceProvider mockPreferenceProvider() {
         return new MockPreferenceProvider();
     }
+
+    @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.api.authn.ServiceConnectionProvider.class)
+    public io.casehub.platform.authn.NoOpServiceConnectionProvider noOpServiceConnectionProvider() {
+        return new io.casehub.platform.authn.NoOpServiceConnectionProvider();
+    }
+
 
     @Bean
     @ConditionalOnMissingBean(ProcessExecutor.class)

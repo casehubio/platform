@@ -8,4 +8,9 @@ public interface ScopeRegistry {
     Set<String> requiredScopes(String provider, Class<?> consumer);
     boolean satisfies(String provider, Set<String> grantedScopes);
     Set<String> missingScopes(String provider, Set<String> grantedScopes);
+
+    default Set<String> registeredProviders() {
+        return Set.of();
+    }
+
 }

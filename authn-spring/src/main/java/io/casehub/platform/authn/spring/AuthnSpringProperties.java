@@ -12,6 +12,7 @@ public class AuthnSpringProperties {
     private long refreshTokenTtlSeconds = 2592000;
     private WebAuthn webauthn;
     private Map<String, SocialProvider> social = Map.of();
+    private boolean mergeServiceScopes = true;
 
     public long getAccessTokenTtlSeconds() { return accessTokenTtlSeconds; }
     public void setAccessTokenTtlSeconds(long accessTokenTtlSeconds) { this.accessTokenTtlSeconds = accessTokenTtlSeconds; }
@@ -24,6 +25,9 @@ public class AuthnSpringProperties {
 
     public Map<String, SocialProvider> getSocial() { return social; }
     public void setSocial(Map<String, SocialProvider> social) { this.social = social; }
+
+    public boolean isMergeServiceScopes() { return mergeServiceScopes; }
+    public void setMergeServiceScopes(boolean mergeServiceScopes) { this.mergeServiceScopes = mergeServiceScopes; }
 
     public static class WebAuthn {
         private String rpId;

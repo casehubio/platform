@@ -16,6 +16,10 @@ public interface AuthnConfig {
     @WithDefault("2592000")
     long refreshTokenTtlSeconds();
 
+    @WithDefault("true")
+    boolean mergeServiceScopes();
+
+
     Optional<WebAuthn> webauthn();
 
     Map<String, SocialProvider> social();

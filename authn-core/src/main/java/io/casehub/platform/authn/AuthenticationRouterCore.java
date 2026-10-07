@@ -28,20 +28,32 @@ public class AuthenticationRouterCore implements AuthenticationRouter {
     private final Map<String, AuthenticationProvider> providers;
     private final ChallengeStore                      challengeStore;
     private final AuthenticationEventListener         eventListener;
+    private final ScopeMergingLoginCustomizer         scopeMergingCustomizer;
 
     public AuthenticationRouterCore(List<AuthenticationProvider> providers,
                                     ChallengeStore challengeStore,
                                     AuthenticationEventListener eventListener) {
+        this(providers, challengeStore, eventListener, null);
+    }
+
+    public AuthenticationRouterCore(List<AuthenticationProvider> providers,
+                                    ChallengeStore challengeStore,
+                                    AuthenticationEventListener eventListener,
+                                    ScopeMergingLoginCustomizer scopeMergingCustomizer) {
         this.providers      = providers.stream()
                                        .collect(Collectors.toUnmodifiableMap(AuthenticationProvider::method, p -> p));
         this.challengeStore = challengeStore;
         this.eventListener  = eventListener;
+        this.scopeMergingCustomizer = scopeMergingCustomizer;
     }
 
     @Override
     public ChallengeResponse initiate(AuthenticationContext context) {
         var provider = resolveProvider(context.method());
-        var response = provider.initiate(context);
+        var effectiveContext = scopeMergingCustomizer != null
+            ? scopeMergingCustomizer.customize(context, context.method())
+            : context;
+        var response = provider.initiate(effectiveContext);
         var record = new ChallengeRecord(
                 response.challengeId(), context.method(), context.tenancyId(),
                 null, Instant.now(), response.expiresAt());

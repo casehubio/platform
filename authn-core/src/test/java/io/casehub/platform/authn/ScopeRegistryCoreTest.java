@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScopeRegistryCoreTest {
 
@@ -94,6 +96,19 @@ class ScopeRegistryCoreTest {
     @Test
     void satisfiesReturnsTrueForUnknownProvider() {
         assertTrue(registry.satisfies("unknown", Set.of()));
+    }
+
+
+    @Test
+    void registeredProvidersReturnsEmptyWhenNoneRegistered() {
+        assertTrue(registry.registeredProviders().isEmpty());
+    }
+
+    @Test
+    void registeredProvidersReturnsRegisteredKeys() {
+        registry.register("google", Set.of("drive"), Object.class);
+        registry.register("github", Set.of("repo"), Object.class);
+        assertEquals(Set.of("google", "github"), registry.registeredProviders());
     }
 
     static class FakeCalendarConsumer {}

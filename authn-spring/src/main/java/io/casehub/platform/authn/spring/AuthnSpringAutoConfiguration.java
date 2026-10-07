@@ -175,8 +175,9 @@ public class AuthnSpringAutoConfiguration {
     public AuthenticationRouterCore authenticationRouterCore(
             List<AuthenticationProvider> providers,
             ChallengeStore challengeStore,
-            AuthenticationEventListener eventListener) {
-        return new AuthenticationRouterCore(providers, challengeStore, eventListener);
+            AuthenticationEventListener eventListener,
+            io.casehub.platform.authn.ScopeMergingLoginCustomizer scopeMergingCustomizer) {
+        return new AuthenticationRouterCore(providers, challengeStore, eventListener, scopeMergingCustomizer);
     }
 
     @Bean
@@ -219,6 +220,23 @@ public class AuthnSpringAutoConfiguration {
             }
         }
         return new io.casehub.platform.authn.social.IncrementalConsentHandlerCore(providerMap);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.ScopeMergingLoginCustomizer scopeMergingLoginCustomizer(
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry,
+            AuthnSpringProperties props) {
+        return new io.casehub.platform.authn.ScopeMergingLoginCustomizer(scopeRegistry, props.isMergeServiceScopes());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.social.ServiceConnectionProviderCore serviceConnectionProviderCore(
+            OAuthTokenStore tokenStore,
+            OAuthTokenManagerCore tokenManager,
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
+        return new io.casehub.platform.authn.social.ServiceConnectionProviderCore(tokenStore, tokenManager, scopeRegistry);
     }
 
 

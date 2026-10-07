@@ -122,8 +122,9 @@ public class AuthnBeans {
     public AuthenticationRouterCore authenticationRouterCore(
             List<AuthenticationProvider> providers,
             ChallengeStore challengeStore,
-            AuthenticationEventListener eventListener) {
-        return new AuthenticationRouterCore(providers, challengeStore, eventListener);
+            AuthenticationEventListener eventListener,
+            io.casehub.platform.authn.ScopeMergingLoginCustomizer scopeMergingCustomizer) {
+        return new AuthenticationRouterCore(providers, challengeStore, eventListener, scopeMergingCustomizer);
     }
 
     @Produces
@@ -161,6 +162,23 @@ public class AuthnBeans {
             }
         }
         return new io.casehub.platform.authn.social.IncrementalConsentHandlerCore(providerMap);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.authn.ScopeMergingLoginCustomizer scopeMergingLoginCustomizer(
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry,
+            AuthnConfig config) {
+        return new io.casehub.platform.authn.ScopeMergingLoginCustomizer(scopeRegistry, config.mergeServiceScopes());
+    }
+
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.authn.social.ServiceConnectionProviderCore serviceConnectionProviderCore(
+            OAuthTokenStore tokenStore,
+            OAuthTokenManagerCore tokenManager,
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
+        return new io.casehub.platform.authn.social.ServiceConnectionProviderCore(tokenStore, tokenManager, scopeRegistry);
     }
 
 

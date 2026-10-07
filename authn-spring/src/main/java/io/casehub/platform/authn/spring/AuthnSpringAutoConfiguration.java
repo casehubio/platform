@@ -124,4 +124,38 @@ public class AuthnSpringAutoConfiguration {
         };
         return new OAuthTokenManagerCore(tokenStore, noOpClient);
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.ScopeRegistryCore scopeRegistryCore(
+            org.springframework.context.ApplicationContext applicationContext) {
+        var registry = new io.casehub.platform.authn.ScopeRegistryCore();
+        var beans = applicationContext.getBeansWithAnnotation(
+                io.casehub.platform.api.authn.RequiresScopes.class);
+        for (var entry : beans.entrySet()) {
+            var beanClass = entry.getValue().getClass();
+            var annotation = beanClass.getAnnotation(
+                    io.casehub.platform.api.authn.RequiresScopes.class);
+            if (annotation != null) {
+                registry.register(annotation.provider(),
+                                  Set.of(annotation.scopes()), beanClass);
+            }
+        }
+        return registry;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.social.IncrementalConsentHandlerCore incrementalConsentHandlerCore(
+            List<AuthenticationProvider> providers) {
+        var providerMap = new java.util.HashMap<String, io.casehub.platform.authn.social.AbstractOAuthAuthenticationProvider>();
+        for (var p : providers) {
+            if (p instanceof io.casehub.platform.authn.social.AbstractOAuthAuthenticationProvider oauth) {
+                providerMap.put(oauth.method(), oauth);
+            }
+        }
+        return new io.casehub.platform.authn.social.IncrementalConsentHandlerCore(providerMap);
+    }
+
+
 }

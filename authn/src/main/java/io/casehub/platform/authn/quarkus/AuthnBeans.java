@@ -122,4 +122,33 @@ public class AuthnBeans {
         };
         return new OAuthTokenManagerCore(tokenStore, noOpClient);
     }
+
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.authn.ScopeRegistryCore scopeRegistryCore(
+            jakarta.enterprise.inject.spi.BeanManager beanManager) {
+        var registry = new io.casehub.platform.authn.ScopeRegistryCore();
+        for (var bean : beanManager.getBeans(Object.class)) {
+            var annotation = bean.getBeanClass().getAnnotation(io.casehub.platform.api.authn.RequiresScopes.class);
+            if (annotation != null) {
+                registry.register(annotation.provider(), Set.of(annotation.scopes()), bean.getBeanClass());
+            }
+        }
+        return registry;
+    }
+
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.authn.social.IncrementalConsentHandlerCore incrementalConsentHandlerCore(
+            List<AuthenticationProvider> providers) {
+        var providerMap = new java.util.HashMap<String, io.casehub.platform.authn.social.AbstractOAuthAuthenticationProvider>();
+        for (var p : providers) {
+            if (p instanceof io.casehub.platform.authn.social.AbstractOAuthAuthenticationProvider oauth) {
+                providerMap.put(oauth.method(), oauth);
+            }
+        }
+        return new io.casehub.platform.authn.social.IncrementalConsentHandlerCore(providerMap);
+    }
+
+
 }

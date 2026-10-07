@@ -63,8 +63,8 @@ public class OAuthTokenEntity {
                 stringToScopes(grantedScopesJson), expiresAt, createdAt);
     }
 
-    static String scopesToString(Set<String> scopes) {
-        if (scopes == null || scopes.isEmpty()) return null;
+    public static String scopesToString(Set<String> scopes) {
+        if (scopes == null || scopes.isEmpty()) {return null;}
         return String.join(",", scopes);
     }
 

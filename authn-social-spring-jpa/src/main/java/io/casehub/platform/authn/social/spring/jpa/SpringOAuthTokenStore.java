@@ -56,4 +56,15 @@ public class SpringOAuthTokenStore implements OAuthTokenStore {
             repo.save(e);
         });
     }
+
+    @Override
+    @Transactional
+    public void updateScopes(String actorId, String provider, String tenancyId,
+                             java.util.Set<String> grantedScopes) {
+        repo.findById(new OAuthTokenId(actorId, provider, tenancyId)).ifPresent(e -> {
+            e.grantedScopesJson = OAuthTokenEntity.scopesToString(grantedScopes);
+            repo.save(e);
+        });
+    }
+
 }

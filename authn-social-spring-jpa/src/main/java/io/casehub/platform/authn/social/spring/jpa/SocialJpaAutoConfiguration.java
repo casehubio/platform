@@ -24,4 +24,11 @@ public class SocialJpaAutoConfiguration {
     public SpringOAuthTokenStore springOAuthTokenStore(OAuthTokenRepository repo) {
         return new SpringOAuthTokenStore(repo);
     }
+
+    @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.api.authn.StaticCredentialStore.class)
+    public SpringStaticCredentialStore springStaticCredentialStore(StaticCredentialRepository repo) {
+        return new SpringStaticCredentialStore(repo);
+    }
+
 }

@@ -23,6 +23,7 @@
             <groupId>io.casehub</groupId>
             <artifactId>casehub-spring-boot-starter</artifactId>
             <version>${project.version}</version>
+            <type>pom</type>
         </dependency>
 
         <!-- Authn auto-configuration -->

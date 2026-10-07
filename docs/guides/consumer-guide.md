@@ -428,6 +428,7 @@ Pluggable identity authentication — WebAuthn/passkeys, social login (Google/Gi
 | `WebAuthnCredentialStore` | WebAuthn credential persistence — COSE public keys, sign counts |
 | `JwtSigningKeyResolver` | Per-tenant JWT signing key resolution |
 | `UserResolver` | SCIM user lookup for identity binding |
+| `AuthenticationEventListener` | Callback for authentication events — `onAuthenticationSuccess()`, `onAuthenticationFailure()`, `onSocialLoginCompleted()`, `onOAuthTokenRefreshFailed()`. No-op default; implement to audit or react |
 
 **Configuration** (Quarkus and Spring):
 

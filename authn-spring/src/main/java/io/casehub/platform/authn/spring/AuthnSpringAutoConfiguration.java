@@ -39,6 +39,51 @@ public class AuthnSpringAutoConfiguration {
         return new AuthenticationEventListener() {};
     }
 
+    @Bean
+    @ConditionalOnMissingBean
+    public JwtSigningKeyResolver jwtSigningKeyResolver() {
+        return new JwtSigningKeyResolver() {
+            @Override
+            public java.security.KeyPair signingKeyPair(String tenancyId) {
+                throw new UnsupportedOperationException("No JWT signing key configured");
+            }
+
+            @Override
+            public String keyId(String tenancyId) {
+                throw new UnsupportedOperationException("No JWT signing key configured");
+            }
+
+            @Override
+            public java.util.List<io.casehub.platform.api.authn.PublicKeyDescriptor> publicKeys() {
+                return java.util.List.of();
+            }
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public UserResolver userResolver() {
+        return (email, tenancyId) -> java.util.Optional.empty();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ChallengeStore challengeStore() {
+        return new ChallengeStore() {
+            private final java.util.concurrent.ConcurrentHashMap<String, io.casehub.platform.api.authn.ChallengeRecord> store = new java.util.concurrent.ConcurrentHashMap<>();
+
+            @Override
+            public void store(io.casehub.platform.api.authn.ChallengeRecord record) {
+                store.put(record.challengeId(), record);
+            }
+
+            @Override
+            public java.util.Optional<io.casehub.platform.api.authn.ChallengeRecord> consume(String challengeId) {
+                return java.util.Optional.ofNullable(store.remove(challengeId));
+            }
+        };
+    }
+
 
     @Bean
     @ConditionalOnMissingBean

@@ -69,6 +69,18 @@ class SpringBootCompositionTest {
         assertThat(io.casehub.platform.streams.poll.PollStreamProcessorCore.class).isNotNull();
     }
 
+    @Test
+    void authnBeansRegistered() {
+        assertThat(context.getBean(io.casehub.platform.authn.AuthenticationRouterCore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.authn.SessionManagerCore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.authn.JwtIssuerCore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.authn.SessionStore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.authn.RefreshTokenStore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.authn.WebAuthnCredentialStore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.authn.IdentityBindingStore.class)).isNotNull();
+        assertThat(context.getBean(io.casehub.platform.api.authn.OAuthTokenStore.class)).isNotNull();
+    }
+
 
     @Test
     void healthCheckReturnsUp() throws Exception {

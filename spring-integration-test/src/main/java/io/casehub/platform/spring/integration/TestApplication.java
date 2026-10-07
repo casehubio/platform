@@ -4,7 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 
-@SpringBootApplication(excludeName = "org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration")
+@SpringBootApplication(excludeName = {
+        "org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration",
+        "io.casehub.platform.agent.session.spring.AgentSessionAutoConfiguration"
+})
 @EntityScan("io.casehub.platform")
 public class TestApplication {
 

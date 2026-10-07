@@ -208,6 +208,7 @@
         <module>spring-boot-starter</module>
         <module>spring-boot-starter-agent</module>
         <module>spring-boot-starter-streams</module>
+        <module>spring-boot-starter-authn</module>
         <module>spring-integration-test</module>
     </modules>
 

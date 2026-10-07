@@ -38,6 +38,9 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 | `casehub-platform-persistence-jpa` | JPA-backed scoped preference overrides (`JpaPreferenceProvider`, `JpaPreferenceStore`) |
 | `casehub-platform-persistence-mongodb` | MongoDB preference backend (beats JPA when co-deployed via CDI priority) |
 | `casehub-platform-credentials-quarkus` | Bridge `CredentialResolver` to Quarkus `CredentialsProvider` (Vault/AWS/GCP) |
+| `casehub-platform-authn` | Pluggable authentication — WebAuthn, social login, session management (Quarkus) |
+| `casehub-platform-authn-spring` | Same, for Spring Boot |
+| `casehub-platform-security-spring` | Spring Security `CurrentPrincipal` without OIDC (replaces mock) |
 
 ### Notification system (add what you need)
 
@@ -393,6 +396,60 @@ PrincipalId parsed = PrincipalId.parse("agent:claude");
 **Tenancy is not identity.** `tenancyId` answers "where" (which organisational boundary), not "who." They are orthogonal — a `PrincipalId` exists within a tenant but is not scoped by it. Never use `tenancyId` as an ownership key. Never use `PrincipalId` as a tenant filter.
 
 **Migration from raw strings:** Existing SPIs use `String actorId`, `String userId`, `String ownerId` — these are all `PrincipalId` semantically. New code should use the typed identity types. Existing SPI signatures will migrate in future issues.
+
+### Authentication
+
+Pluggable identity authentication — WebAuthn/passkeys, social login (Google/GitHub/Apple), and session management.
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-authn-core` | `AuthenticationRouterCore` (method dispatch), `JwtIssuerCore` (JWT issuance), `SessionManagerCore` (session + refresh token lifecycle) |
+| `casehub-platform-authn-inmem` | In-memory stores for all authn SPIs (test/ephemeral) |
+| `casehub-platform-authn-webauthn-core` | WebAuthn/passkey provider — CBOR/COSE parsing, registration + authentication flows |
+| `casehub-platform-authn-social-core` | OAuth2/OIDC providers — Google, GitHub, Apple. `OAuthTokenManagerCore` for token refresh |
+| `casehub-platform-authn` | Quarkus CDI wiring — `@ConfigMapping(prefix = "casehub.authn")` |
+| `casehub-platform-authn-spring` | Spring Boot auto-configuration — `@ConfigurationProperties(prefix = "casehub.authn")` |
+| `casehub-platform-session-jpa` | JPA SessionStore + RefreshTokenStore (production) |
+| `casehub-platform-authn-webauthn-jpa` | JPA WebAuthnCredentialStore (production) |
+| `casehub-platform-authn-social-jpa` | JPA IdentityBindingStore + OAuthTokenStore (production) |
+| `casehub-platform-security-spring` | Spring Security CurrentPrincipal without OIDC dependency |
+
+**SPIs** (in `platform-api`):
+
+| SPI | Purpose |
+|-----|---------|
+| `AuthenticationRouter` | Dispatches `initiate()`/`verify()` to method-specific `AuthenticationProvider` |
+| `AuthenticationProvider` | Per-method authentication — `method()`, `initiate()`, `verify()` |
+| `SessionStore` | Session persistence — `store()`/`findById()`/`delete()` |
+| `RefreshTokenStore` | Refresh token persistence — family-based revocation |
+| `ChallengeStore` | Ephemeral challenge nonces |
+| `IdentityBindingStore` | External identity ↔ casehub actor mapping |
+| `OAuthTokenStore` | OAuth access/refresh token persistence |
+| `WebAuthnCredentialStore` | WebAuthn credential persistence — COSE public keys, sign counts |
+| `JwtSigningKeyResolver` | Per-tenant JWT signing key resolution |
+| `UserResolver` | SCIM user lookup for identity binding |
+
+**Configuration** (Quarkus and Spring):
+
+```yaml
+casehub:
+  authn:
+    access-token-ttl-seconds: 900
+    refresh-token-ttl-seconds: 2592000
+    webauthn:
+      rp-id: example.com
+      rp-name: Example App
+      allowed-origins: ["https://example.com"]
+    social:
+      google:
+        client-id: ${GOOGLE_CLIENT_ID}
+        client-secret: ${GOOGLE_CLIENT_SECRET}
+        redirect-uri: https://example.com/auth/google/callback
+      github:
+        client-id: ${GITHUB_CLIENT_ID}
+        client-secret: ${GITHUB_CLIENT_SECRET}
+        redirect-uri: https://example.com/auth/github/callback
+```
 
 ### Path
 

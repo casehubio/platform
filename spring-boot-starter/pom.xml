@@ -115,6 +115,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Spring Security fallback (no OIDC) -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-security-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- SCIM -->
         <dependency>
             <groupId>io.casehub</groupId>

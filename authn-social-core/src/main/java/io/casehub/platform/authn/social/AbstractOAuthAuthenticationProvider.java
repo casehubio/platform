@@ -56,6 +56,10 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
 
     protected abstract OAuthIdentity extractIdentity(OAuthTokenResponse tokens);
 
+    protected Map<String, String> additionalAuthorizationParams(AuthenticationContext context) {
+        return Map.of();
+    }
+
     @Override
     public ChallengeResponse initiate(AuthenticationContext context) {
         String  state     = UUID.randomUUID().toString();
@@ -77,7 +81,7 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
             scopes = combined;
         }
 
-        String authUrl = buildAuthorizationUrl(state, scopes);
+        String authUrl = buildAuthorizationUrl(state, scopes, additionalAuthorizationParams(context));
         return new OAuthChallengeResponse(state, expiresAt, authUrl);
     }
 
@@ -157,13 +161,14 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
         return identity.externalId();
     }
 
-    private String buildAuthorizationUrl(String state, Set<String> scopes) {
+    private String buildAuthorizationUrl(String state, Set<String> scopes, Map<String, String> extraParams) {
         var params = new LinkedHashMap<String, String>();
         params.put("client_id", config.clientId());
         params.put("redirect_uri", config.redirectUri());
         params.put("response_type", "code");
         params.put("scope", String.join(" ", scopes));
         params.put("state", state);
+        params.putAll(extraParams);
 
         String query = params.entrySet().stream()
                              .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)

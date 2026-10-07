@@ -7,6 +7,8 @@ import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
 
+import io.casehub.platform.api.authn.AuthenticationContext;
+
 import java.io.IOException;
 import java.util.Base64;
 import java.util.Map;
@@ -47,6 +49,14 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
     @Override
     protected String tokenEndpoint() {
         return TOKEN_ENDPOINT;
+    }
+
+    @Override
+    protected Map<String, String> additionalAuthorizationParams(AuthenticationContext context) {
+        if (context.hints().containsKey("additionalScopes")) {
+            return Map.of("access_type", "offline");
+        }
+        return Map.of();
     }
 
     @Override

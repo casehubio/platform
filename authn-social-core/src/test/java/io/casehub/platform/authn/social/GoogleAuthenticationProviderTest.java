@@ -65,6 +65,35 @@ class GoogleAuthenticationProviderTest {
     }
 
     @Test
+    void initiateIncludesAccessTypeOfflineWhenAdditionalScopesPresent() {
+        var context = new AuthenticationContext(
+                "google", TENANT, ORIGIN, Optional.empty(),
+                Map.of("additionalScopes", "https://www.googleapis.com/auth/calendar"));
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+
+        assertThat(response.authorizationUrl()).contains("access_type=offline");
+    }
+
+    @Test
+    void initiateOmitsAccessTypeOfflineWithoutAdditionalScopes() {
+        var context = new AuthenticationContext(
+                "google", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+
+        assertThat(response.authorizationUrl()).doesNotContain("access_type");
+    }
+
+    @Test
+    void initiateIncludesAccessTypeOfflineWithSetAdditionalScopes() {
+        var context = new AuthenticationContext(
+                "google", TENANT, ORIGIN, Optional.empty(),
+                Map.of("additionalScopes", Set.of("https://www.googleapis.com/auth/calendar")));
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+
+        assertThat(response.authorizationUrl()).contains("access_type=offline");
+    }
+
+    @Test
     void verifyExtractsIdentityFromIdToken() {
         String idToken = buildIdToken("google-user-123", "user@gmail.com", "Jane Doe", true);
         httpClient.nextTokenResponse = new OAuthTokenResponse(

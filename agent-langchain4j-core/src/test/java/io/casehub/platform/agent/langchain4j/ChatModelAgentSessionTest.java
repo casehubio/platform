@@ -189,6 +189,39 @@ class ChatModelAgentSessionTest {
     }
 
     @Test
+    void clear_resetsMemory_subsequentQueryHasNoHistory() throws InterruptedException {
+        AtomicInteger callCount = new AtomicInteger(0);
+        ChatModel model = new ChatModel() {
+            @Override
+            public ChatResponse doChat(ChatRequest request) {
+                int call = callCount.incrementAndGet();
+                if (call == 2) {
+                    // After clear(), second query should only have system + user (no prior history)
+                    List<ChatMessage> messages = request.messages();
+                    assertThat(messages).hasSize(2); // System + User only
+                }
+                return ChatResponse.builder().aiMessage(AiMessage.from("Response " + call)).build();
+            }
+        };
+        AgentSessionInit           init       = AgentSessionInit.of("system prompt");
+        AgentLangchain4jProperties properties = new TestProperties(Duration.ofSeconds(30), 20, 10);
+
+        ChatModelAgentSession session = new ChatModelAgentSession(model, null, init, properties, acquiredSemaphore());
+
+        // First query populates memory
+        session.query("prompt 1").collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        // Clear resets memory
+        session.clear();
+
+        // Second query should have no history from first query
+        session.query("prompt 2").collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        assertThat(callCount.get()).isEqualTo(2);
+    }
+
+
+    @Test
     void query_streaming_emitsMultipleTextDeltas() throws InterruptedException {
         StreamingChatModel model = streamingChatModel((request, handler) -> {
             handler.onPartialResponse("Hello");

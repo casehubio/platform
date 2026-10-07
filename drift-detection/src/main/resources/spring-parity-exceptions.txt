@@ -23,6 +23,10 @@ notifications-inmem
 view-inmem
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 subscriptions-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+authn-inmem
+# Hand-written authn-spring auto-configuration (not generated)
+authn
 
 # Simulation framework — Quarkus-only by design
 simulation-inmem

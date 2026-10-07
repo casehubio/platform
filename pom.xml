@@ -40,6 +40,8 @@
         <module>authn-webauthn-jpa</module>
         <module>authn-social-jpa-common</module>
         <module>authn-social-jpa</module>
+        <module>authn</module>
+        <module>authn-spring</module>
         <module>platform-spring</module>
         <module>testing</module>
         <module>agent-runtime-core</module>
@@ -197,6 +199,9 @@
         <module>credentials-spring</module>
         <module>oidc-spring</module>
         <module>security-spring</module>
+        <module>session-spring-jpa</module>
+        <module>authn-webauthn-spring-jpa</module>
+        <module>authn-social-spring-jpa</module>
         <module>scim-spring</module>
         <module>streams-spring</module>
         <module>platform-spring-actuator</module>

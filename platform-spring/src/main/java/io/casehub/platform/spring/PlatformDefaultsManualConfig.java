@@ -37,10 +37,27 @@ public class PlatformDefaultsManualConfig {
 
     @Bean
     @ConditionalOnMissingBean(io.casehub.platform.api.authn.ServiceConnectionProvider.class)
-    public io.casehub.platform.authn.NoOpServiceConnectionProvider noOpServiceConnectionProvider() {
-        return new io.casehub.platform.authn.NoOpServiceConnectionProvider();
+    public io.casehub.platform.mock.NoOpServiceConnectionProvider noOpServiceConnectionProvider() {
+        return new io.casehub.platform.mock.NoOpServiceConnectionProvider();
     }
 
+    @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.api.preferences.PreferenceStore.class)
+    public io.casehub.platform.mock.NoOpPreferenceStore noOpPreferenceStore() {
+        return new io.casehub.platform.mock.NoOpPreferenceStore();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.api.acl.AccessControlProvider.class)
+    public io.casehub.platform.acl.NoOpAccessControlProvider noOpAccessControlProvider() {
+        return new io.casehub.platform.acl.NoOpAccessControlProvider();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.api.expression.ExpressionEngineRegistry.class)
+    public io.casehub.platform.expression.NoOpExpressionEngineRegistry noOpExpressionEngineRegistry() {
+        return new io.casehub.platform.expression.NoOpExpressionEngineRegistry();
+    }
 
     @Bean
     @ConditionalOnMissingBean(ProcessExecutor.class)

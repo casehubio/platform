@@ -57,6 +57,35 @@ class OAuthTokenManagerCoreTest {
     }
 
     @Test
+    void getValidTokenRefreshesViaHttpTokenRefreshClient() {
+        var httpClient = new OAuthTestFixtures.StubOAuthHttpClient();
+        httpClient.nextTokenResponse = new OAuthTokenResponse(
+                "refreshed-token", "new-refresh", null, 3600, "Bearer", "openid");
+
+        var realRefreshClient = new HttpTokenRefreshClient(httpClient, java.util.Map.of(
+                PROVIDER, new HttpTokenRefreshClient.ProviderRefreshConfig(
+                        "https://oauth2.googleapis.com/token", "client-id", "client-secret")));
+        var mgr = new OAuthTokenManagerCore(tokenStore, realRefreshClient, OAuthTestFixtures.NO_OP_LISTENER);
+
+        var expired = new OAuthTokenRecord(
+                ACTOR, TENANT, PROVIDER, "old-token", "my-refresh-token",
+                Set.of("openid"), Instant.now().minusSeconds(60), Instant.now());
+        tokenStore.store(expired);
+
+        var result = mgr.getValidToken(ACTOR, PROVIDER, TENANT);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().accessToken()).isEqualTo("refreshed-token");
+        assertThat(httpClient.lastTokenEndpoint).isEqualTo("https://oauth2.googleapis.com/token");
+        assertThat(httpClient.lastTokenParams)
+                .containsEntry("grant_type", "refresh_token")
+                .containsEntry("refresh_token", "my-refresh-token")
+                .containsEntry("client_id", "client-id")
+                .containsEntry("client_secret", "client-secret");
+    }
+
+
+    @Test
     void getValidTokenReturnsEmptyWhenNoToken() {
         var result = manager.getValidToken(ACTOR, PROVIDER, TENANT);
         assertThat(result).isEmpty();
@@ -144,7 +173,7 @@ class OAuthTokenManagerCoreTest {
         boolean failOnRefresh;
 
         @Override
-        public OAuthTokenResponse refresh(String refreshToken) {
+        public OAuthTokenResponse refresh(String provider, String refreshToken) {
             lastRefreshToken = refreshToken;
             if (failOnRefresh) {
                 throw new OAuthException("Refresh failed");

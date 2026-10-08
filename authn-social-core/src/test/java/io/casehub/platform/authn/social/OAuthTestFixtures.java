@@ -44,9 +44,13 @@ final class OAuthTestFixtures {
     static class StubOAuthHttpClient implements OAuthHttpClient {
         OAuthTokenResponse nextTokenResponse;
         Map<String, Object> nextUserInfo;
+        String lastTokenEndpoint;
+        Map<String, String> lastTokenParams;
 
         @Override
         public OAuthTokenResponse exchangeCode(String tokenEndpoint, Map<String, String> params) {
+            lastTokenEndpoint = tokenEndpoint;
+            lastTokenParams = params;
             return nextTokenResponse;
         }
 

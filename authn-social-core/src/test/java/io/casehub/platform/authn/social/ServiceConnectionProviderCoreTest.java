@@ -26,7 +26,7 @@ class ServiceConnectionProviderCoreTest {
     void setUp() {
         tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         scopeRegistry = new StubScopeRegistry();
-        OAuthTokenManagerCore.TokenRefreshClient noOpRefresh = r -> {
+        OAuthTokenManagerCore.TokenRefreshClient noOpRefresh = (p, r) -> {
             throw new UnsupportedOperationException();
         };
         tokenManager = new OAuthTokenManagerCore(tokenStore, noOpRefresh, OAuthTestFixtures.NO_OP_LISTENER);

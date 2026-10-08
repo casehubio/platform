@@ -17,6 +17,7 @@ import io.casehub.platform.authn.social.AppleAuthenticationProvider;
 import io.casehub.platform.authn.social.GitHubAuthenticationProvider;
 import io.casehub.platform.authn.social.GoogleAuthenticationProvider;
 import io.casehub.platform.authn.social.JdkOAuthHttpClient;
+import io.casehub.platform.authn.social.HttpTokenRefreshClient;
 import io.casehub.platform.authn.social.OAuthHttpClient;
 import io.casehub.platform.authn.social.OAuthTokenManagerCore;
 import io.casehub.platform.authn.webauthn.WebAuthnAuthenticationProvider;
@@ -183,11 +184,34 @@ public class AuthnSpringAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public OAuthTokenManagerCore oAuthTokenManagerCore(OAuthTokenStore tokenStore,
+                                                       OAuthHttpClient httpClient,
+                                                       AuthnSpringProperties props,
                                                        AuthenticationEventListener eventListener) {
-        OAuthTokenManagerCore.TokenRefreshClient noOpClient = refreshToken -> {
+        var refreshConfigs = new java.util.LinkedHashMap<String, HttpTokenRefreshClient.ProviderRefreshConfig>();
+        var social         = props.getSocial();
+        if (social.containsKey("google")) {
+            var sc = social.get("google");
+            refreshConfigs.put("google", new HttpTokenRefreshClient.ProviderRefreshConfig(
+                    "https://oauth2.googleapis.com/token", sc.getClientId(), sc.getClientSecret()));
+        }
+        if (social.containsKey("github")) {
+            var sc = social.get("github");
+            refreshConfigs.put("github", new HttpTokenRefreshClient.ProviderRefreshConfig(
+                    "https://github.com/login/oauth/access_token", sc.getClientId(), sc.getClientSecret()));
+        }
+        if (social.containsKey("apple")) {
+            var sc = social.get("apple");
+            refreshConfigs.put("apple", new HttpTokenRefreshClient.ProviderRefreshConfig(
+                    "https://appleid.apple.com/auth/token", sc.getClientId(), sc.getClientSecret()));
+        }
+
+        var refreshClient = refreshConfigs.isEmpty()
+                            ? (OAuthTokenManagerCore.TokenRefreshClient) (provider, refreshToken) -> {
             throw new UnsupportedOperationException("No token refresh client configured");
-        };
-        return new OAuthTokenManagerCore(tokenStore, noOpClient, eventListener);
+        }
+                            : new HttpTokenRefreshClient(httpClient, refreshConfigs);
+
+        return new OAuthTokenManagerCore(tokenStore, refreshClient, eventListener);
     }
 
     @Bean

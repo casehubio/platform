@@ -38,7 +38,7 @@ public class OAuthTokenManagerCore {
         }
 
         try {
-            var refreshed = refreshClient.refresh(token.refreshToken());
+            var refreshed = refreshClient.refresh(provider, token.refreshToken());
             Instant newExpiry = refreshed.expiresIn() > 0
                                 ? Instant.now().plusSeconds(refreshed.expiresIn())
                                 : null;
@@ -67,6 +67,6 @@ public class OAuthTokenManagerCore {
     }
 
     public interface TokenRefreshClient {
-        OAuthTokenResponse refresh(String refreshToken);
+        OAuthTokenResponse refresh(String provider, String refreshToken);
     }
 }

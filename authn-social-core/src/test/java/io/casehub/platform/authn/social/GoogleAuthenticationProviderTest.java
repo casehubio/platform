@@ -67,6 +67,26 @@ class GoogleAuthenticationProviderTest {
     }
 
     @Test
+    void initiateIncludesPromptConsentWhenAdditionalScopesPresent() {
+        var context = new AuthenticationContext(
+                "google", TENANT, ORIGIN, Optional.empty(),
+                Map.of("additionalScopes", "https://www.googleapis.com/auth/calendar"));
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+
+        assertThat(response.authorizationUrl()).contains("prompt=consent");
+    }
+
+    @Test
+    void initiateOmitsPromptConsentWithoutAdditionalScopes() {
+        var context = new AuthenticationContext(
+                "google", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+
+        assertThat(response.authorizationUrl()).doesNotContain("prompt");
+    }
+
+
+    @Test
     void initiateOmitsAccessTypeOfflineWithoutAdditionalScopes() {
         var context = new AuthenticationContext(
                 "google", TENANT, ORIGIN, Optional.empty(), Map.of());

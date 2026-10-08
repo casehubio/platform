@@ -47,7 +47,7 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
     @Override
     protected Map<String, String> additionalAuthorizationParams(AuthenticationContext context) {
         if (context.hints().containsKey("additionalScopes")) {
-            return Map.of("access_type", "offline");
+            return Map.of("access_type", "offline", "prompt", "consent");
         }
         return Map.of();
     }

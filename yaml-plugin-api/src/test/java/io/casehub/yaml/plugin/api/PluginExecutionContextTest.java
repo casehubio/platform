@@ -3,6 +3,7 @@ package io.casehub.yaml.plugin.api;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PluginExecutionContextTest {
 
@@ -23,9 +24,9 @@ class PluginExecutionContextTest {
     }
 
     @Test
-    void lookup_returns_null_when_not_populated() {
+    void lookup_throws_when_not_populated() {
         var registry = new MapServiceRegistry();
-        PluginExecutionContext resolved = registry.lookup(PluginExecutionContext.class);
-        assertThat(resolved).isNull();
+        assertThatThrownBy(() -> registry.lookup(PluginExecutionContext.class))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

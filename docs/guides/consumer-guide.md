@@ -847,6 +847,69 @@ Built-in subscribable events: `CapacityPressureEvent` (`capacity.pressure`), `Ce
 | `GET` | `/acl/check` | self or admin | Check access (returns `{allowed: true/false}`) |
 | `GET` | `/acl/accessible` | self or admin | Paginated accessible resources (cursor-based) |
 
+### Operation Confirmation (`confirmation/`)
+
+Human-in-the-loop verification gate for sensitive operations. An AI agent with
+`ServiceConnectionProvider` access can initiate payments, delete data, or change
+accounts — this SPI ensures a human confirms before the operation proceeds.
+
+**Annotate SPI methods:**
+
+```java
+public interface PaymentInitiation {
+
+    @RequiresConfirmation(summary = "Payment of ${amount} ${currency} to ${destination}")
+    Payment initiate(String amount, String currency, String destination);
+
+    PaymentStatus status(String paymentId);  // no confirmation needed
+}
+```
+
+The `summary` template uses `${paramName}` for simple parameters and
+`${param.field}` for record/POJO accessors (tries `field()` first, then
+`getField()`).
+
+**Implement the provider:**
+
+```java
+@ApplicationScoped
+public class SmsConfirmationProvider implements OperationConfirmationProvider {
+    @Override
+    public ConfirmationResult confirm(String actorId, String tenancyId,
+                                       OperationDescriptor operation) {
+        // 1. Send confirmation message via your channel (SMS, push, etc.)
+        // 2. Block (virtual thread) until human responds or timeout
+        // 3. Return CONFIRMED, DENIED, or EXPIRED
+    }
+}
+```
+
+The method blocks on a virtual thread — this is the intended contract.
+
+**Default behaviour:** If no `OperationConfirmationProvider` is installed, all
+`@RequiresConfirmation` calls throw `ConfirmationRequiredException` (fail-closed).
+
+**Testing:**
+
+```java
+// Auto-confirms everything
+var provider = new TestOperationConfirmationProvider();
+
+// Records all requests for assertion
+var recording = new RecordingOperationConfirmationProvider(ConfirmationResult.CONFIRMED);
+recording.recordings(); // List<RecordedConfirmation>
+```
+
+**YAML step plugins:** Annotate `@Execute` methods with `@RequiresConfirmation`
+to enforce confirmation in playbook-driven execution. The plugin processor emits
+`requiresConfirmation` in the generated schema.
+
+**Channel security recommendations:**
+- Prefer SMS, push notifications, or authenticator apps over email
+- Email is the weakest channel — agents may have Gmail access via
+  `ServiceConnectionProvider` and could read confirmation emails
+- The SPI implementor decides which channel to use; platform does not enforce
+
 ---
 
 ## Spring Boot

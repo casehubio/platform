@@ -2,13 +2,13 @@ package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
 import io.casehub.yaml.core.orchestration.DurationParser;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.orchestration.LoopDirective;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSemaphore;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.RetryDirective;
-import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -26,8 +26,8 @@ import java.util.concurrent.TimeoutException;
 public final class DecoratorChain {
 
     private final ConditionEvaluator conditionEvaluator;
-    private final SpeedMultiplier speedMultiplier;
-    private final ExecutionScope  scope;
+    private final SpeedMultiplier    speedMultiplier;
+    private final ExecutionScope     scope;
 
     public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier) {
         this(conditionEvaluator, speedMultiplier, null);
@@ -35,8 +35,20 @@ public final class DecoratorChain {
 
     public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier, ExecutionScope scope) {
         this.conditionEvaluator = conditionEvaluator;
-        this.speedMultiplier = speedMultiplier;
-        this.scope = scope;
+        this.speedMultiplier    = speedMultiplier;
+        this.scope              = scope;
+    }
+
+    private static long computeDelay(Duration baseDelay, String backoff, int attempt) {
+        long base = baseDelay.toMillis();
+        return switch (backoff) {
+            case "exponential" -> base * (1L << attempt);
+            case "exponential-with-jitter" -> {
+                long exp = base * (1L << attempt);
+                yield exp + (long) (Math.random() * exp);
+            }
+            default -> base;
+        };
     }
 
     public DecoratedExecution apply(Map<String, Object> decorators, DecoratedExecution inner) {
@@ -51,7 +63,8 @@ public final class DecoratorChain {
         current = wrapDelay(current, decorators);           // 9
         current = wrapSemaphore(current, decorators);       // 8
         current = wrapRetry(current, decorators);           // 7
-        current = wrapWait(current, decorators);            // 6
+        current = wrapWait(current, decorators);            // 7
+        current = wrapAt(current, decorators);              // 6 — threshold gate
         current = wrapTimeout(current, decorators);         // 5
         current = wrapOnError(current, decorators);         // 4
         current = wrapLoop(current, decorators);            // 3
@@ -65,7 +78,6 @@ public final class DecoratorChain {
         String resolved = resolver.resolveString(condition, context);
         return conditionEvaluator.evaluate(resolved);
     }
-
 
     private DecoratedExecution wrapWhen(DecoratedExecution inner, Map<String, Object> decorators) {
         Object whenVal = decorators.get("when");
@@ -131,15 +143,15 @@ public final class DecoratorChain {
                 result = inner.execute(ctx);
             } catch (Exception e) {
                 return Result.of(Map.of(
-                                             "on-error.caught", e.getMessage(),
-                                             "on-error.fallback", fallbackStep),
+                                         "on-error.caught", e.getMessage(),
+                                         "on-error.fallback", fallbackStep),
                                  Map.of("on-error.exception", e.getClass().getSimpleName()));
             }
             if (!result.isSuccess()) {
                 String message = result instanceof Result.Failure f ? f.message() : "unknown";
                 return Result.of(Map.of(
-                                             "on-error.caught", message,
-                                             "on-error.fallback", fallbackStep),
+                                         "on-error.caught", message,
+                                         "on-error.fallback", fallbackStep),
                                  Map.of("on-error.handled", true));
             }
             return result;
@@ -216,18 +228,6 @@ public final class DecoratorChain {
                 }
             }
             return last;
-        };
-    }
-
-    private static long computeDelay(Duration baseDelay, String backoff, int attempt) {
-        long base = baseDelay.toMillis();
-        return switch (backoff) {
-            case "exponential" -> base * (1L << attempt);
-            case "exponential-with-jitter" -> {
-                long exp = base * (1L << attempt);
-                yield exp + (long) (Math.random() * exp);
-            }
-            default -> base;
         };
     }
 
@@ -370,11 +370,116 @@ public final class DecoratorChain {
     }
 
     @SuppressWarnings("unchecked")
+    private DecoratedExecution wrapAt(DecoratedExecution inner, Map<String, Object> decorators) {
+        Object atVal = decorators.get("at");
+        if (atVal == null) {return inner;}
+        if (scope == null) {
+            return ctx -> io.casehub.yaml.plugin.api.Result.failed("'at:' requires an execution scope");
+        }
+
+        java.util.List<ThresholdCondition> conditions = new java.util.ArrayList<>();
+        boolean                            guardMode  = false;
+
+        if (atVal instanceof String s) {
+            conditions.add(ThresholdCondition.parse(s));
+        } else if (atVal instanceof java.util.List<?> list) {
+            for (Object item : list) {
+                conditions.add(ThresholdCondition.parse((String) item));
+            }
+        } else if (atVal instanceof Map<?, ?> map) {
+            conditions.add(ThresholdCondition.parse((String) map.get("metric")));
+            guardMode = "guard".equals(map.get("mode"));
+        }
+
+        if (conditions.isEmpty()) {return inner;}
+
+        boolean isGuard = guardMode;
+        return ctx -> {
+            if (isGuard) {
+                for (var cond : conditions) {
+                    var prim = scope.numericPrimitive(cond.metricName());
+                    if (!cond.test(prim.doubleValue())) {
+                        return io.casehub.yaml.plugin.api.Result.of(Map.of());
+                    }
+                }
+                return inner.execute(ctx);
+            }
+
+            var future    = new java.util.concurrent.CompletableFuture<Void>();
+            var listeners = new java.util.ArrayList<java.util.function.DoubleConsumer>();
+
+            for (var cond : conditions) {
+                var prim = scope.numericPrimitive(cond.metricName());
+                java.util.function.DoubleConsumer listener = value -> {
+                    if (allConditionsMet(conditions)) {
+                        future.complete(null);
+                    }
+                };
+                listeners.add(listener);
+                prim.onThresholdChange(listener);
+            }
+
+            if (allConditionsMet(conditions)) {
+                future.complete(null);
+            }
+
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return io.casehub.yaml.plugin.api.Result.failed("Interrupted while waiting for threshold");
+            } catch (java.util.concurrent.ExecutionException e) {
+                return io.casehub.yaml.plugin.api.Result.failed("Error waiting for threshold: " + e.getCause().getMessage());
+            } finally {
+                for (int i = 0; i < conditions.size(); i++) {
+                    scope.numericPrimitive(conditions.get(i).metricName())
+                         .removeThresholdListener(listeners.get(i));
+                }
+            }
+
+            return inner.execute(ctx);
+        };
+    }
+
+    private boolean allConditionsMet(java.util.List<ThresholdCondition> conditions) {
+        for (var cond : conditions) {
+            var prim = scope.numericPrimitive(cond.metricName());
+            if (!cond.test(prim.doubleValue())) {return false;}
+        }
+        return true;
+    }
+
+
+    @SuppressWarnings("unchecked")
     private DecoratedExecution wrapSemaphore(DecoratedExecution inner, Map<String, Object> decorators) {
-        Object semVal   = decorators.get("semaphore");
-        Object mutexVal = decorators.get("mutex");
-        if (semVal == null && mutexVal == null) {return inner;}
-        if (scope == null) {return ctx -> Result.failed("'semaphore'/'mutex' requires an ExecutionScope");}
+        Object semVal      = decorators.get("semaphore");
+        Object mutexVal    = decorators.get("mutex");
+        Object resourceVal = decorators.get("resource");
+        if (semVal == null && mutexVal == null && resourceVal == null) {return inner;}
+        if (scope == null) {return ctx -> Result.failed("'semaphore'/'mutex'/'resource' requires an ExecutionScope");}
+
+        if (resourceVal != null) {
+            String resourceName = String.valueOf(resourceVal);
+            String priorityStr = decorators.containsKey("priority")
+                                 ? String.valueOf(decorators.get("priority"))
+                                 : "normal";
+            io.casehub.yaml.core.orchestration.Priority priority =
+                    io.casehub.yaml.core.orchestration.Priority.valueOf(priorityStr.toUpperCase());
+            return ctx -> {
+                var sem = scope.prioritySemaphore(resourceName, 1);
+                try {
+                    sem.acquire(priority);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return Result.failed("Interrupted acquiring resource '" + resourceName + "'");
+                }
+                try {
+                    return inner.execute(ctx);
+                } finally {
+                    sem.release();
+                }
+            };
+        }
 
         String name;
         int    permits;
@@ -436,10 +541,10 @@ public final class DecoratorChain {
 
     @SuppressWarnings("unchecked")
     private void applyPublish(Object publishVal, Result result, VariableResolver resolver) {
-        if (!(publishVal instanceof Map<?, ?> pubMap)) return;
-        String channelName = String.valueOf(pubMap.get("channel"));
-        OrcChannel<Object> channel = scope.channel(channelName);
-        Object data = pubMap.containsKey("data") ? resolver.resolve(pubMap.get("data")) : result.output();
+        if (!(publishVal instanceof Map<?, ?> pubMap)) {return;}
+        String             channelName = String.valueOf(pubMap.get("channel"));
+        OrcChannel<Object> channel     = scope.channel(channelName);
+        Object             data        = pubMap.containsKey("data") ? resolver.resolve(pubMap.get("data")) : result.output();
         try {
             channel.send(data);
         } catch (InterruptedException e) {

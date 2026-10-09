@@ -6,11 +6,19 @@ import java.util.Map;
 public record YamlModuleFile(
         YamlModuleHeader module,
         Map<String, Map<String, Object>> sections,
-        List<YamlImport> imports) {
+        List<YamlImport> imports,
+        Map<String, ResourceDeclaration> resources) {
 
     public YamlModuleFile {
         if (sections == null) {sections = Map.of();}
         if (imports == null) {imports = List.of();}
+        if (resources == null) {resources = Map.of();}
+    }
+
+    public YamlModuleFile(YamlModuleHeader module,
+                          Map<String, Map<String, Object>> sections,
+                          List<YamlImport> imports) {
+        this(module, sections, imports, Map.of());
     }
 
     public YamlModule toModule() {

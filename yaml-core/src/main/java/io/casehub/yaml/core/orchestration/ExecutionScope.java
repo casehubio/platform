@@ -27,6 +27,11 @@ public interface ExecutionScope extends AutoCloseable {
 
     OrcAccumulator accumulator(String name, java.util.function.DoubleBinaryOperator op, double identity);
 
+    OrcNumericPrimitive numericPrimitive(String name);
+
+    PriorityOrcSemaphore prioritySemaphore(String name, int permits);
+
+
     <K, V> OrcMap<K, V> map(String name);
 
 

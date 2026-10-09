@@ -16,7 +16,8 @@ public final class StepSchemaComposer {
             "if", "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
-            "semaphore", "barrier", "quorum", "race");
+            "semaphore", "barrier", "quorum", "race",
+            "at", "on-complete", "resource", "priority");
 
     private StepSchemaComposer() {}
 
@@ -91,6 +92,28 @@ public final class StepSchemaComposer {
         for (String key : DECORATOR_KEYS) {
             sharedProps.putObject(key);
         }
+
+        ObjectNode atSchema = sharedProps.putObject("at");
+        ArrayNode atOneOf = atSchema.putArray("oneOf");
+        atOneOf.addObject().put("type", "string");
+        ObjectNode atArray = atOneOf.addObject();
+        atArray.put("type", "array");
+        atArray.putObject("items").put("type", "string");
+        ObjectNode atObject = atOneOf.addObject();
+        atObject.put("type", "object");
+        ObjectNode atObjProps = atObject.putObject("properties");
+        atObjProps.putObject("metric").put("type", "string");
+        atObjProps.putObject("mode").putArray("enum").add("wait").add("guard");
+        atObject.putArray("required").add("metric");
+
+        ObjectNode onCompleteSchema = sharedProps.putObject("on-complete");
+        onCompleteSchema.put("type", "array");
+        onCompleteSchema.putObject("items").put("$ref", "#");
+
+        sharedProps.putObject("resource").put("type", "string");
+
+        sharedProps.putObject("priority").putArray("enum")
+                .add("background").add("normal").add("high");
 
         return root;
     }

@@ -18,6 +18,8 @@ public class YamlModuleFileBuilder {
     private YamlModuleHeader module;
     private List<YamlImport> imports = new ArrayList<>();
     private final Map<String, Map<String, Object>> sections = new LinkedHashMap<>();
+    private       Map<String, io.casehub.yaml.core.module.ResourceDeclaration> resources = new LinkedHashMap<>();
+
 
     @JsonProperty("module")
     public YamlModuleFileBuilder module(YamlModuleHeader module) {
@@ -31,6 +33,13 @@ public class YamlModuleFileBuilder {
         return this;
     }
 
+    @JsonProperty("resources")
+    public YamlModuleFileBuilder resources(Map<String, io.casehub.yaml.core.module.ResourceDeclaration> resources) {
+        if (resources != null) {this.resources = resources;}
+        return this;
+    }
+
+
     @JsonAnySetter
     @SuppressWarnings("unchecked")
     public void addSection(String name, Object value) {
@@ -39,7 +48,5 @@ public class YamlModuleFileBuilder {
         }
     }
 
-    public YamlModuleFile build() {
-        return new YamlModuleFile(module, Map.copyOf(sections), List.copyOf(imports));
-    }
+    public YamlModuleFile build() {return new YamlModuleFile(module, Map.copyOf(sections), List.copyOf(imports), Map.copyOf(resources));}
 }

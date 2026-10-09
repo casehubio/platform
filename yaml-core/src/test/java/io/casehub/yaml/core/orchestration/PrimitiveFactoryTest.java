@@ -96,6 +96,9 @@ class PrimitiveFactoryTest {
 
             @Override
             public <K, V> OrcMap<K, V> createMap(String name)                                                                         {return delegate.createMap(name);}
+
+            @Override
+            public PriorityOrcSemaphore createPrioritySemaphore(String name, int permits)                                    {return delegate.createPrioritySemaphore(name, permits);}
         };
 
         var                scope = new DefaultExecutionScope(custom);

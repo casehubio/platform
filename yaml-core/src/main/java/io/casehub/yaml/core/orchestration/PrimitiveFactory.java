@@ -29,4 +29,6 @@ public interface PrimitiveFactory {
     OrcAccumulator createAccumulator(String name, DoubleBinaryOperator op, double identity);
 
     <K, V> OrcMap<K, V> createMap(String name);
+
+    PriorityOrcSemaphore createPrioritySemaphore(String name, int permits);
 }

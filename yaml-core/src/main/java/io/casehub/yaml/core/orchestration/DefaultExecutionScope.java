@@ -119,6 +119,26 @@ public class DefaultExecutionScope implements ExecutionScope {
     }
 
     @Override
+    public OrcNumericPrimitive numericPrimitive(String name) {
+        Object p = findPrimitive(name);
+        if (p == null) {
+            throw new IllegalArgumentException("No primitive named '" + name + "'");
+        }
+        if (p instanceof OrcNumericPrimitive np) {
+            return np;
+        }
+        throw new IllegalArgumentException(
+                "Primitive '" + name + "' is not numeric (type: " + p.getClass().getSimpleName() + ")");
+    }
+
+    @Override
+    public PriorityOrcSemaphore prioritySemaphore(String name, int permits) {
+        return getOrCreate(name, PriorityOrcSemaphore.class,
+                           () -> factory.createPrioritySemaphore(name, permits));
+    }
+
+
+    @Override
     @SuppressWarnings("unchecked")
     public <K, V> OrcMap<K, V> map(String name) {
         return (OrcMap<K, V>) getOrCreate(name, OrcMap.class, () -> factory.createMap(name));

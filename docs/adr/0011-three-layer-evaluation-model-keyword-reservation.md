@@ -45,6 +45,15 @@ The YAML language has three evaluation layers, each owning distinct keywords:
   transitions via `MatchPattern` (#459). Never reactive.
 * **`when`** — reactive only. Engine-layer binding condition that watches for context
   changes and fires when the condition becomes true. Never imperative.
+* **`at`** — imperative only. Blocking threshold gate (default) or non-blocking guard
+  (`mode: guard`). Watches numeric orchestration primitives (`OrcCounter`,
+  `OrcAccumulator`, `OrcGauge<Number>`). Added by #562.
+* **`on-complete`** — imperative only. Syntax sugar desugared at parse time to
+  `signal:`/`wait:` pairs. Not present in the runtime AST. Added by #562.
+* **`resource`** — imperative only. Decorator binding a step to a named contended
+  resource (`PriorityOrcSemaphore`). Added by #562.
+* **`priority`** — imperative only. Decorator annotation qualifying `resource:` with
+  `background`/`normal`/`high` contention priority. Added by #562.
 * **Rules keywords** — must be distinct from all of the above. Candidates should be
   evaluated in the rules engine design phase, not pre-reserved here.
 

@@ -78,4 +78,10 @@ public final class DefaultPrimitiveFactory implements PrimitiveFactory {
     public <K, V> OrcMap<K, V> createMap(String name) {
         return new DefaultOrcMap<>();
     }
+
+    @Override
+    public PriorityOrcSemaphore createPrioritySemaphore(String name, int permits) {
+        return new DefaultPriorityOrcSemaphore(permits);
+    }
+
 }

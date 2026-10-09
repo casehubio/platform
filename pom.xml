@@ -175,6 +175,7 @@
         <module>confirmation-core</module>
         <module>confirmation</module>
         <module>confirmation-spring</module>
+        <module>confirmation-generator</module>
         <module>yaml-core</module>
         <module>yaml-codegen</module>
         <module>yaml-jackson</module>

@@ -173,6 +173,7 @@
         <module>callback-client</module>
         <module>callback-spring</module>
         <module>confirmation-core</module>
+        <module>confirmation</module>
         <module>yaml-core</module>
         <module>yaml-codegen</module>
         <module>yaml-jackson</module>

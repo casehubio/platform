@@ -17,7 +17,8 @@ public final class StepSchemaComposer {
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
             "semaphore", "barrier", "quorum", "race",
-            "at", "on-complete", "resource", "priority");
+            "at", "on-complete", "resource", "priority",
+            "cancel", "background");
 
     private StepSchemaComposer() {}
 
@@ -114,6 +115,9 @@ public final class StepSchemaComposer {
 
         sharedProps.putObject("priority").putArray("enum")
                 .add("background").add("normal").add("high");
+
+        sharedProps.putObject("cancel").put("type", "string");
+        sharedProps.putObject("background").put("type", "boolean");
 
         return root;
     }

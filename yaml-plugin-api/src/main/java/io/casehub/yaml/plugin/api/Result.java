@@ -21,7 +21,9 @@ public sealed interface Result permits Result.Success, Result.Failure {
         public boolean isSuccess() {return true;}
     }
 
-    record Failure(String message) implements Result {
+    record Failure(String message, String category) implements Result {
+        public Failure(String message) { this(message, null); }
+
         @Override
         public boolean isSuccess()          {return false;}
 
@@ -35,5 +37,7 @@ public sealed interface Result permits Result.Success, Result.Failure {
         return new Success(output, executionMetadata);
     }
 
-    static Result failed(String message) {return new Failure(message);}
+    static Result failed(String message) {return new Failure(message, null);}
+
+    static Result failed(String message, String category) {return new Failure(message, category);}
 }

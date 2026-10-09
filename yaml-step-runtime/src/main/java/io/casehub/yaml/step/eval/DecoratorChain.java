@@ -67,7 +67,9 @@ public final class DecoratorChain {
         current = wrapAt(current, decorators);              // 6 — threshold gate
         current = wrapTimeout(current, decorators);         // 5
         current = wrapOnError(current, decorators);         // 4
-        current = wrapLoop(current, decorators);            // 3
+        current = wrapLoop(current, decorators);            // 5
+        current = wrapCancel(current, decorators);          // 4 — signal-triggered cancel
+        current = wrapBackground(current, decorators);      // 3 — spawn and return
         current = wrapForEach(current, decorators);         // 2
         current = wrapWhen(current, decorators);            // 1
 
@@ -107,6 +109,7 @@ public final class DecoratorChain {
                 case LoopDirective.Count c -> c.count();
                 case LoopDirective.CountUntil cu -> cu.count();
                 case LoopDirective.Until u -> 1000;
+                case LoopDirective.Continuous c -> Integer.MAX_VALUE;
             };
             String untilCondition = switch (directive) {
                 case LoopDirective.CountUntil cu -> cu.until();
@@ -115,6 +118,9 @@ public final class DecoratorChain {
             };
 
             for (int i = 0; i < maxIterations; i++) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return Result.failed("Loop interrupted");
+                }
                 last = inner.execute(ctx);
                 if (!last.isSuccess()) {return last;}
 
@@ -131,6 +137,50 @@ public final class DecoratorChain {
             return last;
         };
     }
+
+    private DecoratedExecution wrapCancel(DecoratedExecution inner, Map<String, Object> decorators) {
+        Object cancelVal = decorators.get("cancel");
+        if (cancelVal == null) {return inner;}
+        if (scope == null) {return ctx -> Result.failed("'cancel' requires an ExecutionScope");}
+
+        String signalName = String.valueOf(cancelVal);
+        return ctx -> {
+            OrcSignal signal = scope.signal(signalName);
+
+            if (signal.isSignalled()) {
+                return Result.failed("Cancelled by signal '" + signalName + "'");
+            }
+
+            Thread executionThread = Thread.currentThread();
+            Thread watcher = Thread.ofVirtual().start(() -> {
+                try {
+                    signal.await();
+                    executionThread.interrupt();
+                } catch (InterruptedException e) {
+                    // watcher interrupted — step completed normally
+                }
+            });
+
+            try {
+                return inner.execute(ctx);
+            } finally {
+                watcher.interrupt();
+                Thread.interrupted(); // clear stale interrupt status from cancel signal
+            }
+        };
+    }
+
+    private DecoratedExecution wrapBackground(DecoratedExecution inner, Map<String, Object> decorators) {
+        Object bgVal = decorators.get("background");
+        if (bgVal == null || !Boolean.TRUE.equals(bgVal)) {return inner;}
+        if (scope == null) {return ctx -> Result.failed("'background' requires an ExecutionScope");}
+
+        return ctx -> {
+            scope.spawn("background", () -> inner.execute(ctx));
+            return Result.of(Map.of());
+        };
+    }
+
 
     private DecoratedExecution wrapOnError(DecoratedExecution inner, Map<String, Object> decorators) {
         Object onErrorVal = decorators.get("on-error");
@@ -205,6 +255,10 @@ public final class DecoratorChain {
                 case RetryDirective.Full f -> f.backoff();
                 default -> "fixed";
             };
+            List<String> onCategories = switch (directive) {
+                case RetryDirective.Full f -> f.on();
+                default -> List.of();
+            };
 
             Result last = null;
             for (int attempt = 0; attempt < max; attempt++) {
@@ -213,6 +267,13 @@ public final class DecoratorChain {
                     if (last.isSuccess()) {return last;}
                 } catch (Exception e) {
                     last = Result.failed(e.getMessage());
+                }
+
+                if (!onCategories.isEmpty() && last instanceof Result.Failure f) {
+                    String failCat = f.category();
+                    if (failCat != null && !onCategories.contains(failCat)) {
+                        return last;
+                    }
                 }
 
                 if (attempt < max - 1 && !delay.isZero()) {
@@ -272,6 +333,7 @@ public final class DecoratorChain {
         String as     = (String) forEachMap.get("as");
         if (as == null) {as = "item";}
         boolean parallel = Boolean.TRUE.equals(forEachMap.get("parallel"));
+        boolean collect  = "all".equals(forEachMap.get("collect"));
         String  asName   = as;
 
         return ctx -> {
@@ -282,25 +344,30 @@ public final class DecoratorChain {
             if (items.isEmpty()) {return Result.of(Map.of());}
 
             if (parallel) {
-                return executeForEachParallel(items, asName, inner, ctx);
+                return executeForEachParallel(items, asName, inner, ctx, collect);
             }
-            return executeForEachSequential(items, asName, inner, ctx);
+            return executeForEachSequential(items, asName, inner, ctx, collect);
         };
     }
 
     private Result executeForEachSequential(List<?> items, String as,
-                                            DecoratedExecution inner, StepContext ctx) {
-        Result last = Result.of(Map.of());
+                                            DecoratedExecution inner, StepContext ctx, boolean collect) {
+        Result last      = Result.of(Map.of());
+        var    collected = collect ? new ArrayList<Map<String, Object>>() : null;
         for (int i = 0; i < items.size(); i++) {
             VariableResolver scoped = pushEachContext(ctx.resolver(), as, items.get(i), i);
             last = inner.execute(ctx.withResolver(scoped));
             if (!last.isSuccess()) {return last;}
+            if (collected != null) {collected.add(last.output());}
+        }
+        if (collected != null) {
+            return Result.of(Map.of("collected", collected));
         }
         return last;
     }
 
     private Result executeForEachParallel(List<?> items, String as,
-                                          DecoratedExecution inner, StepContext ctx) {
+                                          DecoratedExecution inner, StepContext ctx, boolean collect) {
         var futures = new ArrayList<Future<Result>>();
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < items.size(); i++) {
@@ -321,6 +388,11 @@ public final class DecoratorChain {
             }
             for (Result r : results) {
                 if (!r.isSuccess()) {return r;}
+            }
+            if (collect) {
+                var collected = new ArrayList<Map<String, Object>>();
+                for (Result r : results) { collected.add(r.output()); }
+                return Result.of(Map.of("collected", collected));
             }
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {

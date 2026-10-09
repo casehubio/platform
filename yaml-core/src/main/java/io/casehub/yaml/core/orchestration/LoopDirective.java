@@ -2,7 +2,9 @@ package io.casehub.yaml.core.orchestration;
 
 import java.util.Map;
 
-public sealed interface LoopDirective permits LoopDirective.Count, LoopDirective.CountUntil, LoopDirective.Until {
+public sealed interface LoopDirective permits LoopDirective.Count, LoopDirective.CountUntil, LoopDirective.Until, LoopDirective.Continuous {
+
+    record Continuous() implements LoopDirective {}
 
     record Count(int count) implements LoopDirective {
         public Count {
@@ -26,8 +28,10 @@ public sealed interface LoopDirective permits LoopDirective.Count, LoopDirective
     static LoopDirective parse(Object raw) {
         if (raw == null) throw new IllegalArgumentException("Loop directive value must not be null");
         if (raw instanceof LoopDirective d) return d;
+        if (raw instanceof String s && "continuous".equalsIgnoreCase(s)) return new Continuous();
         if (raw instanceof Number n) return new Count(n.intValue());
         if (raw instanceof Map<?, ?> m) {
+            if (Boolean.TRUE.equals(m.get("continuous"))) return new Continuous();
             Object countObj = m.get("count");
             String until = (String) m.get("until");
             if (countObj != null && until != null) {

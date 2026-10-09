@@ -54,6 +54,13 @@ The YAML language has three evaluation layers, each owning distinct keywords:
   resource (`PriorityOrcSemaphore`). Added by #562.
 * **`priority`** — imperative only. Decorator annotation qualifying `resource:` with
   `background`/`normal`/`high` contention priority. Added by #562.
+* **`cancel`** — imperative only. Signal-triggered cancellation decorator. Interrupts
+  the decorated step (or entire loop/block) when the named signal fires. Sibling to
+  `timeout:` — same interrupt mechanism, event trigger instead of time trigger.
+  Added by #563.
+* **`background`** — imperative only. Decorator that spawns the step via
+  `scope.spawn()` and returns immediately. Spawned task is scope-bounded — cancelled
+  when the enclosing scope closes. Added by #563.
 * **Rules keywords** — must be distinct from all of the above. Candidates should be
   evaluated in the rules engine design phase, not pre-reserved here.
 

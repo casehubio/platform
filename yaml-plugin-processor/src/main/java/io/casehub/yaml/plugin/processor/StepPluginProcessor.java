@@ -1,5 +1,6 @@
 package io.casehub.yaml.plugin.processor;
 
+import io.casehub.platform.api.confirmation.RequiresConfirmation;
 import io.casehub.yaml.plugin.api.Execute;
 import io.casehub.yaml.plugin.api.Plugin;
 import io.casehub.yaml.plugin.api.Result;
@@ -81,9 +82,14 @@ public class StepPluginProcessor extends AbstractProcessor {
                 param.asType().toString()));
         }
 
+        RequiresConfirmation confirmationAnn = executeMethod.getAnnotation(RequiresConfirmation.class);
+        boolean requiresConfirmation = confirmationAnn != null;
+        String confirmationSummary = requiresConfirmation ? confirmationAnn.summary() : null;
+
         return new PluginModel(annotation.value(), annotation.description(),
             annotation.portability().name(), annotation.capability(),
-            typeElement, fields, executeMethod, serviceParams);
+            typeElement, fields, executeMethod, serviceParams,
+            requiresConfirmation, confirmationSummary);
     }
 
     private void generate(PluginModel model) {

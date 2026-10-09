@@ -13,7 +13,9 @@ record PluginModel(
         TypeElement pluginClass,
         List<RecordComponentElement> fields,
         ExecutableElement executeMethod,
-        List<ServiceParam> serviceParams
+        List<ServiceParam> serviceParams,
+        boolean requiresConfirmation,
+        String confirmationSummary
 ) {
     record ServiceParam(String typeName, String qualifiedTypeName) {}
 }

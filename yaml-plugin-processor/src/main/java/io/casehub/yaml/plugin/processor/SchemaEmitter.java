@@ -40,9 +40,17 @@ class SchemaEmitter {
                 .toList();
             w.print(String.join(", ", requiredFields));
             w.println("],");
+            if (model.requiresConfirmation()) {
+                w.println("  \"requiresConfirmation\": true,");
+                w.println("  \"confirmationSummary\": \"" + escapeJson(model.confirmationSummary()) + "\",");
+            }
             w.println("  \"additionalProperties\": false");
             w.println("}");
         }
+    }
+
+    private static String escapeJson(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private String toJsonType(String javaType) {

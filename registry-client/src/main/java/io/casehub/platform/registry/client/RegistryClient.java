@@ -15,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,22 +23,32 @@ import java.util.Optional;
 public class RegistryClient implements AutoCloseable {
 
     private static final TypeReference<List<RegistryEntry>> ENTRY_LIST_TYPE = new TypeReference<>() {};
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private final String baseUrl;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
+    private final boolean ownsClient;
 
     public RegistryClient(final String baseUrl) {
-        this(baseUrl, HttpClient.newHttpClient(),
+        this(baseUrl,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build(),
                 new ObjectMapper()
                         .registerModule(new JavaTimeModule())
-                        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false));
+                        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false),
+                true);
     }
 
     public RegistryClient(final String baseUrl, final HttpClient httpClient, final ObjectMapper mapper) {
+        this(baseUrl, httpClient, mapper, false);
+    }
+
+    private RegistryClient(final String baseUrl, final HttpClient httpClient,
+                           final ObjectMapper mapper, final boolean ownsClient) {
         this.baseUrl = Objects.requireNonNull(baseUrl, "baseUrl").replaceAll("/+$", "");
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.mapper = Objects.requireNonNull(mapper, "mapper");
+        this.ownsClient = ownsClient;
     }
 
     public void register(final RegistryEntry entry) {
@@ -46,6 +57,7 @@ public class RegistryClient implements AutoCloseable {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/registry/entries"))
                     .header("Content-Type", "application/json")
+                    .timeout(REQUEST_TIMEOUT)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(body))
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
@@ -62,6 +74,7 @@ public class RegistryClient implements AutoCloseable {
         try {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/registry/entries/" + id + "/heartbeat"))
+                    .timeout(REQUEST_TIMEOUT)
                     .PUT(HttpRequest.BodyPublishers.noBody())
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
@@ -78,6 +91,7 @@ public class RegistryClient implements AutoCloseable {
         try {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/registry/entries/" + id))
+                    .timeout(REQUEST_TIMEOUT)
                     .DELETE()
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -98,6 +112,7 @@ public class RegistryClient implements AutoCloseable {
         try {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/registry/entries/" + id))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -121,6 +136,7 @@ public class RegistryClient implements AutoCloseable {
 
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(uri.toString()))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -136,7 +152,9 @@ public class RegistryClient implements AutoCloseable {
 
     @Override
     public void close() {
-        // HttpClient does not require explicit close in JDK 11+
+        if (ownsClient) {
+            httpClient.close();
+        }
     }
 
     private static String encode(final String value) {

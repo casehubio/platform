@@ -1,5 +1,6 @@
 package io.casehub.platform.registry.memory;
 
+import io.casehub.platform.api.registry.CascadeAction;
 import io.casehub.platform.api.registry.CascadeEffect;
 import io.casehub.platform.api.registry.CascadeEngine;
 import io.casehub.platform.api.registry.CascadeResult;
@@ -50,25 +51,35 @@ public class InMemoryRegistryService implements RegistryService {
     @Override
     public CascadeResult deregister(String id) {
         var removed = entries.remove(id);
-        if (removed == null) return CascadeResult.empty();
+        if (removed == null) {return CascadeResult.empty();}
 
-        var rules = List.copyOf(cascadeRules.values());
+        var rules   = List.copyOf(cascadeRules.values());
         var effects = List.<CascadeEffect>of();
         if (!rules.isEmpty()) {
             effects = cascadeEngine.applyCascade(id, rules,
-                    CascadeRule::onSourceDeregister,
-                    k -> Optional.ofNullable(entries.get(k)),
-                    this::outboundRelationships,
-                    new CascadeEngine.EntryMutator() {
-                        @Override public void deregister(String tid) { entries.remove(tid); }
-                        @Override public void markOrphaned(String tid, Instant now) {
-                            entries.computeIfPresent(tid, (k, e) -> e.withOrphaned(now));
-                        }
-                    },
-                    cdiEventSink, new HashSet<>(Set.of(id)), MAX_CASCADE_DEPTH);
+                                                 CascadeRule::onSourceDeregister,
+                                                 k -> Optional.ofNullable(entries.get(k)),
+                                                 this::outboundRelationships,
+                                                 new CascadeEngine.EntryMutator() {
+                                                     @Override
+                                                     public void deregister(String tid) {entries.remove(tid);}
+
+                                                     @Override
+                                                     public void markOrphaned(String tid, Instant now) {
+                                                         entries.computeIfPresent(tid, (k, e) -> e.withOrphaned(now));
+                                                     }
+                                                 },
+                                                 cdiEventSink, new HashSet<>(Set.of(id)), MAX_CASCADE_DEPTH);
         }
 
-        relationships.removeIf(r -> r.sourceId().equals(id) || r.targetId().equals(id));
+        var removedIds = new HashSet<>(Set.of(id));
+        for (var effect : effects) {
+            if (effect.action() == CascadeAction.DEREGISTER) {
+                removedIds.add(effect.targetId());
+            }
+        }
+        relationships.removeIf(r -> removedIds.contains(r.sourceId()) || removedIds.contains(r.targetId()));
+
         var event = RegistryEvent.deregistered(removed);
         cdiEventSink.accept(event);
         notifyWatchers(event);

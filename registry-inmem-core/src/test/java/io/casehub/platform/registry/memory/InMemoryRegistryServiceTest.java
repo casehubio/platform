@@ -388,4 +388,20 @@ class InMemoryRegistryServiceTest {
         assertThat(registry.resolve("b")).isEmpty();
         assertThat(registry.resolve("c")).isEmpty();
     }
+
+    @Test
+    void cascadeDeregister_cleansUpCascadedTargetRelationships() {
+        registry.register(entry("a", "app", "ns"));
+        registry.register(entry("b", "pool", "ns"));
+        registry.register(entry("c", "session", "ns"));
+        registry.link(new Relationship("a", "b", "owns"));
+        registry.link(new Relationship("b", "c", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns", CascadeAction.DEREGISTER));
+
+        registry.deregister("a");
+
+        assertThat(registry.relationships("b")).as("cascaded target's relationships should be cleaned up").isEmpty();
+        assertThat(registry.relationships("c")).as("grandchild's relationships should be cleaned up").isEmpty();
+    }
+
 }

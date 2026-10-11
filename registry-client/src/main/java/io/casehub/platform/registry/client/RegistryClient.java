@@ -9,9 +9,11 @@ import io.casehub.platform.api.registry.RegistryQuery;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -108,9 +110,9 @@ public class RegistryClient implements AutoCloseable {
     public List<RegistryEntry> discover(final RegistryQuery query) {
         try {
             var uri = new StringBuilder(baseUrl)
-                    .append("/registry/entries?tenancyId=").append(query.tenancyId());
-            if (query.type() != null) uri.append("&type=").append(query.type());
-            if (query.namespace() != null) uri.append("&namespace=").append(query.namespace());
+                    .append("/registry/entries?tenancyId=").append(encode(query.tenancyId()));
+            if (query.type() != null) uri.append("&type=").append(encode(query.type()));
+            if (query.namespace() != null) uri.append("&namespace=").append(encode(query.namespace()));
 
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(uri.toString()))
@@ -130,6 +132,10 @@ public class RegistryClient implements AutoCloseable {
     @Override
     public void close() {
         // HttpClient does not require explicit close in JDK 11+
+    }
+
+    private static String encode(final String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private void requireSuccess(final HttpResponse<?> response, final String operation) {

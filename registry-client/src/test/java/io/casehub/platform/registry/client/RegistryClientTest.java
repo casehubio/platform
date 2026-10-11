@@ -153,6 +153,24 @@ class RegistryClientTest {
     }
 
     @Test
+    void discover_urlEncodesQueryParams() throws Exception {
+        var entries = List.of(entry("svc-1"));
+        var json = MAPPER.writeValueAsBytes(entries);
+        server.createContext("/registry/entries", exchange -> {
+            lastRequestPath = exchange.getRequestURI().getRawQuery();
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, json.length);
+            exchange.getResponseBody().write(json);
+            exchange.close();
+        });
+
+        client.discover(new RegistryQuery("tenant with spaces", "type&evil=1", null));
+
+        assertThat(lastRequestPath).contains("tenancyId=tenant+with+spaces");
+        assertThat(lastRequestPath).contains("type=type%26evil%3D1");
+    }
+
+    @Test
     void register_throwsOnServerError() {
         server.createContext("/registry/entries", exchange -> {
             exchange.sendResponseHeaders(500, -1);

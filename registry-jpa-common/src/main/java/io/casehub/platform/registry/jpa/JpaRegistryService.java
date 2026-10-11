@@ -222,22 +222,9 @@ public class JpaRegistryService implements RegistryService {
     }
 
     private void applyCascadeIfGraceElapsed(RegistryEntry entry, List<CascadeRule> rules, Instant now) {
-        var downSince = (entry.lastHeartbeat() != null ? entry.lastHeartbeat() : entry.registeredAt())
-                .plus(entry.ttl());
-        for (var rule : rules) {
-            if (rule.cascadeGracePeriod() != null && now.isBefore(downSince.plus(rule.cascadeGracePeriod()))) {
-                continue;
-            }
-            var outbound = outboundRelationships(entry.id());
-            if (outbound.stream().noneMatch(r -> r.type().equals(rule.relationshipType()))) continue;
-
-            cascadeEngine.applyCascade(entry.id(), List.of(rule),
-                    CascadeRule::effectiveOnSourceExpired,
-                    this::resolve,
-                    this::outboundRelationships,
-                    jpaMutator(),
-                    eventSink, new HashSet<>(Set.of(entry.id())), MAX_CASCADE_DEPTH);
-        }
+        cascadeEngine.applyCascadeIfGraceElapsed(entry, rules, now,
+                this::resolve, this::outboundRelationships, jpaMutator(),
+                eventSink, MAX_CASCADE_DEPTH);
     }
 
 

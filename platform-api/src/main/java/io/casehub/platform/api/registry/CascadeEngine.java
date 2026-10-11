@@ -98,4 +98,32 @@ public class CascadeEngine {
 
         return effects;
     }
+
+    public List<CascadeEffect> applyCascadeIfGraceElapsed(
+            RegistryEntry entry,
+            List<CascadeRule> rules,
+            Instant now,
+            EntryResolver resolver,
+            RelationshipQuery relQuery,
+            EntryMutator mutator,
+            Consumer<RegistryEvent> eventSink,
+            int maxDepth
+    ) {
+        var downSince = (entry.lastHeartbeat() != null ? entry.lastHeartbeat() : entry.registeredAt())
+                .plus(entry.ttl());
+        var effects = new ArrayList<CascadeEffect>();
+        for (var rule : rules) {
+            if (rule.cascadeGracePeriod() != null && now.isBefore(downSince.plus(rule.cascadeGracePeriod()))) {
+                continue;
+            }
+            var outbound = relQuery.outboundFrom(entry.id());
+            if (outbound.stream().noneMatch(r -> r.type().equals(rule.relationshipType()))) continue;
+
+            effects.addAll(applyCascade(entry.id(), List.of(rule),
+                    CascadeRule::effectiveOnSourceExpired,
+                    resolver, relQuery, mutator,
+                    eventSink, new java.util.HashSet<>(Set.of(entry.id())), maxDepth));
+        }
+        return effects;
+    }
 }

@@ -7,10 +7,7 @@ import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryEvent;
 
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.function.Consumer;
 
 public class HeartbeatScheduler {
@@ -54,32 +51,19 @@ public class HeartbeatScheduler {
     }
 
     private void applyCascadeIfGraceElapsed(RegistryEntry entry, List<CascadeRule> rules, Instant now) {
-        var downSince = (entry.lastHeartbeat() != null ? entry.lastHeartbeat() : entry.registeredAt())
-                .plus(entry.ttl());
-        for (var rule : rules) {
-            if (rule.cascadeGracePeriod() != null && now.isBefore(downSince.plus(rule.cascadeGracePeriod()))) {
-                continue;
-            }
-            var outbound = registry.outboundRelationships(entry.id());
-            var matchingRels = outbound.stream()
-                    .filter(r -> r.type().equals(rule.relationshipType())).toList();
-            if (matchingRels.isEmpty()) continue;
-
-            cascadeEngine.applyCascade(entry.id(), List.of(rule),
-                    CascadeRule::effectiveOnSourceExpired,
-                    k -> registry.resolve(k),
-                    registry::outboundRelationships,
-                    new CascadeEngine.EntryMutator() {
-                        @Override public void deregister(String id) {
-                            registry.deregister(id);
-                        }
-                        @Override public void markOrphaned(String id, Instant orphanedAt) {
-                            registry.resolve(id)
-                                    .filter(e -> !e.isOrphaned())
-                                    .ifPresent(e -> registry.updateEntryForExpiry(e.withOrphaned(orphanedAt)));
-                        }
-                    },
-                    eventSink, new HashSet<>(Set.of(entry.id())), MAX_CASCADE_DEPTH);
-        }
+        cascadeEngine.applyCascadeIfGraceElapsed(entry, rules, now,
+                k -> registry.resolve(k),
+                registry::outboundRelationships,
+                new CascadeEngine.EntryMutator() {
+                    @Override public void deregister(String id) {
+                        registry.deregister(id);
+                    }
+                    @Override public void markOrphaned(String id, Instant orphanedAt) {
+                        registry.resolve(id)
+                                .filter(e -> !e.isOrphaned())
+                                .ifPresent(e -> registry.updateEntryForExpiry(e.withOrphaned(orphanedAt)));
+                    }
+                },
+                eventSink, MAX_CASCADE_DEPTH);
     }
 }

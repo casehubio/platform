@@ -59,6 +59,7 @@ public class JpaRegistryService implements RegistryService {
         entity.lastHeartbeat = entry.lastHeartbeat();
         entity.ttlSeconds = entry.ttl().toSeconds();
         entity.health = entry.health().name();
+        entity.orphanedAt = entry.orphanedAt();
         em.merge(entity);
         var event = RegistryEvent.registered(entry);
         eventSink.accept(event);

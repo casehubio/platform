@@ -189,4 +189,27 @@ class HeartbeatSchedulerTest {
         assertThat(registry.resolve("tgt")).isPresent()
                 .hasValueSatisfying(e -> assertThat(e.isOrphaned()).isTrue());
     }
+
+    @Test
+    void ttlExpiry_markOrphanedIdempotentOnSubsequentTick() {
+        var source = new RegistryEntry("src", "app", "ns", "tenant-1",
+                Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
+        var target = new RegistryEntry("tgt", "pool", "ns", "tenant-1",
+                Map.of(), Instant.now(), null, Duration.ofSeconds(300),
+                HealthStatus.HEALTHY, null);
+        registry.register(source);
+        registry.register(target);
+        registry.link(new Relationship("src", "tgt", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns",
+                CascadeAction.DEREGISTER, CascadeAction.MARK_ORPHANED, null));
+
+        scheduler.checkHeartbeats();
+        var firstOrphanedAt = registry.resolve("tgt").get().orphanedAt();
+        assertThat(firstOrphanedAt).isNotNull();
+
+        scheduler.checkHeartbeats();
+        var secondOrphanedAt = registry.resolve("tgt").get().orphanedAt();
+        assertThat(secondOrphanedAt).isEqualTo(firstOrphanedAt);
+    }
 }

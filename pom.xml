@@ -64,6 +64,7 @@
         <module>registry-jpa-common</module>
         <module>registry-jpa</module>
         <module>registry-spring-jpa</module>
+        <module>registry-client</module>
         <module>endpoints-config-core</module>
         <module>endpoints-config</module>
         <module>datasource-alpha</module>

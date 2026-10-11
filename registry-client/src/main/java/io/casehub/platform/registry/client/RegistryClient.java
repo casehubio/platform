@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryQuery;
 
@@ -73,14 +74,18 @@ public class RegistryClient implements AutoCloseable {
         }
     }
 
-    public void deregister(final String id) {
+    public CascadeResult deregister(final String id) {
         try {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/registry/entries/" + id))
                     .DELETE()
                     .build();
-            var response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             requireSuccess(response, "deregister");
+            if (response.statusCode() == 204 || response.body().length == 0) {
+                return CascadeResult.empty();
+            }
+            return mapper.readValue(response.body(), CascadeResult.class);
         } catch (RegistryClientException e) {
             throw e;
         } catch (IOException | InterruptedException e) {

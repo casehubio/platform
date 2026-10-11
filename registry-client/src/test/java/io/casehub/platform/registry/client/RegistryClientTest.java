@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sun.net.httpserver.HttpServer;
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.HealthStatus;
 import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryQuery;
@@ -86,18 +87,37 @@ class RegistryClientTest {
     }
 
     @Test
-    void deregister_sendsDeleteToEntryId() throws Exception {
+    void deregister_returnsCascadeResult() throws Exception {
+        var result = CascadeResult.simple(entry("svc-1"));
+        var json = MAPPER.writeValueAsBytes(result);
         server.createContext("/registry/entries/svc-1", exchange -> {
             lastRequestMethod = exchange.getRequestMethod();
             lastRequestPath = exchange.getRequestURI().getPath();
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, json.length);
+            exchange.getResponseBody().write(json);
+            exchange.close();
+        });
+
+        var cascadeResult = client.deregister("svc-1");
+
+        assertThat(lastRequestMethod).isEqualTo("DELETE");
+        assertThat(lastRequestPath).isEqualTo("/registry/entries/svc-1");
+        assertThat(cascadeResult.deregistered().id()).isEqualTo("svc-1");
+        assertThat(cascadeResult.cascadeEffects()).isEmpty();
+    }
+
+    @Test
+    void deregister_returnsEmptyResultOn204() throws Exception {
+        server.createContext("/registry/entries/svc-1", exchange -> {
             exchange.sendResponseHeaders(204, -1);
             exchange.close();
         });
 
-        client.deregister("svc-1");
+        var cascadeResult = client.deregister("svc-1");
 
-        assertThat(lastRequestMethod).isEqualTo("DELETE");
-        assertThat(lastRequestPath).isEqualTo("/registry/entries/svc-1");
+        assertThat(cascadeResult.deregistered()).isNull();
+        assertThat(cascadeResult.cascadeEffects()).isEmpty();
     }
 
     @Test

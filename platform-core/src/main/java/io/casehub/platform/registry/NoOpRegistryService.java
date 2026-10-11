@@ -1,5 +1,6 @@
 package io.casehub.platform.registry;
 
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryEvent;
 import io.casehub.platform.api.registry.RegistryQuery;
@@ -13,7 +14,7 @@ import java.util.function.Consumer;
 public class NoOpRegistryService implements RegistryService {
     @Override public void register(RegistryEntry entry) {}
     @Override public void heartbeat(String id) {}
-    @Override public void deregister(String id) {}
+    @Override public CascadeResult deregister(String id) { return CascadeResult.empty(); }
     @Override public Optional<RegistryEntry> resolve(String id) { return Optional.empty(); }
     @Override public List<RegistryEntry> discover(RegistryQuery query) { return List.of(); }
     @Override public void link(Relationship rel) {}

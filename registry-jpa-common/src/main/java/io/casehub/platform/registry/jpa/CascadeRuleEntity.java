@@ -15,4 +15,10 @@ public class CascadeRuleEntity {
 
     @Column(name = "on_source_deregister", nullable = false, length = 30)
     public String onSourceDeregister;
+    @Column(name = "on_source_expired", length = 30)
+    public String onSourceExpired;
+
+    @Column(name = "cascade_grace_period_seconds")
+    public Long cascadeGracePeriodSeconds;
+
 }

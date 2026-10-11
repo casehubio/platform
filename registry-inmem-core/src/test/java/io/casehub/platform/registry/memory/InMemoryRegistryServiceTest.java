@@ -34,7 +34,7 @@ class InMemoryRegistryServiceTest {
     private RegistryEntry entry(String id, String type, String namespace) {
         return new RegistryEntry(id, type, namespace, "tenant-1",
                 Map.of(), Instant.now(), null, Duration.ofSeconds(30),
-                HealthStatus.HEALTHY);
+                HealthStatus.HEALTHY, null);
     }
 
     // --- register / resolve ---
@@ -57,7 +57,7 @@ class InMemoryRegistryServiceTest {
         registry.register(entry("svc-1", "service", "default"));
         var updated = new RegistryEntry("svc-1", "service", "default", "tenant-1",
                 Map.of("key", "val"), Instant.now(), null, Duration.ofSeconds(30),
-                HealthStatus.HEALTHY);
+                HealthStatus.HEALTHY, null);
         registry.register(updated);
         assertThat(registry.resolve("svc-1").get().metadata())
                 .containsEntry("key", "val");
@@ -276,13 +276,10 @@ class InMemoryRegistryServiceTest {
 
     @Test
     void watchReceivesHealthChangedEvents() {
-        var entry = new RegistryEntry("svc-1", "service", "default", "tenant-1",
-                                      Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
-                                      Duration.ofSeconds(5), HealthStatus.HEALTHY);
-        registry.register(entry);
+        registry.register(entry("svc-1", "service", "default"));
         registry.watch(new RegistryQuery("tenant-1", null, null), watchEvents::add);
-        var scheduler = new HeartbeatScheduler(registry);
-        scheduler.checkHeartbeats();
+        var updated = registry.resolve("svc-1").get().withHealth(HealthStatus.DOWN);
+        registry.updateEntry(updated);
         assertThat(watchEvents).anyMatch(e ->
                                                  e.kind() == RegistryEvent.EventKind.HEALTH_CHANGED);
     }
@@ -317,5 +314,78 @@ class InMemoryRegistryServiceTest {
     @Test
     void cascadeRulesInitiallyEmpty() {
         assertThat(registry.cascadeRules()).isEmpty();
+    }
+
+    // --- cascade enforcement ---
+
+    @Test
+    void deregisterCascadesDeregister() {
+        registry.register(entry("app-1", "app", "ns"));
+        registry.register(entry("pool-1", "pool", "ns"));
+        registry.link(new Relationship("app-1", "pool-1", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns", CascadeAction.DEREGISTER));
+
+        var result = registry.deregister("app-1");
+
+        assertThat(registry.resolve("pool-1")).isEmpty();
+        assertThat(result.deregistered().id()).isEqualTo("app-1");
+        assertThat(result.cascadeEffects()).hasSize(1);
+        assertThat(result.cascadeEffects().get(0).action()).isEqualTo(CascadeAction.DEREGISTER);
+    }
+
+    @Test
+    void deregisterCascadesMarkOrphaned() {
+        registry.register(entry("app-1", "app", "ns"));
+        registry.register(entry("pool-1", "pool", "ns"));
+        registry.link(new Relationship("app-1", "pool-1", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns", CascadeAction.MARK_ORPHANED));
+
+        registry.deregister("app-1");
+
+        assertThat(registry.resolve("pool-1")).isPresent()
+                .hasValueSatisfying(e -> assertThat(e.isOrphaned()).isTrue());
+    }
+
+    @Test
+    void deregisterCascadesNotify() {
+        registry.register(entry("app-1", "app", "ns"));
+        registry.register(entry("pool-1", "pool", "ns"));
+        registry.link(new Relationship("app-1", "pool-1", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns", CascadeAction.NOTIFY));
+        cdiEvents.clear();
+
+        registry.deregister("app-1");
+
+        assertThat(registry.resolve("pool-1")).isPresent();
+        assertThat(cdiEvents).anyMatch(e -> e.kind() == RegistryEvent.EventKind.CASCADE_NOTIFIED);
+    }
+
+    @Test
+    void deregisterWithoutCascadeRules_returnsSimpleResult() {
+        registry.register(entry("svc-1", "service", "default"));
+        var result = registry.deregister("svc-1");
+        assertThat(result.deregistered().id()).isEqualTo("svc-1");
+        assertThat(result.cascadeEffects()).isEmpty();
+    }
+
+    @Test
+    void deregisterUnknown_returnsEmpty() {
+        var result = registry.deregister("nope");
+        assertThat(result.deregistered()).isNull();
+    }
+
+    @Test
+    void recursiveCascade_deregistersGrandchildren() {
+        registry.register(entry("a", "app", "ns"));
+        registry.register(entry("b", "pool", "ns"));
+        registry.register(entry("c", "session", "ns"));
+        registry.link(new Relationship("a", "b", "owns"));
+        registry.link(new Relationship("b", "c", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns", CascadeAction.DEREGISTER));
+
+        registry.deregister("a");
+
+        assertThat(registry.resolve("b")).isEmpty();
+        assertThat(registry.resolve("c")).isEmpty();
     }
 }

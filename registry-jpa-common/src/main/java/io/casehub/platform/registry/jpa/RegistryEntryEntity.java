@@ -44,4 +44,7 @@ public class RegistryEntryEntity {
 
     @Column(nullable = false, length = 20)
     public String health;
+    @Column(name = "orphaned_at")
+    public Instant orphanedAt;
+
 }

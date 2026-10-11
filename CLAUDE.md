@@ -95,9 +95,9 @@ New modules: `platform-core`, `platform-spring`, `spring-testing`, `generator-co
 | `session-spring-jpa/` | `casehub-platform-session-spring-jpa` | Spring Data JPA SessionStore + RefreshTokenStore — shares entities via session-jpa-common. @AutoConfiguration + @ConditionalOnMissingBean. No quarkus:build goal |
 | `authn-webauthn-spring-jpa/` | `casehub-platform-authn-webauthn-spring-jpa` | Spring Data JPA WebAuthnCredentialStore — shares entities via authn-webauthn-jpa-common. @AutoConfiguration + @ConditionalOnMissingBean. No quarkus:build goal |
 | `authn-social-spring-jpa/` | `casehub-platform-authn-social-spring-jpa` | Spring Data JPA IdentityBindingStore + OAuthTokenStore — shares entities via authn-social-jpa-common. @AutoConfiguration + @ConditionalOnMissingBean. No quarkus:build goal |
-| `registry-inmem-core/` | `casehub-platform-registry-inmem-core` | Framework-neutral volatile InMemoryRegistryService — ConcurrentHashMap entries, CopyOnWriteArrayList relationships/watchers. Consumer<RegistryEvent> for CDI event bridge. HeartbeatScheduler scans all entries cross-tenant, marks DOWN when lastHeartbeat + ttl expires. Pure Java — no CDI, no Spring. No quarkus:build goal |
+| `registry-inmem-core/` | `casehub-platform-registry-inmem-core` | Framework-neutral volatile InMemoryRegistryService — ConcurrentHashMap entries, CopyOnWriteArrayList relationships/watchers. Consumer<RegistryEvent> for CDI event bridge. HeartbeatScheduler scans all entries cross-tenant, marks DOWN when lastHeartbeat + ttl expires (fires HEARTBEAT_EXPIRED), triggers cascade with configurable grace period via CascadeEngine. deregister() returns CascadeResult with cascade effects. Pure Java — no CDI, no Spring. No quarkus:build goal |
 | `registry-inmem/` | `casehub-platform-registry-inmem` | Quarkus CDI wiring for registry-inmem-core — RegistryInmemBeans (@Produces @Alternative @Priority(50) InMemoryRegistryService). Data lost on restart. Add test scope for @QuarkusTest isolation; compile scope for standalone installs. Do NOT combine with a JPA registry backend in same scope. No quarkus:build goal |
-| `registry-jpa-common/` | `casehub-platform-registry-jpa-common` | JPA entities (RegistryEntryEntity, RelationshipEntity, CascadeRuleEntity) + Flyway V1 (`classpath:db/registry/migration`) + framework-neutral JpaRegistryService POJO (constructor: EntityManager + Consumer<RegistryEvent>). Dual-core: shared by Quarkus and Spring JPA modules. No quarkus:build goal |
+| `registry-jpa-common/` | `casehub-platform-registry-jpa-common` | JPA entities (RegistryEntryEntity (orphanedAt), RelationshipEntity, CascadeRuleEntity (onSourceExpired, cascadeGracePeriodSeconds)) + Flyway V1+V2 (cascade_enforcement) (`classpath:db/registry/migration`) + framework-neutral JpaRegistryService POJO (constructor: EntityManager + Consumer<RegistryEvent>). deregister() returns CascadeResult via CascadeEngine. checkHeartbeats() fires HEARTBEAT_EXPIRED + cascade with grace period. Dual-core: shared by Quarkus and Spring JPA modules. No quarkus:build goal |
 | `registry-jpa/` | `casehub-platform-registry-jpa` | Quarkus CDI wiring for registry-jpa-common — RegistryJpaBeans (@Produces @Alternative @Priority(100) JpaRegistryService) + RegistryHeartbeatScheduler (@Scheduled 10s, @Transactional). Do NOT combine with registry-inmem in production scope. No quarkus:build goal |
 | `registry-spring-jpa/` | `casehub-platform-registry-spring-jpa` | Spring Boot auto-configuration for registry JPA — generated RegistryJpaAutoConfiguration from Quarkus @Produces via spring-generator + hand-written RegistryHeartbeatSchedulerConfig (@Scheduled 10s, @Transactional). @ConditionalOnBean guard. No quarkus:build goal |
 | `datasource-alpha/` | `casehub-platform-datasource-alpha` | Rete alpha network runtime — AlphaDataSource, TypeNode, FilterNode, FanOutProcessor. Shared by datasource-inmem and datasource-jpa. Pure runtime — no CDI, no persistence |
@@ -364,14 +364,17 @@ io.casehub.platform.api
                    EndpointCapability (enum: SEND/RECEIVE/QUERY/DISPATCH),
                    EndpointQuery (record: tenancyId, type, protocol, requiredCapabilities),
                    EndpointPropertyKeys (reserved cross-protocol property keys: URL, TOPIC, STREAM_EVENT_TYPE, STREAM_DATA_CONTENT_TYPE)
-  .registry      — RegistryService (SPI: register/heartbeat/deregister/resolve/discover/link/unlink/relationships/watch),
-                   RegistryEntry (record: id, type, namespace, tenancyId, metadata, registeredAt, lastHeartbeat, ttl, health — withHealth/withHeartbeat wither methods),
+  .registry      — RegistryService (SPI: register/heartbeat/deregister(→CascadeResult)/resolve/discover/link/unlink/relationships/watch),
+                   RegistryEntry (record: id, type, namespace, tenancyId, metadata, registeredAt, lastHeartbeat, ttl, health, orphanedAt — withHealth/withHeartbeat/withOrphaned wither methods, isOrphaned()),
                    Relationship (record: sourceId, targetId, type),
                    HealthStatus (enum: HEALTHY/DEGRADED/DOWN),
                    RegistryQuery (record: tenancyId, type, namespace — tenancyId required, type/namespace nullable wildcards),
-                   RegistryEvent (record: kind, entry, relationship — factory methods: registered/deregistered/healthChanged/heartbeatExpired/linked/unlinked),
+                   RegistryEvent (record: kind, entry, relationship — factory methods: registered/deregistered/healthChanged/heartbeatExpired/linked/unlinked/orphaned/cascadeNotified),
                    CascadeAction (enum: DEREGISTER/MARK_ORPHANED/NOTIFY/NONE),
-                   CascadeRule (record: relationshipType, onSourceDeregister — Stage 4 foundation type)
+                   CascadeRule (record: relationshipType, onSourceDeregister, onSourceExpired, cascadeGracePeriod — effectiveOnSourceExpired() fallback),
+                   CascadeResult (record: deregistered, cascadeEffects — return type of deregister(); simple()/empty() factories, hasFailures()),
+                   CascadeEffect (record: targetId, action, relationship, targetEntry, failure),
+                   CascadeEngine (pure Java cascade algorithm — cycle detection via visited set, depth limit, callback interfaces EntryResolver/RelationshipQuery/EntryMutator; shared by InMemory and JPA)
   .memory        — CaseMemoryStore (blocking SPI) + GraphCaseMemoryStore (graph-native extension: graphQuery(GraphMemoryQuery)),
                    MemoryCapability (enum: declared adapter capabilities), MemoryCapabilityException,
                    MemoryResultType (DEFAULT/FACTS), GraphMemoryQuery (graph-native query: tenantId, entityIds, domain,

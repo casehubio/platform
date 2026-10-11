@@ -16,7 +16,7 @@ class RegistryEntryTest {
         var entry = new RegistryEntry(
                 "fleet-1", "service", "default", "tenant-1",
                 Map.of(), Instant.now(), null, Duration.ofSeconds(30),
-                HealthStatus.HEALTHY);
+                HealthStatus.HEALTHY, null);
         assertThat(entry.id()).isEqualTo("fleet-1");
         assertThat(entry.type()).isEqualTo("service");
         assertThat(entry.namespace()).isEqualTo("default");
@@ -28,7 +28,7 @@ class RegistryEntryTest {
     void nullIdThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 null, "service", "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -36,7 +36,7 @@ class RegistryEntryTest {
     void nullTypeThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", null, "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -44,7 +44,7 @@ class RegistryEntryTest {
     void nullNamespaceThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", null, "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -52,7 +52,7 @@ class RegistryEntryTest {
     void nullTenancyIdThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", "default", null, Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -60,7 +60,7 @@ class RegistryEntryTest {
     void nullMetadataThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", "default", "t", null,
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -68,7 +68,7 @@ class RegistryEntryTest {
     void nullRegisteredAtThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                null, null, Duration.ofSeconds(30), HealthStatus.HEALTHY
+                null, null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -76,7 +76,7 @@ class RegistryEntryTest {
     void nullTtlThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                Instant.now(), null, null, HealthStatus.HEALTHY
+                Instant.now(), null, null, HealthStatus.HEALTHY, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -84,7 +84,7 @@ class RegistryEntryTest {
     void nullHealthThrows() {
         assertThatThrownBy(() -> new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), null
+                Instant.now(), null, Duration.ofSeconds(30), null, null
         )).isInstanceOf(NullPointerException.class);
     }
 
@@ -109,7 +109,7 @@ class RegistryEntryTest {
     @Test
     void registryEventDeregisteredFactory() {
         var entry = new RegistryEntry("e1", "service", "default", "t", Map.of(),
-                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY);
+                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null);
         var event = RegistryEvent.deregistered(entry);
         assertThat(event.kind()).isEqualTo(RegistryEvent.EventKind.DEREGISTERED);
         assertThat(event.entry()).isSameAs(entry);
@@ -118,7 +118,7 @@ class RegistryEntryTest {
     @Test
     void registryEventHealthChangedFactory() {
         var entry = new RegistryEntry("e1", "service", "default", "t", Map.of(),
-                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN);
+                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN, null);
         var event = RegistryEvent.healthChanged(entry);
         assertThat(event.kind()).isEqualTo(RegistryEvent.EventKind.HEALTH_CHANGED);
     }
@@ -126,7 +126,7 @@ class RegistryEntryTest {
     @Test
     void registryEventHeartbeatExpiredFactory() {
         var entry = new RegistryEntry("e1", "service", "default", "t", Map.of(),
-                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN);
+                                      Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN, null);
         var event = RegistryEvent.heartbeatExpired(entry);
         assertThat(event.kind()).isEqualTo(RegistryEvent.EventKind.HEARTBEAT_EXPIRED);
     }
@@ -146,7 +146,7 @@ class RegistryEntryTest {
         props.put("key", "value");
         var entry = new RegistryEntry(
                 "e1", "service", "default", "t", props,
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY);
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null);
         assertThatThrownBy(() -> entry.metadata().put("new", "val"))
                 .isInstanceOf(UnsupportedOperationException.class);
         props.put("mutated", "yes");
@@ -157,7 +157,7 @@ class RegistryEntryTest {
     void withHealthReturnsNewEntry() {
         var entry = new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY);
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null);
         var down = entry.withHealth(HealthStatus.DOWN);
         assertThat(down.health()).isEqualTo(HealthStatus.DOWN);
         assertThat(entry.health()).isEqualTo(HealthStatus.HEALTHY);
@@ -168,7 +168,7 @@ class RegistryEntryTest {
     void withHeartbeatSetsTimestampAndHealthy() {
         var entry = new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN);
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.DOWN, null);
         var now = Instant.now();
         var refreshed = entry.withHeartbeat(now);
         assertThat(refreshed.lastHeartbeat()).isEqualTo(now);
@@ -207,7 +207,7 @@ class RegistryEntryTest {
     void registryEventFactories() {
         var entry = new RegistryEntry(
                 "e1", "service", "default", "t", Map.of(),
-                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY);
+                Instant.now(), null, Duration.ofSeconds(30), HealthStatus.HEALTHY, null);
         var registered = RegistryEvent.registered(entry);
         assertThat(registered.kind()).isEqualTo(RegistryEvent.EventKind.REGISTERED);
         assertThat(registered.entry()).isSameAs(entry);

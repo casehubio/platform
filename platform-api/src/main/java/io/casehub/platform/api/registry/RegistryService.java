@@ -36,7 +36,7 @@ public interface RegistryService {
 
     void heartbeat(String id);
 
-    void deregister(String id);
+    CascadeResult deregister(String id);
 
     Optional<RegistryEntry> resolve(String id);
 

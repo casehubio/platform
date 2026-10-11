@@ -14,7 +14,8 @@ public record RegistryEntry(
         Instant registeredAt,
         Instant lastHeartbeat,
         Duration ttl,
-        HealthStatus health
+        HealthStatus health,
+        Instant orphanedAt
 ) {
     public RegistryEntry {
         Objects.requireNonNull(id, "id");
@@ -28,13 +29,22 @@ public record RegistryEntry(
         metadata = Map.copyOf(metadata);
     }
 
+    public boolean isOrphaned() {
+        return orphanedAt != null;
+    }
+
+    public RegistryEntry withOrphaned(Instant now) {
+        return new RegistryEntry(id, type, namespace, tenancyId,
+                metadata, registeredAt, lastHeartbeat, ttl, health, now);
+    }
+
     public RegistryEntry withHealth(HealthStatus newHealth) {
         return new RegistryEntry(id, type, namespace, tenancyId,
-                metadata, registeredAt, lastHeartbeat, ttl, newHealth);
+                metadata, registeredAt, lastHeartbeat, ttl, newHealth, orphanedAt);
     }
 
     public RegistryEntry withHeartbeat(Instant now) {
         return new RegistryEntry(id, type, namespace, tenancyId,
-                metadata, registeredAt, now, ttl, HealthStatus.HEALTHY);
+                metadata, registeredAt, now, ttl, HealthStatus.HEALTHY, orphanedAt);
     }
 }

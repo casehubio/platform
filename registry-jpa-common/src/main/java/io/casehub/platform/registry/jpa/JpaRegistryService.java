@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.registry.CascadeAction;
+import io.casehub.platform.api.registry.CascadeEffect;
+import io.casehub.platform.api.registry.CascadeEngine;
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.CascadeRule;
 import io.casehub.platform.api.registry.HealthStatus;
 import io.casehub.platform.api.registry.RegistryEntry;
@@ -15,10 +18,12 @@ import jakarta.persistence.EntityManager;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -27,9 +32,12 @@ public class JpaRegistryService implements RegistryService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, String>> MAP_TYPE = new TypeReference<>() {};
 
+    private static final int MAX_CASCADE_DEPTH = 10;
+
     private final EntityManager em;
     private final Consumer<RegistryEvent> eventSink;
     private final CopyOnWriteArrayList<WatchSubscription> watchers = new CopyOnWriteArrayList<>();
+    private final CascadeEngine cascadeEngine = new CascadeEngine();
 
     public JpaRegistryService(EntityManager em, Consumer<RegistryEvent> eventSink) {
         this.em = Objects.requireNonNull(em);
@@ -67,18 +75,30 @@ public class JpaRegistryService implements RegistryService {
     }
 
     @Override
-    public void deregister(String id) {
+    public CascadeResult deregister(String id) {
         var entity = em.find(RegistryEntryEntity.class, id);
-        if (entity != null) {
-            em.createQuery("DELETE FROM RelationshipEntity r WHERE r.sourceId = :id OR r.targetId = :id")
-                    .setParameter("id", id)
-                    .executeUpdate();
-            em.remove(entity);
-            var entry = toRegistryEntry(entity);
-            var event = RegistryEvent.deregistered(entry);
-            eventSink.accept(event);
-            notifyWatchers(event);
+        if (entity == null) return CascadeResult.empty();
+
+        var rules = cascadeRules();
+        var effects = List.<CascadeEffect>of();
+        if (!rules.isEmpty()) {
+            effects = cascadeEngine.applyCascade(id, rules,
+                    CascadeRule::onSourceDeregister,
+                    this::resolve,
+                    this::outboundRelationships,
+                    jpaMutator(),
+                    eventSink, new HashSet<>(Set.of(id)), MAX_CASCADE_DEPTH);
         }
+
+        em.createQuery("DELETE FROM RelationshipEntity r WHERE r.sourceId = :id OR r.targetId = :id")
+                .setParameter("id", id)
+                .executeUpdate();
+        em.remove(entity);
+        var entry = toRegistryEntry(entity);
+        var event = RegistryEvent.deregistered(entry);
+        eventSink.accept(event);
+        notifyWatchers(event);
+        return new CascadeResult(entry, effects);
     }
 
     @Override
@@ -150,6 +170,8 @@ public class JpaRegistryService implements RegistryService {
             entity.relationshipType = rule.relationshipType();
         }
         entity.onSourceDeregister = rule.onSourceDeregister().name();
+        entity.onSourceExpired = rule.onSourceExpired() != null ? rule.onSourceExpired().name() : null;
+        entity.cascadeGracePeriodSeconds = rule.cascadeGracePeriod() != null ? rule.cascadeGracePeriod().toSeconds() : null;
         em.merge(entity);
     }
 
@@ -158,12 +180,17 @@ public class JpaRegistryService implements RegistryService {
         return em.createQuery("SELECT c FROM CascadeRuleEntity c", CascadeRuleEntity.class)
                 .getResultList()
                 .stream()
-                .map(c -> new CascadeRule(c.relationshipType, CascadeAction.valueOf(c.onSourceDeregister)))
+                .map(c -> new CascadeRule(
+                        c.relationshipType,
+                        CascadeAction.valueOf(c.onSourceDeregister),
+                        c.onSourceExpired != null ? CascadeAction.valueOf(c.onSourceExpired) : null,
+                        c.cascadeGracePeriodSeconds != null ? Duration.ofSeconds(c.cascadeGracePeriodSeconds) : null))
                 .toList();
     }
 
     public void checkHeartbeats() {
         var now = Instant.now();
+        var rules = cascadeRules();
         var entries = em.createQuery(
                         "SELECT e FROM RegistryEntryEntity e WHERE e.health <> :down", RegistryEntryEntity.class)
                 .setParameter("down", HealthStatus.DOWN.name())
@@ -174,11 +201,78 @@ public class JpaRegistryService implements RegistryService {
                 entity.health = HealthStatus.DOWN.name();
                 em.merge(entity);
                 var entry = toRegistryEntry(entity);
-                var event = RegistryEvent.healthChanged(entry);
+                var event = RegistryEvent.heartbeatExpired(entry);
                 eventSink.accept(event);
                 notifyWatchers(event);
+                if (!rules.isEmpty()) {
+                    applyCascadeIfGraceElapsed(entry, rules, now);
+                }
             }
         }
+        var downEntries = em.createQuery(
+                        "SELECT e FROM RegistryEntryEntity e WHERE e.health = :down", RegistryEntryEntity.class)
+                .setParameter("down", HealthStatus.DOWN.name())
+                .getResultList();
+        if (!rules.isEmpty()) {
+            for (var entity : downEntries) {
+                applyCascadeIfGraceElapsed(toRegistryEntry(entity), rules, now);
+            }
+        }
+    }
+
+    private void applyCascadeIfGraceElapsed(RegistryEntry entry, List<CascadeRule> rules, Instant now) {
+        var downSince = (entry.lastHeartbeat() != null ? entry.lastHeartbeat() : entry.registeredAt())
+                .plus(entry.ttl());
+        for (var rule : rules) {
+            if (rule.cascadeGracePeriod() != null && now.isBefore(downSince.plus(rule.cascadeGracePeriod()))) {
+                continue;
+            }
+            var outbound = outboundRelationships(entry.id());
+            if (outbound.stream().noneMatch(r -> r.type().equals(rule.relationshipType()))) continue;
+
+            cascadeEngine.applyCascade(entry.id(), List.of(rule),
+                    CascadeRule::effectiveOnSourceExpired,
+                    this::resolve,
+                    this::outboundRelationships,
+                    jpaMutator(),
+                    eventSink, new HashSet<>(Set.of(entry.id())), MAX_CASCADE_DEPTH);
+        }
+    }
+
+
+    private List<Relationship> outboundRelationships(String sourceId) {
+        return em.createQuery(
+                         "SELECT r FROM RelationshipEntity r WHERE r.sourceId = :id",
+                         RelationshipEntity.class)
+                 .setParameter("id", sourceId)
+                 .getResultList()
+                 .stream()
+                 .map(r -> new Relationship(r.sourceId, r.targetId, r.type))
+                 .toList();
+    }
+
+    private CascadeEngine.EntryMutator jpaMutator() {
+        return new CascadeEngine.EntryMutator() {
+            @Override
+            public void deregister(String id) {
+                var entity = em.find(RegistryEntryEntity.class, id);
+                if (entity != null) {
+                    em.createQuery("DELETE FROM RelationshipEntity r WHERE r.sourceId = :id OR r.targetId = :id")
+                      .setParameter("id", id)
+                      .executeUpdate();
+                    em.remove(entity);
+                }
+            }
+
+            @Override
+            public void markOrphaned(String id, Instant now) {
+                var entity = em.find(RegistryEntryEntity.class, id);
+                if (entity != null && entity.orphanedAt == null) {
+                    entity.orphanedAt = now;
+                    em.merge(entity);
+                }
+            }
+        };
     }
 
     private RegistryEntry toRegistryEntry(RegistryEntryEntity entity) {
@@ -187,7 +281,8 @@ public class JpaRegistryService implements RegistryService {
                 deserializeMetadata(entity.metadata),
                 entity.registeredAt, entity.lastHeartbeat,
                 Duration.ofSeconds(entity.ttlSeconds),
-                HealthStatus.valueOf(entity.health));
+                HealthStatus.valueOf(entity.health),
+                entity.orphanedAt);
     }
 
     private String serializeMetadata(Map<String, String> metadata) {

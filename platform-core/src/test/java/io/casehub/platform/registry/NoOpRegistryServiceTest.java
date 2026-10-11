@@ -1,6 +1,7 @@
 package io.casehub.platform.registry;
 
 import io.casehub.platform.api.registry.CascadeAction;
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.CascadeRule;
 import io.casehub.platform.api.registry.HealthStatus;
 import io.casehub.platform.api.registry.RegistryEntry;
@@ -25,7 +26,7 @@ class NoOpRegistryServiceTest {
     private RegistryEntry entry(String id, String type) {
         return new RegistryEntry(id, type, "default", "tenant-1",
                 Map.of(), Instant.now(), null, Duration.ofSeconds(30),
-                HealthStatus.HEALTHY);
+                HealthStatus.HEALTHY, null);
     }
 
     @Test
@@ -46,8 +47,9 @@ class NoOpRegistryServiceTest {
     }
 
     @Test
-    void deregisterNoOp() {
-        assertThatNoException().isThrownBy(() -> registry.deregister("e1"));
+    void deregisterReturnsEmpty() {
+        var result = registry.deregister("e1");
+        assertThat(result).isEqualTo(CascadeResult.empty());
     }
 
     @Test

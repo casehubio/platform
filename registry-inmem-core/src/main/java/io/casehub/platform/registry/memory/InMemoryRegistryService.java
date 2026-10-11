@@ -1,5 +1,8 @@
 package io.casehub.platform.registry.memory;
 
+import io.casehub.platform.api.registry.CascadeEffect;
+import io.casehub.platform.api.registry.CascadeEngine;
+import io.casehub.platform.api.registry.CascadeResult;
 import io.casehub.platform.api.registry.CascadeRule;
 import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryEvent;
@@ -8,9 +11,11 @@ import io.casehub.platform.api.registry.RegistryService;
 import io.casehub.platform.api.registry.Relationship;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -21,8 +26,9 @@ public class InMemoryRegistryService implements RegistryService {
     private final CopyOnWriteArrayList<Relationship> relationships = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<WatchSubscription> watchers = new CopyOnWriteArrayList<>();
     private final Consumer<RegistryEvent> cdiEventSink;
-    private final ConcurrentHashMap<String, CascadeRule> cascadeRules = new ConcurrentHashMap<>();
-
+    private final        ConcurrentHashMap<String, CascadeRule> cascadeRules      = new ConcurrentHashMap<>();
+    private final        CascadeEngine                          cascadeEngine     = new CascadeEngine();
+    private static final int                                    MAX_CASCADE_DEPTH = 10;
 
     public InMemoryRegistryService(Consumer<RegistryEvent> cdiEventSink) {
         this.cdiEventSink = Objects.requireNonNull(cdiEventSink);
@@ -42,15 +48,31 @@ public class InMemoryRegistryService implements RegistryService {
     }
 
     @Override
-    public void deregister(String id) {
+    public CascadeResult deregister(String id) {
         var removed = entries.remove(id);
-        if (removed != null) {
-            relationships.removeIf(r ->
-                    r.sourceId().equals(id) || r.targetId().equals(id));
-            var event = RegistryEvent.deregistered(removed);
-            cdiEventSink.accept(event);
-            notifyWatchers(event);
+        if (removed == null) return CascadeResult.empty();
+
+        var rules = List.copyOf(cascadeRules.values());
+        var effects = List.<CascadeEffect>of();
+        if (!rules.isEmpty()) {
+            effects = cascadeEngine.applyCascade(id, rules,
+                    CascadeRule::onSourceDeregister,
+                    k -> Optional.ofNullable(entries.get(k)),
+                    this::outboundRelationships,
+                    new CascadeEngine.EntryMutator() {
+                        @Override public void deregister(String tid) { entries.remove(tid); }
+                        @Override public void markOrphaned(String tid, Instant now) {
+                            entries.computeIfPresent(tid, (k, e) -> e.withOrphaned(now));
+                        }
+                    },
+                    cdiEventSink, new HashSet<>(Set.of(id)), MAX_CASCADE_DEPTH);
         }
+
+        relationships.removeIf(r -> r.sourceId().equals(id) || r.targetId().equals(id));
+        var event = RegistryEvent.deregistered(removed);
+        cdiEventSink.accept(event);
+        notifyWatchers(event);
+        return new CascadeResult(removed, effects);
     }
 
     @Override
@@ -111,6 +133,12 @@ public class InMemoryRegistryService implements RegistryService {
         return List.copyOf(entries.values());
     }
 
+    List<Relationship> outboundRelationships(String sourceId) {
+        return relationships.stream()
+                            .filter(r -> r.sourceId().equals(sourceId)).toList();
+    }
+
+
     void updateEntry(RegistryEntry entry) {
         var previous = entries.put(entry.id(), entry);
         if (previous != null && previous.health() != entry.health()) {
@@ -119,6 +147,11 @@ public class InMemoryRegistryService implements RegistryService {
             notifyWatchers(event);
         }
     }
+
+    void updateEntryForExpiry(RegistryEntry entry) {
+        entries.put(entry.id(), entry);
+    }
+
 
     private void notifyWatchers(RegistryEvent event) {
         for (var sub : watchers) {

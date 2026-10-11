@@ -1,8 +1,11 @@
 package io.casehub.platform.registry.memory;
 
+import io.casehub.platform.api.registry.CascadeAction;
+import io.casehub.platform.api.registry.CascadeRule;
 import io.casehub.platform.api.registry.HealthStatus;
 import io.casehub.platform.api.registry.RegistryEntry;
 import io.casehub.platform.api.registry.RegistryEvent;
+import io.casehub.platform.api.registry.Relationship;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,13 +25,13 @@ class HeartbeatSchedulerTest {
     @BeforeEach
     void setUp() {
         registry = new InMemoryRegistryService(events::add);
-        scheduler = new HeartbeatScheduler(registry);
+        scheduler = new HeartbeatScheduler(registry, events::add);
         events.clear();
     }
 
     private RegistryEntry entryWithTtl(String id, Duration ttl, Instant lastHeartbeat) {
         return new RegistryEntry(id, "service", "default", "tenant-1",
-                Map.of(), Instant.now(), lastHeartbeat, ttl, HealthStatus.HEALTHY);
+                Map.of(), Instant.now(), lastHeartbeat, ttl, HealthStatus.HEALTHY, null);
     }
 
     @Test
@@ -51,14 +54,14 @@ class HeartbeatSchedulerTest {
     }
 
     @Test
-    void expiredEntryFiresHealthChangedEvent() {
+    void expiredEntryFiresHeartbeatExpiredEvent() {
         var entry = entryWithTtl("svc-1", Duration.ofSeconds(1),
                 Instant.now().minus(Duration.ofSeconds(5)));
         registry.register(entry);
         events.clear();
         scheduler.checkHeartbeats();
         assertThat(events).anyMatch(e ->
-                e.kind() == RegistryEvent.EventKind.HEALTH_CHANGED
+                e.kind() == RegistryEvent.EventKind.HEARTBEAT_EXPIRED
                         && e.entry().id().equals("svc-1"));
     }
 
@@ -66,7 +69,7 @@ class HeartbeatSchedulerTest {
     void nullHeartbeatUsesRegisteredAt() {
         var longAgo = Instant.now().minus(Duration.ofSeconds(60));
         var entry = new RegistryEntry("svc-1", "service", "default", "tenant-1",
-                Map.of(), longAgo, null, Duration.ofSeconds(5), HealthStatus.HEALTHY);
+                Map.of(), longAgo, null, Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
         registry.register(entry);
         events.clear();
         scheduler.checkHeartbeats();
@@ -101,10 +104,10 @@ class HeartbeatSchedulerTest {
     void crossTenantScan() {
         var t1 = new RegistryEntry("svc-t1", "service", "default", "tenant-1",
                 Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
-                Duration.ofSeconds(5), HealthStatus.HEALTHY);
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
         var t2 = new RegistryEntry("svc-t2", "service", "default", "tenant-2",
                 Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
-                Duration.ofSeconds(5), HealthStatus.HEALTHY);
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
         registry.register(t1);
         registry.register(t2);
         events.clear();
@@ -117,10 +120,73 @@ class HeartbeatSchedulerTest {
     void degradedEntryMarkedDownWhenExpired() {
         var entry = new RegistryEntry("svc-1", "service", "default", "tenant-1",
                                       Map.of(), Instant.now(), Instant.now().minus(Duration.ofSeconds(10)),
-                                      Duration.ofSeconds(5), HealthStatus.DEGRADED);
+                                      Duration.ofSeconds(5), HealthStatus.DEGRADED, null);
         registry.register(entry);
         events.clear();
         scheduler.checkHeartbeats();
         assertThat(registry.resolve("svc-1").get().health()).isEqualTo(HealthStatus.DOWN);
+    }
+
+    // --- TTL cascade ---
+
+    @Test
+    void ttlExpiry_cascadesDeregisterWithNoGracePeriod() {
+        var source = new RegistryEntry("src", "app", "ns", "tenant-1",
+                Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
+        var target = new RegistryEntry("tgt", "pool", "ns", "tenant-1",
+                Map.of(), Instant.now(), null, Duration.ofSeconds(300),
+                HealthStatus.HEALTHY, null);
+        registry.register(source);
+        registry.register(target);
+        registry.link(new Relationship("src", "tgt", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns",
+                CascadeAction.DEREGISTER, CascadeAction.DEREGISTER, null));
+
+        scheduler.checkHeartbeats();
+
+        assertThat(registry.resolve("tgt")).isEmpty();
+    }
+
+    @Test
+    void ttlExpiry_respectsGracePeriod() {
+        var source = new RegistryEntry("src", "app", "ns", "tenant-1",
+                Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
+        var target = new RegistryEntry("tgt", "pool", "ns", "tenant-1",
+                Map.of(), Instant.now(), null, Duration.ofSeconds(300),
+                HealthStatus.HEALTHY, null);
+        registry.register(source);
+        registry.register(target);
+        registry.link(new Relationship("src", "tgt", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns",
+                CascadeAction.DEREGISTER, CascadeAction.DEREGISTER,
+                Duration.ofMinutes(5)));
+
+        scheduler.checkHeartbeats();
+
+        assertThat(registry.resolve("src").get().health()).isEqualTo(HealthStatus.DOWN);
+        assertThat(registry.resolve("tgt")).isPresent();
+    }
+
+    @Test
+    void ttlExpiry_usesOnSourceExpiredAction() {
+        var source = new RegistryEntry("src", "app", "ns", "tenant-1",
+                Map.of(), Instant.now().minus(Duration.ofSeconds(60)), null,
+                Duration.ofSeconds(5), HealthStatus.HEALTHY, null);
+        var target = new RegistryEntry("tgt", "pool", "ns", "tenant-1",
+                Map.of(), Instant.now(), null, Duration.ofSeconds(300),
+                HealthStatus.HEALTHY, null);
+        registry.register(source);
+        registry.register(target);
+        registry.link(new Relationship("src", "tgt", "owns"));
+        registry.registerCascadeRule(new CascadeRule("owns",
+                CascadeAction.DEREGISTER, CascadeAction.MARK_ORPHANED, null));
+        events.clear();
+
+        scheduler.checkHeartbeats();
+
+        assertThat(registry.resolve("tgt")).isPresent()
+                .hasValueSatisfying(e -> assertThat(e.isOrphaned()).isTrue());
     }
 }

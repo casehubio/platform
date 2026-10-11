@@ -9,7 +9,8 @@ public record RegistryEvent(
 ) {
     public enum EventKind {
         REGISTERED, DEREGISTERED, HEALTH_CHANGED,
-        HEARTBEAT_EXPIRED, LINKED, UNLINKED
+        HEARTBEAT_EXPIRED, LINKED, UNLINKED,
+        ORPHANED, CASCADE_NOTIFIED
     }
 
     public RegistryEvent {
@@ -38,5 +39,13 @@ public record RegistryEvent(
 
     public static RegistryEvent unlinked(Relationship rel) {
         return new RegistryEvent(EventKind.UNLINKED, null, rel);
+    }
+
+    public static RegistryEvent orphaned(RegistryEntry entry) {
+        return new RegistryEvent(EventKind.ORPHANED, entry, null);
+    }
+
+    public static RegistryEvent cascadeNotified(RegistryEntry entry, Relationship rel) {
+        return new RegistryEvent(EventKind.CASCADE_NOTIFIED, entry, rel);
     }
 }

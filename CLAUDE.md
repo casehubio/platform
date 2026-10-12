@@ -238,13 +238,15 @@ io.casehub.platform.api
                    AclPage (record: List<ResourceId> resourceIds, nextCursor — paginated accessibleResources result),
                    AccessDeniedException (extends SecurityException: actorId, ResourceId resourceId, action),
                    ResourceId (record: type, id — structured resource identifier with parse/toString, colon-delimited),
-                   WorkerAction (record: name, AclAction aclAction — extensible action type, domains define constants),
+                   ConsentTier (enum: AUTO/CONFIRM/APPROVE_WITH_DETAILS/DENY — inherent risk level of worker action),
+                   ConsentOutcome (enum: APPROVED/NEEDS_CONFIRMATION/NEEDS_APPROVAL/DENIED — policy evaluation result),
+                   WorkerAction (record: name, AclAction aclAction, ConsentTier defaultTier — extensible action type with consent tier; backward-compat two-arg constructor defaults to AUTO; built-in: READ_CONTEXT, SIGNAL_CASE, SEARCH, ADD_TO_CART, BOOK_CANCELLABLE, PURCHASE, BOOK_NON_REFUNDABLE),
                    WorkerAuthorizationContext (marker interface — domains implement with their own fields),
                    WorkerAuthorizationPolicy (SPI: evaluate(WorkerPermissionRequest) → AuthorizationDecision, default: approve),
                    WorkerPermissionRequest (record: actorId, resourceType, Set<WorkerAction> actions, WorkerAuthorizationContext context, tenancyId),
                    WorkerCredential (record: token, actorId, ResourceId resourceId, tenancyId, Set<WorkerAction> actions, expiresAt, createdAt),
                    WorkerCredentialStore (SPI: store/lookup/revoke/revokeByResource/revokeByActor/findActiveByActorAndResource — no-op defaults),
-                   AuthorizationDecision (record: approved, reason — approve()/deny(String) factories),
+                   AuthorizationDecision (record: ConsentOutcome outcome, reason — approve()/deny(String)/needsConfirmation(String)/needsApproval(String) factories, approved() backward-compat convenience),
                    WorkerAuthorizationDeniedException (extends SecurityException: actorId, definitionId, reason)
   .actor         — ActorStateContributor (SPI: contribute data to a unified actor state view, @ApplicationScoped),
                    ActorStateAccumulator (visitor: trustScore, capabilityScore, capacity — assembled concurrently by aggregator)

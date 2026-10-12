@@ -106,6 +106,11 @@ observability
 # Hand-written Spring Boot Actuator integration (no generator equivalent, IS the Spring module)
 spring-actuator
 
+# Pure HTTP client — no CDI beans, framework-agnostic by design
+registry-client
+# Quarkus CDI wiring for registry-client — Spring equivalent not yet built
+registry-client-quarkus
+
 # YAML build-time/runtime modules — no CDI beans
 yaml-codegen
 # YAML Jackson mixins — no CDI beans

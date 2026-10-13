@@ -9,6 +9,7 @@ import io.casehub.yaml.core.orchestration.OrcSemaphore;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.RetryDirective;
+import io.casehub.yaml.core.orchestration.ChannelClosedException;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -16,6 +17,7 @@ import io.casehub.yaml.plugin.api.Result;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.concurrent.locks.LockSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -467,7 +469,7 @@ public final class DecoratorChain {
                     return Result.of(Map.of("from.stream-ended", true));
                 }
                 if (handle != null && !handle.isRunning()) {
-                    java.util.concurrent.locks.LockSupport.park();
+                    LockSupport.park();
                     if (Thread.interrupted()) {
                         return Result.of(Map.of("from.stream-ended", true));
                     }
@@ -498,7 +500,7 @@ public final class DecoratorChain {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return Result.failed("from channel '" + channelName + "' receive interrupted");
-                } catch (io.casehub.yaml.core.orchestration.ChannelClosedException e) {
+                } catch (ChannelClosedException e) {
                     return Result.failed("channel '" + channelName + "' closed: " + (e.getCause() != null ? e.getCause().getMessage() : "error"));
                 }
 
@@ -547,7 +549,7 @@ public final class DecoratorChain {
                     return Result.of(Map.of("from.stream-ended", true));
                 }
                 if (handle != null && !handle.isRunning()) {
-                    java.util.concurrent.locks.LockSupport.park();
+                    LockSupport.park();
                     if (Thread.interrupted()) {
                         return Result.of(Map.of("from.stream-ended", true));
                     }
@@ -574,6 +576,8 @@ public final class DecoratorChain {
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return Result.failed("from fan-in receive interrupted");
+                    } catch (ChannelClosedException e) {
+                        continue;
                     }
                     if (item != null) {break;}
                 }

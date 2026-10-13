@@ -1,7 +1,6 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
-import io.casehub.yaml.core.orchestration.ConsumerHandle;
 import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
@@ -392,8 +391,8 @@ public final class StructuralStepEvaluator {
         if (scope == null) {
             return Result.failed("'pause'/'resume' requires an ExecutionScope");
         }
-        ConsumerHandle handle =
-                scope.primitive(control.target(), ConsumerHandle.class);
+        io.casehub.yaml.core.orchestration.ConsumerHandle handle =
+                scope.primitive(control.target(), io.casehub.yaml.core.orchestration.ConsumerHandle.class);
         if (handle == null) {
             return Result.failed("Consumer '" + control.target() + "' not found");
         }

@@ -1486,6 +1486,167 @@ class StructuralStepEvaluatorTest {
                 assertThat(result.isSuccess()).isTrue();
                 assertThat(result.output().get("on-error.fallback")).isEqualTo("race-timeout");
             }
+    }
+
+    private ResolvedStep namedLeaf(String name) {
+        return new ResolvedStep.InvokeStep(name, Map.of("id", name), Map.of());
+    }
+
+// ── ParallelPolicyTests ────────────────────────────────────────
+
+    @Nested
+    class ParallelPolicyTests {
+
+        private DefaultExecutionScope   testScope;
+        private StructuralStepEvaluator scopedEval;
+
+        @BeforeEach
+        void setUp() {
+            testScope  = new DefaultExecutionScope();
+            scopedEval = new StructuralStepEvaluator(new ConditionEvaluator(null), testScope);
+        }
+
+        @Test
+        void discriminator_advancesOnFirstSuccess() {
+            var slowLatch = new CountDownLatch(1);
+            var step = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("fast"), namedLeaf("slow")),
+                    1, false, null, Map.of());
+
+            var result = scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    try {slowLatch.await(5, TimeUnit.SECONDS);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return Result.of(Map.of("slow", true));
+                }
+                return Result.of(Map.of("fast", true));
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("fast", true);
+            slowLatch.countDown();
+        }
+
+        @Test
+        void discriminator_remainingStepsContinue() throws InterruptedException {
+            var slowStarted    = new CountDownLatch(1);
+            var slowCanProceed = new CountDownLatch(1);
+            var slowCompleted  = new CountDownLatch(1);
+            var step = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("fast"), namedLeaf("slow")),
+                    1, false, null, Map.of());
+
+            scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    slowStarted.countDown();
+                    try {slowCanProceed.await(5, TimeUnit.SECONDS);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Result.failed("interrupted");
+                    }
+                    slowCompleted.countDown();
+                    return Result.of(Map.of("slow", true));
+                }
+                return Result.of(Map.of("fast", true));
+            });
+
+            assertThat(slowStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            slowCanProceed.countDown();
+            assertThat(slowCompleted.await(2, TimeUnit.SECONDS)).isTrue();
+        }
+
+        @Test
+        void race_cancelsRemainingAfterFirst() throws InterruptedException {
+            var interrupted = new java.util.concurrent.atomic.AtomicBoolean(false);
+            var step = new ResolvedStep.ParallelStep(
+                    "race", List.of(namedLeaf("fast"), namedLeaf("slow")),
+                    1, true, null, Map.of());
+
+            scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    try {Thread.sleep(5000);} catch (InterruptedException e) {
+                        interrupted.set(true);
+                        Thread.currentThread().interrupt();
+                    }
+                    return Result.of(Map.of());
+                }
+                return Result.of(Map.of("fast", true));
+            });
+
+            Thread.sleep(500);
+            assertThat(interrupted.get()).isTrue();
+        }
+
+        @Test
+        void unreachableThreshold_returnsFailed() {
+            var step = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("a"), namedLeaf("b"), namedLeaf("c")),
+                    2, false, null, Map.of());
+
+            var result = scopedEval.evaluate(step, resolver, (s, r) ->
+                                                                     Result.failed("always fail"));
+
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void failureDoesNotCountTowardAdvancement() {
+            var step = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("fail"), namedLeaf("ok")),
+                    1, false, null, Map.of());
+
+            var result = scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "fail".equals(inv.invokeSpec().get("id"))) {
+                    return Result.failed("boom");
+                }
+                return Result.of(Map.of("winner", true));
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.output()).containsEntry("winner", true);
+        }
+
+        @Test
+        void defaultAdvanceAfter_usesExistingPath() {
+            var step = new ResolvedStep.ParallelStep(
+                    null, List.of(leaf("a"), leaf("b")), Map.of());
+            var result = scopedEval.evaluate(step, resolver,
+                                             successRunner(Map.of("ok", true)));
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void barrierAwaitsCompletionLatch() throws InterruptedException {
+            var parallel = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("fast"), namedLeaf("slow")),
+                    1, false, null, Map.of());
+            var barrier = new ResolvedStep.BarrierStep(
+                    "wait", List.of("disc"), null, Map.of());
+            var block = new ResolvedStep.BlockStep(null,
+                                                   List.of(parallel, barrier), Map.of());
+
+            scopedEval.preRegisterLatches(List.of(block));
+
+            var slowDone = new CountDownLatch(1);
+            var result = scopedEval.evaluate(block, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    try {Thread.sleep(200);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Result.failed("interrupted");
+                    }
+                    slowDone.countDown();
+                    return Result.of(Map.of("slow", true));
+                }
+                return Result.of(Map.of("fast", true));
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(slowDone.getCount()).isZero();
         }
     }
 }

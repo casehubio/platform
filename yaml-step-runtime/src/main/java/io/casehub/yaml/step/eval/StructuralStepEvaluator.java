@@ -394,6 +394,17 @@ public final class StructuralStepEvaluator {
 
         Result advancingResult = tracker.advancingResult().get();
 
+        if (!parallel.cancelRemaining() && parallel.collectionTimeout() != null) {
+            scope.spawn(latchPrefix + ":collection-deadline", () -> {
+                try {
+                    long millis = parallel.collectionTimeout().toMillis();
+                    completionLatch.await(millis, java.util.concurrent.TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+
         if (!parallel.cancelRemaining()) {
             scope.spawn(latchPrefix + ":completion-watcher", () -> {
                 try {

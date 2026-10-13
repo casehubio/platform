@@ -394,15 +394,17 @@ public final class StructuralStepEvaluator {
 
         Result advancingResult = tracker.advancingResult().get();
 
-        scope.spawn(latchPrefix + ":completion-watcher", () -> {
-            try {
-                completionLatch.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            recordResult(parallel.name(), advancingResult != null ? advancingResult : Result.of(Map.of()));
-        });
+        if (!parallel.cancelRemaining()) {
+            scope.spawn(latchPrefix + ":completion-watcher", () -> {
+                try {
+                    completionLatch.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                recordResult(parallel.name(), advancingResult != null ? advancingResult : Result.of(Map.of()));
+            });
+        }
 
         return advancingResult != null ? advancingResult : Result.of(Map.of());
     }

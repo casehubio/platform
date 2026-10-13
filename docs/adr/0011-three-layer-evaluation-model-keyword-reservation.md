@@ -32,9 +32,9 @@ The YAML language has three evaluation layers, each owning distinct keywords:
 
 | Layer | Keywords | Evaluation model | Scope |
 |-------|----------|------------------|-------|
-| Imperative (steps) | `if`, `match/cases` | Once, at execution point | yaml-core, yaml-step-runtime |
+| Imperative (steps) | `if`, `match/cases`, `from` | Once, at execution point | yaml-core, yaml-step-runtime |
 | Reactive (bindings) | `when`, `on: contextChange` | Fires when context changes | casehub-engine |
-| Rules (future) | TBD — must not reuse `match`, `when`, or `if` | Continuous, temporal, Rete/PHREAK | TBD |
+| Rules (future) | TBD — must not reuse `match`, `when`, `if`, or `from` | Continuous, temporal, Rete/PHREAK | TBD |
 
 **Reserved keywords per layer:**
 
@@ -61,6 +61,10 @@ The YAML language has three evaluation layers, each owning distinct keywords:
 * **`background`** — imperative only. Decorator that spawns the step via
   `scope.spawn()` and returns immediately. Spawned task is scope-bounded — cancelled
   when the enclosing scope closes. Added by #563.
+* **`from`** — imperative only. Channel source decorator that reads one item per step
+  invocation from an `OrcChannel`. Supports single channel, fan-in (multiple channels),
+  alias, and pre-filter. Injects received item into step context as `${from.*}` or
+  `${alias.*}`. Added in #564.
 * **Rules keywords** — must be distinct from all of the above. Candidates should be
   evaluated in the rules engine design phase, not pre-reserved here.
 

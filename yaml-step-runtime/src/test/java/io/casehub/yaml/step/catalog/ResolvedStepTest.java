@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ResolvedStepTest {
 
@@ -85,4 +86,69 @@ class ResolvedStepTest {
         assertThat(List.of(plugin, invoke, block, ifElse, match, parallel))
                 .allSatisfy(s -> assertThat(s).isInstanceOf(ResolvedStep.class));
     }
+
+    private ResolvedStep leaf(String id) {
+        return new ResolvedStep.InvokeStep(null, Map.of("id", id), Map.of());
+    }
+
+    @Test
+    void parallelStep_defaultPolicyFields() {
+        var steps = List.<ResolvedStep>of(leaf("a"), leaf("b"));
+        var parallel = new ResolvedStep.ParallelStep(
+                null, steps, steps.size(), false, null, Map.of());
+        assertThat(parallel.advanceAfter()).isEqualTo(2);
+        assertThat(parallel.cancelRemaining()).isFalse();
+        assertThat(parallel.collectionTimeout()).isNull();
+    }
+
+    @Test
+    void parallelStep_discriminatorPolicy() {
+        var steps = List.<ResolvedStep>of(leaf("a"), leaf("b"), leaf("c"));
+        var parallel = new ResolvedStep.ParallelStep(
+                null, steps, 1, false, null, Map.of());
+        assertThat(parallel.advanceAfter()).isEqualTo(1);
+        assertThat(parallel.cancelRemaining()).isFalse();
+    }
+
+    @Test
+    void parallelStep_racePolicy() {
+        var steps = List.<ResolvedStep>of(leaf("a"), leaf("b"));
+        var parallel = new ResolvedStep.ParallelStep(
+                null, steps, 1, true, null, Map.of());
+        assertThat(parallel.cancelRemaining()).isTrue();
+    }
+
+    @Test
+    void parallelStep_collectionTimeout() {
+        var steps = List.<ResolvedStep>of(leaf("a"), leaf("b"));
+        var parallel = new ResolvedStep.ParallelStep(
+                null, steps, 1, false, java.time.Duration.ofSeconds(30), Map.of());
+        assertThat(parallel.collectionTimeout()).isEqualTo(java.time.Duration.ofSeconds(30));
+    }
+
+    @Test
+    void parallelStep_advanceAfterExceedsSteps_throws() {
+        var steps = List.<ResolvedStep>of(leaf("a"));
+        assertThatThrownBy(() -> new ResolvedStep.ParallelStep(
+                null, steps, 5, false, null, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parallelStep_advanceAfterZero_throws() {
+        var steps = List.<ResolvedStep>of(leaf("a"));
+        assertThatThrownBy(() -> new ResolvedStep.ParallelStep(
+                null, steps, 0, false, null, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parallelStep_legacyConstructor_setsDefaults() {
+        var steps    = List.<ResolvedStep>of(leaf("a"), leaf("b"));
+        var parallel = new ResolvedStep.ParallelStep(null, steps, Map.of());
+        assertThat(parallel.advanceAfter()).isEqualTo(2);
+        assertThat(parallel.cancelRemaining()).isFalse();
+        assertThat(parallel.collectionTimeout()).isNull();
+    }
+
 }

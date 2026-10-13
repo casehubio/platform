@@ -1648,5 +1648,74 @@ class StructuralStepEvaluatorTest {
             assertThat(result.isSuccess()).isTrue();
             assertThat(slowDone.getCount()).isZero();
         }
+
+        @Test
+        void singleStepWithAdvanceAfterOne_immediateAdvancement() {
+            var step = new ResolvedStep.ParallelStep(
+                    "single", List.of(namedLeaf("a")),
+                    1, false, null, Map.of());
+            var result = scopedEval.evaluate(step, resolver,
+                                             successRunner(Map.of("done", true)));
+            assertThat(result.isSuccess()).isTrue();
+        }
+
+        @Test
+        void resultStore_populatedByBranches() throws InterruptedException {
+            var step = new ResolvedStep.ParallelStep(
+                    "disc",
+                    List.of(namedLeaf("fast"), namedLeaf("slow")),
+                    1, false, null, Map.of());
+
+            scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "slow".equals(inv.invokeSpec().get("id"))) {
+                    try {Thread.sleep(100);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                return Result.of(Map.of("step", ((ResolvedStep.InvokeStep) s).invokeSpec().get("id")));
+            });
+
+            Thread.sleep(500);
+            var store = testScope.resultStore();
+            assertThat(store.hasCompleted("fast")).isTrue();
+            assertThat(store.hasCompleted("slow")).isTrue();
+        }
+
+        @Test
+        void quorumContinue_advancesOnN_restContinues() throws InterruptedException {
+            var thirdCompleted = new CountDownLatch(1);
+            var step = new ResolvedStep.ParallelStep(
+                    "qc", List.of(namedLeaf("a"), namedLeaf("b"), namedLeaf("c")),
+                    2, false, null, Map.of());
+
+            var result = scopedEval.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv
+                    && "c".equals(inv.invokeSpec().get("id"))) {
+                    try {Thread.sleep(200);} catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Result.failed("interrupted");
+                    }
+                    thirdCompleted.countDown();
+                }
+                return Result.of(Map.of("ok", true));
+            });
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(thirdCompleted.await(2, TimeUnit.SECONDS)).isTrue();
+        }
+
+        @Test
+        void allStepsFail_unreachable() {
+            var step = new ResolvedStep.ParallelStep(
+                    "disc", List.of(namedLeaf("a"), namedLeaf("b"), namedLeaf("c")),
+                    1, false, null, Map.of());
+
+            var result = scopedEval.evaluate(step, resolver, (s, r) ->
+                                                                     Result.failed("fail"));
+
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(((Result.Failure) result).message()).contains("unreachable");
+        }
     }
 }

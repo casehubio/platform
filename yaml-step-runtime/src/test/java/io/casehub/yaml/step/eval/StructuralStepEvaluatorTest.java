@@ -1486,6 +1486,7 @@ class StructuralStepEvaluatorTest {
                 assertThat(result.isSuccess()).isTrue();
                 assertThat(result.output().get("on-error.fallback")).isEqualTo("race-timeout");
             }
+        }
     }
 
     private ResolvedStep namedLeaf(String name) {

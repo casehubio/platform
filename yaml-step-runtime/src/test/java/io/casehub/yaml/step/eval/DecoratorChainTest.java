@@ -820,6 +820,152 @@ class DecoratorChainTest {
                 assertThat(seen).containsExactly(1, 2, 3);
             }
         }
+
+        @Test
+        void from_channelCloseReturnsStreamEnded() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("data");
+                channel.close();
+
+                var decorators = Map.<String, Object>of("from", Map.of("channel", "data"));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_errorClosedChannelReturnsFailure() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("data");
+                channel.close(new RuntimeException("connection lost"));
+
+                var decorators = Map.<String, Object>of("from", Map.of("channel", "data"));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of()))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("connection lost");
+            }
+        }
+
+        @Test
+        void from_untilConditionExitsGracefully() {
+            var condEval = new ConditionEvaluator(expr -> "true".equals(expr));
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of(
+                        "from", Map.of("channel", "data", "until", "true"));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_namedConsumerRegistersHandleEagerly() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of(
+                        "from", Map.of("channel", "data", "name", "enricher"));
+                scopedChain.apply(decorators, ctx -> Result.of(Map.of()));
+
+                var handle = scope.consumerHandle("enricher");
+                assertThat(handle).isNotNull();
+                assertThat(handle.isRunning()).isTrue();
+            }
+        }
+
+        @Test
+        void from_pausedConsumerBlocksUntilResumed() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("data");
+
+                var decorators = Map.<String, Object>of(
+                        "from", Map.of("channel", "data", "name", "enricher"));
+                DecoratedExecution wrapped = scopedChain.apply(decorators,
+                        ctx -> Result.of(Map.of("received", true)));
+
+                var handle = scope.consumerHandle("enricher");
+                handle.pause();
+
+                var resultRef = new java.util.concurrent.atomic.AtomicReference<Result>();
+                var started = new java.util.concurrent.CountDownLatch(1);
+                Thread t = Thread.ofVirtual().start(() -> {
+                    started.countDown();
+                    resultRef.set(wrapped.execute(new StepContext(resolver)));
+                });
+
+                assertThat(started.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                Thread.sleep(200);
+                assertThat(resultRef.get()).isNull();
+
+                handle.resume();
+                channel.send("hello");
+                t.join(2000);
+                assertThat(resultRef.get()).isNotNull();
+                assertThat(resultRef.get().isSuccess()).isTrue();
+            }
+        }
+        @Test
+        void from_fanIn_channelCloseReturnsStreamEnded() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var ch1 = scope.<Object>channel("a");
+                var ch2 = scope.<Object>channel("b");
+                ch1.close();
+                ch2.close();
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b")));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_fanIn_untilConditionExits() {
+            var condEval = new ConditionEvaluator(expr -> "true".equals(expr));
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b"), "until", "true"));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_fanIn_namedConsumerRegistersHandle() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b"), "name", "fan-reader"));
+                scopedChain.apply(decorators, ctx -> Result.of(Map.of()));
+
+                var handle = scope.consumerHandle("fan-reader");
+                assertThat(handle).isNotNull();
+                assertThat(handle.isRunning()).isTrue();
+            }
+        }
     }
 
     // ── publish list form ─────────────────────────────────────────────

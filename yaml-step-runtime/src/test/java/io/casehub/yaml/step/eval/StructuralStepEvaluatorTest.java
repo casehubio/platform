@@ -1324,4 +1324,168 @@ class StructuralStepEvaluatorTest {
     }
 
 
+    @Nested
+    class ControlStepTests {
+
+        @Test
+        void controlStepPausesNamedConsumer() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var handle = scope.consumerHandle("enricher");
+                assertThat(handle.isRunning()).isTrue();
+
+                var    step   = new ResolvedStep.ControlStep(null, "enricher", false, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(handle.isRunning()).isFalse();
+            }
+        }
+
+        @Test
+        void controlStepResumesNamedConsumer() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var handle = scope.consumerHandle("enricher");
+                handle.pause();
+                assertThat(handle.isRunning()).isFalse();
+
+                var    step   = new ResolvedStep.ControlStep(null, "enricher", true, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(handle.isRunning()).isTrue();
+            }
+        }
+
+        @Test
+        void controlStepMissingHandleReturnsFailure() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var    step   = new ResolvedStep.ControlStep(null, "nonexistent", false, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("not found");
+            }
+        }
+
+        @Test
+        void controlStepBlankTargetThrows() {
+            assertThatThrownBy(() -> new ResolvedStep.ControlStep(null, "", false, Map.of()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Nested
+    class RaceStepTests {
+
+        @Test
+        void raceFirstSuccessfulBranchWins() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var channel1 = scope.<Object>channel("fast");
+                var channel2 = scope.<Object>channel("slow");
+
+                var branch1 = new ResolvedStep.BlockStep(null, List.of(),
+                                                         Map.of("from", Map.of("channel", "fast")));
+                var branch2 = new ResolvedStep.BlockStep(null, List.of(),
+                                                         Map.of("from", Map.of("channel", "slow")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(branch1, branch2), Map.of());
+
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        Thread.sleep(50);
+                        channel1.send("fast-wins");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+            }
+        }
+
+        @Test
+        void raceAllBranchesFailReportsErrors() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                StepRunner failRunner = (step, r) -> Result.failed("branch failed");
+                var        branch1    = new ResolvedStep.PluginStep(null, "fail1", Map.of(), Map.of());
+                var        branch2    = new ResolvedStep.PluginStep(null, "fail2", Map.of(), Map.of());
+
+                var    race   = new ResolvedStep.RaceStep(null, List.of(branch1, branch2), Map.of());
+                Result result = scopedEval.evaluate(race, resolver, failRunner);
+
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("All race branches failed");
+            }
+        }
+
+        @Test
+        void raceRequiresAtLeastTwoBranches() {
+            var singleBranch = new ResolvedStep.BlockStep(null, List.of(), Map.of());
+            assertThatThrownBy(() -> new ResolvedStep.RaceStep(null, List.of(singleBranch), Map.of()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least 2 branches");
+        }
+
+        @Test
+        void raceCancelsLosingBranches() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var fastChannel = scope.<Object>channel("fast");
+                var slowChannel = scope.<Object>channel("slow");
+
+                var fastBranch = new ResolvedStep.BlockStep(null, List.of(),
+                                                            Map.of("from", Map.of("channel", "fast")));
+                var slowBranch = new ResolvedStep.BlockStep(null, List.of(),
+                                                            Map.of("from", Map.of("channel", "slow")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(fastBranch, slowBranch), Map.of());
+
+                fastChannel.send("winner");
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(slowChannel.isEmpty()).isTrue();
+            }
+        }
+
+        @Test
+        void raceWithTimeoutDecorator() throws Exception {
+            try (var scope = new DefaultExecutionScope(
+                    new io.casehub.yaml.core.orchestration.DefaultPrimitiveFactory(() -> 100.0),
+                    () -> 100.0)) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var slowBranch1 = new ResolvedStep.BlockStep(null, List.of(),
+                                                             Map.of("from", Map.of("channel", "never1")));
+                var slowBranch2 = new ResolvedStep.BlockStep(null, List.of(),
+                                                             Map.of("from", Map.of("channel", "never2")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(slowBranch1, slowBranch2),
+                                                     Map.of("timeout", "200ms", "on-error", "race-timeout"));
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("on-error.fallback")).isEqualTo("race-timeout");
+            }
+        }
+    }
 }

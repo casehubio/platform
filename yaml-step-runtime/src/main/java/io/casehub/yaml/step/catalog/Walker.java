@@ -20,7 +20,10 @@ public final class Walker {
             "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
-            "parallel", "semaphore", "barrier", "quorum", "race");
+            "parallel", "semaphore", "barrier", "quorum", "race",
+            "pause", "resume",
+            "from", "cancel", "background", "at", "on-complete",
+            "resource", "priority", "wait", "mutex", "when");
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
     private static final Set<String> REMOVED_KEYS = Set.of("steps", "do");
@@ -100,7 +103,7 @@ public final class Walker {
                 stepName = (String) e.getValue();
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
-            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key) || "barrier".equals(key) || "quorum".equals(key)) {
+            } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key) || "barrier".equals(key) || "quorum".equals(key) || "race".equals(key) || "pause".equals(key) || "resume".equals(key)) {
                 structuralType  = key;
                 structuralValue = e.getValue();
             } else if ("if".equals(key)) {
@@ -269,11 +272,26 @@ public final class Walker {
             return new ResolvedStep.QuorumStep(stepName, required, ofList,
                     io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
         }
+        if ("race".equals(structuralType)) {
+            @SuppressWarnings("unchecked")
+            var branches = (List<Map<String, Object>>) structuralValue;
+            var resolvedBranches = resolve(branches, registry, depth + 1, stepPath + " → race", seenNames);
+            return new ResolvedStep.RaceStep(stepName, resolvedBranches, decorators);
+        }
+        if ("pause".equals(structuralType)) {
+            return new ResolvedStep.ControlStep(stepName, String.valueOf(structuralValue), false, decorators);
+        }
+        if ("resume".equals(structuralType)) {
+            return new ResolvedStep.ControlStep(stepName, String.valueOf(structuralValue), true, decorators);
+        }
         if (matchedAction != null) {
             return new ResolvedStep.PluginStep(stepName, matchedAction, actionParams, decorators);
         }
         if (invokeSpec != null) {
             return new ResolvedStep.InvokeStep(stepName, invokeSpec, decorators);
+        }
+        if (!decorators.isEmpty()) {
+            return new ResolvedStep.BlockStep(stepName, List.of(), decorators);
         }
 
         throw new IllegalArgumentException(
@@ -402,6 +420,7 @@ public final class Walker {
                 }
                 case ResolvedStep.BlockStep b -> validateBarrierQuorumReferences(b.steps(), knownNames);
                 case ResolvedStep.ParallelStep p -> validateBarrierQuorumReferences(p.steps(), knownNames);
+                case ResolvedStep.RaceStep r -> validateBarrierQuorumReferences(r.branches(), knownNames);
                 case ResolvedStep.TryCatchFinallyStep t -> {
                     validateBarrierQuorumReferences(t.trySteps(), knownNames);
                     validateBarrierQuorumReferences(t.catchSteps(), knownNames);

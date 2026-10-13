@@ -8,6 +8,9 @@ public interface OrcChannel<T> extends OrcPrimitive {
     T receive() throws InterruptedException;
     T receive(long timeout, TimeUnit unit) throws InterruptedException;
     boolean isEmpty();
+
+    boolean isClosed();
+
     void close();
     void close(Throwable cause);
     boolean isErrorClosed();

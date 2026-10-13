@@ -99,6 +99,9 @@ class PrimitiveFactoryTest {
 
             @Override
             public PriorityOrcSemaphore createPrioritySemaphore(String name, int permits)                                    {return delegate.createPrioritySemaphore(name, permits);}
+
+            @Override
+            public ConsumerHandle createConsumerHandle(String name)                                                          {return delegate.createConsumerHandle(name);}
         };
 
         var                scope = new DefaultExecutionScope(custom);

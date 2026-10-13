@@ -1382,4 +1382,88 @@ class StructuralStepEvaluatorTest {
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }
+
+    @Nested
+    class RaceStepTests {
+
+        @Test
+        void raceFirstSuccessfulBranchWins() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var channel1 = scope.<Object>channel("fast");
+                var channel2 = scope.<Object>channel("slow");
+
+                var branch1 = new ResolvedStep.BlockStep(null, List.of(),
+                                                         Map.of("from", Map.of("channel", "fast")));
+                var branch2 = new ResolvedStep.BlockStep(null, List.of(),
+                                                         Map.of("from", Map.of("channel", "slow")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(branch1, branch2), Map.of());
+
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        Thread.sleep(50);
+                        channel1.send("fast-wins");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+            }
+        }
+
+        @Test
+        void raceAllBranchesFailReportsErrors() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                StepRunner failRunner = (step, r) -> Result.failed("branch failed");
+                var        branch1    = new ResolvedStep.PluginStep(null, "fail1", Map.of(), Map.of());
+                var        branch2    = new ResolvedStep.PluginStep(null, "fail2", Map.of(), Map.of());
+
+                var    race   = new ResolvedStep.RaceStep(null, List.of(branch1, branch2), Map.of());
+                Result result = scopedEval.evaluate(race, resolver, failRunner);
+
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("All race branches failed");
+            }
+        }
+
+        @Test
+        void raceRequiresAtLeastTwoBranches() {
+            var singleBranch = new ResolvedStep.BlockStep(null, List.of(), Map.of());
+            assertThatThrownBy(() -> new ResolvedStep.RaceStep(null, List.of(singleBranch), Map.of()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least 2 branches");
+        }
+
+        @Test
+        void raceCancelsLosingBranches() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var fastChannel = scope.<Object>channel("fast");
+                var slowChannel = scope.<Object>channel("slow");
+
+                var fastBranch = new ResolvedStep.BlockStep(null, List.of(),
+                                                            Map.of("from", Map.of("channel", "fast")));
+                var slowBranch = new ResolvedStep.BlockStep(null, List.of(),
+                                                            Map.of("from", Map.of("channel", "slow")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(fastBranch, slowBranch), Map.of());
+
+                fastChannel.send("winner");
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(slowChannel.isEmpty()).isTrue();
+            }
+        }
+    }
 }

@@ -1324,4 +1324,62 @@ class StructuralStepEvaluatorTest {
     }
 
 
+    @Nested
+    class ControlStepTests {
+
+        @Test
+        void controlStepPausesNamedConsumer() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var handle = scope.consumerHandle("enricher");
+                assertThat(handle.isRunning()).isTrue();
+
+                var    step   = new ResolvedStep.ControlStep(null, "enricher", false, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(handle.isRunning()).isFalse();
+            }
+        }
+
+        @Test
+        void controlStepResumesNamedConsumer() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var handle = scope.consumerHandle("enricher");
+                handle.pause();
+                assertThat(handle.isRunning()).isFalse();
+
+                var    step   = new ResolvedStep.ControlStep(null, "enricher", true, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(handle.isRunning()).isTrue();
+            }
+        }
+
+        @Test
+        void controlStepMissingHandleReturnsFailure() {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var    step   = new ResolvedStep.ControlStep(null, "nonexistent", false, Map.of());
+                Result result = scopedEval.evaluate(step, resolver, (s, r) -> Result.of(Map.of()));
+
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("not found");
+            }
+        }
+
+        @Test
+        void controlStepBlankTargetThrows() {
+            assertThatThrownBy(() -> new ResolvedStep.ControlStep(null, "", false, Map.of()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
 }

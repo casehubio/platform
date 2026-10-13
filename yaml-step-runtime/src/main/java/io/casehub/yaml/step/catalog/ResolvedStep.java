@@ -13,7 +13,9 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.TryCatchFinallyStep,
                                      ResolvedStep.SelectStep,
                                      ResolvedStep.BarrierStep,
-                                     ResolvedStep.QuorumStep {
+                                     ResolvedStep.QuorumStep,
+                                     ResolvedStep.ControlStep,
+                                     ResolvedStep.RaceStep {
 
     Map<String, Object> decorators();
 
@@ -160,6 +162,35 @@ public sealed interface ResolvedStep permits
                         "quorum 'required' (" + required + ") > 'of' (" + ofSteps.size() + ")");
             }
             ofSteps    = List.copyOf(ofSteps);
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record ControlStep(
+            String name,
+            String target,
+            boolean activate,
+            Map<String, Object> decorators) implements ResolvedStep {
+
+        public ControlStep {
+            if (target == null || target.isBlank()) {
+                throw new IllegalArgumentException(
+                        "pause/resume requires a non-blank target consumer name");
+            }
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record RaceStep(
+            String name,
+            List<ResolvedStep> branches,
+            Map<String, Object> decorators) implements ResolvedStep {
+
+        public RaceStep {
+            if (branches == null || branches.size() < 2) {
+                throw new IllegalArgumentException("race requires at least 2 branches");
+            }
+            branches   = List.copyOf(branches);
             decorators = Map.copyOf(decorators);
         }
     }

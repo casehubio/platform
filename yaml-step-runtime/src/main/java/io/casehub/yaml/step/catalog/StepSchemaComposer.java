@@ -16,7 +16,7 @@ public final class StepSchemaComposer {
             "if", "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
-            "semaphore", "barrier", "quorum", "race",
+            "semaphore", "barrier", "quorum",
             "at", "on-complete", "resource", "priority",
             "cancel", "background", "from");
 
@@ -87,6 +87,22 @@ public final class StepSchemaComposer {
         parallelProps.putObject("parallel").put("type", "array");
         parallelVariant.putArray("required").add("parallel");
         oneOf.add(parallelVariant);
+
+        ObjectNode raceVariant = mapper.createObjectNode();
+        ObjectNode raceProps   = raceVariant.putObject("properties");
+        raceProps.putObject("race").put("type", "array");
+        raceVariant.putArray("required").add("race");
+        oneOf.add(raceVariant);
+
+        ObjectNode pauseVariant = mapper.createObjectNode();
+        pauseVariant.putObject("properties").putObject("pause").put("type", "string");
+        pauseVariant.putArray("required").add("pause");
+        oneOf.add(pauseVariant);
+
+        ObjectNode resumeVariant = mapper.createObjectNode();
+        resumeVariant.putObject("properties").putObject("resume").put("type", "string");
+        resumeVariant.putArray("required").add("resume");
+        oneOf.add(resumeVariant);
 
         ObjectNode sharedProps = root.putObject("properties");
         sharedProps.putObject("step").put("type", "string");

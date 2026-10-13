@@ -67,7 +67,7 @@ class StepSchemaComposerTest {
 
         ObjectNode schema = StepSchemaComposer.compose(registry, mapper);
 
-        assertThat(schema.get("oneOf").size()).isEqualTo(5);
+        assertThat(schema.get("oneOf").size()).isEqualTo(8);
     }
 
     @Test

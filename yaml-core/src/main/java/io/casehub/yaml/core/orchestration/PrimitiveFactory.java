@@ -31,4 +31,6 @@ public interface PrimitiveFactory {
     <K, V> OrcMap<K, V> createMap(String name);
 
     PriorityOrcSemaphore createPrioritySemaphore(String name, int permits);
+
+    ConsumerHandle createConsumerHandle(String name);
 }

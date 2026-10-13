@@ -84,11 +84,27 @@ public sealed interface ResolvedStep permits
     record ParallelStep(
             String name,
             List<ResolvedStep> steps,
+            int advanceAfter,
+            boolean cancelRemaining,
+            java.time.Duration collectionTimeout,
             Map<String, Object> decorators) implements ResolvedStep {
 
         public ParallelStep {
             steps      = List.copyOf(steps);
             decorators = Map.copyOf(decorators);
+            if (!steps.isEmpty()) {
+                if (advanceAfter <= 0) {
+                    throw new IllegalArgumentException("advance-after must be > 0, got: " + advanceAfter);
+                }
+                if (advanceAfter > steps.size()) {
+                    throw new IllegalArgumentException(
+                            "advance-after (" + advanceAfter + ") > steps (" + steps.size() + ")");
+                }
+            }
+        }
+
+        public ParallelStep(String name, List<ResolvedStep> steps, Map<String, Object> decorators) {
+            this(name, steps, steps.isEmpty() ? 1 : steps.size(), false, null, decorators);
         }
     }
 

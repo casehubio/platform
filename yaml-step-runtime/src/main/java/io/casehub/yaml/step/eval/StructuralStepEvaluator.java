@@ -1,9 +1,10 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
+import io.casehub.yaml.core.orchestration.ConsumerHandle;
+import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
-import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
@@ -81,6 +82,7 @@ public final class StructuralStepEvaluator {
                 }
                 case ResolvedStep.BlockStep b -> preRegisterLatches(b.steps());
                 case ResolvedStep.ParallelStep p -> preRegisterLatches(p.steps());
+                case ResolvedStep.RaceStep r -> preRegisterLatches(r.branches());
                 case ResolvedStep.TryCatchFinallyStep t -> {
                     preRegisterLatches(t.trySteps());
                     preRegisterLatches(t.catchSteps());
@@ -102,6 +104,8 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.SelectStep s -> evaluateSelect(s, ctx, runner);
             case ResolvedStep.BarrierStep b -> evaluateBarrier(b);
             case ResolvedStep.QuorumStep q -> evaluateQuorum(q);
+            case ResolvedStep.ControlStep c -> evaluateControl(c);
+            case ResolvedStep.RaceStep r -> evaluateRace(r, ctx, runner);
             case ResolvedStep.PluginStep ps -> runner.run(ps, ctx.resolver());
             case ResolvedStep.InvokeStep is -> runner.run(is, ctx.resolver());
         };
@@ -382,6 +386,86 @@ public final class StructuralStepEvaluator {
                                  + " steps failed, " + quorum.required() + " successes required");
         }
         return Result.of(Map.of());
+    }
+
+    private Result evaluateControl(ResolvedStep.ControlStep control) {
+        if (scope == null) {
+            return Result.failed("'pause'/'resume' requires an ExecutionScope");
+        }
+        ConsumerHandle handle =
+                scope.primitive(control.target(), ConsumerHandle.class);
+        if (handle == null) {
+            return Result.failed("Consumer '" + control.target() + "' not found");
+        }
+        if (control.activate()) {
+            handle.resume();
+        } else {
+            handle.pause();
+        }
+        return Result.of(Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Result evaluateRace(ResolvedStep.RaceStep race, StepContext ctx, StepRunner runner) {
+        int         branchCount    = race.branches().size();
+        var         winnerResult   = new AtomicReference<Result>();
+        var         winnerIndex    = new AtomicInteger(-1);
+        var         branchFailures = new AtomicReference[branchCount];
+        Future<?>[] futures        = new Future<?>[branchCount];
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < branchCount; i++) {
+                int idx = i;
+                branchFailures[idx] = new AtomicReference<String>();
+                ResolvedStep branch = race.branches().get(i);
+                futures[i] = executor.submit(() -> {
+                    Result result = evaluateInternal(branch, ctx, runner);
+                    if (result.isSuccess() && winnerIndex.compareAndSet(-1, idx)) {
+                        winnerResult.set(result);
+                        for (int j = 0; j < branchCount; j++) {
+                            if (j != idx && futures[j] != null) {
+                                futures[j].cancel(true);
+                            }
+                        }
+                    } else if (!result.isSuccess()) {
+                        String msg = result instanceof Result.Failure f ? f.message() : "unknown";
+                        branchFailures[idx].set("branch " + idx + ": " + msg);
+                    }
+                });
+            }
+            try {
+                for (Future<?> f : futures) {
+                    try {
+                        f.get();
+                    } catch (ExecutionException | java.util.concurrent.CancellationException e) {
+                        // expected for cancelled branches
+                    }
+                }
+            } finally {
+                for (Future<?> f : futures) {
+                    if (f != null) {
+                        f.cancel(true);
+                    }
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Result.failed("Race interrupted");
+        }
+
+        Result result = winnerResult.get();
+        if (result != null) {
+            return result;
+        }
+
+        var failures = new java.util.ArrayList<String>();
+        for (var ref : branchFailures) {
+            Object msg = ref.get();
+            if (msg != null) {
+                failures.add((String) msg);
+            }
+        }
+        return Result.failed("All race branches failed: " + String.join("; ", failures));
     }
 
 

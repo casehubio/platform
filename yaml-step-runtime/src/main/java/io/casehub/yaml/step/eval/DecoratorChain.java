@@ -9,6 +9,7 @@ import io.casehub.yaml.core.orchestration.OrcSemaphore;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.RetryDirective;
+import io.casehub.yaml.core.orchestration.ChannelClosedException;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -16,6 +17,7 @@ import io.casehub.yaml.plugin.api.Result;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.concurrent.locks.LockSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -422,12 +424,14 @@ public final class DecoratorChain {
         if (scope == null) {return ctx -> Result.failed("'from' requires an ExecutionScope");}
 
         if (fromVal instanceof String channelName) {
-            return wrapFromSingleChannel(inner, channelName, "from", null);
+            return wrapFromSingleChannel(inner, channelName, "from", null, null, null);
         }
 
         if (fromVal instanceof Map<?, ?> fromMap) {
-            String filter = fromMap.containsKey("filter") ? String.valueOf(fromMap.get("filter")) : null;
-            String alias = fromMap.containsKey("as") ? String.valueOf(fromMap.get("as")) : "from";
+            String filter     = fromMap.containsKey("filter") ? String.valueOf(fromMap.get("filter")) : null;
+            String alias      = fromMap.containsKey("as") ? String.valueOf(fromMap.get("as")) : "from";
+            String until      = fromMap.containsKey("until") ? String.valueOf(fromMap.get("until")) : null;
+            String handleName = fromMap.containsKey("name") ? String.valueOf(fromMap.get("name")) : null;
 
             if (fromMap.containsKey("channels")) {
                 Object channelsVal = fromMap.get("channels");
@@ -435,12 +439,12 @@ public final class DecoratorChain {
                     return ctx -> Result.failed("from 'channels' must be a list");
                 }
                 List<String> names = channelNames.stream().map(String::valueOf).toList();
-                return wrapFromFanIn(inner, names, alias, filter);
+                return wrapFromFanIn(inner, names, alias, filter, until, handleName);
             }
 
             if (fromMap.containsKey("channel")) {
                 String channelName = String.valueOf(fromMap.get("channel"));
-                return wrapFromSingleChannel(inner, channelName, alias, filter);
+                return wrapFromSingleChannel(inner, channelName, alias, filter, until, handleName);
             }
 
             return ctx -> Result.failed("from map must contain 'channel' or 'channels' key");
@@ -450,24 +454,68 @@ public final class DecoratorChain {
     }
 
     @SuppressWarnings("unchecked")
-    private DecoratedExecution wrapFromSingleChannel(DecoratedExecution inner, String channelName, String alias, String filter) {
+    private DecoratedExecution wrapFromSingleChannel(DecoratedExecution inner, String channelName, String alias, String filter, String until, String handleName) {
+        io.casehub.yaml.core.orchestration.ConsumerHandle handle =
+                handleName != null ? scope.consumerHandle(handleName) : null;
+        boolean useTimedReceive = handleName != null || until != null;
+
         return ctx -> {
             OrcChannel<Object> channel = scope.channel(channelName);
+            if (handle != null) {
+                handle.registerThread(Thread.currentThread());
+            }
             while (true) {
+                if (handle != null && handle.isReleased()) {
+                    return Result.of(Map.of("from.stream-ended", true));
+                }
+                if (handle != null && !handle.isRunning()) {
+                    LockSupport.park();
+                    if (Thread.interrupted()) {
+                        return Result.of(Map.of("from.stream-ended", true));
+                    }
+                    continue;
+                }
+                if (until != null) {
+                    try {
+                        if (resolveCondition(until, ctx.resolver(), "from-until")) {
+                            return Result.of(Map.of("from.stream-ended", true));
+                        }
+                    } catch (Exception e) {
+                        // condition evaluation failure — continue receiving
+                    }
+                }
+
                 Object item;
                 try {
-                    var remaining = ctx.deadline().remainingTime();
-                    if (remaining.isPresent()) {
-                        item = channel.receive(remaining.get().toMillis(), TimeUnit.MILLISECONDS);
-                        if (item == null) {
-                            return Result.failed("from channel '" + channelName + "' receive exceeded deadline");
-                        }
+                    if (useTimedReceive) {
+                        item = channel.receive(100, TimeUnit.MILLISECONDS);
                     } else {
-                        item = channel.receive();
+                        var remaining = ctx.deadline().remainingTime();
+                        if (remaining.isPresent()) {
+                            item = channel.receive(remaining.get().toMillis(), TimeUnit.MILLISECONDS);
+                        } else {
+                            item = channel.receive();
+                        }
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return Result.failed("from channel '" + channelName + "' receive interrupted");
+                } catch (ChannelClosedException e) {
+                    return Result.failed("channel '" + channelName + "' closed: " + (e.getCause() != null ? e.getCause().getMessage() : "error"));
+                }
+
+                if (item == null) {
+                    if (channel.isErrorClosed()) {
+                        Throwable cause = channel.closeError();
+                        return Result.failed("channel '" + channelName + "' closed: " + (cause != null ? cause.getMessage() : "error"));
+                    }
+                    if (channel.isClosed()) {
+                        return Result.of(Map.of("from.stream-ended", true));
+                    }
+                    if (!useTimedReceive) {
+                        return Result.failed("from channel '" + channelName + "' receive exceeded deadline");
+                    }
+                    continue;
                 }
 
                 if (filter != null) {
@@ -488,19 +536,54 @@ public final class DecoratorChain {
     }
 
     @SuppressWarnings("unchecked")
-    private DecoratedExecution wrapFromFanIn(DecoratedExecution inner, List<String> channelNames, String alias, String filter) {
+    private DecoratedExecution wrapFromFanIn(DecoratedExecution inner, List<String> channelNames, String alias, String filter, String until, String handleName) {
+        io.casehub.yaml.core.orchestration.ConsumerHandle handle =
+                handleName != null ? scope.consumerHandle(handleName) : null;
+
         return ctx -> {
+            if (handle != null) {
+                handle.registerThread(Thread.currentThread());
+            }
             while (true) {
-                Object item = null;
+                if (handle != null && handle.isReleased()) {
+                    return Result.of(Map.of("from.stream-ended", true));
+                }
+                if (handle != null && !handle.isRunning()) {
+                    LockSupport.park();
+                    if (Thread.interrupted()) {
+                        return Result.of(Map.of("from.stream-ended", true));
+                    }
+                    continue;
+                }
+                if (until != null) {
+                    try {
+                        if (resolveCondition(until, ctx.resolver(), "from-until")) {
+                            return Result.of(Map.of("from.stream-ended", true));
+                        }
+                    } catch (Exception e) {
+                        // condition evaluation failure — continue receiving
+                    }
+                }
+
+                Object  item      = null;
+                boolean allClosed = true;
                 for (String name : channelNames) {
                     OrcChannel<Object> ch = scope.channel(name);
+                    if (ch.isClosed()) {continue;}
+                    allClosed = false;
                     try {
                         item = ch.receive(0, TimeUnit.MILLISECONDS);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return Result.failed("from fan-in receive interrupted");
+                    } catch (ChannelClosedException e) {
+                        continue;
                     }
-                    if (item != null) break;
+                    if (item != null) {break;}
+                }
+
+                if (allClosed && item == null) {
+                    return Result.of(Map.of("from.stream-ended", true));
                 }
 
                 if (item == null) {
@@ -511,7 +594,7 @@ public final class DecoratorChain {
                         return Result.failed("from fan-in poll interrupted");
                     }
                     if (ctx.deadline().remainingTime().isPresent()
-                            && ctx.deadline().remainingTime().get().isNegative()) {
+                        && ctx.deadline().remainingTime().get().isNegative()) {
                         return Result.failed("from fan-in receive exceeded deadline");
                     }
                     continue;

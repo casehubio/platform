@@ -694,6 +694,164 @@ class DecoratorChainTest {
         }
     }
 
+    // ── from (between on-error and timeout) ─────────────────────────
+
+    @Nested
+    class FromTests {
+
+        @Test
+        void from_simpleString_readsFromChannel() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("events");
+                channel.send(Map.of("type", "click", "value", 42));
+
+                var captured = new java.util.concurrent.atomic.AtomicReference<Object>();
+                var decorators = Map.<String, Object>of("from", "events");
+                var result = scopedChain.apply(decorators, ctx -> {
+                    captured.set(ctx.resolver().resolve("${from.type}"));
+                    return Result.of(Map.of());
+                }).execute(new StepContext(resolver));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(captured.get()).isEqualTo("click");
+            }
+        }
+
+        @Test
+        void from_withAlias_injectsUnderAlias() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("readings");
+                channel.send(Map.of("temp", 25));
+
+                var captured = new java.util.concurrent.atomic.AtomicReference<Object>();
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channel", "readings", "as", "reading"));
+                var result = scopedChain.apply(decorators, ctx -> {
+                    captured.set(ctx.resolver().resolve("${reading.temp}"));
+                    return Result.of(Map.of());
+                }).execute(new StepContext(resolver));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(captured.get()).isEqualTo(25);
+            }
+        }
+
+        @Test
+        void from_withFilter_skipsNonMatchingItems() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("data");
+                channel.send(Map.of("severity", "INFO"));
+                channel.send(Map.of("severity", "WARNING"));
+
+                var captured = new java.util.concurrent.atomic.AtomicReference<Object>();
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channel", "data", "as", "item",
+                                "filter", "${item.severity} == WARNING"));
+                var condEval = new ConditionEvaluator(expr -> {
+                    String[] parts = expr.split(" == ");
+                    return parts.length == 2 && parts[0].trim().equals(parts[1].trim());
+                });
+                var filterChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
+                var result = filterChain.apply(decorators, ctx -> {
+                    captured.set(ctx.resolver().resolve("${item.severity}"));
+                    return Result.of(Map.of());
+                }).execute(new StepContext(resolver));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(captured.get()).isEqualTo("WARNING");
+            }
+        }
+
+        @Test
+        void from_fanIn_readsFromFirstAvailableChannel() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var ch1 = scope.<Object>channel("fire");
+                var ch2 = scope.<Object>channel("flood");
+                ch2.send(Map.of("type", "flood-alert"));
+
+                var captured = new java.util.concurrent.atomic.AtomicReference<Object>();
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("fire", "flood"), "as", "alert"));
+                var result = scopedChain.apply(decorators, ctx -> {
+                    captured.set(ctx.resolver().resolve("${alert.type}"));
+                    return Result.of(Map.of());
+                }).execute(new StepContext(resolver));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(captured.get()).isEqualTo("flood-alert");
+            }
+        }
+
+        @Test
+        void from_withoutScope_returnsFailure() {
+            var decorators = Map.<String, Object>of("from", "events");
+            var result = chain.apply(decorators, success(Map.of())).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void from_insideLoop_readsOnePerIteration() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var channel = scope.<Object>channel("items");
+                channel.send(Map.of("n", 1));
+                channel.send(Map.of("n", 2));
+                channel.send(Map.of("n", 3));
+
+                var seen = new ArrayList<Object>();
+                var decorators = new LinkedHashMap<String, Object>();
+                decorators.put("loop", 3);
+                decorators.put("from", "items");
+                var result = scopedChain.apply(decorators, ctx -> {
+                    seen.add(ctx.resolver().resolve("${from.n}"));
+                    return Result.of(Map.of());
+                }).execute(new StepContext(resolver));
+
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(seen).containsExactly(1, 2, 3);
+            }
+        }
+    }
+
+    // ── publish list form ─────────────────────────────────────────────
+
+    @Nested
+    class PublishListTests {
+
+        @Test
+        void publish_listForm_sendsToMatchingChannels() throws InterruptedException {
+            try (var scope = new DefaultExecutionScope()) {
+                var condEval = new ConditionEvaluator(expr -> {
+                    String[] parts = expr.split(" == ");
+                    return parts.length == 2 && parts[0].trim().equals(parts[1].trim());
+                });
+                var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
+
+                var resultResolver = resolver.withObjectScope("result",
+                        name -> "class".equals(name) ? "ANOMALY" : null);
+
+                var decorators = Map.<String, Object>of("publish",
+                        List.of(
+                                Map.of("channel", "normal", "if", "${result.class} == NORMAL"),
+                                Map.of("channel", "anomaly", "if", "${result.class} == ANOMALY")));
+                scopedChain.apply(decorators, success(Map.of("class", "ANOMALY")))
+                        .execute(new StepContext(resultResolver));
+
+                assertThat(scope.<Object>channel("normal").isEmpty()).isTrue();
+                assertThat(scope.<Object>channel("anomaly").isEmpty()).isFalse();
+            }
+        }
+    }
+
     // ── transition (position 12) ───────────────────────────────────
 
     @Nested

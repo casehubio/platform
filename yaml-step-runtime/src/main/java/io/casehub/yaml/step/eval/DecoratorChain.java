@@ -66,6 +66,7 @@ public final class DecoratorChain {
         current = wrapWait(current, decorators);            // 7
         current = wrapAt(current, decorators);              // 6 — threshold gate
         current = wrapTimeout(current, decorators);         // 5
+        current = wrapFrom(current, decorators);            // 4.5 — read from channel
         current = wrapOnError(current, decorators);         // 4
         current = wrapLoop(current, decorators);            // 5
         current = wrapCancel(current, decorators);          // 4 — signal-triggered cancel
@@ -414,6 +415,125 @@ public final class DecoratorChain {
         return resolver.withObjectScope("each", eachSource);
     }
 
+    @SuppressWarnings("unchecked")
+    private DecoratedExecution wrapFrom(DecoratedExecution inner, Map<String, Object> decorators) {
+        Object fromVal = decorators.get("from");
+        if (fromVal == null) {return inner;}
+        if (scope == null) {return ctx -> Result.failed("'from' requires an ExecutionScope");}
+
+        if (fromVal instanceof String channelName) {
+            return wrapFromSingleChannel(inner, channelName, "from", null);
+        }
+
+        if (fromVal instanceof Map<?, ?> fromMap) {
+            String filter = fromMap.containsKey("filter") ? String.valueOf(fromMap.get("filter")) : null;
+            String alias = fromMap.containsKey("as") ? String.valueOf(fromMap.get("as")) : "from";
+
+            if (fromMap.containsKey("channels")) {
+                Object channelsVal = fromMap.get("channels");
+                if (!(channelsVal instanceof List<?> channelNames)) {
+                    return ctx -> Result.failed("from 'channels' must be a list");
+                }
+                List<String> names = channelNames.stream().map(String::valueOf).toList();
+                return wrapFromFanIn(inner, names, alias, filter);
+            }
+
+            if (fromMap.containsKey("channel")) {
+                String channelName = String.valueOf(fromMap.get("channel"));
+                return wrapFromSingleChannel(inner, channelName, alias, filter);
+            }
+
+            return ctx -> Result.failed("from map must contain 'channel' or 'channels' key");
+        }
+
+        return ctx -> Result.failed("from must be a string (channel name) or a map");
+    }
+
+    @SuppressWarnings("unchecked")
+    private DecoratedExecution wrapFromSingleChannel(DecoratedExecution inner, String channelName, String alias, String filter) {
+        return ctx -> {
+            OrcChannel<Object> channel = scope.channel(channelName);
+            while (true) {
+                Object item;
+                try {
+                    var remaining = ctx.deadline().remainingTime();
+                    if (remaining.isPresent()) {
+                        item = channel.receive(remaining.get().toMillis(), TimeUnit.MILLISECONDS);
+                        if (item == null) {
+                            return Result.failed("from channel '" + channelName + "' receive exceeded deadline");
+                        }
+                    } else {
+                        item = channel.receive();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return Result.failed("from channel '" + channelName + "' receive interrupted");
+                }
+
+                if (filter != null) {
+                    VariableResolver filterResolver = ScopeUtils.pushScope(ctx.resolver(), alias, item);
+                    try {
+                        if (!resolveCondition(filter, filterResolver, "from-filter")) {
+                            continue;
+                        }
+                    } catch (Exception e) {
+                        continue;
+                    }
+                }
+
+                VariableResolver scoped = ScopeUtils.pushScope(ctx.resolver(), alias, item);
+                return inner.execute(ctx.withResolver(scoped));
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private DecoratedExecution wrapFromFanIn(DecoratedExecution inner, List<String> channelNames, String alias, String filter) {
+        return ctx -> {
+            while (true) {
+                Object item = null;
+                for (String name : channelNames) {
+                    OrcChannel<Object> ch = scope.channel(name);
+                    try {
+                        item = ch.receive(0, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Result.failed("from fan-in receive interrupted");
+                    }
+                    if (item != null) break;
+                }
+
+                if (item == null) {
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Result.failed("from fan-in poll interrupted");
+                    }
+                    if (ctx.deadline().remainingTime().isPresent()
+                            && ctx.deadline().remainingTime().get().isNegative()) {
+                        return Result.failed("from fan-in receive exceeded deadline");
+                    }
+                    continue;
+                }
+
+                if (filter != null) {
+                    VariableResolver filterResolver = ScopeUtils.pushScope(ctx.resolver(), alias, item);
+                    try {
+                        if (!resolveCondition(filter, filterResolver, "from-filter")) {
+                            continue;
+                        }
+                    } catch (Exception e) {
+                        continue;
+                    }
+                }
+
+                VariableResolver scoped = ScopeUtils.pushScope(ctx.resolver(), alias, item);
+                return inner.execute(ctx.withResolver(scoped));
+            }
+        };
+    }
+
     private DecoratedExecution wrapWait(DecoratedExecution inner, Map<String, Object> decorators) {
         Object waitVal = decorators.get("wait");
         if (waitVal == null) {return inner;}
@@ -613,10 +733,34 @@ public final class DecoratorChain {
 
     @SuppressWarnings("unchecked")
     private void applyPublish(Object publishVal, Result result, VariableResolver resolver) {
-        if (!(publishVal instanceof Map<?, ?> pubMap)) {return;}
-        String             channelName = String.valueOf(pubMap.get("channel"));
-        OrcChannel<Object> channel     = scope.channel(channelName);
-        Object             data        = pubMap.containsKey("data") ? resolver.resolve(pubMap.get("data")) : result.output();
+        if (publishVal instanceof List<?> pubList) {
+            for (Object entry : pubList) {
+                if (entry instanceof Map<?, ?> pubMap) {
+                    publishToChannel(pubMap, result, resolver);
+                }
+            }
+            return;
+        }
+        if (publishVal instanceof Map<?, ?> pubMap) {
+            publishToChannel(pubMap, result, resolver);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void publishToChannel(Map<?, ?> pubMap, Result result, VariableResolver resolver) {
+        if (pubMap.containsKey("if")) {
+            String condition = String.valueOf(pubMap.get("if"));
+            try {
+                if (!resolveCondition(condition, resolver, "publish-if")) {
+                    return;
+                }
+            } catch (Exception e) {
+                return;
+            }
+        }
+        String channelName = String.valueOf(pubMap.get("channel"));
+        OrcChannel<Object> channel = scope.channel(channelName);
+        Object data = pubMap.containsKey("data") ? resolver.resolve(pubMap.get("data")) : result.output();
         try {
             channel.send(data);
         } catch (InterruptedException e) {

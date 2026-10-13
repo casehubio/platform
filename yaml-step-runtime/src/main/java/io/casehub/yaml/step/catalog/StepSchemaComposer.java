@@ -18,7 +18,7 @@ public final class StepSchemaComposer {
             "transform", "signal", "publish", "transition",
             "semaphore", "barrier", "quorum", "race",
             "at", "on-complete", "resource", "priority",
-            "cancel", "background");
+            "cancel", "background", "from");
 
     private StepSchemaComposer() {}
 

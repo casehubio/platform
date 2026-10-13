@@ -114,6 +114,12 @@ public class DefaultExecutionScope implements ExecutionScope {
     }
 
     @Override
+    public ConsumerHandle consumerHandle(String name) {
+        return getOrCreate(name, ConsumerHandle.class, () -> factory.createConsumerHandle(name));
+    }
+
+
+    @Override
     public OrcAccumulator accumulator(String name, java.util.function.DoubleBinaryOperator op, double identity) {
         return getOrCreate(name, OrcAccumulator.class, () -> factory.createAccumulator(name, op, identity));
     }

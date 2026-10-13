@@ -25,6 +25,9 @@ public interface ExecutionScope extends AutoCloseable {
 
     OrcFlag flag(String name);
 
+    ConsumerHandle consumerHandle(String name);
+
+
     OrcAccumulator accumulator(String name, java.util.function.DoubleBinaryOperator op, double identity);
 
     OrcNumericPrimitive numericPrimitive(String name);

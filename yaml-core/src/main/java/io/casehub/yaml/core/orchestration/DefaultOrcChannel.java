@@ -88,6 +88,12 @@ public final class DefaultOrcChannel<T> implements OrcChannel<T> {
     }
 
     @Override
+    public boolean isClosed() {
+        return closed;
+    }
+
+
+    @Override
     public void close() {
         closed = true;
     }

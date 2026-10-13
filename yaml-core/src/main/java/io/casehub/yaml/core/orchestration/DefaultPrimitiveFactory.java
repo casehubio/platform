@@ -84,4 +84,9 @@ public final class DefaultPrimitiveFactory implements PrimitiveFactory {
         return new DefaultPriorityOrcSemaphore(permits);
     }
 
+
+    @Override
+    public ConsumerHandle createConsumerHandle(String name) {
+        return new DefaultConsumerHandle(name);
+    }
 }

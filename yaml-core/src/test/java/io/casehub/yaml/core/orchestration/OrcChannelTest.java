@@ -114,4 +114,25 @@ class OrcChannelTest {
         assertThat(ch2.isErrorClosed()).isTrue();
         assertThat(ch2.closeError()).hasMessage("err");
     }
+
+    @Test
+    void isClosedReturnsFalseBeforeClose() {
+        var ch = new DefaultOrcChannel<String>("test");
+        assertThat(ch.isClosed()).isFalse();
+    }
+
+    @Test
+    void isClosedReturnsTrueAfterClose() {
+        var ch = new DefaultOrcChannel<String>("test");
+        ch.close();
+        assertThat(ch.isClosed()).isTrue();
+    }
+
+    @Test
+    void isClosedReturnsTrueAfterErrorClose() {
+        var ch = new DefaultOrcChannel<String>("test");
+        ch.close(new RuntimeException("error"));
+        assertThat(ch.isClosed()).isTrue();
+        assertThat(ch.isErrorClosed()).isTrue();
+    }
 }

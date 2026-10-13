@@ -222,10 +222,41 @@ public final class Walker {
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
+            if (structuralValue instanceof java.util.List) {
+                @SuppressWarnings("unchecked")
+                var stepList = (List<Map<String, Object>>) structuralValue;
+                return new ResolvedStep.ParallelStep(
+                        stepName,
+                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames),
+                        decorators);
+            }
+            @SuppressWarnings("unchecked")
+            var policyMap = (Map<String, Object>) structuralValue;
+            @SuppressWarnings("unchecked")
+            var stepList = (List<Map<String, Object>>) policyMap.get("steps");
+            if (stepList == null || stepList.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "parallel map form requires a non-empty 'steps' list at " + stepPath);
+            }
+            var resolved = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames);
+            Object advanceAfterRaw = policyMap.get("advance-after");
+            int advanceAfter;
+            if (advanceAfterRaw == null || "all".equals(advanceAfterRaw)) {
+                advanceAfter = resolved.size();
+            } else if (advanceAfterRaw instanceof Number n) {
+                advanceAfter = n.intValue();
+            } else {
+                throw new IllegalArgumentException(
+                    "advance-after must be a positive integer or 'all', got: " + advanceAfterRaw + " at " + stepPath);
+            }
+            boolean cancelRemaining = Boolean.TRUE.equals(policyMap.get("cancel-remaining"));
+            java.time.Duration collectionTimeout = null;
+            Object ctRaw = policyMap.get("collection-timeout");
+            if (ctRaw != null) {
+                collectionTimeout = io.casehub.yaml.core.orchestration.DurationParser.parse(ctRaw.toString());
+            }
             return new ResolvedStep.ParallelStep(
-                    stepName,
-                    resolve((List<Map<String, Object>>) structuralValue, registry, depth + 1, stepPath + " → parallel", seenNames),
-                    decorators);
+                    stepName, resolved, advanceAfter, cancelRemaining, collectionTimeout, decorators);
         }
         if ("try".equals(structuralType)) {
             var trySteps     = (List<Map<String, Object>>) structuralValue;

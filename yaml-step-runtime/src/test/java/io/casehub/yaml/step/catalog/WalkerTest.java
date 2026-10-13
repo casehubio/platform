@@ -821,4 +821,108 @@ class WalkerTest {
         assertThat(race.branches()).hasSize(2);
         assertThat(race.decorators()).containsEntry("timeout", "30s");
     }
+
+    @Test
+    void parallel_listForm_defaultPolicy() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")),
+                Map.<String, Object>of("process", Map.of("command", "b.sh")));
+        var step     = Map.<String, Object>of("parallel", steps);
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved).hasSize(1);
+        var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
+        assertThat(parallel.advanceAfter()).isEqualTo(2);
+        assertThat(parallel.cancelRemaining()).isFalse();
+        assertThat(parallel.collectionTimeout()).isNull();
+    }
+
+    @Test
+    void parallel_mapForm_discriminator() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")),
+                Map.<String, Object>of("process", Map.of("command", "b.sh")),
+                Map.<String, Object>of("process", Map.of("command", "c.sh")));
+        Map<String, Object> step = new java.util.LinkedHashMap<>();
+        step.put("step", "query");
+        step.put("parallel", Map.of("advance-after", 1, "steps", steps));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved).hasSize(1);
+        var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
+        assertThat(parallel.name()).isEqualTo("query");
+        assertThat(parallel.advanceAfter()).isEqualTo(1);
+        assertThat(parallel.cancelRemaining()).isFalse();
+        assertThat(parallel.steps()).hasSize(3);
+    }
+
+    @Test
+    void parallel_mapForm_race() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")),
+                Map.<String, Object>of("process", Map.of("command", "b.sh")));
+        var step = Map.<String, Object>of(
+                "parallel", Map.of(
+                        "advance-after", 1,
+                        "cancel-remaining", true,
+                        "steps", steps));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
+        assertThat(parallel.advanceAfter()).isEqualTo(1);
+        assertThat(parallel.cancelRemaining()).isTrue();
+    }
+
+    @Test
+    void parallel_mapForm_advanceAfterAll() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")),
+                Map.<String, Object>of("process", Map.of("command", "b.sh")));
+        var step = Map.<String, Object>of(
+                "parallel", Map.of("advance-after", "all", "steps", steps));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
+        assertThat(parallel.advanceAfter()).isEqualTo(2);
+    }
+
+    @Test
+    void parallel_mapForm_collectionTimeout() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")),
+                Map.<String, Object>of("process", Map.of("command", "b.sh")));
+        Map<String, Object> policyMap = new java.util.LinkedHashMap<>();
+        policyMap.put("advance-after", 1);
+        policyMap.put("collection-timeout", "30s");
+        policyMap.put("steps", steps);
+        var step     = Map.<String, Object>of("parallel", policyMap);
+        var resolved = Walker.resolve(List.of(step), registry);
+        var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
+        assertThat(parallel.collectionTimeout()).isEqualTo(java.time.Duration.ofSeconds(30));
+    }
+
+    @Test
+    void parallel_mapForm_advanceAfterZero_throws() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")));
+        var step = Map.<String, Object>of(
+                "parallel", Map.of("advance-after", 0, "steps", steps));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parallel_mapForm_advanceAfterExceedsSteps_throws() {
+        var steps = List.of(
+                Map.<String, Object>of("process", Map.of("command", "a.sh")));
+        var step = Map.<String, Object>of(
+                "parallel", Map.of("advance-after", 5, "steps", steps));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parallel_mapForm_noSteps_throws() {
+        var step = Map.<String, Object>of(
+                "parallel", Map.of("advance-after", 1));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

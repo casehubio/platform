@@ -84,7 +84,20 @@ public final class StepSchemaComposer {
 
         ObjectNode parallelVariant = mapper.createObjectNode();
         ObjectNode parallelProps   = parallelVariant.putObject("properties");
-        parallelProps.putObject("parallel").put("type", "array");
+        ObjectNode parallelSchema  = parallelProps.putObject("parallel");
+        ArrayNode  parallelOneOf   = parallelSchema.putArray("oneOf");
+        parallelOneOf.addObject().put("type", "array");
+        ObjectNode mapForm = parallelOneOf.addObject();
+        mapForm.put("type", "object");
+        ObjectNode mapFormProps = mapForm.putObject("properties");
+        mapFormProps.putObject("steps").put("type", "array");
+        ObjectNode advanceAfter = mapFormProps.putObject("advance-after");
+        ArrayNode advanceOneOf = advanceAfter.putArray("oneOf");
+        advanceOneOf.addObject().put("type", "integer");
+        advanceOneOf.addObject().put("type", "string").putArray("enum").add("all");
+        mapFormProps.putObject("cancel-remaining").put("type", "boolean");
+        mapFormProps.putObject("collection-timeout").put("type", "string");
+        mapForm.putArray("required").add("steps");
         parallelVariant.putArray("required").add("parallel");
         oneOf.add(parallelVariant);
 

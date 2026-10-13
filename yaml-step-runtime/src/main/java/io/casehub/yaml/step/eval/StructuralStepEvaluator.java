@@ -54,7 +54,11 @@ public final class StructuralStepEvaluator {
             result = decoratorChain.apply(decorators, c -> dispatchStep(step, c, runner))
                                    .execute(ctx);
         }
-        recordResult(step.name(), result);
+        boolean isPolicyParallel = step instanceof ResolvedStep.ParallelStep p
+                                   && p.advanceAfter() < p.steps().size();
+        if (!isPolicyParallel) {
+            recordResult(step.name(), result);
+        }
         return result;
     }
 
@@ -80,7 +84,9 @@ public final class StructuralStepEvaluator {
                     }
                 }
                 case ResolvedStep.BlockStep b -> preRegisterLatches(b.steps());
-                case ResolvedStep.ParallelStep p -> preRegisterLatches(p.steps());
+                case ResolvedStep.ParallelStep p -> {
+                    preRegisterLatches(p.steps());
+                }
                 case ResolvedStep.RaceStep r -> preRegisterLatches(r.branches());
                 case ResolvedStep.TryCatchFinallyStep t -> {
                     preRegisterLatches(t.trySteps());
@@ -303,6 +309,10 @@ public final class StructuralStepEvaluator {
             return Result.of(Map.of());
         }
 
+        if (parallel.advanceAfter() < parallel.steps().size()) {
+            return evaluateParallelWithPolicy(parallel, ctx, runner);
+        }
+
         int stepCount = parallel.steps().size();
         @SuppressWarnings("unchecked")
         Future<Result>[] futures = new Future[stepCount];
@@ -333,6 +343,70 @@ public final class StructuralStepEvaluator {
             return Result.failed("Parallel execution interrupted");
         }
     }
+
+    private Result evaluateParallelWithPolicy(ResolvedStep.ParallelStep parallel,
+                                              StepContext ctx, StepRunner runner) {
+        if (scope == null) {
+            return Result.failed("parallel with advance-after requires an ExecutionScope");
+        }
+        int    totalSteps  = parallel.steps().size();
+        int    required    = parallel.advanceAfter();
+        String latchPrefix = "parallel:" + (parallel.name() != null ? parallel.name() : "anon-" + System.identityHashCode(parallel));
+
+        io.casehub.yaml.core.orchestration.OrcLatch advancementLatch = scope.latch(latchPrefix + ":advance", required);
+        io.casehub.yaml.core.orchestration.OrcLatch completionLatch  = scope.latch(latchPrefix + ":complete", totalSteps);
+
+        var tracker = new ParallelCompletionTracker(
+                advancementLatch, completionLatch, required, totalSteps,
+                new AtomicInteger(), new AtomicInteger(),
+                new java.util.concurrent.atomic.AtomicBoolean(), new AtomicReference<>());
+
+        ExecutionScope branchScope = parallel.cancelRemaining() ? scope.childScope(latchPrefix + ":branches") : scope;
+
+        for (ResolvedStep sub : parallel.steps()) {
+            branchScope.spawn(
+                    sub.name() != null ? sub.name() : "branch",
+                    () -> {
+                        Result result = evaluateInternal(sub, ctx, runner);
+                        tracker.onStepComplete(result.isSuccess(), result);
+                    });
+        }
+
+        try {
+            advancementLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Result.failed("Parallel advancement interrupted");
+        }
+
+        if (tracker.isUnreachable()) {
+            if (parallel.cancelRemaining()) {
+                branchScope.close();
+            }
+            return Result.failed("Advance threshold unreachable: required "
+                                 + required + " successes from " + totalSteps + " steps, but "
+                                 + tracker.failureCount().get() + " failed");
+        }
+
+        if (parallel.cancelRemaining()) {
+            branchScope.close();
+        }
+
+        Result advancingResult = tracker.advancingResult().get();
+
+        scope.spawn(latchPrefix + ":completion-watcher", () -> {
+            try {
+                completionLatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            recordResult(parallel.name(), advancingResult != null ? advancingResult : Result.of(Map.of()));
+        });
+
+        return advancingResult != null ? advancingResult : Result.of(Map.of());
+    }
+
 
     private Result evaluateBarrier(ResolvedStep.BarrierStep barrier) {
         if (scope == null) {

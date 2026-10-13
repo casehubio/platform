@@ -917,6 +917,55 @@ class DecoratorChainTest {
                 assertThat(resultRef.get().isSuccess()).isTrue();
             }
         }
+        @Test
+        void from_fanIn_channelCloseReturnsStreamEnded() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var ch1 = scope.<Object>channel("a");
+                var ch2 = scope.<Object>channel("b");
+                ch1.close();
+                ch2.close();
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b")));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_fanIn_untilConditionExits() {
+            var condEval = new ConditionEvaluator(expr -> "true".equals(expr));
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b"), "until", "true"));
+                var result = scopedChain.apply(decorators, ctx -> Result.of(Map.of("ran", true)))
+                                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("from.stream-ended")).isEqualTo(true);
+            }
+        }
+
+        @Test
+        void from_fanIn_namedConsumerRegistersHandle() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+
+                var decorators = Map.<String, Object>of("from",
+                        Map.of("channels", List.of("a", "b"), "name", "fan-reader"));
+                scopedChain.apply(decorators, ctx -> Result.of(Map.of()));
+
+                var handle = scope.consumerHandle("fan-reader");
+                assertThat(handle).isNotNull();
+                assertThat(handle.isRunning()).isTrue();
+            }
+        }
     }
 
     // ── publish list form ─────────────────────────────────────────────

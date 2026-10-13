@@ -1,8 +1,8 @@
 package io.casehub.yaml.step.catalog;
 
 import io.casehub.yaml.plugin.api.Definition;
-import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.PluginRegistry;
+import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
@@ -725,5 +725,100 @@ class WalkerTest {
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("'do' is no longer valid");
+    }
+
+    @Test
+    void resolvesRaceStep() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("race", List.of(
+                Map.of("process", Map.of("cmd", "fast")),
+                Map.of("process", Map.of("cmd", "slow"))
+                                ));
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ResolvedStep.RaceStep.class);
+        var race = (ResolvedStep.RaceStep) result.get(0);
+        assertThat(race.branches()).hasSize(2);
+    }
+
+    @Test
+    void rejectsRaceWithSingleBranch() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("race", List.of(
+                Map.of("process", Map.of("cmd", "only"))
+                                ));
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least 2 branches");
+    }
+
+    @Test
+    void resolvesPauseStep() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("pause", "enricher");
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ResolvedStep.ControlStep.class);
+        var control = (ResolvedStep.ControlStep) result.get(0);
+        assertThat(control.target()).isEqualTo("enricher");
+        assertThat(control.activate()).isFalse();
+    }
+
+    @Test
+    void resolvesResumeStep() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("resume", "enricher");
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ResolvedStep.ControlStep.class);
+        var control = (ResolvedStep.ControlStep) result.get(0);
+        assertThat(control.target()).isEqualTo("enricher");
+        assertThat(control.activate()).isTrue();
+    }
+
+    @Test
+    void resolvesDecoratorOnlyStepAsEmptyBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("from", Map.of("channel", "events"));
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) result.get(0);
+        assertThat(block.steps()).isEmpty();
+        assertThat(block.decorators()).containsKey("from");
+    }
+
+    @Test
+    void resolvesDelayOnlyStepAsEmptyBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("delay", "5s");
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) result.get(0);
+        assertThat(block.steps()).isEmpty();
+        assertThat(block.decorators()).containsEntry("delay", "5s");
+    }
+
+    @Test
+    void raceStepWithDecorators() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("race", List.of(
+                Map.of("process", Map.of("cmd", "a")),
+                Map.of("process", Map.of("cmd", "b"))
+                                ));
+        step.put("timeout", "30s");
+
+        var result = Walker.resolve(List.of(step), registry);
+        assertThat(result).hasSize(1);
+        var race = (ResolvedStep.RaceStep) result.get(0);
+        assertThat(race.branches()).hasSize(2);
+        assertThat(race.decorators()).containsEntry("timeout", "30s");
     }
 }

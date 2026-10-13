@@ -21,7 +21,9 @@ public final class Walker {
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
             "parallel", "semaphore", "barrier", "quorum", "race",
-            "pause", "resume");
+            "pause", "resume",
+            "from", "cancel", "background", "at", "on-complete",
+            "resource", "priority", "wait", "mutex", "when");
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
     private static final Set<String> REMOVED_KEYS = Set.of("steps", "do");

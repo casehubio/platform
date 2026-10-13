@@ -1465,5 +1465,27 @@ class StructuralStepEvaluatorTest {
                 assertThat(slowChannel.isEmpty()).isTrue();
             }
         }
+
+        @Test
+        void raceWithTimeoutDecorator() throws Exception {
+            try (var scope = new DefaultExecutionScope(
+                    new io.casehub.yaml.core.orchestration.DefaultPrimitiveFactory(() -> 100.0),
+                    () -> 100.0)) {
+                var condEval   = new ConditionEvaluator(null);
+                var scopedEval = new StructuralStepEvaluator(condEval, scope);
+
+                var slowBranch1 = new ResolvedStep.BlockStep(null, List.of(),
+                                                             Map.of("from", Map.of("channel", "never1")));
+                var slowBranch2 = new ResolvedStep.BlockStep(null, List.of(),
+                                                             Map.of("from", Map.of("channel", "never2")));
+
+                var race = new ResolvedStep.RaceStep(null, List.of(slowBranch1, slowBranch2),
+                                                     Map.of("timeout", "200ms", "on-error", "race-timeout"));
+
+                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output().get("on-error.fallback")).isEqualTo("race-timeout");
+            }
+        }
     }
 }

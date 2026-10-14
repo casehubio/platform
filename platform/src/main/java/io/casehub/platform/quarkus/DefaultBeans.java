@@ -35,9 +35,7 @@ import io.casehub.platform.view.NoOpCrossTenantSubjectViewStore;
 import io.casehub.platform.view.NoOpSubjectViewStore;
 import io.casehub.platform.view.NoOpViewMembershipTracker;
 import io.quarkus.arc.DefaultBean;
-import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.enterprise.inject.Produces;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -50,7 +48,7 @@ public class DefaultBeans {
 
     // --- Identity ---
 
-    @Produces @Alternative @Priority(100) @ApplicationScoped
+    @Produces @DefaultBean @ApplicationScoped
     public MockCurrentPrincipal mockCurrentPrincipal(
             @ConfigProperty(name = "casehub.platform.principal.actorId", defaultValue = "system") String actorId,
             @ConfigProperty(name = "casehub.platform.principal.groups") Optional<List<String>> groups,

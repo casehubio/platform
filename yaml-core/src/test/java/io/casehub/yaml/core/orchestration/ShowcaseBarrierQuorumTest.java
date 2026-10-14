@@ -89,8 +89,9 @@ class ShowcaseBarrierQuorumTest {
             results.recordSuccess("strategy-b", Map.of("vote", "BUY"));
             quorum.countDown();
         });
+        var slowGate = new CountDownLatch(1);
         Thread.ofVirtual().name("slow-c").start(() -> {
-            try { Thread.sleep(5000); } catch (InterruptedException e) { return; }
+            try { slowGate.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { return; }
             results.recordSuccess("strategy-c", Map.of("vote", "SELL"));
             quorum.countDown();
         });

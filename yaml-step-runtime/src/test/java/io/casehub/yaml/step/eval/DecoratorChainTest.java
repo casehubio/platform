@@ -559,11 +559,12 @@ class DecoratorChainTest {
                         new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
                 var semaphore = scope.semaphore("exhausted", 1);
                 var acquired  = new java.util.concurrent.CountDownLatch(1);
+                var holder    = new java.util.concurrent.CountDownLatch(1);
                 Thread.ofVirtual().start(() -> {
                     try {
                         semaphore.acquire();
                         acquired.countDown();
-                        Thread.sleep(5000);
+                        holder.await(2, java.util.concurrent.TimeUnit.SECONDS);
                     } catch (InterruptedException ignored) {} finally {semaphore.release();}
                 });
                 acquired.await();

@@ -24,8 +24,9 @@ class WrapBackgroundDecoratorTest {
         var scope = new DefaultExecutionScope();
         var chain = new DecoratorChain(new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
 
+        var blocker = new CountDownLatch(1);
         DecoratedExecution inner = ctx -> {
-            try { Thread.sleep(5000); } catch (InterruptedException e) {
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
             return Result.of(Map.of());
@@ -61,8 +62,9 @@ class WrapBackgroundDecoratorTest {
         var chain = new DecoratorChain(new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
         var interrupted = new CompletableFuture<Boolean>();
 
+        var blocker = new CountDownLatch(1);
         DecoratedExecution inner = ctx -> {
-            try { Thread.sleep(60_000); } catch (InterruptedException e) {
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) {
                 interrupted.complete(true);
             }
             return Result.of(Map.of());

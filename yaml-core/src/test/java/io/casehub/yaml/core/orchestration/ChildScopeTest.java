@@ -31,14 +31,15 @@ class ChildScopeTest {
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
 
+        var blocker = new CountDownLatch(1);
         child.spawn("child-worker", () -> {
             started.countDown();
-            try { Thread.sleep(60_000); } catch (InterruptedException e) { interrupted.set(true); }
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { interrupted.set(true); }
         });
 
         started.await(1, TimeUnit.SECONDS);
         parent.close();
-        Thread.sleep(200);
+        Thread.sleep(50);
         assertThat(interrupted.get()).isTrue();
     }
 
@@ -51,14 +52,15 @@ class ChildScopeTest {
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
 
+        var blocker = new CountDownLatch(1);
         grandchild.spawn("deep-worker", () -> {
             started.countDown();
-            try { Thread.sleep(60_000); } catch (InterruptedException e) { interrupted.set(true); }
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { interrupted.set(true); }
         });
 
         started.await(1, TimeUnit.SECONDS);
         parent.close();
-        Thread.sleep(200);
+        Thread.sleep(50);
         assertThat(interrupted.get()).isTrue();
     }
 

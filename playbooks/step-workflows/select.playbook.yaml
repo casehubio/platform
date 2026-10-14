@@ -1,0 +1,17 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Select"
+  description: "Channel and signal multiplexing — wait on multiple named signals, the first signal to fire determines which branch executes. For first-to-complete over arbitrary concurrent blocks, use race: instead."
+  tags:
+    - select
+    - signal
+    - multiplexing
+    - step-workflows
+---
+- select:
+  - wait: fast-signal
+    log: { message: "Fast branch won the race" }
+  - wait: slow-signal
+    log: { message: "Slow branch won the race" }

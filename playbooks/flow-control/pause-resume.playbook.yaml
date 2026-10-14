@@ -1,0 +1,38 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Pause / Resume"
+  description: "Consumer lifecycle — a named consumer reads from a channel, is paused by a control step, then resumed. Items buffer during the pause."
+  tags:
+    - from
+    - consumer
+    - pause
+    - resume
+    - lifecycle
+    - flow-control
+---
+- concurrent:
+    producer:
+      - log: { message: "Sending batch 1" }
+        publish: { channel: events, data: { batch: 1 } }
+        loop: 3
+      - delay: 500ms
+      - log: { message: "Sending batch 2" }
+        publish: { channel: events, data: { batch: 2 } }
+        loop: 3
+
+    consumer:
+      - step: reader
+        log: { message: "Reading ${from.batch}" }
+        from: { channel: events, name: primary-reader }
+        loop: continuous
+        cancel: shutdown
+
+    controller:
+      - delay: 200ms
+      - pause: primary-reader
+      - log: { message: "Consumer paused — items buffer" }
+      - delay: 300ms
+      - resume: primary-reader
+      - log: { message: "Consumer resumed — buffered items drain" }

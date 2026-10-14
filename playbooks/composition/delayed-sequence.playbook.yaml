@@ -1,0 +1,23 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Delayed Sequence"
+  description: "Sequential from: reads with a delay between them — read A, wait, then read B with a timeout. Models delayed causality: event A causes event B after a processing delay."
+  tags:
+    - temporal
+    - sequence
+    - delay
+    - from
+    - composition
+---
+- step: read-a
+  log: { message: "Read trigger: ${from.type}" }
+  from: triggers
+
+- delay: 2s
+
+- step: read-b
+  log: { message: "Read consequence: ${from.type}" }
+  from: consequences
+  timeout: 10s

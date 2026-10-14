@@ -1,0 +1,17 @@
+playbook: "1.0"
+schema: client
+---
+playbook: delay-decorator-demo
+meta:
+  title: "Delay (decorator)"
+  description: "Delay in decorator form pauses AFTER the step completes. Compare with standalone delay which is its own step between actions."
+  tags:
+    - delay
+    - decorator
+    - flow-control
+steps:
+  - click: { role: button, name: "A" }
+    delay: 1000ms
+  - click: { role: button, name: "B" }
+    delay: 500ms
+  - click: { role: button, name: "C" }

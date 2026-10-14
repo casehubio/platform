@@ -1,0 +1,31 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Named Consumer"
+  description: "Named consumer with lifecycle control — register a consumer handle via from: name, then stop it from a separate branch."
+  tags:
+    - from
+    - consumer
+    - named
+    - lifecycle
+    - concurrency-patterns
+---
+- concurrent:
+    source:
+      - log: { message: "Emitting events" }
+        publish: { channel: raw-events, data: { type: "click", ts: 1000 } }
+        delay: 100ms
+        loop: 10
+
+    enricher:
+      - step: enrich
+        log: { message: "Enriching ${from.type}" }
+        from: { channel: raw-events, name: enricher }
+        loop: continuous
+        cancel: shutdown
+
+    supervisor:
+      - delay: 500ms
+      - stop: enricher
+      - log: { message: "Enricher stopped after 500ms" }

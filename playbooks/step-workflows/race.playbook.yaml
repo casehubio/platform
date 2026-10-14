@@ -1,0 +1,17 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Race"
+  description: "First-to-complete over arbitrary blocks — two branches execute concurrently, the first to finish wins, the loser is cancelled."
+  tags:
+    - race
+    - first-to-complete
+    - cancellation
+    - step-workflows
+---
+- race:
+  - block:
+    - delay: 200ms
+    - log: { message: "Slow branch finished" }
+  - log: { message: "Fast branch finished" }

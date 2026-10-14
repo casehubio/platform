@@ -202,7 +202,7 @@ public final class Walker {
             var elseSteps = (List<Map<String, Object>>) companions.get("else");
             return new ResolvedStep.IfElseStep(
                     stepName,
-                    (String) ifValue,
+                    String.valueOf(ifValue),
                     resolve(thenSteps, registry, depth + 1, stepPath + " → then", seenNames),
                     elseSteps != null ? resolve(elseSteps, registry, depth + 1, stepPath + " → else", seenNames) : null,
                     decorators);

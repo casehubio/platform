@@ -1,0 +1,22 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "From Until"
+  description: "from: with exit condition — reads from a channel repeatedly until a flag is set. The until expression is evaluated before each receive."
+  tags:
+    - from
+    - until
+    - channel
+    - flow-control
+---
+- step: producer
+  log: { message: "Sending 3 items" }
+  publish: { channel: events, data: { value: 1 } }
+  loop: 3
+
+- step: consumer
+  log: { message: "Processing ${from.value}" }
+  from: { channel: events, until: "${flag.done}" }
+  loop: continuous
+  cancel: shutdown

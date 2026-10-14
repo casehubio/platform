@@ -1,0 +1,32 @@
+playbook: "1.0"
+schema: client
+---
+playbook: orchestration-block-demo
+meta:
+  title: "Orchestration Block"
+  description: "Top-level orchestration block pre-declares barriers and signals. Init delays then signals, worker awaits, both sync at a barrier before proceeding."
+  tags:
+    - orchestration block
+    - signal
+    - await
+    - barrier
+    - delay
+    - concurrent
+    - composition
+orchestration:
+  barriers:
+    sync: { count: 2 }
+  signals: [ready]
+steps:
+  - concurrent:
+      init:
+        - click: { role: button, name: "A" }
+        - delay: 1500ms
+        - signal: ready
+        - await: { barrier: sync }
+        - click: { role: button, name: "C" }
+      worker:
+        - await: { signal: ready }
+        - click: { role: button, name: "B" }
+        - await: { barrier: sync }
+        - click: { role: button, name: "D" }

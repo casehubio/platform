@@ -1,0 +1,26 @@
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "From Channel Close"
+  description: "from: with channel close detection — the consumer exits cleanly when the producer closes the channel. Error-close propagates the failure."
+  tags:
+    - from
+    - channel
+    - close
+    - flow-control
+---
+- concurrent:
+    producer:
+      - log: { message: "Sending item 1" }
+        publish: { channel: data, data: { id: 1 } }
+      - log: { message: "Sending item 2" }
+        publish: { channel: data, data: { id: 2 } }
+      - log: { message: "Closing channel" }
+
+    consumer:
+      - step: read
+        log: { message: "Received ${from.id}" }
+        from: data
+        loop: continuous
+        cancel: shutdown

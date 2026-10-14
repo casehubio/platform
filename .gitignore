@@ -3,7 +3,6 @@ target/
 .idea/
 wksp
 .claude
-package-lock.json
 proj
 .mvn/maven.config
 .mvn/slot-settings.xml

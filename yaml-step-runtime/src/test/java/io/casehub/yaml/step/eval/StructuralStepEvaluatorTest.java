@@ -1209,10 +1209,11 @@ class StructuralStepEvaluatorTest {
                                                          List.of(leaf("fast"), leaf("slow")),
                                                          Map.of("timeout", "100ms"));
 
+            var blocker = new CountDownLatch(1);
             var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
                 if (step instanceof ResolvedStep.InvokeStep inv
                     && "slow".equals(inv.invokeSpec().get("id"))) {
-                    try {Thread.sleep(2000);} catch (InterruptedException e) {
+                    try {blocker.await(2, TimeUnit.SECONDS);} catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
                 }
@@ -1275,8 +1276,9 @@ class StructuralStepEvaluatorTest {
                                                         List.of(innerBlock),
                                                         Map.of("timeout", "10s"));
 
+            var blocker = new CountDownLatch(1);
             var result = scopedEvaluator.evaluate(outerBlock, resolver, (step, res) -> {
-                try {Thread.sleep(2000);} catch (InterruptedException e) {
+                try {blocker.await(2, TimeUnit.SECONDS);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 return Result.of(Map.of());
@@ -1298,8 +1300,9 @@ class StructuralStepEvaluatorTest {
 
             scopedEvaluator.preRegisterLatches(List.of(parallel));
 
+            var blocker = new CountDownLatch(1);
             var result = scopedEvaluator.evaluate(parallel, resolver, (step, res) -> {
-                try {Thread.sleep(2000);} catch (InterruptedException e) {
+                try {blocker.await(2, TimeUnit.SECONDS);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 return Result.of(Map.of());
@@ -1565,10 +1568,11 @@ class StructuralStepEvaluatorTest {
                     "race", List.of(namedLeaf("fast"), namedLeaf("slow")),
                     1, true, null, Map.of());
 
+            var blocker = new CountDownLatch(1);
             scopedEval.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv
                     && "slow".equals(inv.invokeSpec().get("id"))) {
-                    try {Thread.sleep(5000);} catch (InterruptedException e) {
+                    try {blocker.await(2, TimeUnit.SECONDS);} catch (InterruptedException e) {
                         interrupted.set(true);
                         Thread.currentThread().interrupt();
                     }
@@ -1577,7 +1581,7 @@ class StructuralStepEvaluatorTest {
                 return Result.of(Map.of("fast", true));
             });
 
-            Thread.sleep(500);
+            Thread.sleep(200);
             assertThat(interrupted.get()).isTrue();
         }
 

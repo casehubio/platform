@@ -27,9 +27,10 @@ class WrapCancelDecoratorTest {
         var started = new CountDownLatch(1);
         var result = new CompletableFuture<Result>();
 
+        var blocker = new CountDownLatch(1);
         DecoratedExecution inner = ctx -> {
             started.countDown();
-            try { Thread.sleep(5000); } catch (InterruptedException e) {
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return Result.failed("interrupted");
             }
@@ -53,8 +54,9 @@ class WrapCancelDecoratorTest {
         scope.signal("already-done").signal();
         var chain = new DecoratorChain(new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
 
+        var blocker = new CountDownLatch(1);
         DecoratedExecution inner = ctx -> {
-            try { Thread.sleep(5000); } catch (InterruptedException e) {
+            try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return Result.failed("interrupted");
             }

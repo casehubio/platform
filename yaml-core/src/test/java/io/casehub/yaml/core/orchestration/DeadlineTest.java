@@ -40,10 +40,9 @@ class DeadlineTest {
     @Test
     void deadline_expiresAfterDuration_closesScope() throws InterruptedException {
         var scope = new DefaultExecutionScope();
-        var expired = new AtomicBoolean(false);
-        var deadlined = scope.withDeadline(Duration.ofMillis(100), () -> expired.set(true));
-        Thread.sleep(400);
-        assertThat(expired.get()).isTrue();
+        var expiredLatch = new java.util.concurrent.CountDownLatch(1);
+        var deadlined = scope.withDeadline(Duration.ofMillis(100), expiredLatch::countDown);
+        assertThat(expiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         assertThat(deadlined.isDeadlineExpired()).isTrue();
         scope.close();
     }
@@ -51,10 +50,9 @@ class DeadlineTest {
     @Test
     void deadline_respectsSpeedMultiplier() throws InterruptedException {
         var scope = new DefaultExecutionScope(new DefaultPrimitiveFactory(), () -> 10.0);
-        var expired = new AtomicBoolean(false);
-        scope.withDeadline(Duration.ofSeconds(1), () -> expired.set(true));
-        Thread.sleep(400);
-        assertThat(expired.get()).isTrue();
+        var expiredLatch = new java.util.concurrent.CountDownLatch(1);
+        scope.withDeadline(Duration.ofSeconds(1), expiredLatch::countDown);
+        assertThat(expiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         scope.close();
     }
 
@@ -98,10 +96,13 @@ class DeadlineTest {
     @Test
     void deadline_withHandler_handlerThrows_scopeStillCloses() throws InterruptedException {
         var scope = new DefaultExecutionScope();
+        var firedLatch = new java.util.concurrent.CountDownLatch(1);
         var deadlined = scope.withDeadline(Duration.ofMillis(50), () -> {
+            firedLatch.countDown();
             throw new RuntimeException("handler failure");
         });
-        Thread.sleep(300);
+        assertThat(firedLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(50);
         assertThat(deadlined.isDeadlineExpired()).isTrue();
         scope.close();
     }
@@ -109,9 +110,10 @@ class DeadlineTest {
     @Test
     void deadline_isDeadlineExpired_childReportsParentDeadline() throws InterruptedException {
         var scope = new DefaultExecutionScope();
-        var deadlined = scope.withDeadline(Duration.ofMillis(100));
+        var expiredLatch = new java.util.concurrent.CountDownLatch(1);
+        var deadlined = scope.withDeadline(Duration.ofMillis(100), expiredLatch::countDown);
         var child = deadlined.childScope("nested");
-        Thread.sleep(400);
+        assertThat(expiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         assertThat(child.isDeadlineExpired()).isTrue();
         scope.close();
     }
@@ -131,17 +133,16 @@ class DeadlineTest {
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
         OrcChannel<String> channel = deadlined.channel("data");
 
-        var interrupted = new AtomicBoolean(false);
+        var interruptedLatch = new java.util.concurrent.CountDownLatch(1);
         deadlined.spawn("receiver", () -> {
             try {
                 channel.receive();
             } catch (InterruptedException e) {
-                interrupted.set(true);
+                interruptedLatch.countDown();
             }
         });
 
-        Thread.sleep(300);
-        assertThat(interrupted.get()).isTrue();
+        assertThat(interruptedLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         scope.close();
     }
 
@@ -151,15 +152,16 @@ class DeadlineTest {
         var deadlined = scope.withDeadline(Duration.ofMillis(100));
 
         var interrupted = new AtomicBoolean(false);
+        var blocker = new java.util.concurrent.CountDownLatch(1);
         deadlined.spawn("worker", () -> {
             try {
-                Thread.sleep(60_000);
+                blocker.await(2, java.util.concurrent.TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 interrupted.set(true);
             }
         });
 
-        Thread.sleep(300);
+        Thread.sleep(200);
         assertThat(interrupted.get()).isTrue();
         assertThat(deadlined.isDeadlineExpired()).isTrue();
         scope.close();
@@ -168,11 +170,13 @@ class DeadlineTest {
     @Test
     void deadline_primitivesCleaned_viaOrcPrimitive() throws InterruptedException {
         var scope     = new DefaultExecutionScope();
-        var deadlined = scope.withDeadline(Duration.ofMillis(100));
+        var expiredLatch = new java.util.concurrent.CountDownLatch(1);
+        var deadlined = scope.withDeadline(Duration.ofMillis(100), expiredLatch::countDown);
         var latch     = deadlined.latch("gate", 5);
         var signal    = deadlined.signal("notify");
 
-        Thread.sleep(300);
+        assertThat(expiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(50);
         assertThat(deadlined.isDeadlineExpired()).isTrue();
         assertThat(latch.getCount()).isEqualTo(0);
         assertThat(signal.isSignalled()).isTrue();
@@ -183,11 +187,10 @@ class DeadlineTest {
     void deadline_childShorterDeadline_childClosesFirst() throws InterruptedException {
         var scope        = new DefaultExecutionScope();
         var parent       = scope.withDeadline(Duration.ofSeconds(60));
-        var childExpired = new AtomicBoolean(false);
-        parent.withDeadline(Duration.ofMillis(100), () -> childExpired.set(true));
+        var childExpiredLatch = new java.util.concurrent.CountDownLatch(1);
+        parent.withDeadline(Duration.ofMillis(100), childExpiredLatch::countDown);
 
-        Thread.sleep(300);
-        assertThat(childExpired.get()).isTrue();
+        assertThat(childExpiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         assertThat(parent.isDeadlineExpired()).isFalse();
         scope.close();
     }
@@ -195,12 +198,12 @@ class DeadlineTest {
     @Test
     void deadline_parentDeadline_childClosesWithParent() throws InterruptedException {
         var scope         = new DefaultExecutionScope();
-        var parentExpired = new AtomicBoolean(false);
-        var parent        = scope.withDeadline(Duration.ofMillis(100), () -> parentExpired.set(true));
+        var parentExpiredLatch = new java.util.concurrent.CountDownLatch(1);
+        var parent        = scope.withDeadline(Duration.ofMillis(100), parentExpiredLatch::countDown);
         var childLatch    = parent.latch("child-gate", 3);
 
-        Thread.sleep(300);
-        assertThat(parentExpired.get()).isTrue();
+        assertThat(parentExpiredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(50);
         assertThat(childLatch.getCount()).isEqualTo(0);
         scope.close();
     }

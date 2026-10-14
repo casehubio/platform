@@ -75,10 +75,11 @@ class SpawnTest {
         var interrupted = new AtomicBoolean(false);
         var started = new CountDownLatch(1);
 
+        var blocker = new CountDownLatch(1);
         scope.spawn("waiting", () -> {
             started.countDown();
             try {
-                Thread.sleep(60_000);
+                blocker.await(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 interrupted.set(true);
             }
@@ -86,7 +87,7 @@ class SpawnTest {
 
         started.await(1, TimeUnit.SECONDS);
         scope.close();
-        Thread.sleep(100);
+        Thread.sleep(50);
         assertThat(interrupted.get()).isTrue();
     }
 
@@ -127,16 +128,17 @@ class SpawnTest {
         var count = new java.util.concurrent.atomic.AtomicInteger(0);
         var allStarted = new CountDownLatch(3);
 
+        var blocker = new CountDownLatch(1);
         for (int i = 0; i < 3; i++) {
             scope.spawn("worker-" + i, () -> {
                 allStarted.countDown();
-                try { Thread.sleep(60_000); } catch (InterruptedException e) { count.incrementAndGet(); }
+                try { blocker.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { count.incrementAndGet(); }
             });
         }
 
         allStarted.await(1, TimeUnit.SECONDS);
         scope.close();
-        Thread.sleep(200);
+        Thread.sleep(50);
         assertThat(count.get()).isEqualTo(3);
     }
 }

@@ -1980,5 +1980,57 @@ class GraphQLResolverProcessorTest {
                 .contains("empty description");
     }
 
+    @Test
+    void basePathWithPathParamsDoesNotDuplicateInMethodPath() throws Exception {
+        var api = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.AdverseEventApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import java.util.List;
+
+                @McpDomain(value = "adverse-events",
+                           basePath = "/trials/{trialId}/sites/{siteId}/patients/{enrollmentId}/adverse-events")
+                public interface AdverseEventApi {
+                    @PlatformQuery("List adverse events")
+                    @RestPath("/")
+                    List<String> list(@PathParam String trialId,
+                                     @PathParam String siteId,
+                                     @PathParam String enrollmentId);
+
+                    @PlatformQuery("Get adverse event by id")
+                    @RestPath("/{eventId}")
+                    String getById(@PathParam String trialId,
+                                   @PathParam String siteId,
+                                   @PathParam String enrollmentId,
+                                   @PathParam String eventId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=adverse-events")
+                .compile(api);
+
+        System.out.println("=== Compilation errors ===");
+        compilation.errors().forEach(e -> System.out.println("  " + e));
+
+        var restSource = compilation.generatedSourceFile("test.rest.AdverseEventsResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        System.out.println("=== Generated REST Resource ===");
+        System.out.println(restContent);
+
+        assertThat(compilation.errors()).isEmpty();
+
+        assertThat(restContent).contains(
+                "@Path(\"/trials/{trialId}/sites/{siteId}/patients/{enrollmentId}/adverse-events\")");
+
+        assertThat(restContent).doesNotContain("//{trialId}");
+        assertThat(restContent).doesNotContain("/{trialId}/{siteId}/{enrollmentId}");
+
+        assertThat(restContent).contains("@Path(\"/\")");
+        assertThat(restContent).contains("@Path(\"/{eventId}\")");
+    }
 
 }

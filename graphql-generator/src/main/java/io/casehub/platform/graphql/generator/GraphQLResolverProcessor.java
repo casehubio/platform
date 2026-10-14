@@ -1072,7 +1072,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
 
                 for (ResolvedOperation op : toGenerate) {
-                    generateRestMethod(out, op);
+                    generateRestMethod(out, op, restBasePath);
                 }
 
                 if (needsUriInfo(toGenerate)) {
@@ -1096,13 +1096,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
     }
 
-    private void generateRestMethod(PrintWriter out, ResolvedOperation op) {
+    private void generateRestMethod(PrintWriter out, ResolvedOperation op, String restBasePath) {
         if (op.type() == OperationType.STREAM) {
-            generateRestStreamMethod(out, op);
+            generateRestStreamMethod(out, op, restBasePath);
             return;
         }
         if (op.type() == OperationType.WEBHOOK) {
-            generateRestWebhookMethod(out, op);
+            generateRestWebhookMethod(out, op, restBasePath);
             return;
         }
         String  httpVerb         = resolveHttpVerb(op.type(), op.restMethodOverride());
@@ -1158,7 +1158,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             pathSuffix.append("/").append(resolvedPath);
         }
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }
@@ -1273,7 +1273,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
 
-    private void generateRestStreamMethod(PrintWriter out, ResolvedOperation op) {
+    private void generateRestStreamMethod(PrintWriter out, ResolvedOperation op, String restBasePath) {
         List<String> pathParams = new ArrayList<>();
         Set<Integer> pathParamPositions = new HashSet<>();
         for (int i = 0; i < op.params().size(); i++) {
@@ -1292,7 +1292,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             pathSuffix.append("/").append(resolvedPath);
         }
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }
@@ -1359,7 +1359,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return "Object";
     }
 
-    private void generateRestWebhookMethod(PrintWriter out, ResolvedOperation op) {
+    private void generateRestWebhookMethod(PrintWriter out, ResolvedOperation op, String restBasePath) {
         List<String> pathParams           = new ArrayList<>();
         Set<Integer> pathParamPositions   = new HashSet<>();
         Set<Integer> headerParamPositions = new HashSet<>();
@@ -1388,7 +1388,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             pathSuffix.append("/").append(resolvedPath);
         }
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }

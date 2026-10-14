@@ -78,18 +78,18 @@ public class SpringDomainRestControllerWriter {
 
         for (ResolvedOperation op : domain.operations()) {
             if (op.type() == OperationType.STREAM) {
-                classBuilder.addMethod(buildStreamMethod(op, fieldName));
+                classBuilder.addMethod(buildStreamMethod(op, fieldName, domain.resolvedBasePath()));
             } else if (op.type() == OperationType.WEBHOOK) {
-                classBuilder.addMethod(buildWebhookMethod(op, fieldName));
+                classBuilder.addMethod(buildWebhookMethod(op, fieldName, domain.resolvedBasePath()));
             } else {
-                classBuilder.addMethod(buildRestMethod(op, fieldName));
+                classBuilder.addMethod(buildRestMethod(op, fieldName, domain.resolvedBasePath()));
             }
         }
 
         return JavaFile.builder(targetPackage, classBuilder.build()).build();
     }
 
-    private MethodSpec buildRestMethod(ResolvedOperation op, String fieldName) {
+    private MethodSpec buildRestMethod(ResolvedOperation op, String fieldName, String restBasePath) {
         String httpVerb = GeneratorUtils.resolveHttpVerb(op.type(), op.restMethodOverride());
         boolean isBodyVerb = httpVerb.equals("POST") || httpVerb.equals("PUT") || httpVerb.equals("PATCH");
 
@@ -116,7 +116,7 @@ public class SpringDomainRestControllerWriter {
         pathSuffix.append("/").append(GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName()));
         String resolvedPath = GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName());
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }
@@ -198,7 +198,7 @@ public class SpringDomainRestControllerWriter {
         return builder.build();
     }
 
-    private MethodSpec buildStreamMethod(ResolvedOperation op, String fieldName) {
+    private MethodSpec buildStreamMethod(ResolvedOperation op, String fieldName, String restBasePath) {
         List<String> pathParams         = new ArrayList<>();
         Set<Integer> pathParamPositions = new HashSet<>();
         for (int i = 0; i < op.params().size(); i++) {
@@ -213,7 +213,7 @@ public class SpringDomainRestControllerWriter {
         pathSuffix.append("/").append(GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName()));
         String resolvedPath = GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName());
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }
@@ -285,7 +285,7 @@ public class SpringDomainRestControllerWriter {
         return builder.build();
     }
 
-    private MethodSpec buildWebhookMethod(ResolvedOperation op, String fieldName) {
+    private MethodSpec buildWebhookMethod(ResolvedOperation op, String fieldName, String restBasePath) {
         List<String> pathParams = new ArrayList<>();
         Set<Integer> pathParamPositions = new HashSet<>();
         int bodyParamIndex = -1;
@@ -304,7 +304,7 @@ public class SpringDomainRestControllerWriter {
         pathSuffix.append("/").append(GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName()));
         String resolvedPath = GeneratorUtils.resolveRestPath(op.restPathOverride(), op.methodName());
         for (String pp : pathParams) {
-            if (!resolvedPath.contains("{" + pp + "}")) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
                 pathSuffix.append("/{").append(pp).append("}");
             }
         }

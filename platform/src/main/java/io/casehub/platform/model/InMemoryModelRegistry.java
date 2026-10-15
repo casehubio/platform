@@ -93,6 +93,7 @@ public class InMemoryModelRegistry implements MutableModelRegistry {
                                         || (d.costTier() != null && d.costTier().rank() <= query.maxCostTier().rank()))
                            .filter(d -> query.minContextWindow() == null || d.contextWindow() >= query.minContextWindow())
                            .filter(d -> query.minMaxOutput() == null || d.maxOutput() >= query.minMaxOutput())
+                           .filter(d -> query.backendKey() == null || query.backendKey().equals(d.backendKey()))
                            .toList();
     }
 

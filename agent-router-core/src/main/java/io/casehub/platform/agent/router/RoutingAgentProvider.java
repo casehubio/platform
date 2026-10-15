@@ -16,6 +16,7 @@ import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRef;
 import io.casehub.platform.api.model.ModelRegistry;
+import java.util.Collections;
 import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
@@ -32,7 +33,7 @@ public class RoutingAgentProvider implements AgentProvider {
     private final BackendInstanceRegistry registry;
     private final String                  defaultBackendKey;
     private final ModelRegistry           modelRegistry;
-    private final Map<String, ModelQuery> aliases;
+    private final Map<String, ModelChain> aliases;
     private final io.casehub.platform.agent.session.SessionPoolRegistry poolRegistry;
 
     private final ModelAvailabilityFilter availabilityFilter;
@@ -48,14 +49,14 @@ public class RoutingAgentProvider implements AgentProvider {
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry,
-                                Map<String, ModelQuery> aliases) {
+                                Map<String, ModelChain> aliases) {
         this(registry, defaultBackendKey, modelRegistry, aliases, (ModelAvailabilityFilter) null, null);
     }
 
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry,
-                                Map<String, ModelQuery> aliases,
+                                Map<String, ModelChain> aliases,
                                 ModelAvailabilityFilter availabilityFilter,
                                 io.casehub.platform.agent.session.SessionPoolRegistry poolRegistry) {
         this.registry           = registry;
@@ -72,7 +73,7 @@ public class RoutingAgentProvider implements AgentProvider {
     public RoutingAgentProvider(BackendInstanceRegistry registry,
                                 String defaultBackendKey,
                                 ModelRegistry modelRegistry,
-                                Map<String, ModelQuery> aliases,
+                                Map<String, ModelChain> aliases,
                                 ModelAvailabilityFilter availabilityFilter) {
         this(registry, defaultBackendKey, modelRegistry, aliases, availabilityFilter, null);
     }
@@ -108,6 +109,9 @@ public class RoutingAgentProvider implements AgentProvider {
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+        if (config.model() != null && aliases.containsKey(config.model())) {
+            return resolveAndInvokeWithRetry(config.withModelChain(aliases.get(config.model())));
+        }
         if (config.modelChain() != null && !config.modelChain().isEmpty()) {
             return resolveAndInvokeWithRetry(config);
         }
@@ -181,6 +185,9 @@ public class RoutingAgentProvider implements AgentProvider {
     }
 
     private ResolvedRoute resolveFromConfig(AgentSessionConfig config) {
+        if (config.model() != null && aliases.containsKey(config.model())) {
+            return resolveChain(aliases.get(config.model()), availabilityFilter);
+        }
         if (config.modelChain() != null && !config.modelChain().isEmpty()) {
             return resolveChain(config.modelChain(), availabilityFilter);
         }
@@ -190,6 +197,9 @@ public class RoutingAgentProvider implements AgentProvider {
     }
 
     private ResolvedRoute resolveFromInit(AgentSessionInit init) {
+        if (init.model() != null && aliases.containsKey(init.model())) {
+            return resolveChain(aliases.get(init.model()), availabilityFilter);
+        }
         if (init.modelChain() != null && !init.modelChain().isEmpty()) {
             return resolveChain(init.modelChain(), availabilityFilter);
         }
@@ -288,12 +298,6 @@ public class RoutingAgentProvider implements AgentProvider {
                         "No default backend configured: " + defaultBackendKey);
             }
             return new ResolvedRoute(backend.get(), null);
-        }
-
-        // Step 0: Alias?
-        if (aliases.containsKey(model)) {
-            LOG.debugf("Resolving alias: %s", model);
-            return resolveQuery(aliases.get(model));
         }
 
         // Step 1: Tier reference (unambiguous prefix — check first)

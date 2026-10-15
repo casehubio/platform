@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.step.handler.AriaInvokeHandler;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,7 +27,7 @@ class PlaybookParsingTest {
     private static final Set<String> STUB_ACTIONS = Set.of(
             "accumulate", "accumulate-get", "agent-delegate", "await",
             "chan-consume", "chan-produce", "concurrent",
-            "click", "corr-await", "corr-expect", "corr-send",
+            "corr-await", "corr-expect", "corr-send",
             "counter-add", "counter-get",
             "deadline-check", "deadline-create", "deadline-work",
             "fail", "flag-check", "flag-set", "flag-toggle",
@@ -46,6 +48,10 @@ class PlaybookParsingTest {
             REGISTRY.register(new Definition(action, null, Map.of(), Map.of(),
                     Portability.BOTH, (params, services) -> Result.of(Map.of()), null));
         }
+        new YamlDefinitionSource(
+                List.of("definitions/aria-actions.yaml"),
+                List.of(new AriaInvokeHandler(OutputStream.nullOutputStream())),
+                event -> {}).populate(REGISTRY);
     }
 
     private static final Yaml SNAKE_YAML = new Yaml();

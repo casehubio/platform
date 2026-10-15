@@ -20,6 +20,7 @@ class ModelQueryTest {
         assertThat(query.minContextWindow()).isNull();
         assertThat(query.minMaxOutput()).isNull();
         assertThat(query.preferVendor()).isNull();
+        assertThat(query.backendKey()).isNull();
     }
 
     @Test
@@ -45,11 +46,22 @@ class ModelQueryTest {
         assertThat(query.minContextWindow()).isEqualTo(128000);
         assertThat(query.minMaxOutput()).isEqualTo(16384);
         assertThat(query.preferVendor()).isEqualTo("anthropic");
+        assertThat(query.backendKey()).isNull();
+    }
+
+    @Test
+    void builderSetsBackendKey() {
+        var query = ModelQuery.builder()
+                              .tier(ModelTier.FAST)
+                              .backendKey("simulation")
+                              .build();
+        assertThat(query.backendKey()).isEqualTo("simulation");
+        assertThat(query.tier()).isEqualTo(ModelTier.FAST);
     }
 
     @Test
     void nullCapabilities_defaultsToEmptySet() {
-        var query = new ModelQuery("anthropic", null, null, null, null, null, null, null, null);
+        var query = new ModelQuery("anthropic", null, null, null, null, null, null, null, null, null);
         assertThat(query.requiredCapabilities()).isEmpty();
     }
 

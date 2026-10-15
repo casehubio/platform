@@ -11,7 +11,8 @@ public record ModelQuery(
         CostTier maxCostTier,
         Integer minContextWindow,
         Integer minMaxOutput,
-        String preferVendor
+        String preferVendor,
+        String backendKey
 ) {
     public ModelQuery {
         requiredCapabilities = requiredCapabilities != null
@@ -19,7 +20,7 @@ public record ModelQuery(
     }
 
     public static ModelQuery all() {
-        return new ModelQuery(null, null, null, Set.of(), null, null, null, null, null);
+        return new ModelQuery(null, null, null, Set.of(), null, null, null, null, null, null);
     }
 
     public static Builder builder() {return new Builder();}
@@ -34,6 +35,7 @@ public record ModelQuery(
         private Integer       minContextWindow;
         private Integer       minMaxOutput;
         private String        preferVendor;
+        private String        backendKey;
 
         public Builder vendor(String vendor) {
                                                  this.vendor = vendor;
@@ -80,9 +82,15 @@ public record ModelQuery(
                                                                       return this;
                                                                   }
 
+        public Builder backendKey(String backendKey)              {
+                                                                      this.backendKey = backendKey;
+                                                                      return this;
+                                                                  }
+
         public ModelQuery build() {
             return new ModelQuery(vendor, family, tier, requiredCapabilities,
-                                  locality, maxCostTier, minContextWindow, minMaxOutput, preferVendor);
+                                  locality, maxCostTier, minContextWindow, minMaxOutput,
+                                  preferVendor, backendKey);
         }
     }
 }

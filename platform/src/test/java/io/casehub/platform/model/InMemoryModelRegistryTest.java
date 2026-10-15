@@ -206,4 +206,37 @@ class InMemoryModelRegistryTest {
         assertThat(delta2.addedIds()).containsExactly("llama-4-scout");
         assertThat(delta2.removedIds()).containsExactly("gpt-4.1");
     }
+
+    private ModelDescriptor descWithBackend(String id, String backendKey, ModelTier tier) {
+        return new ModelDescriptor(id, id, backendKey, null, "vendor", "fam", id, tier,
+                                   Set.of(ModelCapabilities.TEXT), 200000, 16384,
+                                   ModelLocality.LOCAL, CostTier.FREE, "local", Map.of());
+    }
+
+    @Test
+    void queryWithBackendKeyFiltersToMatchingBackend() {
+        var registry = new InMemoryModelRegistry();
+        registry.replaceSource("test", 1, List.of(
+                descWithBackend("gemma3", "ollama", ModelTier.FAST),
+                descWithBackend("sim-fast", "simulation", ModelTier.FAST)));
+
+        var query = ModelQuery.builder().tier(ModelTier.FAST).backendKey("simulation").build();
+        var results = registry.query(query);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).id()).isEqualTo("sim-fast");
+    }
+
+    @Test
+    void queryWithoutBackendKeyReturnsAll() {
+        var registry = new InMemoryModelRegistry();
+        registry.replaceSource("test", 1, List.of(
+                descWithBackend("gemma3", "ollama", ModelTier.FAST),
+                descWithBackend("sim-fast", "simulation", ModelTier.FAST)));
+
+        var query = ModelQuery.builder().tier(ModelTier.FAST).build();
+        var results = registry.query(query);
+
+        assertThat(results).hasSize(2);
+    }
 }

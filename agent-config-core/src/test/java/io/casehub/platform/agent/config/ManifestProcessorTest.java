@@ -2,6 +2,7 @@ package io.casehub.platform.agent.config;
 
 import io.casehub.platform.api.credentials.LlmCredentialStore;
 import io.casehub.platform.api.model.CostTier;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
 import io.casehub.platform.api.model.ModelQuery;
@@ -66,19 +67,70 @@ class ManifestProcessorTest {
     }
 
     @Test
-    void processConvertsAliasToModelQuery() {
-        var alias = new AliasDeclaration("FLAGSHIP", List.of("reasoning", "code"), null, "HIGH", 128000, null, "anthropic");
+    void processConvertsAliasToSingleEntryChain() {
+        var alias = new AliasDeclaration("FLAGSHIP", List.of("reasoning", "code"), null, "HIGH", 128000, null, "anthropic", null, null);
         var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of("reasoning-heavy", alias), List.of(), null, Map.of());
 
         var result = processor(Map.of()).process(manifest);
 
         assertThat(result.aliases()).containsKey("reasoning-heavy");
-        var query = result.aliases().get("reasoning-heavy");
+        var chain = result.aliases().get("reasoning-heavy");
+        assertThat(chain.entries()).hasSize(1);
+        var query = ((ModelChain.ModelChainEntry.Queried) chain.entries().get(0)).query();
         assertThat(query.tier()).isEqualTo(ModelTier.FLAGSHIP);
         assertThat(query.requiredCapabilities()).containsExactlyInAnyOrder("reasoning", "code");
         assertThat(query.maxCostTier()).isEqualTo(CostTier.HIGH);
         assertThat(query.minContextWindow()).isEqualTo(128000);
         assertThat(query.preferVendor()).isEqualTo("anthropic");
+    }
+
+    @Test
+    void chainAliasProducesModelChain() {
+        var entry1 = new ChainEntry(null, "FAST", List.of(), "LOCAL", null, null, null, null, null);
+        var entry2 = new ChainEntry(null, "FAST", List.of(), "CLOUD", null, null, null, null, null);
+        var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry1, entry2));
+
+        var chain = ManifestProcessor.toModelChain(alias);
+
+        assertThat(chain.entries()).hasSize(2);
+        var q1 = (ModelChain.ModelChainEntry.Queried) chain.entries().get(0);
+        assertThat(q1.query().tier()).isEqualTo(ModelTier.FAST);
+        assertThat(q1.query().locality()).isEqualTo(ModelLocality.LOCAL);
+        var q2 = (ModelChain.ModelChainEntry.Queried) chain.entries().get(1);
+        assertThat(q2.query().locality()).isEqualTo(ModelLocality.CLOUD);
+    }
+
+    @Test
+    void chainWithNamedEntryProducesNamedChainEntry() {
+        var entry = new ChainEntry("claude-opus-5", null, List.of(), null, null, null, null, null, null);
+        var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry));
+
+        var chain = ManifestProcessor.toModelChain(alias);
+
+        assertThat(chain.entries()).hasSize(1);
+        assertThat(chain.entries().get(0)).isInstanceOf(ModelChain.ModelChainEntry.Named.class);
+        assertThat(((ModelChain.ModelChainEntry.Named) chain.entries().get(0)).modelRef()).isEqualTo("claude-opus-5");
+    }
+
+    @Test
+    void chainWithBackendKeyProducesQueryWithBackendKey() {
+        var entry = new ChainEntry(null, "FAST", List.of(), null, null, null, null, null, "simulation");
+        var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry));
+
+        var chain = ManifestProcessor.toModelChain(alias);
+
+        var q = (ModelChain.ModelChainEntry.Queried) chain.entries().get(0);
+        assertThat(q.query().backendKey()).isEqualTo("simulation");
+    }
+
+    @Test
+    void chainAndQueryFieldsMutuallyExclusive() {
+        var entry = new ChainEntry(null, "FAST", List.of(), null, null, null, null, null, null);
+        var alias = new AliasDeclaration("STANDARD", List.of(), null, null, null, null, null, null, List.of(entry));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ManifestProcessor.toModelChain(alias))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mutually exclusive");
     }
 
     @Test

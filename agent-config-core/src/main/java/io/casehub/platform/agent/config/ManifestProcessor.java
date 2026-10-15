@@ -3,6 +3,7 @@ package io.casehub.platform.agent.config;
 import io.casehub.platform.api.credentials.LlmCredentialStore;
 import io.casehub.platform.api.model.CostTier;
 import io.casehub.platform.api.model.ModelLocality;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelTier;
 import io.casehub.platform.api.model.MutableModelRegistry;
@@ -107,9 +108,9 @@ public class ManifestProcessor {
     }
 
     private ManifestResult processAliasesAndDefaults(Manifest manifest) {
-        var aliases = new LinkedHashMap<String, ModelQuery>();
+        var aliases = new LinkedHashMap<String, ModelChain>();
         for (var entry : manifest.aliases().entrySet()) {
-            aliases.put(entry.getKey(), toModelQuery(entry.getValue()));
+            aliases.put(entry.getKey(), toModelChain(entry.getValue()));
         }
 
         String defaultBackend = manifest.defaults() != null ? manifest.defaults().backend() : null;
@@ -119,15 +120,51 @@ public class ManifestProcessor {
         return new ManifestResult(aliases, defaultBackend, pools);
     }
 
+    static ModelChain toModelChain(AliasDeclaration alias) {
+        boolean hasQueryFields = alias.tier() != null || !alias.capabilities().isEmpty()
+                || alias.locality() != null || alias.maxCost() != null
+                || alias.minContext() != null || alias.minOutput() != null
+                || alias.preferVendor() != null || alias.backendKey() != null;
+        boolean hasChain = !alias.chain().isEmpty();
+
+        if (hasQueryFields && hasChain) {
+            throw new IllegalArgumentException(
+                    "Alias has both 'chain' and query fields — these are mutually exclusive");
+        }
+        if (hasChain) {
+            return ModelChain.of(alias.chain().stream()
+                    .map(ManifestProcessor::toChainEntry)
+                    .toList());
+        }
+        return ModelChain.of(List.of(new ModelChain.ModelChainEntry.Queried(toModelQuery(alias))));
+    }
+
+    private static ModelChain.ModelChainEntry toChainEntry(ChainEntry entry) {
+        if (entry.model() != null) {
+            return new ModelChain.ModelChainEntry.Named(entry.model());
+        }
+        return new ModelChain.ModelChainEntry.Queried(buildQuery(
+                entry.tier(), entry.capabilities(), entry.locality(), entry.maxCost(),
+                entry.minContext(), entry.minOutput(), entry.preferVendor(), entry.backendKey()));
+    }
+
     static ModelQuery toModelQuery(AliasDeclaration alias) {
+        return buildQuery(alias.tier(), alias.capabilities(), alias.locality(), alias.maxCost(),
+                alias.minContext(), alias.minOutput(), alias.preferVendor(), alias.backendKey());
+    }
+
+    private static ModelQuery buildQuery(String tier, List<String> capabilities, String locality,
+                                         String maxCost, Integer minContext, Integer minOutput,
+                                         String preferVendor, String backendKey) {
         return ModelQuery.builder()
-                .tier(alias.tier() != null ? ModelTier.valueOf(alias.tier()) : null)
-                .requiredCapabilities(alias.capabilities() != null ? Set.copyOf(alias.capabilities()) : Set.of())
-                .locality(alias.locality() != null ? ModelLocality.valueOf(alias.locality()) : null)
-                .maxCostTier(alias.maxCost() != null ? CostTier.valueOf(alias.maxCost()) : null)
-                .minContextWindow(alias.minContext())
-                .minMaxOutput(alias.minOutput())
-                .preferVendor(alias.preferVendor())
+                .tier(tier != null ? ModelTier.valueOf(tier) : null)
+                .requiredCapabilities(capabilities != null ? Set.copyOf(capabilities) : Set.of())
+                .locality(locality != null ? ModelLocality.valueOf(locality) : null)
+                .maxCostTier(maxCost != null ? CostTier.valueOf(maxCost) : null)
+                .minContextWindow(minContext)
+                .minMaxOutput(minOutput)
+                .preferVendor(preferVendor)
+                .backendKey(backendKey)
                 .build();
     }
 }

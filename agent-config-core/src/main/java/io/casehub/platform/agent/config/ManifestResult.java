@@ -1,10 +1,10 @@
 package io.casehub.platform.agent.config;
 
-import io.casehub.platform.api.model.ModelQuery;
+import io.casehub.platform.api.model.ModelChain;
 import java.util.List;
 import java.util.Map;
 
-public record ManifestResult(Map<String, ModelQuery> aliases, String defaultBackendKey, List<PoolDeclaration> pools) {
+public record ManifestResult(Map<String, ModelChain> aliases, String defaultBackendKey, List<PoolDeclaration> pools) {
 
     public ManifestResult {
         aliases = aliases != null ? Map.copyOf(aliases) : Map.of();

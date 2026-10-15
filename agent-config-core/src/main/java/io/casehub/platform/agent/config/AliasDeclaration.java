@@ -10,9 +10,12 @@ public record AliasDeclaration(
         @JsonProperty("max-cost") String maxCost,
         @JsonProperty("min-context") Integer minContext,
         @JsonProperty("min-output") Integer minOutput,
-        @JsonProperty("prefer-vendor") String preferVendor
+        @JsonProperty("prefer-vendor") String preferVendor,
+        @JsonProperty("backend-key") String backendKey,
+        List<ChainEntry> chain
 ) {
     public AliasDeclaration {
         capabilities = capabilities != null ? List.copyOf(capabilities) : List.of();
+        chain = chain != null ? List.copyOf(chain) : List.of();
     }
 }

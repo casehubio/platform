@@ -75,8 +75,8 @@ class ManifestLoaderTest {
 
     @Test
     void mergeHigherPriorityWinsForAliases() {
-        var a1 = new AliasDeclaration("FLAGSHIP", List.of("reasoning"), null, null, null, null, null);
-        var a2 = new AliasDeclaration("FAST", List.of("text"), null, null, null, null, null);
+        var a1 = new AliasDeclaration("FLAGSHIP", List.of("reasoning"), null, null, null, null, null, null, null);
+        var a2 = new AliasDeclaration("FAST", List.of("text"), null, null, null, null, null, null, null);
 
         var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
         entries.add(new ManifestLoader.PrioritizedManifest(

@@ -25,30 +25,37 @@ public class SimulatedAgentBackend implements AgentBackend {
 
     @Override
     public String key() {
-        return "simulated";
+        return "simulation";
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Multi<AgentEvent> invoke(final AgentSessionConfig config) {
-        final Optional<SimulationStrategy<AgentSimulationInput, List<AgentEvent>>> strategy =
-                simulation.strategyFor(AgentProviderQN.INVOKE);
-        if (strategy.isEmpty()) {
-            return Multi.createFrom().empty();
+        if (simulation != null) {
+            final Optional<SimulationStrategy<AgentSimulationInput, List<AgentEvent>>> strategy =
+                    simulation.strategyFor(AgentProviderQN.INVOKE);
+            if (strategy.isPresent()) {
+                final AgentSimulationInput input = AgentSimulationInput.from(config);
+                if (strategy.get().canResolve(input)) {
+                    final List<AgentEvent> events = strategy.get().resolve(input);
+                    return Multi.createFrom().iterable(events);
+                }
+            }
         }
+        return cannedResponse(config);
+    }
 
-        final AgentSimulationInput input = AgentSimulationInput.from(config);
-        if (!strategy.get().canResolve(input)) {
-            return Multi.createFrom().empty();
-        }
-
-        final List<AgentEvent> events = strategy.get().resolve(input);
-        return Multi.createFrom().iterable(events);
+    private Multi<AgentEvent> cannedResponse(AgentSessionConfig config) {
+        String modelId = config.model() != null ? config.model() : "unknown";
+        return Multi.createFrom().items(
+                new AgentEvent.TextDelta("Simulated response from " + modelId),
+                new AgentEvent.InvocationComplete(0, 0, 0, 0, 0, 0.0, 0L, 0L, null, 0, false)
+        );
     }
 
     @Override
     public AgentSession openSession(final AgentSessionInit init) {
-        throw new UnsupportedOperationException("Multi-turn simulation not yet implemented");
+        return new SimulationAgentSession(init.model());
     }
 
     public static KeyExtractor<AgentSimulationInput> defaultKeyExtractor() {

@@ -7,6 +7,7 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRegistry;
 import io.casehub.platform.api.model.ModelTier;
@@ -465,7 +466,8 @@ class RoutingAgentProviderTest {
         var registry = tierAwareRegistry(
                 descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"));
         var aliases = Map.of("reasoning-heavy",
-                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).requiredCapabilities(Set.of("reasoning")).build());
+                             ModelChain.of(java.util.List.of(new ModelChain.ModelChainEntry.Queried(
+                                     ModelQuery.builder().tier(ModelTier.FLAGSHIP).requiredCapabilities(Set.of("reasoning")).build()))));
         var router = new RoutingAgentProvider(
                 backendRegistry(capturingBackend("claude", configCapture, initCapture)),
                 "claude", registry, aliases);
@@ -483,7 +485,8 @@ class RoutingAgentProviderTest {
                 descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"),
                 descriptorWithVendor("claude-haiku", "claude-haiku", "claude", ModelTier.FAST, "anthropic"));
         var aliases = Map.of("tier:FLAGSHIP",
-                             ModelQuery.builder().tier(ModelTier.FAST).build());
+                             ModelChain.of(java.util.List.of(new ModelChain.ModelChainEntry.Queried(
+                                     ModelQuery.builder().tier(ModelTier.FAST).build()))));
         var router = new RoutingAgentProvider(
                 backendRegistry(capturingBackend("claude", configCapture, initCapture)),
                 "claude", registry, aliases);
@@ -516,7 +519,8 @@ class RoutingAgentProviderTest {
                 descriptorWithVendor("claude-opus-5", "claude-opus-5", "claude", ModelTier.FLAGSHIP, "anthropic"),
                 descriptorWithVendor("o3", "o3", "openai", ModelTier.FLAGSHIP, "openai"));
         var aliases = Map.of("prefer-openai",
-                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("openai").build());
+                             ModelChain.of(java.util.List.of(new ModelChain.ModelChainEntry.Queried(
+                                     ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("openai").build()))));
         var router = new RoutingAgentProvider(
                 backendRegistry(capturingBackend("claude", configCapture, initCapture), stubBackend("openai")),
                 "claude", registry, aliases);
@@ -537,7 +541,8 @@ class RoutingAgentProviderTest {
                 descriptorWithVendor("o3", "o3", "openai", ModelTier.FLAGSHIP, "openai"),
                 descriptorWithVendor("gemini-ultra", "gemini-ultra", "gemini", ModelTier.FLAGSHIP, "google"));
         var aliases = Map.of("prefer-google",
-                             ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("google").build());
+                             ModelChain.of(java.util.List.of(new ModelChain.ModelChainEntry.Queried(
+                                     ModelQuery.builder().tier(ModelTier.FLAGSHIP).preferVendor("google").build()))));
         var router = new RoutingAgentProvider(
                 backendRegistry(stubBackend("openai"),
                                 capturingBackend("gemini", configCapture, initCapture)),

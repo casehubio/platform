@@ -1,5 +1,6 @@
 package io.casehub.platform.simulation.config.quarkus;
 
+import io.casehub.platform.agent.simulation.SimulatedAgentBackend;
 import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
@@ -16,6 +17,7 @@ import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import org.eclipse.microprofile.config.ConfigProvider;
 
@@ -89,6 +91,12 @@ public class SimulationConfigBeans {
         return runtime::globalSpeed;
     }
 
+    @Produces
+    @ApplicationScoped
+    public SimulatedAgentBackend simulationBackend(Instance<SimulationRuntime> runtime) {
+        return new SimulatedAgentBackend(
+                runtime.isResolvable() ? runtime.get() : null);
+    }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     void onStartup(@Observes StartupEvent event,

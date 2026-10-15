@@ -21,7 +21,7 @@ class AgentConfigBeansTest {
     @Test
     void aliasesLoadedFromConfig() {
         assertThat(manifestResult.aliases()).containsKey("fast");
-        var fastQuery = manifestResult.aliases().get("fast");
-        assertThat(fastQuery.tier()).isNotNull();
+        var fastChain = manifestResult.aliases().get("fast");
+        assertThat(fastChain.entries()).isNotEmpty();
     }
 }

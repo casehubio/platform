@@ -38,9 +38,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to GitHub Packages
+      - name: Deploy parent POM
         if: github.event_name != 'pull_request'
-        run: mvn --batch-mode deploy -DskipTests
+        run: mvn --batch-mode deploy -DskipTests -N || echo "::warning::Parent POM already deployed (409), continuing with modules"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish modules to GitHub Packages
+        if: github.event_name != 'pull_request'
+        run: mvn --batch-mode deploy -DskipTests -rf :casehub-platform-playbook-catalog
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -22,13 +22,19 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: maven
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
+      - name: Bootstrap API dependencies for coordinated releases
+        run: python3 .github/scripts/bootstrap-release-apis.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and test
         if: github.event_name == 'pull_request'
-        run: mvn --batch-mode install
+        run: mvn --batch-mode --fail-at-end install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

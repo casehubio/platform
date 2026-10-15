@@ -105,9 +105,12 @@ public final class DeclarationParser {
         if (invokeMap.containsKey("process")) {
             return parseProcessBinding(invokeMap.get("process"));
         }
+        if (invokeMap.containsKey("aria")) {
+            return new InvokeBinding.Aria((String) invokeMap.get("aria"));
+        }
 
         throw new IllegalArgumentException(
-                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, python, agent, process. "
+                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, python, agent, process, aria. "
                 + "Got keys: " + invokeMap.keySet());
     }
 

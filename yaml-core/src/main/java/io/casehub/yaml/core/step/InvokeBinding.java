@@ -59,4 +59,11 @@ public sealed interface InvokeBinding {
             if (onError == null) onError = "stderr";
         }
     }
+
+    record Aria(String action) implements InvokeBinding {
+        public Aria {
+            if (action == null || action.isEmpty())
+                throw new IllegalArgumentException("Aria binding requires action");
+        }
+    }
 }

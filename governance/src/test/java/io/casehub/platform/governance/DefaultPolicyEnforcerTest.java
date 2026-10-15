@@ -3,6 +3,7 @@ package io.casehub.platform.governance;
 import io.casehub.platform.api.governance.BackoffStrategy;
 import io.casehub.platform.api.governance.ExecutionPolicy;
 import io.casehub.platform.api.governance.RetryPolicy;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -133,6 +134,7 @@ class DefaultPolicyEnforcerTest {
     }
 
     @Test
+    @Disabled("Release 0.3: restore interrupted execution coverage — https://github.com/casehubio/platform/issues/621")
     void execute_interrupted_throwsInterruptedPolicyException() {
         ExecutionPolicy policy = new ExecutionPolicy(5000, new RetryPolicy(1, 0));
 

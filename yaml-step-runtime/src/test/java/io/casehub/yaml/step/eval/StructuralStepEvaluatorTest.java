@@ -8,9 +8,12 @@ import io.casehub.yaml.core.step.MatchPattern;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
 import io.casehub.yaml.step.catalog.ResolvedStep;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -1387,7 +1390,18 @@ class StructuralStepEvaluatorTest {
     }
 
     @Nested
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
     class RaceStepTests {
+
+        @BeforeEach
+        void traceStart(TestInfo testInfo) {
+            System.err.println("RaceStepTests START " + testInfo.getDisplayName());
+        }
+
+        @AfterEach
+        void traceEnd(TestInfo testInfo) {
+            System.err.println("RaceStepTests END " + testInfo.getDisplayName());
+        }
 
         @Test
         void raceFirstSuccessfulBranchWins() throws Exception {

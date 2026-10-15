@@ -119,3 +119,6 @@ yaml-jackson
 yaml-plugin-processor
 # YAML step runtime — framework-neutral step catalog SPI, no CDI beans
 yaml-step-runtime
+
+# Framework-neutral JSON/YAML resource catalog — no Java classes or CDI beans
+playbook-catalog

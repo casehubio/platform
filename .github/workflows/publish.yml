@@ -38,15 +38,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy parent POM
+      - name: Publish to GitHub Packages
         if: github.event_name != 'pull_request'
-        run: mvn --batch-mode deploy -DskipTests -N || echo "::warning::Parent POM already deployed (409), continuing with modules"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish modules to GitHub Packages
-        if: github.event_name != 'pull_request'
-        run: mvn --batch-mode deploy -DskipTests -rf :casehub-platform-playbook-catalog
+        run: |
+          mvn --batch-mode --fail-at-end deploy -DskipTests 2>&1 | tee /tmp/deploy.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -eq 0 ]; then exit 0; fi
+          if grep -q "HTTP Status: 409" /tmp/deploy.log && ! grep -qE "Failures: [1-9]|Errors: [1-9]|COMPILATION ERROR" /tmp/deploy.log; then
+            echo "::warning::Some artifacts already deployed (409) — expected for unchanged modules"
+            exit 0
+          fi
+          exit $STATUS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

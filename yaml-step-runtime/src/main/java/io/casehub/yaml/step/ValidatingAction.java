@@ -73,6 +73,7 @@ public class ValidatingAction implements Action {
             case InvokeBinding.Mcp m -> "mcp";
             case InvokeBinding.Rest r -> "rest";
             case InvokeBinding.Graphql g -> "graphql";
+            case InvokeBinding.Aria a -> "aria";
         };
     }
 }

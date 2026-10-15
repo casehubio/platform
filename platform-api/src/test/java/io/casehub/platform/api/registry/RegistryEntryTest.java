@@ -223,7 +223,7 @@ class RegistryEntryTest {
     @Test
     void healthStatusValues() {
         assertThat(HealthStatus.values()).containsExactly(
-                HealthStatus.HEALTHY, HealthStatus.DEGRADED, HealthStatus.DOWN);
+                HealthStatus.HEALTHY, HealthStatus.DEGRADED, HealthStatus.DOWN, HealthStatus.SUSPENDED);
     }
 
     @Test

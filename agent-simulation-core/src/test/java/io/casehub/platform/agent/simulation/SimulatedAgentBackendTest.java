@@ -24,22 +24,44 @@ class SimulatedAgentBackendTest {
     private static final String QN_INVOKE = "agent-provider.invoke";
 
     @Test
-    void keyReturnsSimulated() {
+    void keyReturnsSimulation() {
         final var runtime = createRuntime(Optional.empty(), false);
         final AgentBackend backend = new SimulatedAgentBackend(runtime);
 
-        assertThat(backend.key()).isEqualTo("simulated");
+        assertThat(backend.key()).isEqualTo("simulation");
     }
 
     @Test
-    void invokeWithNoStrategyReturnsEmptyMulti() {
+    void keyWithNullRuntime() {
+        final AgentBackend backend = new SimulatedAgentBackend(null);
+        assertThat(backend.key()).isEqualTo("simulation");
+    }
+
+    @Test
+    void invokeWithNoStrategyReturnsCannedResponse() {
         final var runtime = createRuntime(Optional.empty(), false);
         final var backend = new SimulatedAgentBackend(runtime);
 
-        final var events = backend.invoke(AgentSessionConfig.of("system", "hello"))
+        final var events = backend.invoke(AgentSessionConfig.of("system", "hello").withModel("sim-fast"))
                 .collect().asList().await().indefinitely();
 
-        assertThat(events).isEmpty();
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0)).isInstanceOf(AgentEvent.TextDelta.class);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).contains("sim-fast");
+        assertThat(events.get(1)).isInstanceOf(AgentEvent.InvocationComplete.class);
+        assertThat(((AgentEvent.InvocationComplete) events.get(1)).isError()).isFalse();
+    }
+
+    @Test
+    void invokeWithNullRuntimeReturnsCannedResponse() {
+        final var backend = new SimulatedAgentBackend(null);
+
+        final var events = backend.invoke(AgentSessionConfig.of("system", "hello").withModel("sim-fast"))
+                .collect().asList().await().indefinitely();
+
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0)).isInstanceOf(AgentEvent.TextDelta.class);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).contains("sim-fast");
     }
 
     @Test
@@ -69,7 +91,7 @@ class SimulatedAgentBackendTest {
     }
 
     @Test
-    void invokeWhenCannotResolveReturnsEmptyMulti() {
+    void invokeWhenCannotResolveReturnsCannedResponse() {
         final var corpus = new InMemorySimulationCorpus<AgentSimulationInput, List<AgentEvent>>();
         final var config = stubConfig(Optional.of("key-lookup"), false, Optional.empty());
         final var runtime = new SimulationRuntime(config, corpus);
@@ -77,19 +99,39 @@ class SimulatedAgentBackendTest {
                 (AgentSimulationInput input) -> input.userPrompt());
 
         final var backend = new SimulatedAgentBackend(runtime);
-        final var events = backend.invoke(AgentSessionConfig.of("sys", "missing"))
+        final var events = backend.invoke(AgentSessionConfig.of("sys", "missing").withModel("sim-fast"))
                 .collect().asList().await().indefinitely();
 
-        assertThat(events).isEmpty();
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0)).isInstanceOf(AgentEvent.TextDelta.class);
     }
 
     @Test
-    void openSessionThrowsUnsupported() {
-        final var runtime = createRuntime(Optional.empty(), false);
-        final var backend = new SimulatedAgentBackend(runtime);
+    void openSessionReturnsCannedResponseSession() {
+        final var backend = new SimulatedAgentBackend(null);
+        final var session = backend.openSession(AgentSessionInit.of("sys", "sim-fast"));
 
-        assertThatThrownBy(() -> backend.openSession(AgentSessionInit.of("sys")))
-                .isInstanceOf(UnsupportedOperationException.class);
+        final var events = session.query("hello")
+                .collect().asList().await().indefinitely();
+
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0)).isInstanceOf(AgentEvent.TextDelta.class);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).contains("sim-fast");
+    }
+
+    @Test
+    void openSessionCloseIsIdempotent() {
+        final var backend = new SimulatedAgentBackend(null);
+        final var session = backend.openSession(AgentSessionInit.of("sys", "sim-fast"));
+
+        session.close(java.time.Duration.ofSeconds(5));
+        session.close(java.time.Duration.ofSeconds(5));
+
+        final var events = session.query("hello")
+                .collect().asList()
+                .onFailure().recoverWithItem(List.of())
+                .await().indefinitely();
+        assertThat(events).isEmpty();
     }
 
     @Test

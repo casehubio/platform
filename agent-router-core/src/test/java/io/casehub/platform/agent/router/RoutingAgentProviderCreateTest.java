@@ -8,6 +8,7 @@ import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.config.ManifestResult;
 import java.util.List;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRegistry;
 import io.smallrye.mutiny.Multi;
@@ -30,7 +31,8 @@ class RoutingAgentProviderCreateTest {
 
     @Test
     void create_withManifestResult_usesManifestDefaultAndAliases() {
-        var aliases = Map.of("fast", ModelQuery.builder().build());
+        var aliases = Map.of("fast", ModelChain.of(List.of(
+                new ModelChain.ModelChainEntry.Queried(ModelQuery.builder().build()))));
         var manifest = new ManifestResult(aliases, "custom-backend", List.of());
 
         var provider = RoutingAgentProvider.create(

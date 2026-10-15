@@ -84,8 +84,8 @@ class InvokeBindingTest {
     }
 
     @Test
-    void sealedInterfacePermitsSixTypes() {
-        assertThat(InvokeBinding.class.getPermittedSubclasses()).hasSize(6);
+    void sealedInterfacePermitsSevenTypes() {
+        assertThat(InvokeBinding.class.getPermittedSubclasses()).hasSize(7);
     }
 
     @Test
@@ -114,5 +114,21 @@ class InvokeBindingTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new InvokeBinding.Script("python3", null, null, null, null))
                 .withMessageContaining("requires script");
+    }
+
+    @Test
+    void ariaBindingStoresAction() {
+        var binding = new InvokeBinding.Aria("click");
+        assertThat(binding.action()).isEqualTo("click");
+    }
+
+    @Test
+    void ariaBindingRequiresAction() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.Aria(null))
+                .withMessageContaining("requires action");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.Aria(""))
+                .withMessageContaining("requires action");
     }
 }

@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.casehub</groupId>
         <artifactId>casehub-platform-parent</artifactId>
-        <version>${revision}</version>
+        <version>0.4-SNAPSHOT</version>
     </parent>
 
     <artifactId>casehub-platform-acl-worker-core</artifactId>

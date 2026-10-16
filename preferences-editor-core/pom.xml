@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.casehub</groupId>
         <artifactId>casehub-platform-parent</artifactId>
-        <version>0.4-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>casehub-platform-preferences-editor-core</artifactId>

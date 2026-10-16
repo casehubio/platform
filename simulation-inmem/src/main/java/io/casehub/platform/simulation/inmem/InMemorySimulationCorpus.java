@@ -26,6 +26,19 @@ public class InMemorySimulationCorpus<I, O> implements SimulationCorpus<I, O> {
     }
 
     @Override
+    public List<O> lookupAllByKey(final String qualifiedName, final String key) {
+        final var records = store.get(qualifiedName);
+        if (records == null) {
+            return List.of();
+        }
+        return records.stream()
+                      .filter(r -> key.equals(r.key()))
+                      .map(InvocationRecord::output)
+                      .toList();
+    }
+
+
+    @Override
     public Optional<O> lookupByIndex(final String qualifiedName, final int index) {
         final var records = store.get(qualifiedName);
         if (records == null || index < 0 || index >= records.size()) {

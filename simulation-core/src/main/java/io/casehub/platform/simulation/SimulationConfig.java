@@ -10,6 +10,10 @@ public interface SimulationConfig {
 
     Optional<ExhaustionPolicy> exhaustionPolicy(String qualifiedName);
 
+    default Optional<MatchPolicy> matchPolicy(String qualifiedName) {
+        return Optional.empty();
+    }
+
     default Optional<Double> threshold(String qualifiedName) {
         return Optional.empty();
     }

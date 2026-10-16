@@ -7,8 +7,11 @@ import io.casehub.platform.simulation.SimulationExhaustedException;
 import io.casehub.platform.simulation.SimulationStrategy;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 
 public final class SequentialStrategy<I, O> implements SimulationStrategy<I, O> {
+
+    private static final Logger LOG = Logger.getLogger(SequentialStrategy.class.getName());
 
     private final SimulationCorpus<I, O> corpus;
     private final String qualifiedName;
@@ -31,13 +34,27 @@ public final class SequentialStrategy<I, O> implements SimulationStrategy<I, O> 
                     "Corpus is empty for " + qualifiedName);
         }
         final int i = index.getAndIncrement();
-        if (exhaustionPolicy == ExhaustionPolicy.THROW && i >= size) {
-            throw new SimulationExhaustedException(
-                    "Corpus exhausted at index " + i + " (size: " + size + ") for " + qualifiedName);
-        }
-        return corpus.lookupByIndex(qualifiedName, i % size)
+        final int resolvedIndex = switch (exhaustionPolicy) {
+            case THROW -> {
+                if (i >= size) {
+                    throw new SimulationExhaustedException(
+                            "Corpus exhausted at index " + i + " (size: " + size + ") for " + qualifiedName);
+                }
+                yield i;
+            }
+            case WRAP -> i % size;
+            case CLAMP -> {
+                final int idx = Math.clamp(i, 0, size - 1);
+                if (i >= size) {
+                    LOG.info(() -> "CLAMP activated for " + qualifiedName
+                            + " at index " + i + " (size: " + size + ")");
+                }
+                yield idx;
+            }
+        };
+        return corpus.lookupByIndex(qualifiedName, resolvedIndex)
                 .orElseThrow(() -> new SimulationExhaustedException(
-                        "No entry at index " + (i % size) + " for " + qualifiedName));
+                        "No entry at index " + resolvedIndex + " for " + qualifiedName));
     }
 
     @Override
@@ -46,10 +63,10 @@ public final class SequentialStrategy<I, O> implements SimulationStrategy<I, O> 
         if (size == 0) {
             return false;
         }
-        if (exhaustionPolicy == ExhaustionPolicy.THROW) {
-            return index.get() < size;
-        }
-        return true;
+        return switch (exhaustionPolicy) {
+            case THROW -> index.get() < size;
+            case WRAP, CLAMP -> true;
+        };
     }
 
     @Override

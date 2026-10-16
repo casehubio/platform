@@ -2,6 +2,7 @@ package io.casehub.platform.simulation.config;
 
 import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.ExhaustionPolicy;
+import io.casehub.platform.simulation.MatchPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -529,6 +530,46 @@ class YamlSimulationConfigTest {
         assertThat(profile).isPresent();
         assertThat(profile.get().config().fallthroughRealism("test-spi.resolve"))
                 .isEqualTo(DataRealism.STRUCTURALLY_VALID);
+    }
+
+
+    @Test
+    void matchPolicyParsedFromYaml() {
+        var config = load("""
+                          methods:
+                            test.method:
+                              strategy: key-lookup
+                              key-extractor: identity
+                              match: sequential
+                              exhaustion-policy: clamp
+                              corpus:
+                                - key: conv
+                                  output: first
+                                - key: conv
+                                  output: second
+                          """);
+
+        assertThat(config.matchPolicy("test.method"))
+                .isPresent()
+                .contains(MatchPolicy.SEQUENTIAL);
+        assertThat(config.exhaustionPolicy("test.method"))
+                .isPresent()
+                .contains(ExhaustionPolicy.CLAMP);
+    }
+
+    @Test
+    void matchPolicyDefaultsToEmptyWhenAbsent() {
+        var config = load("""
+                          methods:
+                            test.method:
+                              strategy: key-lookup
+                              key-extractor: identity
+                              corpus:
+                                - key: k1
+                                  output: out
+                          """);
+
+        assertThat(config.matchPolicy("test.method")).isEmpty();
     }
 
     private YamlSimulationConfig load(String yaml) {

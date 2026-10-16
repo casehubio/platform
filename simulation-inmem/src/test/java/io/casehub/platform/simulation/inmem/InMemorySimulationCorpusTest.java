@@ -189,4 +189,38 @@ class InMemorySimulationCorpusTest {
         assertThat(corpus.listByTenant(QN, "t1")).isEmpty();
         assertThat(corpus.size(QN)).isZero();
     }
+
+
+    @Test
+    void lookupAllByKeyReturnsAllMatchingOutputsInInsertionOrder() {
+        final var corpus = new InMemorySimulationCorpus<String, String>();
+        corpus.record(QN, "t1", "conv", "input1", "response-1");
+        corpus.record(QN, "t1", "conv", "input2", "response-2");
+        corpus.record(QN, "t1", "conv", "input3", "response-3");
+        corpus.record(QN, "t1", "other", "input4", "other-response");
+
+        List<String> results = corpus.lookupAllByKey(QN, "conv");
+
+        assertThat(results).containsExactly("response-1", "response-2", "response-3");
+    }
+
+    @Test
+    void lookupAllByKeyReturnsEmptyListForMissingKey() {
+        final var corpus = new InMemorySimulationCorpus<String, String>();
+        corpus.record(QN, "t1", "existing", "in", "out");
+
+        List<String> results = corpus.lookupAllByKey(QN, "missing");
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    void lookupAllByKeyReturnsEmptyListForMissingQualifiedName() {
+        final var corpus = new InMemorySimulationCorpus<String, String>();
+
+        List<String> results = corpus.lookupAllByKey("nonexistent.method", "any");
+
+        assertThat(results).isEmpty();
+    }
+
 }

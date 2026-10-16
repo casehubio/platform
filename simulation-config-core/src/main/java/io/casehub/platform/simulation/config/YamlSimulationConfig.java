@@ -2,9 +2,9 @@ package io.casehub.platform.simulation.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.simulation.DataRealism;
-import io.casehub.yaml.jackson.YamlMappers;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.InvocationRecord;
+import io.casehub.platform.simulation.MatchPolicy;
 import io.casehub.platform.simulation.ProfileSource;
 import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationConfigException;
@@ -13,6 +13,7 @@ import io.casehub.platform.simulation.TemporalProfile;
 import io.casehub.platform.simulation.TimedEntry;
 import io.casehub.platform.simulation.TimedSequence;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
+import io.casehub.yaml.jackson.YamlMappers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,6 +102,13 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         return Optional.ofNullable(methods.get(qualifiedName))
                 .map(MethodConfig::exhaustionPolicy);
     }
+
+    @Override
+    public Optional<MatchPolicy> matchPolicy(String qualifiedName) {
+        return Optional.ofNullable(methods.get(qualifiedName))
+                       .map(MethodConfig::matchPolicy);
+    }
+
 
     @Override
     public Optional<Double> threshold(String qualifiedName) {
@@ -282,6 +290,10 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                 ? ExhaustionPolicy.valueOf(
                 ((String) props.get("exhaustion-policy")).toUpperCase().replace("-", "_"))
                 : null;
+        MatchPolicy mp = props.containsKey("match")
+                ? MatchPolicy.valueOf(
+                ((String) props.get("match")).toUpperCase().replace("-", "_"))
+                : null;
         String keyExtractor = (String) props.get("key-extractor");
         String scorer = (String) props.get("scorer");
         Double threshold = props.containsKey("threshold")
@@ -311,7 +323,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                         .toUpperCase().replace("-", "_"))
                 : null;
 
-        return new MethodConfig(strategy, capture, ep, keyExtractor, scorer,
+        return new MethodConfig(strategy, capture, ep, mp, keyExtractor, scorer,
                 threshold, corpus, corpusFiles, fallthroughRealism);
     }
 
@@ -559,6 +571,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             String strategy,
             Boolean capture,
             ExhaustionPolicy exhaustionPolicy,
+            MatchPolicy matchPolicy,
             String keyExtractor,
             String scorer,
             Double threshold,

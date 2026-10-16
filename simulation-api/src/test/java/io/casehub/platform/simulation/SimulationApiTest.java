@@ -129,7 +129,8 @@ class SimulationApiTest {
     void exhaustionPolicyHasExpectedValues() {
         assertThat(ExhaustionPolicy.values()).containsExactly(
                 ExhaustionPolicy.WRAP,
-                ExhaustionPolicy.THROW);
+                ExhaustionPolicy.THROW,
+                ExhaustionPolicy.CLAMP);
     }
 
     // --- Exceptions ---

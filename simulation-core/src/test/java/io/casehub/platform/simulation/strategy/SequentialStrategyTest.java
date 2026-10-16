@@ -114,4 +114,32 @@ class SequentialStrategyTest {
         var strategy = new SequentialStrategy<String, String>(corpus, QN, ExhaustionPolicy.WRAP);
         assertThat(strategy.dataRealism()).isEqualTo(DataRealism.STRUCTURALLY_VALID);
     }
+
+
+    @Test
+    void clampRepeatsLastRecordAfterExhaustion() {
+        final var corpus = ListBackedCorpus.of(
+                entry("k1", "in1", "first"),
+                entry("k2", "in2", "last"));
+
+        final var strategy = new SequentialStrategy<String, String>(
+                corpus, QN, ExhaustionPolicy.CLAMP);
+
+        assertThat(strategy.resolve("any")).isEqualTo("first");
+        assertThat(strategy.resolve("any")).isEqualTo("last");
+        assertThat(strategy.resolve("any")).isEqualTo("last");
+        assertThat(strategy.resolve("any")).isEqualTo("last");
+    }
+
+    @Test
+    void clampCanResolveAlwaysReturnsTrueWhenCorpusNotEmpty() {
+        final var corpus = ListBackedCorpus.of(entry("k1", "in1", "out"));
+
+        final var strategy = new SequentialStrategy<String, String>(
+                corpus, QN, ExhaustionPolicy.CLAMP);
+
+        strategy.resolve("any");
+        assertThat(strategy.canResolve("any")).isTrue();
+    }
+
 }

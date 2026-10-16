@@ -175,7 +175,10 @@ public class SimulationRuntime {
                     config.exhaustionPolicy(qualifiedName).orElse(ExhaustionPolicy.WRAP));
             case "key-lookup" -> {
                 final KeyExtractor extractor = requireExtractor(qualifiedName);
-                yield new KeyLookupStrategy<>(corpus, qualifiedName, extractor);
+                final MatchPolicy mp = config.matchPolicy(qualifiedName).orElse(MatchPolicy.FIRST);
+                final ExhaustionPolicy ep = config.exhaustionPolicy(qualifiedName)
+                        .orElse(ExhaustionPolicy.CLAMP);
+                yield new KeyLookupStrategy<>(corpus, qualifiedName, extractor, mp, ep);
             }
             case "random" -> new RandomStrategy<>(corpus, qualifiedName, new Random(), null);
             case "recorded-replay" -> {

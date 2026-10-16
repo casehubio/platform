@@ -7,6 +7,13 @@ public interface SimulationCorpus<I, O> {
 
     Optional<O> lookupByKey(String qualifiedName, String key);
 
+    default List<O> lookupAllByKey(String qualifiedName, String key) {
+        return list(qualifiedName).stream()
+                .filter(r -> key.equals(r.key()))
+                .map(InvocationRecord::output)
+                .toList();
+    }
+
     Optional<O> lookupByIndex(String qualifiedName, int index);
 
     List<InvocationRecord<I, O>> list(String qualifiedName);

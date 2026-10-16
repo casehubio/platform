@@ -10,3 +10,5 @@ Users/
 .worktrees
 .worktrees/
 .claude/
+
+.flattened-pom.xml

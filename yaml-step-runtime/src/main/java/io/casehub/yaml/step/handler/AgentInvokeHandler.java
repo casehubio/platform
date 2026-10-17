@@ -6,8 +6,8 @@ import io.casehub.eidos.api.spi.AgentDescriptorRegistrar;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
-import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.core.step.Declaration;
+import io.casehub.yaml.core.step.InvokeBinding;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.InvokeHandler;
@@ -59,11 +59,14 @@ public class AgentInvokeHandler implements InvokeHandler {
         }
 
         try {
-            AgentDescriptor descriptor = resolveDescriptor(agent.descriptor());
+            AgentDescriptor descriptor = agent.descriptor() != null
+                    ? resolveDescriptor(agent.descriptor()) : null;
 
-            String systemPrompt = buildSystemPrompt(descriptor);
-            String userPrompt = "Execute with the following inputs: "
-                                + objectMapper.writeValueAsString(params);
+            String systemPrompt = agent.system() != null
+                    ? agent.system() : buildSystemPrompt(descriptor);
+            String userPrompt = agent.user() != null
+                    ? agent.user() : "Execute with the following inputs: "
+                                     + objectMapper.writeValueAsString(params);
 
             String model = agent.model();
             if (model == null && descriptor != null && descriptor.modelFamily() != null) {
@@ -72,8 +75,13 @@ public class AgentInvokeHandler implements InvokeHandler {
 
             Duration timeout = io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(agent.timeout());
 
+            io.casehub.platform.api.model.ModelQuery modelQuery = null;
+            if (agent.modelQuery() != null) {
+                modelQuery = buildModelQuery(agent.modelQuery());
+            }
+
             AgentSessionConfig config = new AgentSessionConfig(
-                    systemPrompt, userPrompt, List.of(), timeout, null, model);
+                    systemPrompt, userPrompt, List.of(), timeout, null, model, modelQuery);
 
             List<AgentEvent> events = agentProvider.invoke(config)
                                                    .collect().asList()
@@ -151,5 +159,34 @@ public class AgentInvokeHandler implements InvokeHandler {
         }
         return sb.length() > 0 ? sb.toString() : "You are a helpful assistant.";
     }
+
+    @SuppressWarnings("unchecked")
+    private io.casehub.platform.api.model.ModelQuery buildModelQuery(Map<String, Object> map) {
+        var builder = io.casehub.platform.api.model.ModelQuery.builder();
+        if (map.containsKey("vendor")) {builder.vendor((String) map.get("vendor"));}
+        if (map.containsKey("family")) {builder.family((String) map.get("family"));}
+        if (map.containsKey("tier")) {
+            builder.tier(io.casehub.platform.api.model.ModelTier.valueOf(
+                    ((String) map.get("tier")).toUpperCase()));
+        }
+        if (map.containsKey("capabilities")) {
+            builder.requiredCapabilities(new java.util.LinkedHashSet<>((List<String>) map.get("capabilities")));
+        }
+        if (map.containsKey("locality")) {
+            builder.locality(io.casehub.platform.api.model.ModelLocality.valueOf(
+                    ((String) map.get("locality")).toUpperCase()));
+        }
+        if (map.containsKey("max-cost-tier")) {
+            builder.maxCostTier(io.casehub.platform.api.model.CostTier.valueOf(
+                    ((String) map.get("max-cost-tier")).toUpperCase()));
+        }
+        if (map.containsKey("min-context-window")) {
+            builder.minContextWindow(((Number) map.get("min-context-window")).intValue());
+        }
+        if (map.containsKey("prefer-vendor")) {builder.preferVendor((String) map.get("prefer-vendor"));}
+        if (map.containsKey("backend")) {builder.backendKey((String) map.get("backend"));}
+        return builder.build();
+    }
+
 
 }

@@ -1,0 +1,13 @@
+providers:
+  - vendor: simulation
+
+defaults:
+  backend: simulation
+
+aliases:
+  fast:
+    backend: simulation
+  flagship:
+    backend: simulation
+  triage:
+    backend: simulation

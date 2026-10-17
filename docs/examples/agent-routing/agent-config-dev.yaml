@@ -1,0 +1,19 @@
+# Development profile — prefer local Ollama, fall back to simulation
+providers:
+  - vendor: ollama
+    host: http://localhost:11434
+  - vendor: simulation
+
+aliases:
+  fast:
+    chain:
+      - backend: ollama
+      - backend: simulation
+  flagship:
+    chain:
+      - backend: ollama
+      - backend: simulation
+  triage:
+    chain:
+      - backend: ollama
+      - backend: simulation

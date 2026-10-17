@@ -132,10 +132,14 @@ public final class DeclarationParser {
         Map<String, Object> map = (Map<String, Object>) raw;
         String descriptor = (String) map.get("descriptor");
         String model = (String) map.get("model");
+        Map<String, Object> modelQuery = (Map<String, Object>) map.getOrDefault("model-query",
+                map.get("modelQuery"));
+        String system = (String) map.get("system");
+        String user = (String) map.get("user");
         String timeout = (String) map.get("timeout");
         Boolean structuredOutput = (Boolean) map.getOrDefault("structured-output",
                 map.get("structuredOutput"));
-        return new InvokeBinding.Agent(descriptor, model, timeout,
+        return new InvokeBinding.Agent(descriptor, model, modelQuery, system, user, timeout,
                 structuredOutput != null && structuredOutput);
     }
 

@@ -1,0 +1,22 @@
+# Production profile — real backends, no simulation
+providers:
+  - vendor: claude
+    credential: ${ANTHROPIC_API_KEY}
+  - vendor: ollama
+    host: http://localhost:11434
+
+defaults:
+  backend: claude
+
+aliases:
+  fast:
+    chain:
+      - backend: ollama
+      - backend: claude
+  flagship:
+    tier: FLAGSHIP
+    prefer-vendor: anthropic
+  triage:
+    chain:
+      - backend: claude
+      - backend: ollama

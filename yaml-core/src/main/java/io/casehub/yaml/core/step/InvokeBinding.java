@@ -36,12 +36,20 @@ public sealed interface InvokeBinding {
 
     record Agent(String descriptor,
                  String model,
+                 Map<String, Object> modelQuery,
+                 String system,
+                 String user,
                  String timeout,
                  boolean structuredOutput) implements InvokeBinding {
         public Agent {
-            if (descriptor == null)
+            if (descriptor == null && system == null)
                 throw new IllegalArgumentException(
-                        "Agent binding requires descriptor");
+                        "Agent binding requires descriptor or system prompt");
+            if (modelQuery != null) modelQuery = Map.copyOf(modelQuery);
+        }
+
+        public Agent(String descriptor, String model, String timeout, boolean structuredOutput) {
+            this(descriptor, model, null, null, null, timeout, structuredOutput);
         }
     }
 

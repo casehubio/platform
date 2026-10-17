@@ -1,0 +1,44 @@
+# Example: Agent-driven case triage with simulation fallback
+#
+# This playbook demonstrates three agent invocation patterns:
+# 1. Alias-based routing (model: fast)
+# 2. Inline prompts without a descriptor (system: / user:)
+# 3. Model-query requirements (tier: FLAGSHIP, capabilities)
+#
+# Configured for simulation — runs without a real LLM.
+# Switch profiles to use real backends:
+#   CASEHUB_AGENT_PROFILE=dev   → Ollama locally
+#   CASEHUB_AGENT_PROFILE=prod  → Claude via API
+
+name: triage-case
+description: Classify and investigate an incoming case using agent routing
+
+steps:
+  # Step 1: Quick classification using a fast model alias
+  - name: classify
+    invoke:
+      agent:
+        model: fast
+        system: "You are a case triage assistant. Classify incoming cases as HIGH, MEDIUM, or LOW priority. Respond with JSON: {\"priority\": \"...\", \"category\": \"...\", \"summary\": \"...\"}"
+        user: "Classify this case: ${input.description}"
+        structured-output: true
+        timeout: 30s
+
+  # Step 2: Detailed analysis using model requirements
+  - name: investigate
+    when: "${classify.priority == 'HIGH'}"
+    invoke:
+      agent:
+        model-query:
+          tier: FLAGSHIP
+          capabilities: [TOOL_USE]
+        system: "You are a senior investigator. Analyse the case thoroughly and recommend actions."
+        user: "Case priority: ${classify.priority}. Category: ${classify.category}. Description: ${input.description}"
+        timeout: 120s
+
+  # Step 3: Descriptor-based agent (traditional pattern)
+  - name: summarise
+    invoke:
+      agent:
+        descriptor: case-summariser
+        model: fast

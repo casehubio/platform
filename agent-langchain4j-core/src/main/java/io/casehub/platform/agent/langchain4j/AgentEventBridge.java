@@ -98,6 +98,7 @@ public final class AgentEventBridge {
     public static void dispatch(Multi<AgentEvent> events, StreamingChatResponseHandler handler) {
         StringBuilder buffer = new StringBuilder();
         List<ToolExecutionRequest> toolRequests = new ArrayList<>();
+        AtomicReference<AgentEvent.InvocationComplete> completionRef = new AtomicReference<>();
         events.subscribe().with(
             event -> {
                 switch (event) {
@@ -118,7 +119,7 @@ public final class AgentEventBridge {
                         toolRequests.add(ter);
                     }
                     case AgentEvent.ToolResult ignored -> {}
-                    case AgentEvent.InvocationComplete ignored -> {}
+                    case AgentEvent.InvocationComplete ic -> completionRef.set(ic);
                 }
             },
             handler::onError,
@@ -127,11 +128,15 @@ public final class AgentEventBridge {
                     ? AiMessage.from(buffer.toString())
                     : AiMessage.builder().text(buffer.toString())
                         .toolExecutionRequests(toolRequests).build();
-                FinishReason reason = toolRequests.isEmpty()
-                    ? FinishReason.STOP
-                    : FinishReason.TOOL_EXECUTION;
-                handler.onCompleteResponse(ChatResponse.builder()
-                    .aiMessage(aiMessage).finishReason(reason).build());
+                var builder = ChatResponse.builder().aiMessage(aiMessage);
+                var completion = completionRef.get();
+                if (completion != null) {
+                    builder.metadata(CaseHubChatResponseMetadata.from(completion));
+                } else {
+                    builder.finishReason(toolRequests.isEmpty()
+                        ? FinishReason.STOP : FinishReason.TOOL_EXECUTION);
+                }
+                handler.onCompleteResponse(builder.build());
             }
         );
     }

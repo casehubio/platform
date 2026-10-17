@@ -70,15 +70,28 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
         String userMessage = extractUserText(request.messages());
         String userWithSchema = prependSchema(request, userMessage);
         AgentSessionConfig config = AgentSessionConfig.of(systemPrompt, userWithSchema);
-        String text = agentProvider.invoke(config)
-            .filter(e -> e instanceof AgentEvent.TextDelta)
-            .map(e -> ((AgentEvent.TextDelta) e).text())
-            .collect().with(Collectors.joining())
+        List<AgentEvent> events = agentProvider.invoke(config)
+            .collect().asList()
             .await().atMost(properties.closeTimeout());
-        return ChatResponse.builder()
-            .aiMessage(AiMessage.from(text))
-            .finishReason(FinishReason.STOP)
-            .build();
+
+        StringBuilder text = new StringBuilder();
+        AgentEvent.InvocationComplete completion = null;
+        for (AgentEvent event : events) {
+            if (event instanceof AgentEvent.TextDelta td) {
+                text.append(td.text());
+            } else if (event instanceof AgentEvent.InvocationComplete ic) {
+                completion = ic;
+            }
+        }
+
+        var builder = ChatResponse.builder()
+            .aiMessage(AiMessage.from(text.toString()));
+        if (completion != null) {
+            builder.metadata(CaseHubChatResponseMetadata.from(completion));
+        } else {
+            builder.finishReason(FinishReason.STOP);
+        }
+        return builder.build();
     }
 
     @Override

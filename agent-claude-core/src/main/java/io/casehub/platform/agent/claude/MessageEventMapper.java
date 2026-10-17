@@ -86,7 +86,7 @@ public class MessageEventMapper {
             rm.totalCostUsd(),
             rm.durationMs(), rm.durationApiMs(),
             rm.sessionId(), rm.numTurns(),
-            rm.isError());
+            rm.isError(), null, null);
     }
 
     private static int getInt(final Map<String, Object> map, final String key) {

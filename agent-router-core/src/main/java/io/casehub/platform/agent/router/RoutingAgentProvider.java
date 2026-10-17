@@ -16,7 +16,6 @@ import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRef;
 import io.casehub.platform.api.model.ModelRegistry;
-import java.util.Collections;
 import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
@@ -106,6 +105,53 @@ public class RoutingAgentProvider implements AgentProvider {
                                         Map.of(), availabilityFilter, poolRegistry);
     }
 
+    public static RoutingAgentProvider of(AgentBackend... backends) {
+        return of(java.util.List.of(backends), ManifestResult.empty());
+    }
+
+    public static RoutingAgentProvider of(java.util.List<AgentBackend> backends, ManifestResult manifest) {
+        return of(backends, manifest, ModelRegistry.empty());
+    }
+
+    public static RoutingAgentProvider of(java.util.List<AgentBackend> backends,
+                                          ManifestResult manifest, ModelRegistry modelRegistry) {
+        var registry = InMemoryBackendInstanceRegistry.of(backends.toArray(AgentBackend[]::new));
+        String defaultKey = manifest.defaultBackendKey() != null
+                            ? manifest.defaultBackendKey()
+                            : (backends.isEmpty() ? null : backends.get(0).key());
+        return new RoutingAgentProvider(registry, defaultKey, modelRegistry,
+                                        manifest.aliases());
+    }
+
+    public static RoutingAgentProvider discover(java.nio.file.Path projectDir) {
+        return discover(projectDir, null);
+    }
+
+    public static RoutingAgentProvider discover(java.nio.file.Path projectDir, String profile) {
+        var loader   = io.casehub.platform.agent.config.AgentConfigLoader.withDefaults(projectDir, profile);
+        var manifest = loader.load();
+
+        var backendProviders = java.util.ServiceLoader.load(io.casehub.platform.agent.BackendProvider.class);
+        var registry         = new InMemoryBackendInstanceRegistry();
+
+        for (var entry : manifest.providers().entrySet()) {
+            var vendorKey  = entry.getKey();
+            var properties = entry.getValue();
+            backendProviders.stream()
+                            .map(java.util.ServiceLoader.Provider::get)
+                            .filter(p -> p.vendorKey().equals(vendorKey))
+                            .findFirst()
+                            .ifPresentOrElse(
+                                    p -> registry.register(p.create(properties)),
+                                    () -> LOG.warnf("No BackendProvider found for vendor '%s' — skipping", vendorKey));
+        }
+
+        return create(registry,
+                      manifest.defaultBackendKey() != null ? manifest.defaultBackendKey() : "claude",
+                      loader.modelRegistry(),
+                      Optional.of(manifest));
+    }
+
 
     @Override
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
@@ -125,7 +171,7 @@ public class RoutingAgentProvider implements AgentProvider {
                 return pool.get().invokeViaSession(rewritten);
             }
         }
-        return route.backend().invoke(rewritten);
+        return annotateRouting(route.backend().invoke(rewritten), route.backend());
     }
 
     private Multi<AgentEvent> resolveAndInvokeWithRetry(AgentSessionConfig config) {
@@ -158,10 +204,20 @@ public class RoutingAgentProvider implements AgentProvider {
         var rewritten = new AgentSessionConfig(
                 config.systemPrompt(), config.userPrompt(), config.mcpServers(),
                 config.timeout(), config.correlationId(), route.apiModelId());
-        return route.backend().invoke(rewritten)
+        return annotateRouting(route.backend().invoke(rewritten), route.backend())
             .onFailure(this::isRetryableApiError)
             .recoverWithMulti(err -> Multi.createFrom().failure(
                 new ModelChainRetryableException(entry, err)));
+    }
+
+
+    private Multi<AgentEvent> annotateRouting(Multi<AgentEvent> stream, AgentBackend backend) {
+        return stream.map(event -> {
+            if (event instanceof AgentEvent.InvocationComplete ic && ic.backendKey() == null) {
+                return ic.withRouting(backend.key(), backend.instanceId());
+            }
+            return event;
+        });
     }
 
     private boolean isRetryableApiError(Throwable t) {

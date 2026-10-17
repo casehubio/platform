@@ -51,7 +51,7 @@ public final class OpenAiEventMapper {
                     promptTokens, completionTokens, reasoningTokens,
                     cacheRead, 0,
                     null, durationMs, durationMs,
-                    chunk.id(), 1, false));
+                    chunk.id(), 1, false, null, null));
         });
         return events;
     }

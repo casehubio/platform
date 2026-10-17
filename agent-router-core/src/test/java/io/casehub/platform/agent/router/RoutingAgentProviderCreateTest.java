@@ -33,7 +33,7 @@ class RoutingAgentProviderCreateTest {
     void create_withManifestResult_usesManifestDefaultAndAliases() {
         var aliases = Map.of("fast", ModelChain.of(List.of(
                 new ModelChain.ModelChainEntry.Queried(ModelQuery.builder().build()))));
-        var manifest = new ManifestResult(aliases, "custom-backend", List.of());
+        var manifest = new ManifestResult(aliases, "custom-backend", List.of(), Map.of());
 
         var provider = RoutingAgentProvider.create(
                 registry, "fallback-backend", modelRegistry, Optional.of(manifest));
@@ -43,7 +43,7 @@ class RoutingAgentProviderCreateTest {
 
     @Test
     void create_withManifestResultNullDefaultKey_usesConfigDefault() {
-        var manifest = new ManifestResult(Map.of(), null, List.of());
+        var manifest = new ManifestResult(Map.of(), null, List.of(), Map.of());
 
         var provider = RoutingAgentProvider.create(
                 registry, "config-default", modelRegistry, Optional.of(manifest));

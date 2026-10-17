@@ -57,7 +57,7 @@ class AgentInvokeHandlerTest {
         var provider = providerReturning(
                 new io.casehub.platform.agent.AgentEvent.TextDelta("Hello "),
                 new io.casehub.platform.agent.AgentEvent.TextDelta("world"),
-                new io.casehub.platform.agent.AgentEvent.InvocationComplete(100, 50, 0, 0, 0, 0.01, 500, 400, null, 1, false));
+                new io.casehub.platform.agent.AgentEvent.InvocationComplete(100, 50, 0, 0, 0, 0.01, 500, 400, null, 1, false, null, null));
 
         var handler = new AgentInvokeHandler(mapper, provider, java.util.List.of());
         var binding = new InvokeBinding.Agent("analyst", null, "30s", false);
@@ -78,7 +78,7 @@ class AgentInvokeHandlerTest {
         var provider = providerWithAssertions(
                 config -> assertThat(config.systemPrompt()).contains("You are a trade analyst"),
                 new io.casehub.platform.agent.AgentEvent.TextDelta("analysis done"),
-                new io.casehub.platform.agent.AgentEvent.InvocationComplete(50, 30, 0, 0, 0, null, 200, 150, null, 1, false));
+                new io.casehub.platform.agent.AgentEvent.InvocationComplete(50, 30, 0, 0, 0, null, 200, 150, null, 1, false, null, null));
 
         io.casehub.eidos.api.AgentDescriptor descriptor = io.casehub.eidos.api.AgentDescriptor.builder()
                                                                                               .agentId("trade-analyst")
@@ -104,7 +104,7 @@ class AgentInvokeHandlerTest {
     void structuredOutputParsesJson() {
         var provider = providerReturning(
                 new io.casehub.platform.agent.AgentEvent.TextDelta("{\"level\":\"HIGH\",\"score\":0.95}"),
-                new io.casehub.platform.agent.AgentEvent.InvocationComplete(50, 30, 0, 0, 0, null, 200, 150, null, 1, false));
+                new io.casehub.platform.agent.AgentEvent.InvocationComplete(50, 30, 0, 0, 0, null, 200, 150, null, 1, false, null, null));
 
         var handler = new AgentInvokeHandler(mapper, provider, java.util.List.of());
         var binding = new InvokeBinding.Agent("analyst", null, null, true);

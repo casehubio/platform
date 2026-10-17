@@ -75,5 +75,15 @@ public sealed interface AgentEvent permits
             Double totalCostUsd,
             long durationMs, long apiDurationMs,
             String sessionId, int numTurns,
-            boolean isError) implements AgentEvent {}
+            boolean isError,
+            String backendKey,
+            String instanceId) implements AgentEvent {
+
+        public InvocationComplete withRouting(String backendKey, String instanceId) {
+            return new InvocationComplete(inputTokens, outputTokens, thinkingTokens,
+                    cacheReadTokens, cacheWriteTokens, totalCostUsd,
+                    durationMs, apiDurationMs, sessionId, numTurns, isError,
+                    backendKey, instanceId);
+        }
+    }
 }

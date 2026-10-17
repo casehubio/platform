@@ -115,9 +115,19 @@ public class ManifestProcessor {
 
         String defaultBackend = manifest.defaults() != null ? manifest.defaults().backend() : null;
         var pools = new java.util.ArrayList<>(manifest.pools().values());
-        LOG.infof("Manifest processed: %d aliases, %d pools, default backend: %s",
-                aliases.size(), pools.size(), defaultBackend != null ? defaultBackend : "(not set)");
-        return new ManifestResult(aliases, defaultBackend, pools);
+
+        var providers = new LinkedHashMap<String, Map<String, String>>();
+        for (var pd : manifest.providers()) {
+            var props = new LinkedHashMap<String, String>();
+            if (pd.host() != null) props.put("host", pd.host());
+            if (pd.hasScalarCredential()) props.put("credential", pd.scalarCredential());
+            providers.put(pd.vendor(), props);
+        }
+
+        LOG.infof("Manifest processed: %d aliases, %d pools, %d providers, default backend: %s",
+                aliases.size(), pools.size(), providers.size(),
+                defaultBackend != null ? defaultBackend : "(not set)");
+        return new ManifestResult(aliases, defaultBackend, pools, providers);
     }
 
     static ModelChain toModelChain(AliasDeclaration alias) {

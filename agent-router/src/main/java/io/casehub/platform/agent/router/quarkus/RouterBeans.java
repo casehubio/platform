@@ -28,6 +28,14 @@ public class RouterBeans {
     @Any
     Instance<io.casehub.platform.api.model.ModelAvailabilityFilter> availabilityFilterInstance;
 
+
+    @Produces
+    @ApplicationScoped
+    @io.quarkus.arc.DefaultBean
+    public io.casehub.platform.agent.router.InMemoryBackendInstanceRegistry backendInstanceRegistry() {
+        return new io.casehub.platform.agent.router.InMemoryBackendInstanceRegistry();
+    }
+
     @Produces
     @ApplicationScoped
     public RoutingAgentProvider routingAgentProvider(RoutingAgentConfig config) {

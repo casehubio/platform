@@ -162,4 +162,33 @@ class AgentEventTest {
         var delta = new AgentEvent.TextDelta("");
         assertThat(delta.text()).isEmpty();
     }
+
+// ── InvocationComplete ───────────────────────────────────────────────────
+
+    @Test
+    void invocationComplete_withRoutingAddsBackendInfo() {
+        var ic = new AgentEvent.InvocationComplete(
+                100, 50, 0, 0, 0, 0.01, 1000L, 900L, "s1", 1, false, null, null);
+        var routed = ic.withRouting("ollama", "default");
+        assertThat(routed.backendKey()).isEqualTo("ollama");
+        assertThat(routed.instanceId()).isEqualTo("default");
+        assertThat(routed.inputTokens()).isEqualTo(100);
+        assertThat(routed.outputTokens()).isEqualTo(50);
+        assertThat(routed.isError()).isFalse();
+    }
+
+    @Test
+    void invocationComplete_withRoutingPreservesAllFields() {
+        var ic = new AgentEvent.InvocationComplete(
+                10, 20, 5, 3, 2, 0.05, 500L, 400L, "sess", 3, true, null, null);
+        var routed = ic.withRouting("claude", "vertex-1");
+        assertThat(routed.thinkingTokens()).isEqualTo(5);
+        assertThat(routed.cacheReadTokens()).isEqualTo(3);
+        assertThat(routed.totalCostUsd()).isEqualTo(0.05);
+        assertThat(routed.sessionId()).isEqualTo("sess");
+        assertThat(routed.numTurns()).isEqualTo(3);
+        assertThat(routed.isError()).isTrue();
+        assertThat(routed.backendKey()).isEqualTo("claude");
+        assertThat(routed.instanceId()).isEqualTo("vertex-1");
+    }
 }

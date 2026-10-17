@@ -49,7 +49,7 @@ public class SimulatedAgentBackend implements AgentBackend {
         String modelId = config.model() != null ? config.model() : "unknown";
         return Multi.createFrom().items(
                 new AgentEvent.TextDelta("Simulated response from " + modelId),
-                new AgentEvent.InvocationComplete(0, 0, 0, 0, 0, 0.0, 0L, 0L, null, 0, false)
+                new AgentEvent.InvocationComplete(0, 0, 0, 0, 0, 0.0, 0L, 0L, null, 0, false, null, null)
         );
     }
 

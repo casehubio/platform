@@ -3,17 +3,24 @@ package io.casehub.platform.agent.router;
 import io.casehub.platform.agent.AgentBackend;
 import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.BackendRef;
-import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-@ApplicationScoped
+/** In-memory BackendInstanceRegistry backed by ConcurrentHashMap. */
 public class InMemoryBackendInstanceRegistry implements BackendInstanceRegistry {
 
     private final ConcurrentHashMap<BackendRef, AgentBackend> instances = new ConcurrentHashMap<>();
+
+    public static InMemoryBackendInstanceRegistry of(AgentBackend... backends) {
+        var registry = new InMemoryBackendInstanceRegistry();
+        for (var backend : backends) {
+            registry.register(backend);
+        }
+        return registry;
+    }
 
     @Override
     public void register(AgentBackend backend) {

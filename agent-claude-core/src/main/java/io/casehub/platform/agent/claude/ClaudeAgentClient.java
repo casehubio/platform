@@ -1,6 +1,7 @@
 package io.casehub.platform.agent.claude;
 
 import io.casehub.platform.agent.AgentEvent;
+import io.casehub.platform.agent.ResponseFormatType;
 import io.casehub.platform.agent.AgentMcpServer;
 import io.casehub.platform.agent.AgentProcessException;
 import io.casehub.platform.agent.AgentSession;
@@ -155,11 +156,11 @@ public class ClaudeAgentClient {
         }
 
         Duration effectiveTimeout = config.timeout() != null
-            ? config.timeout()
-            : properties.defaultTimeout();
+                                    ? config.timeout()
+                                    : properties.defaultTimeout();
 
         var optionsBuilder = CLIOptions.builder()
-            .systemPrompt(config.systemPrompt());
+                                       .systemPrompt(config.systemPrompt());
 
         Map<String, McpServerConfig> sdkMcpServers = toSdkMcpServers(config.mcpServers());
         if (!sdkMcpServers.isEmpty()) {
@@ -168,10 +169,23 @@ public class ClaudeAgentClient {
         if (!env.isEmpty()) {
             optionsBuilder.env(new HashMap<>(env));
         }
+        if (config.responseFormat() != null
+            && config.responseFormat().type() == ResponseFormatType.JSON
+            && config.responseFormat().schema() != null) {
+            try {
+                var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> schemaMap = objectMapper.readValue(
+                        config.responseFormat().schema(), Map.class);
+                optionsBuilder.jsonSchema(schemaMap);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalArgumentException("Invalid JSON schema: " + e.getMessage(), e);
+            }
+        }
         CLIOptions cliOptions = optionsBuilder.build();
 
         var sessionBuilder = ClaudeClient.async(cliOptions)
-            .workingDirectory(Path.of(System.getProperty("user.dir")));
+                                         .workingDirectory(Path.of(System.getProperty("user.dir")));
         properties.binaryPath().ifPresent(sessionBuilder::claudePath);
 
         ClaudeAsyncClient sdkClient = sessionBuilder.build();
@@ -186,30 +200,30 @@ public class ClaudeAgentClient {
         }, effectiveTimeout.toMillis(), TimeUnit.MILLISECONDS);
 
         try {
-            Flux<Message> messageFlux = sdkClient.connect(config.userPrompt()).messages();
-            final AtomicInteger toolIndex = new AtomicInteger(0);
+            Flux<Message>       messageFlux = sdkClient.connect(config.userPrompt()).messages();
+            final AtomicInteger toolIndex   = new AtomicInteger(0);
 
             Multi<AgentEvent> eventStream = Multi.createFrom()
-                .publisher(JdkFlowAdapter.publisherToFlowPublisher(messageFlux))
-                .onItem().transformToMultiAndConcatenate(
-                    msg -> Multi.createFrom().iterable(MessageEventMapper.toEvents(msg, toolIndex)))
-                .onFailure().transform(e ->
-                    timedOut.get()
-                        ? new AgentTimeoutException(effectiveTimeout)
-                        : new AgentProcessException(
-                            Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e))
-                .onCompletion().invoke(() -> {
-                    logCorrelationEvent(config, "completed");
-                    cleanup(timeoutFuture, sdkClient);
-                })
-                .onFailure().invoke(t -> {
-                    logCorrelationEvent(config, "failed");
-                    cleanup(timeoutFuture, sdkClient);
-                })
-                .onCancellation().invoke(() -> {
-                    logCorrelationEvent(config, "cancelled");
-                    cleanup(timeoutFuture, sdkClient);
-                });
+                                                 .publisher(JdkFlowAdapter.publisherToFlowPublisher(messageFlux))
+                                                 .onItem().transformToMultiAndConcatenate(
+                            msg -> Multi.createFrom().iterable(MessageEventMapper.toEvents(msg, toolIndex)))
+                                                 .onFailure().transform(e ->
+                                                                                timedOut.get()
+                                                                                ? new AgentTimeoutException(effectiveTimeout)
+                                                                                : new AgentProcessException(
+                                                                                        Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e))
+                                                 .onCompletion().invoke(() -> {
+                        logCorrelationEvent(config, "completed");
+                        cleanup(timeoutFuture, sdkClient);
+                    })
+                                                 .onFailure().invoke(t -> {
+                        logCorrelationEvent(config, "failed");
+                        cleanup(timeoutFuture, sdkClient);
+                    })
+                                                 .onCancellation().invoke(() -> {
+                        logCorrelationEvent(config, "cancelled");
+                        cleanup(timeoutFuture, sdkClient);
+                    });
 
             if (config.correlationId() != null) {
                 LOG.infof("Agent session started [correlationId=%s]", config.correlationId());

@@ -1,13 +1,5 @@
 package io.casehub.platform.agent.openai;
 
-import io.casehub.platform.agent.AgentBackend;
-import io.casehub.platform.agent.AgentEvent;
-import io.casehub.platform.agent.AgentProcessException;
-import io.casehub.platform.agent.AgentSession;
-import io.casehub.platform.agent.AgentSessionConfig;
-import io.casehub.platform.agent.AgentSessionInit;
-import io.casehub.platform.agent.AgentSessionLimitException;
-import io.casehub.platform.agent.AgentTimeoutException;
 import com.openai.core.http.StreamResponse;
 import com.openai.models.ChatModel;
 import com.openai.models.chat.completions.ChatCompletionChunk;
@@ -15,9 +7,18 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionStreamOptions;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
+import com.openai.models.ResponseFormatJsonSchema;
+import io.casehub.platform.agent.AgentBackend;
+import io.casehub.platform.agent.ResponseFormatType;
+import io.casehub.platform.agent.AgentEvent;
+import io.casehub.platform.agent.AgentProcessException;
+import io.casehub.platform.agent.AgentSession;
+import io.casehub.platform.agent.AgentSessionConfig;
+import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.AgentSessionLimitException;
+import io.casehub.platform.agent.AgentTimeoutException;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
-
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -93,55 +94,79 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
 
     Multi<AgentEvent> buildEventStream(AgentSessionConfig config) {
         Duration effectiveTimeout = config.timeout() != null
-            ? config.timeout()
-            : defaultTimeout();
+                                    ? config.timeout()
+                                    : defaultTimeout();
 
-        String modelId = config.model() != null ? config.model() : defaultModel();
-        long startTimeMs = System.currentTimeMillis();
+        String modelId     = config.model() != null ? config.model() : defaultModel();
+        long   startTimeMs = System.currentTimeMillis();
 
-        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
-            .model(ChatModel.of(modelId))
-            .addMessage(ChatCompletionSystemMessageParam.builder()
-                .content(config.systemPrompt())
-                .build())
-            .addMessage(ChatCompletionUserMessageParam.builder()
-                .content(config.userPrompt())
-                .build())
-            .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build())
-            .build();
+        var paramsBuilder = ChatCompletionCreateParams.builder()
+                                                      .model(ChatModel.of(modelId))
+                                                      .addMessage(ChatCompletionSystemMessageParam.builder()
+                                                                                                  .content(config.systemPrompt())
+                                                                                                  .build())
+                                                      .addMessage(ChatCompletionUserMessageParam.builder()
+                                                                                                .content(config.userPrompt())
+                                                                                                .build())
+                                                      .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build());
+
+        if (config.responseFormat() != null
+            && config.responseFormat().type() == ResponseFormatType.JSON) {
+            if (config.responseFormat().schema() != null) {
+                var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                try {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Object> schemaMap = objectMapper.readValue(
+                            config.responseFormat().schema(), java.util.Map.class);
+                    paramsBuilder.responseFormat(ResponseFormatJsonSchema.builder()
+                                                                         .jsonSchema(ResponseFormatJsonSchema.JsonSchema.builder()
+                                                                                                                        .name(config.responseFormat().name())
+                                                                                                                        .schema(com.openai.core.JsonValue.from(schemaMap))
+                                                                                                                        .strict(true)
+                                                                                                                        .build())
+                                                                         .build());
+                } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                    throw new IllegalArgumentException("Invalid JSON schema: " + e.getMessage(), e);
+                }
+            } else {
+                paramsBuilder.responseFormat(com.openai.models.ResponseFormatJsonObject.builder().build());
+            }
+        }
+
+        ChatCompletionCreateParams params = paramsBuilder.build();
 
         return Multi.createFrom().emitter(emitter -> {
             AtomicReference<StreamResponse<ChatCompletionChunk>> streamRef = new AtomicReference<>();
-            AtomicBoolean timedOut = new AtomicBoolean(false);
+            AtomicBoolean                                        timedOut  = new AtomicBoolean(false);
 
             ScheduledFuture<?> timeoutFuture = timeoutScheduler.schedule(() -> {
                 if (timedOut.compareAndSet(false, true)) {
                     StreamResponse<?> s = streamRef.get();
                     if (s != null) {
-                        try { s.close(); } catch (Exception ignored) {}
+                        try {s.close();} catch (Exception ignored) {}
                     }
                 }
             }, effectiveTimeout.toMillis(), TimeUnit.MILLISECONDS);
 
             try {
                 StreamResponse<ChatCompletionChunk> stream =
-                    openAiClient().chat().completions().createStreaming(params);
+                        openAiClient().chat().completions().createStreaming(params);
                 streamRef.set(stream);
                 stream.stream().forEach(chunk ->
-                    OpenAiEventMapper.toEvents(chunk, startTimeMs).forEach(emitter::emit));
+                                                OpenAiEventMapper.toEvents(chunk, startTimeMs).forEach(emitter::emit));
                 emitter.complete();
             } catch (Exception e) {
                 if (timedOut.get()) {
                     emitter.fail(new AgentTimeoutException(effectiveTimeout));
                 } else {
                     emitter.fail(new AgentProcessException(
-                        java.util.Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e));
+                            java.util.Objects.toString(e.getMessage(), e.getClass().getSimpleName()), e));
                 }
             } finally {
                 timeoutFuture.cancel(false);
                 StreamResponse<?> s = streamRef.get();
                 if (s != null) {
-                    try { s.close(); } catch (Exception ignored) {}
+                    try {s.close();} catch (Exception ignored) {}
                 }
             }
         });

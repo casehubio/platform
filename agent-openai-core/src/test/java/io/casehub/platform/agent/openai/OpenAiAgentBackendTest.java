@@ -101,6 +101,26 @@ class OpenAiAgentBackendTest {
         first.cancel();
     }
 
+
+    @Test
+    void responseFormatFlowsThroughToFactory() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<AgentSessionConfig>();
+        var backend = backend(1, config -> {
+            captured.set(config);
+            return Multi.createFrom().empty();
+        });
+
+        var format = io.casehub.platform.agent.ResponseFormat.json("weather",
+                                                                   "{\"type\":\"object\",\"properties\":{\"temp\":{\"type\":\"number\"}}}");
+        var config = AgentSessionConfig.of("sys", "user").withResponseFormat(format);
+
+        backend.invoke(config).collect().asList().await().atMost(Duration.ofSeconds(5));
+        assertThat(captured.get().responseFormat()).isEqualTo(format);
+        assertThat(captured.get().responseFormat().type())
+                .isEqualTo(io.casehub.platform.agent.ResponseFormatType.JSON);
+        assertThat(captured.get().responseFormat().name()).isEqualTo("weather");
+    }
+
     @Test
     void openSessionThrowsUnsupported() {
         var backend = backend(1, config -> Multi.createFrom().empty());

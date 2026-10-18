@@ -1,0 +1,23 @@
+playbook: "1.0"
+schema: client
+---
+playbook: retry-structural-demo
+meta:
+  title: "Retry (structural)"
+  description: "Structural retry wraps multiple steps — the entire group retries on failure. Compare with the decorator form which retries a single step."
+  tags:
+    - retry
+    - structural
+    - block
+    - step-workflows
+steps:
+  # ── structural form: retry wraps child steps ──
+  # No block: wrapper needed. The trailing ":"
+  # after the count makes retry a structural key.
+  - retry: 3:
+      - click: { role: button, name: "A" }
+      - click: { role: button, name: "B" }
+
+  # ── decorator form (unchanged): retry on a single step ──
+  - click: { role: button, name: "C" }
+    retry: 3

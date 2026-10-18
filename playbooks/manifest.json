@@ -680,6 +680,34 @@
             "step-workflows"
           ],
           "runnable": false
+        },
+        {
+          "file": "step-workflows/retry-structural.playbook.yaml",
+          "title": "Retry (structural)",
+          "description": "Structural retry wraps multiple steps — the entire group retries on failure. Compare with the decorator form which retries a single step.",
+          "tags": ["retry", "structural", "block", "step-workflows"],
+          "runnable": false
+        },
+        {
+          "file": "step-workflows/foreach-structural.playbook.yaml",
+          "title": "ForEach (structural)",
+          "description": "Structural forEach wraps child steps — each iteration runs the full group. The expression is the object key; the steps array is its value.",
+          "tags": ["forEach", "structural", "block", "step-workflows"],
+          "runnable": false
+        },
+        {
+          "file": "step-workflows/when-structural.playbook.yaml",
+          "title": "When (structural)",
+          "description": "Structural when wraps child steps — the entire group is conditionally executed. Compare with the decorator form which guards a single step.",
+          "tags": ["when", "structural", "conditional", "step-workflows"],
+          "runnable": false
+        },
+        {
+          "file": "step-workflows/timeout-structural.playbook.yaml",
+          "title": "Timeout (structural)",
+          "description": "Structural timeout wraps child steps — the entire group is aborted if it exceeds the duration. Also shows combining structural and scalar decorators.",
+          "tags": ["timeout", "structural", "block", "step-workflows"],
+          "runnable": false
         }
       ]
     }

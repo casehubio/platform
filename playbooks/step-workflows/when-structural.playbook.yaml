@@ -1,0 +1,21 @@
+playbook: "1.0"
+schema: client
+---
+playbook: when-structural-demo
+meta:
+  title: "When (structural)"
+  description: "Structural when wraps child steps — the entire group is conditionally executed. Compare with the decorator form which guards a single step."
+  tags:
+    - when
+    - structural
+    - conditional
+    - step-workflows
+steps:
+  # ── structural form: when guards a group of steps ──
+  - when: "${params.enabled}":
+      - click: { role: button, name: "A" }
+      - click: { role: button, name: "B" }
+
+  # ── decorator form (unchanged): when on a single step ──
+  - click: { role: button, name: "C" }
+    when: true

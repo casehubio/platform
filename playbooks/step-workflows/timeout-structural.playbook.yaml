@@ -1,0 +1,24 @@
+playbook: "1.0"
+schema: client
+---
+playbook: timeout-structural-demo
+meta:
+  title: "Timeout (structural)"
+  description: "Structural timeout wraps child steps — the entire group is aborted if it exceeds the duration. Compare with the decorator form which timeouts a single step."
+  tags:
+    - timeout
+    - structural
+    - block
+    - step-workflows
+steps:
+  # ── structural form: timeout scopes a group ──
+  - timeout: "10s":
+      - click: { role: button, name: "A" }
+      - click: { role: button, name: "B" }
+      - click: { role: button, name: "C" }
+
+  # ── combined: structural decorator + scalar decorators ──
+  - forEach: "item in items":
+      - click: { role: button, name: "${item.name}" }
+    retry: 3
+    timeout: "30s"

@@ -101,6 +101,14 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
+#### ChatModel (LangChain4j)
+
+Platform provides a LangChain4j `ChatModel` bean via `RoutingChatModel` — model-registry-backed routing that resolves `modelName` to the correct vendor backend. Inject `ChatModel` (from `dev.langchain4j.model.chat`) to get routed chat completions with tool-use support.
+
+Two native backends ship today: `OpenAiNativeChatModel` (OpenAI Java SDK) and `AnthropicNativeChatModel` (Anthropic Java SDK with prompt caching). Each backend module produces a `ChatModelBackend` bean; the router collects them automatically.
+
+Config: vendor API keys via `casehub.platform.agent.openai.api-key` and `casehub.platform.agent.anthropic.api-key`. Default backend: `casehub.platform.agent.default-backend` (default: "claude").
+
 #### Securing remote manifest sources
 
 The `sources:` section in `agent-config.yaml` supports authentication headers and content integrity verification for remote model catalogs. All fields are optional — existing manifests without `auth:` or `integrity:` blocks continue to work unchanged.
@@ -992,7 +1000,7 @@ spring.flyway.locations=classpath:db/migration,classpath:db/platform/migration,c
 | `casehub-platform-governance-spring` | `casehub-platform-governance` | `PolicyEnforcer` for retry/timeout/circuit-breaker |
 | `casehub-platform-callback-spring` | `casehub-platform-callback` | `BeanPostProcessor` that wraps `@CallbackEligible` SPIs |
 | `casehub-platform-mcp-spring` | `casehub-platform-mcp` | MCP tool infrastructure |
-| `casehub-platform-agent-*-spring` | `casehub-platform-agent-*` | Agent backend auto-configs (Claude, OpenAI, Codex, Gemini, Gemini CLI, LangChain4j, Router, Config, Gate) |
+| `casehub-platform-agent-*-spring` | `casehub-platform-agent-*` | Agent backend auto-configs (Claude, OpenAI, Codex, Gemini, Gemini CLI, Ollama, Router, Config, Gate) + ChatModel routing (3 manual configs) |
 | `casehub-platform-spring-actuator` | `casehub-platform-observability` | Health indicators (model registry, agent backends, delivery channels, SCIM, certificate expiry), metrics BPP (wraps AgentBackend + AccessControlProvider), info contributor |
 
 ### Auto-configuration behaviour

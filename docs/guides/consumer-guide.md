@@ -99,7 +99,6 @@ Callers inject `AgentProvider` — the `RoutingAgentProvider` resolves the `mode
 | `casehub-platform-agent-codex` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `casehub-platform-agent-gemini` | AgentBackend "gemini" -- native Google GenAI SDK with explicit caching |
 | `casehub-platform-agent-gemini-cli` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `casehub-platform-agent-langchain4j` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `casehub-platform-agent-gate` | CDI `@Decorator` rate limiter -- wraps `RoutingAgentProvider` transparently |
 
 #### Securing remote manifest sources
@@ -662,7 +661,7 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 - `invoke(AgentSessionConfig)` -- single-shot, returns cold `Multi<AgentEvent>`. The `AgentSessionConfig` carries `systemPrompt`, `userPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model` (provider key).
 - `openSession(AgentSessionInit)` -- multi-turn `AgentSession` (IDLE/ACTIVE/CLOSED state machine). `AgentSessionInit` carries `systemPrompt`, `mcpServers`, `timeout`, `correlationId`, and nullable `model`.
 
-`AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli", "langchain4j"). When `model` is null, the configurable default backend is used. When `model` matches no backend key and no `ModelRegistry` entry, resolution fails fast with `IllegalArgumentException`.
+`AgentBackend` has the same two methods plus `key()` — a string identifying the provider ("claude", "openai", "codex", "gemini", "gemini-cli"). When `model` is null, the configurable default backend is used. When `model` matches no backend key and no `ModelRegistry` entry, resolution fails fast with `IllegalArgumentException`.
 
 `AgentRuntime` abstracts subprocess lifecycle for CLI-based providers. `SubprocessRuntime` wraps `ProcessBuilder`; future runtimes (Kubernetes, container) would slot in without touching provider code. Only CLI providers (`agent-codex`, `agent-gemini-cli`) inject `AgentRuntime`.
 
@@ -726,9 +725,6 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 | `casehub.platform.agent.gemini-cli.binary-path` | Path to Gemini CLI binary | gemini |
 | `casehub.platform.agent.gemini-cli.default-timeout` | Default wall-clock timeout | PT5M |
 | `casehub.platform.agent.gemini-cli.max-concurrent-sessions` | Concurrent Gemini CLI session limit | 4 |
-| `casehub.platform.agent.langchain4j.closeTimeout` | Session close timeout | PT30S |
-| `casehub.platform.agent.langchain4j.sessionMemoryWindowSize` | Conversation memory window | 20 |
-| `casehub.platform.agent.langchain4j.max-concurrent-sessions` | Concurrent LangChain4j session limit | 10 |
 
 ### Expression
 

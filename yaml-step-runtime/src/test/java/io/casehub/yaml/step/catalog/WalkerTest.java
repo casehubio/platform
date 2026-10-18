@@ -925,4 +925,101 @@ class WalkerTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- structural decorator forms ---
+
+    @Test
+    void resolvesForEachWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("forEach", Map.of("member in members",
+                List.of(Map.of("process", Map.of("command", "a.sh")),
+                        Map.of("assert", Map.of()))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(2);
+        assertThat(block.decorators()).containsEntry("forEach", "member in members");
+    }
+
+    @Test
+    void resolvesRetryWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("retry", Map.of("3", List.of(Map.of("process", Map.of("command", "a.sh")))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(1);
+        assertThat(block.decorators()).containsEntry("retry", "3");
+    }
+
+    @Test
+    void resolvesRetryWithArrayValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("retry", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(1);
+        assertThat(block.decorators()).containsEntry("retry", true);
+    }
+
+    @Test
+    void combinesStructuralDecoratorWithScalarDecorators() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("forEach", Map.of("item in items",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        step.put("retry", 3);
+        step.put("timeout", "30s");
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("forEach", "item in items");
+        assertThat(block.decorators()).containsEntry("retry", 3);
+        assertThat(block.decorators()).containsEntry("timeout", "30s");
+    }
+
+    @Test
+    void scalarDecoratorAlongsideActionKeyUnchanged() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("command", "a.sh"));
+        step.put("retry", 3);
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
+        assertThat(resolved.get(0).decorators()).containsEntry("retry", 3);
+    }
+
+    @Test
+    void throwsWhenTwoPromotableDecoratorsHaveNonScalarValues() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("forEach", Map.of("a in b",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        step.put("retry", Map.of("3",
+                List.of(Map.of("process", Map.of("command", "b.sh")))));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("structural");
+    }
+
+    @Test
+    void treatsObjectWithMultipleKeysAsDecorator() {
+        var innerMap = new LinkedHashMap<String, Object>();
+        innerMap.put("a in b", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        innerMap.put("c in d", List.of(Map.of("process", Map.of("command", "b.sh"))));
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("command", "test.sh"));
+        step.put("forEach", innerMap);
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
+        assertThat(resolved.get(0).decorators()).containsKey("forEach");
+    }
+
+    @Test
+    void treatsObjectWithNonArrayValueAsDecorator() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("command", "test.sh"));
+        step.put("forEach", Map.of("a in b", "not-an-array"));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
+        assertThat(resolved.get(0).decorators()).containsKey("forEach");
+    }
+
 }

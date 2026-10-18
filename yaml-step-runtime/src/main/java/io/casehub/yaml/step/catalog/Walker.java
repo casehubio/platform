@@ -26,6 +26,9 @@ public final class Walker {
             "resource", "priority", "wait", "mutex", "when");
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
+    private static final Set<String> PROMOTABLE_DECORATORS = Set.of(
+            "forEach", "retry", "timeout", "when", "mutex", "loop");
+
     private static final Set<String> REMOVED_KEYS = Set.of("steps", "do");
     static final         int         MAX_DEPTH             = 32;
 
@@ -115,6 +118,17 @@ public final class Walker {
                 matchValue = e.getValue();
             } else if (STRUCTURAL_COMPANIONS.contains(key)) {
                 companions.put(key, e.getValue());
+            } else if (PROMOTABLE_DECORATORS.contains(key)
+                       && (e.getValue() instanceof List
+                           || (e.getValue() instanceof Map<?,?> pm && pm.size() == 1
+                               && pm.values().iterator().next() instanceof List))) {
+                if (structuralType != null) {
+                    throw new IllegalArgumentException(
+                            path + " → Step " + index + ": step has both structural type '"
+                            + structuralType + "' and structural decorator '" + key + "'");
+                }
+                structuralType = key;
+                structuralValue = e.getValue();
             } else if (RESERVED_KEYS.contains(key)) {
                 decorators.put(key, e.getValue());
             } else {
@@ -314,6 +328,36 @@ public final class Walker {
         }
         if ("resume".equals(structuralType)) {
             return new ResolvedStep.ControlStep(stepName, String.valueOf(structuralValue), true, decorators);
+        }
+        if (structuralType != null && PROMOTABLE_DECORATORS.contains(structuralType)) {
+            if (structuralValue instanceof List) {
+                @SuppressWarnings("unchecked")
+                var stepList = (List<Map<String, Object>>) structuralValue;
+                var resolved = resolve(stepList, registry, depth + 1,
+                        stepPath + " → " + structuralType, seenNames);
+                decorators.put(structuralType, true);
+                return new ResolvedStep.BlockStep(stepName, resolved, decorators);
+            }
+            @SuppressWarnings("unchecked")
+            var paramMap = (Map<String, Object>) structuralValue;
+            if (paramMap.size() != 1) {
+                throw new IllegalArgumentException(
+                        stepPath + ": structural '" + structuralType
+                        + "' must have exactly one key (the parameter), got " + paramMap.size());
+            }
+            var entry = paramMap.entrySet().iterator().next();
+            String param = String.valueOf(entry.getKey());
+            if (!(entry.getValue() instanceof List)) {
+                throw new IllegalArgumentException(
+                        stepPath + ": structural '" + structuralType
+                        + "' parameter '" + param + "' must map to a steps array");
+            }
+            @SuppressWarnings("unchecked")
+            var stepList = (List<Map<String, Object>>) entry.getValue();
+            var resolved = resolve(stepList, registry, depth + 1,
+                    stepPath + " → " + structuralType, seenNames);
+            decorators.put(structuralType, param);
+            return new ResolvedStep.BlockStep(stepName, resolved, decorators);
         }
         if (matchedAction != null) {
             return new ResolvedStep.PluginStep(stepName, matchedAction, actionParams, decorators);

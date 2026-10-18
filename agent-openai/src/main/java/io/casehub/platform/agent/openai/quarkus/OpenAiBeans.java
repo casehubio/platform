@@ -1,6 +1,5 @@
 package io.casehub.platform.agent.openai.quarkus;
 
-import dev.langchain4j.model.chat.ChatModel;
 import io.casehub.platform.agent.openai.OpenAiAgentBackend;
 import io.casehub.platform.agent.openai.OpenAiNativeChatModel;
 import io.casehub.platform.agent.openai.config.OpenAiAgentConfig;
@@ -28,13 +27,7 @@ public class OpenAiBeans {
         config.apiKey().ifPresent(clientBuilder::apiKey);
         OpenAiNativeChatModel chatModel = new OpenAiNativeChatModel(
                 clientBuilder.build(), config.defaultModel(), config.defaultTimeout());
-        return new ChatModelBackend() {
-            @Override
-            public String key()                                     {return "openai";}
-
-            @Override
-            public ChatModel chatModel() {return chatModel;}
-        };
+        return new io.casehub.platform.agent.router.SimpleChatModelBackend("openai", chatModel);
     }
 
 

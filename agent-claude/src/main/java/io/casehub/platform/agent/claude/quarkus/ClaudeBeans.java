@@ -1,6 +1,5 @@
 package io.casehub.platform.agent.claude.quarkus;
 
-import dev.langchain4j.model.chat.ChatModel;
 import io.casehub.platform.agent.claude.AnthropicNativeChatModel;
 import io.casehub.platform.agent.claude.ClaudeAgentClient;
 import io.casehub.platform.agent.claude.ClaudeAgentProvider;
@@ -39,13 +38,7 @@ public class ClaudeBeans {
         config.apiKey().ifPresent(clientBuilder::apiKey);
         AnthropicNativeChatModel chatModel = new AnthropicNativeChatModel(
                 clientBuilder.build(), config.defaultModel(), config.defaultTimeout(), config.maxTokens());
-        return new ChatModelBackend() {
-            @Override
-            public String key()                                     {return "claude";}
-
-            @Override
-            public ChatModel chatModel() {return chatModel;}
-        };
+        return new io.casehub.platform.agent.router.SimpleChatModelBackend("claude", chatModel);
     }
 
 

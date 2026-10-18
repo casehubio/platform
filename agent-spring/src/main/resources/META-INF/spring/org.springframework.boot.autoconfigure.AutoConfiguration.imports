@@ -1,2 +1,5 @@
 io.casehub.platform.agent.config.spring.AgentConfigManualConfig
 io.casehub.platform.agent.gate.spring.AgentGateSpringAutoConfiguration
+io.casehub.platform.agent.claude.spring.ClaudeChatModelManualConfig
+io.casehub.platform.agent.openai.spring.OpenAiChatModelManualConfig
+io.casehub.platform.agent.router.spring.ChatModelRouterManualConfig

@@ -52,4 +52,26 @@ public interface AgentProvider {
      *         when a gate decorator is present
      */
     AgentSession openSession(AgentSessionInit init);
+
+    default AgentInvocationResult invokeBlocking(AgentSessionConfig config, java.time.Duration timeout) {
+        java.util.List<AgentEvent> events = invoke(config)
+                                                    .collect().asList()
+                                                    .await().atMost(timeout);
+
+        StringBuilder                 text       = new StringBuilder();
+        AgentEvent.InvocationComplete completion = null;
+        for (AgentEvent event : events) {
+            if (event instanceof AgentEvent.TextDelta td) {
+                text.append(td.text());
+            } else if (event instanceof AgentEvent.InvocationComplete ic) {
+                completion = ic;
+            }
+        }
+        return AgentInvocationResult.from(text.toString(), completion);
+    }
+
+    default AgentInvocationResult invokeBlocking(String systemPrompt, String userPrompt, java.time.Duration timeout) {
+        return invokeBlocking(AgentSessionConfig.of(systemPrompt, userPrompt), timeout);
+    }
+
 }

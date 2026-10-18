@@ -22,25 +22,27 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 class ChatModelAgentSession implements AgentSession {
 
-    private enum State { IDLE, ACTIVE, CLOSED }
+    private enum State {IDLE, ACTIVE, CLOSED}
 
-    private final ChatModel chatModel;
-    private final StreamingChatModel streamingChatModel;
-    private final String systemPrompt;
-    private final ChatMemory memory;
+    private final ChatModel              chatModel;
+    private final StreamingChatModel     streamingChatModel;
+    private final String                 systemPrompt;
+    private final ChatMemory             memory;
     private final AtomicReference<State> state = new AtomicReference<>(State.IDLE);
-    private final Semaphore semaphore;
+    private final Semaphore              semaphore;
 
     ChatModelAgentSession(ChatModel chatModel, StreamingChatModel streamingChatModel,
                           AgentSessionInit init, AgentLangchain4jProperties properties,
                           Semaphore semaphore) {
-        this.chatModel = chatModel;
+        this.chatModel          = chatModel;
         this.streamingChatModel = streamingChatModel;
-        this.systemPrompt = init.systemPrompt();
-        this.memory = MessageWindowChatMemory.withMaxMessages(properties.sessionMemoryWindowSize());
-        this.semaphore = semaphore;
+        this.systemPrompt       = init.systemPrompt();
+        this.memory             = MessageWindowChatMemory.withMaxMessages(properties.sessionMemoryWindowSize());
+        this.semaphore          = semaphore;
     }
 
     @Override
@@ -48,8 +50,8 @@ class ChatModelAgentSession implements AgentSession {
         if (!state.compareAndSet(State.IDLE, State.ACTIVE)) {
             State current = state.get();
             throw new IllegalStateException(current == State.CLOSED
-                ? "session is closed"
-                : "a turn is already active — wait for it to complete or call interrupt()");
+                                            ? "session is closed"
+                                            : "a turn is already active — wait for it to complete or call interrupt()");
         }
         memory.add(UserMessage.from(prompt));
         List<ChatMessage> messages = new ArrayList<>();
@@ -63,24 +65,24 @@ class ChatModelAgentSession implements AgentSession {
         if (streamingChatModel != null) {
             StringBuilder buffer = new StringBuilder();
             result = AgentEventBridge.stream(streamingChatModel, request)
-                .onItem().invoke(event -> {
-                    if (event instanceof AgentEvent.TextDelta delta) {
-                        buffer.append(delta.text());
-                    }
-                })
-                .onCompletion().invoke(() ->
-                    memory.add(AiMessage.from(buffer.toString())));
+                                     .onItem().invoke(event -> {
+                        if (event instanceof AgentEvent.TextDelta delta) {
+                            buffer.append(delta.text());
+                        }
+                    })
+                                     .onCompletion().invoke(() ->
+                                                                    memory.add(AiMessage.from(buffer.toString())));
         } else {
             result = Multi.createFrom().item(() -> {
                 ChatResponse response = chatModel.chat(request);
-                String text = response.aiMessage().text();
+                String       text     = response.aiMessage().text();
                 memory.add(AiMessage.from(text != null ? text : ""));
                 return (AgentEvent) new AgentEvent.TextDelta(text != null ? text : "");
             });
         }
 
         return result.onTermination().invoke(
-            () -> state.compareAndSet(State.ACTIVE, State.IDLE));
+                () -> state.compareAndSet(State.ACTIVE, State.IDLE));
     }
 
     @Override

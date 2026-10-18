@@ -19,29 +19,39 @@ import org.jboss.logging.Logger;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 
+/**
+ * Wraps a LangChain4j {@code ChatModel} as an {@code AgentBackend}.
+ *
+ * @deprecated This module is scheduled for removal. Use native {@code AgentBackend}
+ * implementations (claude, openai, ollama, gemini) directly. For blocking
+ * invocation use {@code AgentProvider.invokeBlocking()}; for structured
+ * output use {@code ResponseFormat}. See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 public class ChatModelAgentProvider implements AgentBackend {
 
     private static final Logger LOG = Logger.getLogger(ChatModelAgentProvider.class);
 
-    private final ChatModel chatModel;
-    private final StreamingChatModel streamingChatModel;
+    private final ChatModel                  chatModel;
+    private final StreamingChatModel         streamingChatModel;
     private final AgentLangchain4jProperties properties;
-    private final Semaphore semaphore;
-    private final boolean disabled;
+    private final Semaphore                  semaphore;
+    private final boolean                    disabled;
 
     public ChatModelAgentProvider(ChatModel chatModel,
-                                   StreamingChatModel streamingChatModel,
-                                   AgentLangchain4jProperties properties) {
-        this.chatModel = chatModel;
+                                  StreamingChatModel streamingChatModel,
+                                  AgentLangchain4jProperties properties) {
+        this.chatModel          = chatModel;
         this.streamingChatModel = streamingChatModel;
-        this.properties = properties;
+        this.properties         = properties;
         int maxSessions = properties.maxConcurrentSessions();
         if (maxSessions < 0) {
             throw new IllegalStateException(
-                "casehub.platform.agent.langchain4j.max-concurrent-sessions must be >= 0, got " + maxSessions);
+                    "casehub.platform.agent.langchain4j.max-concurrent-sessions must be >= 0, got " + maxSessions);
         }
         this.semaphore = new Semaphore(maxSessions == 0 ? Integer.MAX_VALUE : maxSessions);
-        this.disabled = chatModel == null;
+        this.disabled  = chatModel == null;
         if (disabled) {
             LOG.warn("ChatModelAgentProvider: no ChatModel available — " +
                      "add a langchain4j provider to activate. " +
@@ -73,16 +83,16 @@ public class ChatModelAgentProvider implements AgentBackend {
     public Multi<AgentEvent> invoke(AgentSessionConfig config) {
         if (disabled) {
             return Multi.createFrom().failure(new IllegalStateException(
-                "ChatModelAgentProvider is inactive — no ChatModel bean available. " +
-                "Add a langchain4j provider (e.g. quarkus-langchain4j-openai) " +
-                "to the classpath."));
+                    "ChatModelAgentProvider is inactive — no ChatModel bean available. " +
+                    "Add a langchain4j provider (e.g. quarkus-langchain4j-openai) " +
+                    "to the classpath."));
         }
         if (!semaphore.tryAcquire()) {
             LOG.warnf("ChatModelAgentProvider: session limit reached (%d/%d active sessions)",
-                properties.maxConcurrentSessions() - semaphore.availablePermits(),
-                properties.maxConcurrentSessions());
+                      properties.maxConcurrentSessions() - semaphore.availablePermits(),
+                      properties.maxConcurrentSessions());
             return Multi.createFrom().failure(
-                new AgentSessionLimitException(properties.maxConcurrentSessions()));
+                    new AgentSessionLimitException(properties.maxConcurrentSessions()));
         }
         try {
             if (!config.mcpServers().isEmpty()) {
@@ -92,11 +102,11 @@ public class ChatModelAgentProvider implements AgentBackend {
             }
 
             ChatRequest request = ChatRequest.builder()
-                .messages(config.systemPrompt().isEmpty()
-                    ? List.of(UserMessage.from(config.userPrompt()))
-                    : List.of(SystemMessage.from(config.systemPrompt()),
-                              UserMessage.from(config.userPrompt())))
-                .build();
+                                             .messages(config.systemPrompt().isEmpty()
+                                                       ? List.of(UserMessage.from(config.userPrompt()))
+                                                       : List.of(SystemMessage.from(config.systemPrompt()),
+                                                                 UserMessage.from(config.userPrompt())))
+                                             .build();
 
             Multi<AgentEvent> result;
             if (streamingChatModel != null) {
@@ -104,19 +114,19 @@ public class ChatModelAgentProvider implements AgentBackend {
             } else {
                 result = Multi.createFrom().item(() -> {
                     ChatResponse response = chatModel.chat(request);
-                    String text = response.aiMessage().text();
+                    String       text     = response.aiMessage().text();
                     return (AgentEvent) new AgentEvent.TextDelta(text != null ? text : "");
                 });
             }
 
             if (config.timeout() != null) {
                 result = result.ifNoItem().after(config.timeout()).failWith(
-                    () -> new AgentTimeoutException(config.timeout()));
+                        () -> new AgentTimeoutException(config.timeout()));
             }
             return result
-                .onCompletion().invoke(semaphore::release)
-                .onFailure().invoke(t -> semaphore.release())
-                .onCancellation().invoke(semaphore::release);
+                           .onCompletion().invoke(semaphore::release)
+                           .onFailure().invoke(t -> semaphore.release())
+                           .onCancellation().invoke(semaphore::release);
         } catch (Exception e) {
             semaphore.release();
             return Multi.createFrom().failure(e);
@@ -127,12 +137,12 @@ public class ChatModelAgentProvider implements AgentBackend {
     public AgentSession openSession(AgentSessionInit init) {
         if (disabled) {
             throw new IllegalStateException(
-                "ChatModelAgentProvider is inactive — no ChatModel bean available.");
+                    "ChatModelAgentProvider is inactive — no ChatModel bean available.");
         }
         if (!semaphore.tryAcquire()) {
             LOG.warnf("ChatModelAgentProvider: session limit reached (%d/%d active sessions)",
-                properties.maxConcurrentSessions() - semaphore.availablePermits(),
-                properties.maxConcurrentSessions());
+                      properties.maxConcurrentSessions() - semaphore.availablePermits(),
+                      properties.maxConcurrentSessions());
             throw new AgentSessionLimitException(properties.maxConcurrentSessions());
         }
         try {

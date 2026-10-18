@@ -1,7 +1,6 @@
 package io.casehub.platform.agent.langchain4j.quarkus;
 
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.langchain4j.AgentProviderChatModel;
@@ -17,6 +16,11 @@ import jakarta.enterprise.inject.Produces;
 
 import java.util.List;
 
+/**
+ * @deprecated This module is scheduled for removal. See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 @ApplicationScoped
 public class Langchain4jBeans {
 

@@ -5,7 +5,12 @@ import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 import io.casehub.platform.agent.AgentEvent;
 
-/** Extends LangChain4j metadata with CaseHub routing observability. */
+/**
+ * Extends LangChain4j metadata with CaseHub routing observability.
+ *
+ * @deprecated This module is scheduled for removal. See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
 public class CaseHubChatResponseMetadata extends ChatResponseMetadata {
 
     private final String backendKey;
@@ -16,12 +21,14 @@ public class CaseHubChatResponseMetadata extends ChatResponseMetadata {
         super(builder);
         this.backendKey = builder.backendKey;
         this.instanceId = builder.instanceId;
-        this.costUsd = builder.costUsd;
+        this.costUsd    = builder.costUsd;
     }
 
-    public String backendKey() { return backendKey; }
-    public String instanceId() { return instanceId; }
-    public Double costUsd() { return costUsd; }
+    public String backendKey() {return backendKey;}
+
+    public String instanceId() {return instanceId;}
+
+    public Double costUsd()    {return costUsd;}
 
     static CaseHubChatResponseMetadata from(AgentEvent.InvocationComplete ic) {
         var builder = new Builder();
@@ -31,9 +38,9 @@ public class CaseHubChatResponseMetadata extends ChatResponseMetadata {
             builder.backendKey(ic.backendKey());
             builder.modelName(ic.backendKey());
         }
-        if (ic.instanceId() != null) builder.instanceId(ic.instanceId());
-        if (ic.totalCostUsd() != null) builder.costUsd(ic.totalCostUsd());
-        if (ic.sessionId() != null) builder.id(ic.sessionId());
+        if (ic.instanceId() != null) {builder.instanceId(ic.instanceId());}
+        if (ic.totalCostUsd() != null) {builder.costUsd(ic.totalCostUsd());}
+        if (ic.sessionId() != null) {builder.id(ic.sessionId());}
         return builder.build();
     }
 
@@ -42,9 +49,20 @@ public class CaseHubChatResponseMetadata extends ChatResponseMetadata {
         private String instanceId;
         private Double costUsd;
 
-        public Builder backendKey(String backendKey) { this.backendKey = backendKey; return this; }
-        public Builder instanceId(String instanceId) { this.instanceId = instanceId; return this; }
-        public Builder costUsd(Double costUsd) { this.costUsd = costUsd; return this; }
+        public Builder backendKey(String backendKey) {
+                                                         this.backendKey = backendKey;
+                                                         return this;
+                                                     }
+
+        public Builder instanceId(String instanceId) {
+                                                         this.instanceId = instanceId;
+                                                         return this;
+                                                     }
+
+        public Builder costUsd(Double costUsd)       {
+                                                         this.costUsd = costUsd;
+                                                         return this;
+                                                     }
 
         @Override
         public CaseHubChatResponseMetadata build() {

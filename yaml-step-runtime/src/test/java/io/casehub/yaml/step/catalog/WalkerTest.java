@@ -1022,4 +1022,83 @@ class WalkerTest {
         assertThat(resolved.get(0).decorators()).containsKey("forEach");
     }
 
+    @Test
+    void resolvesWhenWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("when", Map.of("${params.enabled}",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(1);
+        assertThat(block.decorators()).containsEntry("when", "${params.enabled}");
+    }
+
+    @Test
+    void resolvesTimeoutWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("timeout", Map.of("30s",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("timeout", "30s");
+    }
+
+    @Test
+    void resolvesMutexWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("mutex", Map.of("order-lock",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("mutex", "order-lock");
+    }
+
+    @Test
+    void resolvesLoopWithObjectValueAsStructuralBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("loop", Map.of("continuous",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        step.put("cancel", "done");
+        step.put("timeout", "1m");
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("loop", "continuous");
+        assertThat(block.decorators()).containsEntry("cancel", "done");
+    }
+
+    @Test
+    void preservesStepNameOnStructuralDecorator() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("step", "my-loop");
+        step.put("forEach", Map.of("item in items",
+                List.of(Map.of("process", Map.of("command", "a.sh")))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0).name()).isEqualTo("my-loop");
+    }
+
+    @Test
+    void throwsWhenStructuralDecoratorConflictsWithBlock() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("block", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        step.put("forEach", Map.of("a in b",
+                List.of(Map.of("process", Map.of("command", "b.sh")))));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("structural");
+    }
+
+    @Test
+    void throwsWhenStructuralDecoratorConflictsWithActionKey() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("process", Map.of("command", "a.sh"));
+        step.put("forEach", Map.of("a in b",
+                List.of(Map.of("process", Map.of("command", "b.sh")))));
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

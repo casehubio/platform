@@ -12,11 +12,12 @@ meta:
     - step-workflows
 steps:
   # ── structural form: retry wraps child steps ──
-  # No block: wrapper needed. The trailing ":"
-  # after the count makes retry a structural key.
-  - retry: 3:
-      - click: { role: button, name: "A" }
-      - click: { role: button, name: "B" }
+  # The count is a nested key; its value is the steps array.
+  # Equivalent to: block: [...] + retry: 3
+  - retry:
+      3:
+        - click: { role: button, name: "A" }
+        - click: { role: button, name: "B" }
 
   # ── decorator form (unchanged): retry on a single step ──
   - click: { role: button, name: "C" }

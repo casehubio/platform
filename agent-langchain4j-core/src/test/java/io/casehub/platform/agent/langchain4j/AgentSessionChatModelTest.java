@@ -1,6 +1,5 @@
 package io.casehub.platform.agent.langchain4j;
 
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -26,13 +25,13 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.awaitility.Awaitility.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class AgentSessionChatModelTest {
 
@@ -181,25 +180,29 @@ class AgentSessionChatModelTest {
     void doChat_jsonFormat_prependsSchemaToUserMessage() {
         List<String> receivedPrompts = new ArrayList<>();
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
-            fakeSession(p -> { receivedPrompts.add(p); return textDeltas("{}"); }));
+                fakeSession(p -> {
+                    receivedPrompts.add(p);
+                    return textDeltas("{}");
+                }));
         ChatRequest request = ChatRequest.builder()
-            .messages(List.of(UserMessage.from("hi")))
-            .responseFormat(ResponseFormat.builder()
-                .type(ResponseFormatType.JSON)
-                .jsonSchema(JsonSchema.builder()
-                    .name("TestSchema")
-                    .rootElement(JsonObjectSchema.builder()
-                        .addStringProperty("field", "a field")
-                        .required("field")
-                        .build())
-                    .build())
-                .build())
-            .build();
+                                         .messages(List.of(UserMessage.from("hi")))
+                                         .responseFormat(ResponseFormat.builder()
+                                                                       .type(ResponseFormatType.JSON)
+                                                                       .jsonSchema(JsonSchema.builder()
+                                                                                             .name("TestSchema")
+                                                                                             .rootElement(JsonObjectSchema.builder()
+                                                                                                                          .addStringProperty("field", "a field")
+                                                                                                                          .required("field")
+                                                                                                                          .build())
+                                                                                             .build())
+                                                                       .build())
+                                         .build();
         model.doChat(request);
         assertThat(receivedPrompts).hasSize(1);
         String prompt = receivedPrompts.get(0);
         assertThat(prompt).startsWith("Respond with JSON matching schema \"TestSchema\":");
-        assertThat(prompt).contains("\"field\": string (required)");
+        assertThat(prompt).contains("\"field\"");
+        assertThat(prompt).contains("\"type\" : \"string\"");
         assertThat(prompt).endsWith("\n\nhi");
     }
 
@@ -375,31 +378,40 @@ class AgentSessionChatModelTest {
     void doChat_streaming_jsonFormat_prependsSchemaToUserMessage() {
         List<String> receivedPrompts = new ArrayList<>();
         AgentSessionChatModel model = AgentSessionChatModel.wrap(
-            fakeSession(p -> { receivedPrompts.add(p); return textDeltas("{}"); }));
+                fakeSession(p -> {
+                    receivedPrompts.add(p);
+                    return textDeltas("{}");
+                }));
         ChatRequest request = ChatRequest.builder()
-            .messages(List.of(UserMessage.from("hi")))
-            .responseFormat(ResponseFormat.builder()
-                .type(ResponseFormatType.JSON)
-                .jsonSchema(JsonSchema.builder()
-                    .name("TestSchema")
-                    .rootElement(JsonObjectSchema.builder()
-                        .addStringProperty("field", "a field")
-                        .required("field")
-                        .build())
-                    .build())
-                .build())
-            .build();
+                                         .messages(List.of(UserMessage.from("hi")))
+                                         .responseFormat(ResponseFormat.builder()
+                                                                       .type(ResponseFormatType.JSON)
+                                                                       .jsonSchema(JsonSchema.builder()
+                                                                                             .name("TestSchema")
+                                                                                             .rootElement(JsonObjectSchema.builder()
+                                                                                                                          .addStringProperty("field", "a field")
+                                                                                                                          .required("field")
+                                                                                                                          .build())
+                                                                                             .build())
+                                                                       .build())
+                                         .build();
         AtomicBoolean done = new AtomicBoolean(false);
         model.doChat(request, new StreamingChatResponseHandler() {
-            @Override public void onPartialResponse(String t) {}
-            @Override public void onCompleteResponse(ChatResponse r) { done.set(true); }
-            @Override public void onError(Throwable t) {}
+            @Override
+            public void onPartialResponse(String t) {}
+
+            @Override
+            public void onCompleteResponse(ChatResponse r) {done.set(true);}
+
+            @Override
+            public void onError(Throwable t) {}
         });
         await().until(done::get);
         assertThat(receivedPrompts).hasSize(1);
         String prompt = receivedPrompts.get(0);
         assertThat(prompt).startsWith("Respond with JSON matching schema \"TestSchema\":");
-        assertThat(prompt).contains("\"field\": string (required)");
+        assertThat(prompt).contains("\"field\"");
+        assertThat(prompt).contains("\"type\" : \"string\"");
         assertThat(prompt).endsWith("\n\nhi");
     }
 

@@ -1101,4 +1101,126 @@ class WalkerTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- combined-key form: "forEach member in members" as key ---
+
+    @Test
+    void combinedKey_forEach() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("forEach member in members",
+                List.of(Map.of("process", Map.of("command", "a.sh")),
+                        Map.of("assert", Map.of())));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(2);
+        assertThat(block.decorators()).containsEntry("forEach", "member in members");
+    }
+
+    @Test
+    void combinedKey_retry() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("retry 3", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(1);
+        assertThat(block.decorators()).containsEntry("retry", "3");
+    }
+
+    @Test
+    void combinedKey_when() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("when ${params.enabled}", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("when", "${params.enabled}");
+    }
+
+    @Test
+    void combinedKey_timeout() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("timeout 30s", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("timeout", "30s");
+    }
+
+    @Test
+    void combinedKey_mutex() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("mutex order-lock", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("mutex", "order-lock");
+    }
+
+    @Test
+    void combinedKey_loop() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("loop continuous", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        step.put("cancel", "done");
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("loop", "continuous");
+        assertThat(block.decorators()).containsEntry("cancel", "done");
+    }
+
+    @Test
+    void combinedKey_withScalarDecorators() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("forEach item in items",
+                List.of(Map.of("process", Map.of("command", "a.sh"))));
+        step.put("retry", 3);
+        step.put("timeout", "30s");
+        var resolved = Walker.resolve(List.of(step), registry);
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.decorators()).containsEntry("forEach", "item in items");
+        assertThat(block.decorators()).containsEntry("retry", 3);
+        assertThat(block.decorators()).containsEntry("timeout", "30s");
+    }
+
+    @Test
+    void combinedKey_block_setsName() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("block setup",
+                List.of(Map.of("process", Map.of("command", "a.sh")),
+                        Map.of("assert", Map.of())));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
+        assertThat(resolved.get(0).name()).isEqualTo("setup");
+        var block = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(block.steps()).hasSize(2);
+    }
+
+    @Test
+    void combinedKey_parallel_setsName() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("parallel fast-path",
+                List.of(Map.of("process", Map.of("command", "a.sh")),
+                        Map.of("assert", Map.of())));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.ParallelStep.class);
+        assertThat(resolved.get(0).name()).isEqualTo("fast-path");
+    }
+
+    @Test
+    void combinedKey_race_setsName() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("race winner",
+                List.of(Map.of("process", Map.of("command", "a.sh")),
+                        Map.of("assert", Map.of())));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.RaceStep.class);
+        assertThat(resolved.get(0).name()).isEqualTo("winner");
+    }
+
+    @Test
+    void combinedKey_explicitStepNameTakesPrecedence() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("step", "explicit");
+        step.put("block setup",
+                List.of(Map.of("process", Map.of("command", "a.sh"))));
+        var resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved.get(0).name()).isEqualTo("explicit");
+    }
+
 }

@@ -12,12 +12,11 @@ meta:
     - step-workflows
 steps:
   # ── structural form: when guards a group of steps ──
-  # The condition is a nested key; its value is the steps array.
+  # "when ${params.enabled}" is the YAML key; the steps array is its value.
   # Equivalent to: block: [...] + when: "${params.enabled}"
-  - when:
-      "${params.enabled}":
-        - click: { role: button, name: "A" }
-        - click: { role: button, name: "B" }
+  - when ${params.enabled}:
+      - click: { role: button, name: "A" }
+      - click: { role: button, name: "B" }
 
   # ── decorator form (unchanged): when on a single step ──
   - click: { role: button, name: "C" }

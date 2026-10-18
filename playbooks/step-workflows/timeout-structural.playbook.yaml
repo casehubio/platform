@@ -12,18 +12,15 @@ meta:
     - step-workflows
 steps:
   # ── structural form: timeout scopes a group ──
-  # The duration is a nested key; its value is the steps array.
+  # "timeout 10s" is the YAML key; the steps array is its value.
   # Equivalent to: block: [...] + timeout: "10s"
-  - timeout:
-      "10s":
-        - click: { role: button, name: "A" }
-        - click: { role: button, name: "B" }
-        - click: { role: button, name: "C" }
+  - timeout 10s:
+      - click: { role: button, name: "A" }
+      - click: { role: button, name: "B" }
+      - click: { role: button, name: "C" }
 
   # ── combined: structural decorator + scalar decorators ──
-  # forEach is structural (wraps steps), retry and timeout are scalar decorators.
-  - forEach:
-      "item in items":
-        - click: { role: button, name: "${item.name}" }
+  - forEach item in items:
+      - click: { role: button, name: "${item.name}" }
     retry: 3
     timeout: "30s"

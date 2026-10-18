@@ -4,7 +4,7 @@ schema: client
 playbook: foreach-structural-demo
 meta:
   title: "ForEach (structural)"
-  description: "Structural forEach wraps child steps — each iteration runs the full group. The expression is the nested key; the steps array is its value."
+  description: "Structural forEach wraps child steps — each iteration runs the full group. The expression is part of the YAML key; the steps array is its value."
   tags:
     - forEach
     - structural
@@ -12,9 +12,8 @@ meta:
     - step-workflows
 steps:
   # ── structural form: forEach directly contains steps ──
-  # The expression is a nested key; its value is the steps array.
+  # "forEach item in items" is the YAML key; the steps array is its value.
   # Equivalent to: block: [...] + forEach: "item in items"
-  - forEach:
-      "item in items":
-        - click: { role: button, name: "${item.name}" }
-        - assert: { expression: "${item.valid}" }
+  - forEach item in items:
+      - click: { role: button, name: "${item.name}" }
+      - assert: { expression: "${item.valid}" }

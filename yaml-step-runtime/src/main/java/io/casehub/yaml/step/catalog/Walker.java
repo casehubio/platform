@@ -35,6 +35,20 @@ public final class Walker {
 
     private Walker() {}
 
+    private static final Set<String> COMBINED_KEY_PREFIXES = new java.util.HashSet<>();
+    static {
+        COMBINED_KEY_PREFIXES.addAll(PROMOTABLE_DECORATORS);
+        COMBINED_KEY_PREFIXES.addAll(java.util.List.of(
+                "block", "parallel", "try", "select", "race", "if", "match"));
+    }
+
+    private static String matchCombinedKey(String key) {
+        int spaceIdx = key.indexOf(' ');
+        if (spaceIdx < 0) return null;
+        String prefix = key.substring(0, spaceIdx);
+        return COMBINED_KEY_PREFIXES.contains(prefix) ? prefix : null;
+    }
+
     private static Map<String, Object> stripKeys(
             Map<String, Object> map, Set<String> keysToStrip) {
         var result = new LinkedHashMap<String, Object>();
@@ -131,6 +145,23 @@ public final class Walker {
                 structuralValue = e.getValue();
             } else if (RESERVED_KEYS.contains(key)) {
                 decorators.put(key, e.getValue());
+            } else if (matchCombinedKey(key) != null && e.getValue() instanceof List) {
+                if (structuralType != null) {
+                    throw new IllegalArgumentException(
+                            path + " → Step " + index + ": step has both structural type '"
+                            + structuralType + "' and structural decorator '" + key + "'");
+                }
+                int spaceIdx = key.indexOf(' ');
+                String prefix = key.substring(0, spaceIdx);
+                String param = key.substring(spaceIdx + 1);
+                if (PROMOTABLE_DECORATORS.contains(prefix)) {
+                    structuralType = prefix;
+                    structuralValue = java.util.Map.of(param, e.getValue());
+                } else {
+                    if (stepName == null) stepName = param;
+                    structuralType = prefix;
+                    structuralValue = e.getValue();
+                }
             } else {
                 var entry = registry.resolve(key);
                 if (entry.isPresent()) {

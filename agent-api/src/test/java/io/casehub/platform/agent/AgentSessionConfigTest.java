@@ -68,4 +68,29 @@ class AgentSessionConfigTest {
         var config = AgentSessionConfig.of("sys", "user", "claude");
         assertThat(config.model()).isEqualTo("claude");
     }
+
+    @Test
+    void responseFormatDefaultsToNull() {
+        var config = AgentSessionConfig.of("sys", "user");
+        assertThat(config.responseFormat()).isNull();
+    }
+
+    @Test
+    void withResponseFormatSetsFormat() {
+        var config  = AgentSessionConfig.of("sys", "user");
+        var format  = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var updated = config.withResponseFormat(format);
+        assertThat(updated.responseFormat()).isEqualTo(format);
+        assertThat(updated.systemPrompt()).isEqualTo("sys");
+        assertThat(updated.userPrompt()).isEqualTo("user");
+    }
+
+    @Test
+    void withModelPreservesResponseFormat() {
+        var format  = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var config  = AgentSessionConfig.of("sys", "user").withResponseFormat(format);
+        var updated = config.withModel("gpt-4");
+        assertThat(updated.responseFormat()).isEqualTo(format);
+        assertThat(updated.model()).isEqualTo("gpt-4");
+    }
 }

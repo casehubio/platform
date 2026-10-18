@@ -49,7 +49,6 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `agent-codex/` | `casehub-platform-agent-codex` | `@ApplicationScoped` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `agent-gemini/` | `casehub-platform-agent-gemini` | `@ApplicationScoped` | AgentBackend "gemini" -- native Google GenAI SDK (v1.65.0), explicit caching |
 | `agent-gemini-cli/` | `casehub-platform-agent-gemini-cli` | `@ApplicationScoped` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `agent-langchain4j/` | `casehub-platform-agent-langchain4j` | `@ApplicationScoped` | AgentBackend "langchain4j" -- bidirectional LangChain4j interop |
 | `agent-config-core/` | `casehub-platform-agent-config-core` | (none) | Manifest types, `ManifestLoader`, `ManifestProcessor`, `ManifestCredentialResolver`, `CredentialRef` sealed interface, `ManifestResult`, `LocalModelReconciler`. Pure Java + Jackson |
 | `agent-config/` | `casehub-platform-agent-config` | `@Startup @Priority(50)` | `AgentConfigBeans` -- discovers `agent-config.yaml`, runs loader+processor, produces `ManifestResult @Singleton` |
 | `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking; consumes `ManifestResult`; `NoOpModelRegistry @DefaultBean` fallback |
@@ -119,7 +118,6 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `agent-gemini-cli-core/` | `casehub-platform-agent-gemini-cli-core` | (none) | Framework-neutral Gemini CLI agent POJOs |
 | `agent-router-core/` | `casehub-platform-agent-router-core` | (none) | Framework-neutral agent router POJOs |
 | `agent-gate-core/` | `casehub-platform-agent-gate-core` | (none) | Framework-neutral agent gate POJOs |
-| `agent-langchain4j-core/` | `casehub-platform-agent-langchain4j-core` | (none) | Framework-neutral LangChain4j agent POJOs |
 | `acl-worker/` | `casehub-platform-acl-worker` | `@Provider` | Worker credential filter -- token lookup, tenancy validation, `FailClosedWorkerScopeExtractor @DefaultBean` |
 | `schema-generator/` | `casehub-platform-schema-generator` | (none) | JSON Schema generation -- victools/jsonschema-generator (Draft 2020-12), `SealedHierarchyModule`, `ShorthandModule` |
 | `drift-detection/` | `casehub-platform-drift-detection` | (Maven Enforcer) | Drift detection custom rule -- detects hand-written types in codegen-managed packages |
@@ -301,7 +299,6 @@ agent-config.yaml files → ManifestLoader → ManifestProcessor → existing SP
 
 CDI tier for `AgentProvider`:
 - Tier 0: `NoOpAgentProvider @DefaultBean` (platform/) -- fallback
-- Tier 1: `ChatModelAgentProvider @Alternative @Priority(1)` (agent-langchain4j/) -- any LangChain4j ChatModel
 - Tier 10: `ClaudeAgentProvider @Alternative @Priority(10)` (agent-claude/) -- native Claude CLI
 - Decorator: `GatedAgentProvider @Decorator @Priority(APPLICATION)` (agent-gate/) -- token bucket + concurrency gate, wraps any provider
 
@@ -310,11 +307,6 @@ CDI tier for `AgentProvider`:
 `AgentMcpServer` sealed interface with three transport variants: `Stdio(command, args, env)`, `Sse(url, headers)`, `Http(url, headers)`.
 
 `agent-claude/` wraps the Claude Code CLI via the Spring AI Community `claude-code-sdk` 1.0.0. `ClaudeAgentClient` manages subprocess lifecycle, semaphore gating, wall-clock timeout, and message-to-AgentEvent mapping via `MessageEventMapper`. `ClaudeAgentSession` implements serial multi-turn with IDLE/ACTIVE/CLOSED state machine. First `query()` calls `connect()`; subsequent calls use `query()` on the same session.
-
-`agent-langchain4j/` provides bidirectional interop:
-- `ChatModelAgentProvider` wraps any LangChain4j `ChatModel` as `AgentProvider`. Discovers `@Default ChatModel` beans, filters out `AgentProviderChatModel` to avoid circular injection. Supports streaming via `StreamingChatModel` detection.
-- `AgentProviderChatModel` / `AgentSessionChatModel` wrap `AgentProvider` as LangChain4j `ChatModel`. Blocks on Mutiny pipeline, collects text deltas, maps to `AiMessage`.
-- `AgentEventBridge` converts LangChain4j streaming responses into `Multi<AgentEvent>`.
 
 ### Access Control Architecture
 
@@ -427,7 +419,6 @@ Cross-domain actor overload detection and automated work redistribution. The SPI
 - jackson-jq 1.6.0 (expression module)
 - MVEL3 3.0.0-SNAPSHOT from JBoss Nexus snapshots (expression module)
 - Commons JEXL 3.4.0 (expression module)
-- LangChain4j 1.14.1 (agent-langchain4j module)
 - Spring AI Community `claude-code-sdk` 1.0.0 (agent-claude module)
 - `quarkus-kubernetes-config` (optional, expression module -- for K8s ConfigMap/Secret integration)
 

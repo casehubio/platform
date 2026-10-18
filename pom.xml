@@ -91,8 +91,6 @@
         <module>agent-gemini</module>
         <module>agent-gemini-cli-core</module>
         <module>agent-gemini-cli</module>
-        <module>agent-langchain4j-core</module>
-        <module>agent-langchain4j</module>
         <module>acl-inmem-core</module>
         <module>acl-inmem</module>
         <module>acl-jpa-common</module>
@@ -232,7 +230,6 @@
         <quarkus.platform.version>3.39.3</quarkus.platform.version>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <jandex-maven-plugin.version>3.3.1</jandex-maven-plugin.version>
-        <langchain4j.version>1.14.1</langchain4j.version>
         <spring-boot.version>4.1.1</spring-boot.version>
         <spring-ai.version>2.0.0</spring-ai.version>
         <bouncycastle.version>1.85</bouncycastle.version>
@@ -319,16 +316,6 @@
                 <groupId>com.zaxxer</groupId>
                 <artifactId>HikariCP</artifactId>
                 <version>7.0.2</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-core</artifactId>
-                <version>${langchain4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j</artifactId>
-                <version>${langchain4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.openhtmltopdf</groupId>

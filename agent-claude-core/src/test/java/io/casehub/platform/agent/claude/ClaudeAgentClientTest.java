@@ -176,4 +176,23 @@ class ClaudeAgentClientTest {
         assertThat(client.availablePermits()).isEqualTo(2);
     }
 
+
+    @Test
+    void responseFormatFlowsThroughToFactory() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<AgentSessionConfig>();
+        client = new ClaudeAgentClient(props(1), c -> {
+            captured.set(c);
+            return Multi.createFrom().empty();
+        });
+
+        var format = io.casehub.platform.agent.ResponseFormat.json("weather",
+                                                                   "{\"type\":\"object\",\"properties\":{\"temp\":{\"type\":\"number\"}}}");
+        var config = AgentSessionConfig.of("sys", "user").withResponseFormat(format);
+
+        client.run(config).collect().asList().await().indefinitely();
+        assertThat(captured.get().responseFormat()).isEqualTo(format);
+        assertThat(captured.get().responseFormat().type())
+                .isEqualTo(io.casehub.platform.agent.ResponseFormatType.JSON);
+        assertThat(captured.get().responseFormat().name()).isEqualTo("weather");
+    }
 }

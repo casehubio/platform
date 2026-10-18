@@ -52,4 +52,28 @@ class AgentSessionInitTest {
         var init = AgentSessionInit.of("sys", "openai");
         assertThat(init.model()).isEqualTo("openai");
     }
+
+    @Test
+    void responseFormatDefaultsToNull() {
+        var init = AgentSessionInit.of("sys");
+        assertThat(init.responseFormat()).isNull();
+    }
+
+    @Test
+    void withResponseFormatSetsFormat() {
+        var init    = AgentSessionInit.of("sys");
+        var format  = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var updated = init.withResponseFormat(format);
+        assertThat(updated.responseFormat()).isEqualTo(format);
+        assertThat(updated.systemPrompt()).isEqualTo("sys");
+    }
+
+    @Test
+    void withModelPreservesResponseFormat() {
+        var format  = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var init    = AgentSessionInit.of("sys").withResponseFormat(format);
+        var updated = init.withModel("gpt-4");
+        assertThat(updated.responseFormat()).isEqualTo(format);
+        assertThat(updated.model()).isEqualTo("gpt-4");
+    }
 }

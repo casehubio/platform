@@ -233,6 +233,8 @@
         <spring-boot.version>4.1.1</spring-boot.version>
         <spring-ai.version>2.0.0</spring-ai.version>
         <bouncycastle.version>1.85</bouncycastle.version>
+        <version.dev.langchain4j>1.19.0</version.dev.langchain4j>
+        <version.com.anthropic>2.40.1</version.com.anthropic>
     </properties>
 
     <dependencyManagement>
@@ -346,6 +348,16 @@
                 <groupId>io.cloudevents</groupId>
                 <artifactId>cloudevents-json-jackson</artifactId>
                 <version>4.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-core</artifactId>
+                <version>${version.dev.langchain4j}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.anthropic</groupId>
+                <artifactId>anthropic-java-client-okhttp</artifactId>
+                <version>${version.com.anthropic}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

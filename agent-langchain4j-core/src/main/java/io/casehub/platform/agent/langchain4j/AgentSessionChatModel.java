@@ -23,6 +23,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Wraps an {@code AgentSession} as a LangChain4j {@code ChatModel}.
+ *
+ * @deprecated This module is scheduled for removal. Use {@code AgentSession.query()}
+ * directly instead of wrapping in a ChatModel adapter.
+ * See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 public final class AgentSessionChatModel implements ChatModel, StreamingChatModel {
 
     private final AgentSession session;
@@ -60,14 +69,14 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
         String userMessage = extractLastUserText(request.messages());
         userMessage = prependSchema(request, userMessage);
         String text = session.query(userMessage)
-            .filter(e -> e instanceof AgentEvent.TextDelta)
-            .map(e -> ((AgentEvent.TextDelta) e).text())
-            .collect().with(Collectors.joining())
-            .await().indefinitely();
+                             .filter(e -> e instanceof AgentEvent.TextDelta)
+                             .map(e -> ((AgentEvent.TextDelta) e).text())
+                             .collect().with(Collectors.joining())
+                             .await().indefinitely();
         return ChatResponse.builder()
-            .aiMessage(AiMessage.from(text))
-            .finishReason(FinishReason.STOP)
-            .build();
+                           .aiMessage(AiMessage.from(text))
+                           .finishReason(FinishReason.STOP)
+                           .build();
     }
 
     @Override
@@ -81,25 +90,25 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
         for (ChatMessage m : messages) {
             if (m instanceof AiMessage) {
                 throw new IllegalArgumentException(
-                    "AgentSession-backed ChatModel adapters do not accept AiMessage — " +
-                    "session history lives in the subprocess. " +
-                    "Each call must supply only a single new UserMessage.");
+                        "AgentSession-backed ChatModel adapters do not accept AiMessage — " +
+                        "session history lives in the subprocess. " +
+                        "Each call must supply only a single new UserMessage.");
             }
             if (m instanceof SystemMessage) {
                 throw new IllegalArgumentException(
-                    "AgentSession-backed ChatModel adapters do not accept SystemMessage — " +
-                    "the session system prompt is fixed at open time via AgentSessionInit. " +
-                    "Per-call system prompts are not supported.");
+                        "AgentSession-backed ChatModel adapters do not accept SystemMessage — " +
+                        "the session system prompt is fixed at open time via AgentSessionInit. " +
+                        "Per-call system prompts are not supported.");
             }
         }
         List<UserMessage> userMessages = messages.stream()
-            .filter(m -> m instanceof UserMessage)
-            .map(m -> (UserMessage) m)
-            .toList();
+                                                 .filter(m -> m instanceof UserMessage)
+                                                 .map(m -> (UserMessage) m)
+                                                 .toList();
         if (userMessages.size() > 1) {
             throw new IllegalArgumentException(
-                "AgentSession-backed ChatModel adapters accept exactly one UserMessage per call — " +
-                "multiple UserMessage elements indicate caller confusion about session state.");
+                    "AgentSession-backed ChatModel adapters accept exactly one UserMessage per call — " +
+                    "multiple UserMessage elements indicate caller confusion about session state.");
         }
         if (userMessages.isEmpty()) {
             throw new IllegalArgumentException("ChatRequest must contain at least one UserMessage");
@@ -108,8 +117,8 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
             return userMessages.get(0).singleText();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException(
-                "This adapter supports text-only UserMessage; " +
-                "multimodal content is not supported by the subprocess.", e);
+                    "This adapter supports text-only UserMessage; " +
+                    "multimodal content is not supported by the subprocess.", e);
         }
     }
 

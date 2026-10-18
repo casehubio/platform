@@ -6,6 +6,11 @@ import io.smallrye.config.WithDefault;
 
 import java.time.Duration;
 
+/**
+ * @deprecated This module is scheduled for removal. See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 @ConfigMapping(prefix = "casehub.platform.agent.langchain4j")
 public interface AgentLangchain4jConfig extends AgentLangchain4jProperties {
 

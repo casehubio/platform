@@ -22,6 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Bidirectional mapping between {@code AgentEvent} and LangChain4j streaming handlers.
+ *
+ * @deprecated This module is scheduled for removal. See casehubio/platform#638.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 public final class AgentEventBridge {
 
     private AgentEventBridge() {}
@@ -31,7 +38,7 @@ public final class AgentEventBridge {
             AtomicReference<StreamingHandle> handleRef = new AtomicReference<>();
             emitter.onTermination(() -> {
                 StreamingHandle h = handleRef.get();
-                if (h != null) h.cancel();
+                if (h != null) {h.cancel();}
             });
 
             model.chat(request, new StreamingChatResponseHandler() {
@@ -42,7 +49,7 @@ public final class AgentEventBridge {
 
                 @Override
                 public void onPartialResponse(PartialResponse partialResponse,
-                                               PartialResponseContext context) {
+                                              PartialResponseContext context) {
                     handleRef.compareAndSet(null, context.streamingHandle());
                     emitter.emit(new AgentEvent.TextDelta(partialResponse.text()));
                 }
@@ -54,7 +61,7 @@ public final class AgentEventBridge {
 
                 @Override
                 public void onPartialThinking(PartialThinking partialThinking,
-                                               PartialThinkingContext context) {
+                                              PartialThinkingContext context) {
                     handleRef.compareAndSet(null, context.streamingHandle());
                     emitter.emit(new AgentEvent.ThinkingDelta(partialThinking.text()));
                 }
@@ -62,24 +69,24 @@ public final class AgentEventBridge {
                 @Override
                 public void onPartialToolCall(PartialToolCall partialToolCall) {
                     emitter.emit(new AgentEvent.ToolCallDelta(
-                        partialToolCall.index(), partialToolCall.id(),
-                        partialToolCall.name(), partialToolCall.partialArguments()));
+                            partialToolCall.index(), partialToolCall.id(),
+                            partialToolCall.name(), partialToolCall.partialArguments()));
                 }
 
                 @Override
                 public void onPartialToolCall(PartialToolCall partialToolCall,
-                                               PartialToolCallContext context) {
+                                              PartialToolCallContext context) {
                     handleRef.compareAndSet(null, context.streamingHandle());
                     emitter.emit(new AgentEvent.ToolCallDelta(
-                        partialToolCall.index(), partialToolCall.id(),
-                        partialToolCall.name(), partialToolCall.partialArguments()));
+                            partialToolCall.index(), partialToolCall.id(),
+                            partialToolCall.name(), partialToolCall.partialArguments()));
                 }
 
                 @Override
                 public void onCompleteToolCall(CompleteToolCall completeToolCall) {
                     var ter = completeToolCall.toolExecutionRequest();
                     emitter.emit(new AgentEvent.ToolCallComplete(
-                        completeToolCall.index(), ter.id(), ter.name(), ter.arguments()));
+                            completeToolCall.index(), ter.id(), ter.name(), ter.arguments()));
                 }
 
                 @Override
@@ -96,48 +103,46 @@ public final class AgentEventBridge {
     }
 
     public static void dispatch(Multi<AgentEvent> events, StreamingChatResponseHandler handler) {
-        StringBuilder buffer = new StringBuilder();
-        List<ToolExecutionRequest> toolRequests = new ArrayList<>();
+        StringBuilder                                  buffer        = new StringBuilder();
+        List<ToolExecutionRequest>                     toolRequests  = new ArrayList<>();
         AtomicReference<AgentEvent.InvocationComplete> completionRef = new AtomicReference<>();
         events.subscribe().with(
-            event -> {
-                switch (event) {
-                    case AgentEvent.TextDelta delta -> {
-                        handler.onPartialResponse(delta.text());
-                        buffer.append(delta.text());
+                event -> {
+                    switch (event) {
+                        case AgentEvent.TextDelta delta -> {
+                            handler.onPartialResponse(delta.text());
+                            buffer.append(delta.text());
+                        }
+                        case AgentEvent.ThinkingDelta thinking -> handler.onPartialThinking(new PartialThinking(thinking.text()));
+                        case AgentEvent.ToolCallDelta d -> handler.onPartialToolCall(PartialToolCall.builder()
+                                                                                                    .index(d.index()).id(d.id()).name(d.name())
+                                                                                                    .partialArguments(d.partialArguments()).build());
+                        case AgentEvent.ToolCallComplete c -> {
+                            ToolExecutionRequest ter = ToolExecutionRequest.builder()
+                                                                           .id(c.id()).name(c.name()).arguments(c.arguments()).build();
+                            handler.onCompleteToolCall(new CompleteToolCall(c.index(), ter));
+                            toolRequests.add(ter);
+                        }
+                        case AgentEvent.ToolResult ignored -> {}
+                        case AgentEvent.InvocationComplete ic -> completionRef.set(ic);
                     }
-                    case AgentEvent.ThinkingDelta thinking ->
-                        handler.onPartialThinking(new PartialThinking(thinking.text()));
-                    case AgentEvent.ToolCallDelta d ->
-                        handler.onPartialToolCall(PartialToolCall.builder()
-                            .index(d.index()).id(d.id()).name(d.name())
-                            .partialArguments(d.partialArguments()).build());
-                    case AgentEvent.ToolCallComplete c -> {
-                        ToolExecutionRequest ter = ToolExecutionRequest.builder()
-                            .id(c.id()).name(c.name()).arguments(c.arguments()).build();
-                        handler.onCompleteToolCall(new CompleteToolCall(c.index(), ter));
-                        toolRequests.add(ter);
+                },
+                handler::onError,
+                () -> {
+                    AiMessage aiMessage = toolRequests.isEmpty()
+                                          ? AiMessage.from(buffer.toString())
+                                          : AiMessage.builder().text(buffer.toString())
+                                                     .toolExecutionRequests(toolRequests).build();
+                    var builder    = ChatResponse.builder().aiMessage(aiMessage);
+                    var completion = completionRef.get();
+                    if (completion != null) {
+                        builder.metadata(CaseHubChatResponseMetadata.from(completion));
+                    } else {
+                        builder.finishReason(toolRequests.isEmpty()
+                                             ? FinishReason.STOP : FinishReason.TOOL_EXECUTION);
                     }
-                    case AgentEvent.ToolResult ignored -> {}
-                    case AgentEvent.InvocationComplete ic -> completionRef.set(ic);
+                    handler.onCompleteResponse(builder.build());
                 }
-            },
-            handler::onError,
-            () -> {
-                AiMessage aiMessage = toolRequests.isEmpty()
-                    ? AiMessage.from(buffer.toString())
-                    : AiMessage.builder().text(buffer.toString())
-                        .toolExecutionRequests(toolRequests).build();
-                var builder = ChatResponse.builder().aiMessage(aiMessage);
-                var completion = completionRef.get();
-                if (completion != null) {
-                    builder.metadata(CaseHubChatResponseMetadata.from(completion));
-                } else {
-                    builder.finishReason(toolRequests.isEmpty()
-                        ? FinishReason.STOP : FinishReason.TOOL_EXECUTION);
-                }
-                handler.onCompleteResponse(builder.build());
-            }
-        );
+                               );
     }
 }

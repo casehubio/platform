@@ -58,7 +58,7 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
     @Override
     public ChatResponse doChat(ChatRequest request) {
         String userMessage = extractLastUserText(request.messages());
-        userMessage = AgentProviderChatModel.prependSchema(request, userMessage);
+        userMessage = prependSchema(request, userMessage);
         String text = session.query(userMessage)
             .filter(e -> e instanceof AgentEvent.TextDelta)
             .map(e -> ((AgentEvent.TextDelta) e).text())
@@ -73,7 +73,7 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
     @Override
     public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
         String userMessage = extractLastUserText(request.messages());
-        userMessage = AgentProviderChatModel.prependSchema(request, userMessage);
+        userMessage = prependSchema(request, userMessage);
         AgentEventBridge.dispatch(session.query(userMessage), handler);
     }
 
@@ -110,6 +110,25 @@ public final class AgentSessionChatModel implements ChatModel, StreamingChatMode
             throw new IllegalArgumentException(
                 "This adapter supports text-only UserMessage; " +
                 "multimodal content is not supported by the subprocess.", e);
+        }
+    }
+
+    private static String prependSchema(ChatRequest request, String userText) {
+        dev.langchain4j.model.chat.request.ResponseFormat format = request.responseFormat();
+        if (format == null || format.type() != dev.langchain4j.model.chat.request.ResponseFormatType.JSON
+            || format.jsonSchema() == null) {
+            return userText;
+        }
+        try {
+            java.util.Map<String, Object> schemaMap =
+                    dev.langchain4j.internal.JsonSchemaElementJsonUtils.toMap(format.jsonSchema().rootElement());
+            var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String schemaJson = objectMapper.writerWithDefaultPrettyPrinter()
+                                            .writeValueAsString(schemaMap);
+            return "Respond with JSON matching schema \"" + format.jsonSchema().name()
+                   + "\":\n" + schemaJson + "\n\n" + userText;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return userText;
         }
     }
 }

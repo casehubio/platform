@@ -14,9 +14,6 @@ import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.request.DefaultChatRequestParameters;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
-import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonSchema;
-import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
@@ -25,10 +22,7 @@ import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
 
@@ -66,15 +60,14 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
 
     @Override
     public ChatResponse doChat(ChatRequest request) {
-        String systemPrompt = extractSystemPrompt(request.messages());
-        String userMessage = extractUserText(request.messages());
-        String userWithSchema = prependSchema(request, userMessage);
-        AgentSessionConfig config = AgentSessionConfig.of(systemPrompt, userWithSchema);
+        String             systemPrompt = extractSystemPrompt(request.messages());
+        String             userMessage  = extractUserText(request.messages());
+        AgentSessionConfig config       = applyResponseFormat(request, AgentSessionConfig.of(systemPrompt, userMessage));
         List<AgentEvent> events = agentProvider.invoke(config)
-            .collect().asList()
-            .await().atMost(properties.closeTimeout());
+                                               .collect().asList()
+                                               .await().atMost(properties.closeTimeout());
 
-        StringBuilder text = new StringBuilder();
+        StringBuilder                 text       = new StringBuilder();
         AgentEvent.InvocationComplete completion = null;
         for (AgentEvent event : events) {
             if (event instanceof AgentEvent.TextDelta td) {
@@ -85,7 +78,7 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
         }
 
         var builder = ChatResponse.builder()
-            .aiMessage(AiMessage.from(text.toString()));
+                                  .aiMessage(AiMessage.from(text.toString()));
         if (completion != null) {
             builder.metadata(CaseHubChatResponseMetadata.from(completion));
         } else {
@@ -96,10 +89,9 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
 
     @Override
     public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
-        String systemPrompt = extractSystemPrompt(request.messages());
-        String userMessage = extractUserText(request.messages());
-        String userWithSchema = prependSchema(request, userMessage);
-        AgentSessionConfig config = AgentSessionConfig.of(systemPrompt, userWithSchema);
+        String             systemPrompt = extractSystemPrompt(request.messages());
+        String             userMessage  = extractUserText(request.messages());
+        AgentSessionConfig config       = applyResponseFormat(request, AgentSessionConfig.of(systemPrompt, userMessage));
         AgentEventBridge.dispatch(agentProvider.invoke(config), handler);
     }
 
@@ -136,33 +128,26 @@ public class AgentProviderChatModel implements ChatModel, StreamingChatModel {
         }
     }
 
-    static String prependSchema(ChatRequest request, String userText) {
+    static AgentSessionConfig applyResponseFormat(ChatRequest request, AgentSessionConfig config) {
         ResponseFormat format = request.responseFormat();
-        if (format == null || format.type() != ResponseFormatType.JSON || format.jsonSchema() == null) {
-            return userText;
+        if (format == null || format.type() != ResponseFormatType.JSON) {
+            return config;
         }
-        return serializeSchema(format.jsonSchema()) + "\n\n" + userText;
+        if (format.jsonSchema() == null) {
+            return config.withResponseFormat(
+                    io.casehub.platform.agent.ResponseFormat.jsonAny());
+        }
+        try {
+            java.util.Map<String, Object> schemaMap =
+                    dev.langchain4j.internal.JsonSchemaElementJsonUtils.toMap(format.jsonSchema().rootElement());
+            var    objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String schemaJson   = objectMapper.writeValueAsString(schemaMap);
+            return config.withResponseFormat(
+                    io.casehub.platform.agent.ResponseFormat.json(
+                            format.jsonSchema().name(), schemaJson));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to serialize JSON schema: " + e.getMessage(), e);
+        }
     }
 
-    static String serializeSchema(JsonSchema schema) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Respond with JSON matching schema \"").append(schema.name()).append("\":\n{\n");
-        JsonSchemaElement root = schema.rootElement();
-        if (root instanceof JsonObjectSchema obj) {
-            Map<String, JsonSchemaElement> props = obj.properties();
-            List<String> required = obj.required() != null ? obj.required() : List.of();
-            new TreeMap<>(props).forEach((name, element) -> {
-                String typeName = element.getClass().getSimpleName()
-                    .replace("Json", "").replace("Schema", "").toLowerCase();
-                String reqLabel = required.contains(name) ? " (required)" : "";
-                sb.append("  \"").append(name).append("\": ").append(typeName).append(reqLabel).append(",\n");
-            });
-            if (!props.isEmpty()) {
-                sb.setLength(sb.length() - 2);
-                sb.append('\n');
-            }
-        }
-        sb.append('}');
-        return sb.toString();
-    }
 }

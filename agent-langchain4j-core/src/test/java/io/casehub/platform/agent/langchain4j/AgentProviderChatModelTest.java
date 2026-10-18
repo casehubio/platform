@@ -1,6 +1,5 @@
 package io.casehub.platform.agent.langchain4j;
 
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -13,7 +12,6 @@ import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
-import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.CompleteToolCall;
 import dev.langchain4j.model.chat.response.PartialThinking;
@@ -30,14 +28,17 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.awaitility.Awaitility.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 class AgentProviderChatModelTest {
 
@@ -210,36 +211,41 @@ class AgentProviderChatModelTest {
 
     @Test
     void doChat_blocking_jsonFormat_prependsSchema() {
-        List<String> capturedUserPrompts = new ArrayList<>();
+        var capturedConfigs = new ArrayList<AgentSessionConfig>();
         AgentProvider provider = new AgentProvider() {
-            @Override public Multi<AgentEvent> invoke(AgentSessionConfig c) {
-                capturedUserPrompts.add(c.userPrompt());
+            @Override
+            public Multi<AgentEvent> invoke(AgentSessionConfig c) {
+                capturedConfigs.add(c);
                 return textDeltas("{\"name\":\"test\"}");
             }
-            @Override public io.casehub.platform.agent.AgentSession openSession(io.casehub.platform.agent.AgentSessionInit init) {
+
+            @Override
+            public io.casehub.platform.agent.AgentSession openSession(io.casehub.platform.agent.AgentSessionInit init) {
                 throw new UnsupportedOperationException();
             }
         };
         JsonSchema schema = JsonSchema.builder()
-            .name("Person")
-            .rootElement(JsonObjectSchema.builder()
-                .addStringProperty("name", "person's name")
-                .required("name")
-                .build())
-            .build();
+                                      .name("Person")
+                                      .rootElement(JsonObjectSchema.builder()
+                                                                   .addStringProperty("name", "person's name")
+                                                                   .required("name")
+                                                                   .build())
+                                      .build();
         ChatRequest request = ChatRequest.builder()
-            .messages(List.of(UserMessage.from("give me a person")))
-            .responseFormat(ResponseFormat.builder()
-                .type(ResponseFormatType.JSON)
-                .jsonSchema(schema)
-                .build())
-            .build();
+                                         .messages(List.of(UserMessage.from("give me a person")))
+                                         .responseFormat(ResponseFormat.builder()
+                                                                       .type(ResponseFormatType.JSON)
+                                                                       .jsonSchema(schema)
+                                                                       .build())
+                                         .build();
         ChatResponse response = model(provider).chat(request);
-        assertThat(capturedUserPrompts).hasSize(1);
-        String prompt = capturedUserPrompts.get(0);
-        assertThat(prompt).contains("Respond with JSON matching schema \"Person\"");
-        assertThat(prompt).contains("\"name\": string (required)");
-        assertThat(prompt).contains("give me a person");
+        assertThat(capturedConfigs).hasSize(1);
+        AgentSessionConfig config = capturedConfigs.get(0);
+        assertThat(config.userPrompt()).isEqualTo("give me a person");
+        assertThat(config.responseFormat()).isNotNull();
+        assertThat(config.responseFormat().type()).isEqualTo(io.casehub.platform.agent.ResponseFormatType.JSON);
+        assertThat(config.responseFormat().name()).isEqualTo("Person");
+        assertThat(config.responseFormat().schema()).contains("\"name\"");
         assertThat(response.aiMessage().text()).isEqualTo("{\"name\":\"test\"}");
     }
 
@@ -284,41 +290,51 @@ class AgentProviderChatModelTest {
 
     @Test
     void doChat_streaming_jsonFormat_prependsSchema() {
-        List<String> capturedUserPrompts = new ArrayList<>();
+        var capturedConfigs = new ArrayList<AgentSessionConfig>();
         AgentProvider provider = new AgentProvider() {
-            @Override public Multi<AgentEvent> invoke(AgentSessionConfig c) {
-                capturedUserPrompts.add(c.userPrompt());
+            @Override
+            public Multi<AgentEvent> invoke(AgentSessionConfig c) {
+                capturedConfigs.add(c);
                 return textDeltas("{\"age\":", "42", "}");
             }
-            @Override public io.casehub.platform.agent.AgentSession openSession(io.casehub.platform.agent.AgentSessionInit init) {
+
+            @Override
+            public io.casehub.platform.agent.AgentSession openSession(io.casehub.platform.agent.AgentSessionInit init) {
                 throw new UnsupportedOperationException();
             }
         };
         JsonSchema schema = JsonSchema.builder()
-            .name("Data")
-            .rootElement(JsonObjectSchema.builder()
-                .addNumberProperty("age", "person's age")
-                .build())
-            .build();
+                                      .name("Data")
+                                      .rootElement(JsonObjectSchema.builder()
+                                                                   .addNumberProperty("age", "person's age")
+                                                                   .build())
+                                      .build();
         ChatRequest request = ChatRequest.builder()
-            .messages(List.of(UserMessage.from("give me data")))
-            .responseFormat(ResponseFormat.builder()
-                .type(ResponseFormatType.JSON)
-                .jsonSchema(schema)
-                .build())
-            .build();
+                                         .messages(List.of(UserMessage.from("give me data")))
+                                         .responseFormat(ResponseFormat.builder()
+                                                                       .type(ResponseFormatType.JSON)
+                                                                       .jsonSchema(schema)
+                                                                       .build())
+                                         .build();
         ChatResponse[] completed = {null};
         model(provider).chat(request, new StreamingChatResponseHandler() {
-            @Override public void onPartialResponse(String t) {}
-            @Override public void onCompleteResponse(ChatResponse r) { completed[0] = r; }
-            @Override public void onError(Throwable t) {}
+            @Override
+            public void onPartialResponse(String t)        {}
+
+            @Override
+            public void onCompleteResponse(ChatResponse r) {completed[0] = r;}
+
+            @Override
+            public void onError(Throwable t)               {}
         });
         await().untilAsserted(() -> assertThat(completed[0]).isNotNull());
-        assertThat(capturedUserPrompts).hasSize(1);
-        String prompt = capturedUserPrompts.get(0);
-        assertThat(prompt).contains("Respond with JSON matching schema \"Data\"");
-        assertThat(prompt).contains("\"age\": number");
-        assertThat(prompt).contains("give me data");
+        assertThat(capturedConfigs).hasSize(1);
+        AgentSessionConfig config = capturedConfigs.get(0);
+        assertThat(config.userPrompt()).isEqualTo("give me data");
+        assertThat(config.responseFormat()).isNotNull();
+        assertThat(config.responseFormat().type()).isEqualTo(io.casehub.platform.agent.ResponseFormatType.JSON);
+        assertThat(config.responseFormat().name()).isEqualTo("Data");
+        assertThat(config.responseFormat().schema()).contains("\"age\"");
         assertThat(completed[0].aiMessage().text()).isEqualTo("{\"age\":42}");
     }
 

@@ -159,6 +159,7 @@
         <module>agent-config-core</module>
         <module>agent-session-core</module>
         <module>agent-session</module>
+        <module>agent-react-core</module>
         <module>agent-router-core</module>
         <module>agent-router</module>
         <module>agent-gate-core</module>

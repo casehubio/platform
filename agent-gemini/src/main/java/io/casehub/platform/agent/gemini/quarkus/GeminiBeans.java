@@ -30,6 +30,17 @@ public class GeminiBeans {
         return new io.casehub.platform.agent.router.SimpleChatModelBackend("gemini", chatModel);
     }
 
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.agent.router.EmbeddingModelBackend geminiEmbeddingModelBackend(GeminiAgentConfig config) {
+        var clientBuilder = com.google.genai.Client.builder();
+        config.apiKey().ifPresent(clientBuilder::apiKey);
+        io.casehub.platform.agent.gemini.GeminiNativeEmbeddingModel embeddingModel =
+                new io.casehub.platform.agent.gemini.GeminiNativeEmbeddingModel(
+                        clientBuilder.build(), "text-embedding-004", null);
+        return new io.casehub.platform.agent.router.SimpleEmbeddingModelBackend("gemini", embeddingModel);
+    }
+
 
     @PreDestroy
     void shutdown() {

@@ -8,13 +8,14 @@ import io.casehub.platform.agent.router.RoutingAgentProvider;
 import io.casehub.platform.agent.router.RoutingChatModel;
 import io.casehub.platform.agent.router.config.RoutingAgentConfig;
 import io.casehub.platform.api.model.ModelRegistry;
-import java.util.ArrayList;
-import java.util.List;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @ApplicationScoped
 public class RouterBeans {
@@ -35,6 +36,9 @@ public class RouterBeans {
     @Inject
     @Any
     Instance<ChatModelBackend>                                      chatModelBackends;
+    @Inject
+    @Any
+    Instance<io.casehub.platform.agent.router.EmbeddingModelBackend> embeddingModelBackends;
 
 
     @Produces
@@ -66,5 +70,17 @@ public class RouterBeans {
         chatModelBackends.forEach(backendList::add);
         return new RoutingChatModel(backendList, modelRegistry, config.defaultBackend(), null);
     }
+
+    @Produces
+    @ApplicationScoped
+    @io.quarkus.arc.DefaultBean
+    public dev.langchain4j.model.embedding.EmbeddingModel routingEmbeddingModel(
+            io.casehub.platform.agent.router.config.RoutingAgentConfig config) {
+        List<io.casehub.platform.agent.router.EmbeddingModelBackend> backendList = new ArrayList<>();
+        embeddingModelBackends.forEach(backendList::add);
+        return new io.casehub.platform.agent.router.RoutingEmbeddingModel(
+                backendList, modelRegistry, config.defaultBackend());
+    }
+
 
 }

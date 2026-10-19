@@ -33,6 +33,19 @@ public class OllamaBeans {
         return new SimpleChatModelBackend("ollama", chatModel);
     }
 
+    @Produces
+    @ApplicationScoped
+    public io.casehub.platform.agent.router.EmbeddingModelBackend ollamaEmbeddingModelBackend(OllamaAgentConfig config) {
+        var client = com.openai.client.okhttp.OpenAIOkHttpClient.builder()
+                                                                .baseUrl(config.host() + "/v1/")
+                                                                .apiKey("ollama")
+                                                                .build();
+        io.casehub.platform.agent.openai.OpenAiNativeEmbeddingModel embeddingModel =
+                new io.casehub.platform.agent.openai.OpenAiNativeEmbeddingModel(
+                        client, config.defaultModel(), null);
+        return new io.casehub.platform.agent.router.SimpleEmbeddingModelBackend("ollama", embeddingModel);
+    }
+
 
     @PreDestroy
     void shutdown() {

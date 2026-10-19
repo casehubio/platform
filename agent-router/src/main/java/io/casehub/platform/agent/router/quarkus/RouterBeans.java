@@ -1,10 +1,15 @@
 package io.casehub.platform.agent.router.quarkus;
 
+import dev.langchain4j.model.chat.ChatModel;
 import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.router.ChatModelBackend;
 import io.casehub.platform.agent.router.RoutingAgentProvider;
+import io.casehub.platform.agent.router.RoutingChatModel;
 import io.casehub.platform.agent.router.config.RoutingAgentConfig;
 import io.casehub.platform.api.model.ModelRegistry;
+import java.util.ArrayList;
+import java.util.List;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
@@ -27,6 +32,9 @@ public class RouterBeans {
     @Inject
     @Any
     Instance<io.casehub.platform.api.model.ModelAvailabilityFilter> availabilityFilterInstance;
+    @Inject
+    @Any
+    Instance<ChatModelBackend>                                      chatModelBackends;
 
 
     @Produces
@@ -49,4 +57,14 @@ public class RouterBeans {
         return RoutingAgentProvider.create(registry, config.defaultBackend(),
                                            modelRegistry, manifest, availabilityFilter, poolRegistry);
     }
+
+    @Produces
+    @ApplicationScoped
+    @io.quarkus.arc.DefaultBean
+    public ChatModel routingChatModel(RoutingAgentConfig config) {
+        List<ChatModelBackend> backendList = new ArrayList<>();
+        chatModelBackends.forEach(backendList::add);
+        return new RoutingChatModel(backendList, modelRegistry, config.defaultBackend(), null);
+    }
+
 }

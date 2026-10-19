@@ -13,6 +13,9 @@ import java.util.Objects;
 
 public class OpenAiNativeChatModel implements ChatModel {
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
     private final OpenAIClient client;
     private final String defaultModel;
     private final Duration defaultTimeout;
@@ -42,10 +45,9 @@ public class OpenAiNativeChatModel implements ChatModel {
             var rf = request.parameters().responseFormat();
             if (rf.type() == dev.langchain4j.model.chat.request.ResponseFormatType.JSON) {
                 if (rf.jsonSchema() != null) {
-                    var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
                     try {
                         @SuppressWarnings("unchecked")
-                        java.util.Map<String, Object> schemaMap = objectMapper.readValue(
+                        java.util.Map<String, Object> schemaMap = OBJECT_MAPPER.readValue(
                                 rf.jsonSchema().rootElement().toString(), java.util.Map.class);
                         paramsBuilder.responseFormat(ResponseFormatJsonSchema.builder()
                                 .jsonSchema(ResponseFormatJsonSchema.JsonSchema.builder()

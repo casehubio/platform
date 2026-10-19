@@ -20,11 +20,15 @@ import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 final class LangChain4jAnthropicMapper {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private LangChain4jAnthropicMapper() {}
 
@@ -168,8 +172,7 @@ final class LangChain4jAnthropicMapper {
     private static Map<String, Object> parseJsonToMap(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(json, Map.class);
+            return OBJECT_MAPPER.readValue(json, Map.class);
         } catch (Exception e) {
             return Map.of();
         }

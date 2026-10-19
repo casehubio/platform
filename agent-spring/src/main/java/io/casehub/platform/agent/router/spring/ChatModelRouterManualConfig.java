@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Bean;
 public class ChatModelRouterManualConfig {
 
     @Bean
+    @ConditionalOnMissingBean(ChatModel.class)
     public ChatModel routingChatModel(
             List<ChatModelBackend> backends,
             ModelRegistry modelRegistry,

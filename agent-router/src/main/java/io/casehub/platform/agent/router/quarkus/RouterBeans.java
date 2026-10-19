@@ -60,6 +60,7 @@ public class RouterBeans {
 
     @Produces
     @ApplicationScoped
+    @io.quarkus.arc.DefaultBean
     public ChatModel routingChatModel(RoutingAgentConfig config) {
         List<ChatModelBackend> backendList = new ArrayList<>();
         chatModelBackends.forEach(backendList::add);

@@ -22,8 +22,10 @@ public class SessionPipeline {
     private final SessionLifecycleManager sessionManager;
     private final String backendKey;
     private final int maxConcurrency;
+    private final int maxSessions;
     private final int clearAtTokens;
     private final Semaphore tickets;
+    private final Semaphore sessionSlots;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService recovery;
     private final AtomicLong lastSuccessTime = new AtomicLong(System.currentTimeMillis());
@@ -31,11 +33,18 @@ public class SessionPipeline {
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
                            int maxConcurrency, int clearAtTokens) {
+        this(sessionManager, backendKey, maxConcurrency, Integer.MAX_VALUE, clearAtTokens);
+    }
+
+    public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
+                           int maxConcurrency, int maxSessions, int clearAtTokens) {
         this.sessionManager = sessionManager;
         this.backendKey = backendKey;
         this.maxConcurrency = maxConcurrency;
+        this.maxSessions = maxSessions;
         this.clearAtTokens = clearAtTokens;
         this.tickets = new Semaphore(maxConcurrency, true);
+        this.sessionSlots = new Semaphore(maxSessions, true);
         this.recovery = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "pipeline-recovery");
             t.setDaemon(true);
@@ -45,9 +54,54 @@ public class SessionPipeline {
     }
 
     public ManagedSession openSession(String id, AgentSessionInit init) {
-        return sessions.computeIfAbsent(id, k ->
-                sessionManager.acquire("pipeline:" + k, backendKey, init,
-                        ClearingPolicy.SIZE_AWARE, clearAtTokens));
+        return openSession(id, init, null);
+    }
+
+    public ManagedSession openSession(String id, AgentSessionInit init, Duration timeout) {
+        ManagedSession existing = sessions.get(id);
+        if (existing != null) return existing;
+
+        try {
+            if (timeout != null) {
+                if (!sessionSlots.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                    return null;
+                }
+            } else {
+                sessionSlots.acquire();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+
+        boolean[] created = {false};
+        ManagedSession session = sessions.computeIfAbsent(id, k -> {
+            created[0] = true;
+            return sessionManager.acquire("pipeline:" + k, backendKey, init,
+                    ClearingPolicy.SIZE_AWARE, clearAtTokens);
+        });
+
+        if (!created[0]) {
+            sessionSlots.release();
+        }
+
+        return session;
+    }
+
+    public void releaseSession(String id) {
+        ManagedSession session = sessions.remove(id);
+        if (session != null) {
+            try {
+                sessionManager.release("pipeline:" + id);
+            } catch (Exception e) {
+                LOG.debugf("Failed to release session [id=%s]: %s", id, e.getMessage());
+            }
+            sessionSlots.release();
+        }
+    }
+
+    public int sessionCount() {
+        return sessions.size();
     }
 
     public ManagedSession sessionFor(String id) {
@@ -155,6 +209,7 @@ public class SessionPipeline {
             } catch (Exception e) {
                 LOG.debugf("Failed to release session on shutdown [id=%s]: %s", id, e.getMessage());
             }
+            sessionSlots.release();
         });
         sessions.clear();
     }

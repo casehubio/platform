@@ -5,11 +5,13 @@ import io.casehub.platform.agent.openai.OpenAiNativeChatModel;
 import io.casehub.platform.agent.router.ChatModelBackend;
 import io.casehub.platform.agent.router.SimpleChatModelBackend;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
 @ConditionalOnClass(OpenAiNativeChatModel.class)
+@ConditionalOnBean(OllamaAgentProperties.class)
 public class OllamaChatModelManualConfig {
 
     @Bean

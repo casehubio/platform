@@ -5,11 +5,13 @@ import io.casehub.platform.agent.gemini.GeminiNativeEmbeddingModel;
 import io.casehub.platform.agent.router.EmbeddingModelBackend;
 import io.casehub.platform.agent.router.SimpleEmbeddingModelBackend;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
 @ConditionalOnClass(GeminiNativeEmbeddingModel.class)
+@ConditionalOnBean(GeminiAgentProperties.class)
 public class GeminiEmbeddingModelManualConfig {
 
     @Bean

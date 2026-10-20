@@ -155,6 +155,65 @@ class SessionLifecycleManagerTest {
         assertThat(poolMetrics.sessionsOpened()).isEqualTo(1);
     }
 
+    @Test
+    void sizeAwareClearsWhenTokensExceedThreshold() {
+        // Threshold 100 tokens. "x".repeat(400) = 400 chars = 100 tokens from prompt alone.
+        // First query: ~100 tokens from prompt + response tokens — under threshold on entry.
+        // Second query: accumulated tokens exceed threshold → auto-clear before query.
+        var session = manager.acquire("appraisal", "stub", init(),
+                                      ClearingPolicy.SIZE_AWARE, 100);
+
+        // First query: 400 chars = 100 estimated tokens from prompt, plus response adds more
+        session.query("x".repeat(400)).collect().asList().await().atMost(Duration.ofSeconds(5));
+        assertThat(session.estimatedTokens()).isGreaterThan(0);
+
+        // Second query triggers clear because accumulated tokens > threshold (100)
+        session.query("y".repeat(40)).collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        // Clear should have fired
+        assertThat(session.metrics().totalClears()).isEqualTo(1);
+    }
+
+    @Test
+    void sizeAwareDoesNotClearWhenUnderThreshold() {
+        // Threshold 1000 tokens. Short prompts stay well under.
+        var session = manager.acquire("appraisal", "stub", init(),
+                                      ClearingPolicy.SIZE_AWARE, 1000);
+
+        session.query("hello").collect().asList().await().atMost(Duration.ofSeconds(5));
+        session.query("world").collect().asList().await().atMost(Duration.ofSeconds(5));
+        session.query("test").collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        assertThat(session.metrics().totalClears()).isZero();
+        assertThat(session.metrics().totalQueries()).isEqualTo(3);
+    }
+
+    @Test
+    void sizeAwareClearResetsTokenEstimate() {
+        var session = manager.acquire("appraisal", "stub", init(),
+                                      ClearingPolicy.SIZE_AWARE, 100);
+
+        // Accumulate tokens
+        session.query("x".repeat(400)).collect().asList().await().atMost(Duration.ofSeconds(5));
+        assertThat(session.estimatedTokens()).isGreaterThan(0);
+
+        // Manual clear resets
+        session.clear();
+        assertThat(session.estimatedTokens()).isZero();
+    }
+
+    @Test
+    void sizeAwareTracksResponseTokens() {
+        var session = manager.acquire("appraisal", "stub", init(),
+                                      ClearingPolicy.SIZE_AWARE, 1000);
+
+        // "hello" = 5 chars = 1 token from prompt. Response "response" = 8 chars = 2 tokens.
+        session.query("hello").collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        // Should include both prompt and response token estimates
+        assertThat(session.estimatedTokens()).isGreaterThan(1);
+    }
+
 
     // --- Infrastructure ---
 

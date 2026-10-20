@@ -169,6 +169,176 @@ class SessionPipelineMultiTickTest {
                 .isTrue();
     }
 
+    @Test
+    void multiTickWithSlowSessionsDoesNotStall() {
+        var slowBackend = new SlowBackend(200);
+        var decl = new PoolDeclaration("slow-pool", "test", "slow",
+                                       0, 10, null, Map.of(), Map.of());
+        var slowRegistry       = new SessionPoolRegistry(List.of(decl), slowBackendRegistry(slowBackend));
+        var slowSessionManager = new SessionLifecycleManager(slowRegistry);
+        pipeline = new SessionPipeline(slowSessionManager, "slow", 5, 50_000);
+
+        for (String id : List.of("a", "b", "c", "d", "e")) {
+            pipeline.openSession(id, AgentSessionInit.of("system prompt"));
+        }
+
+        int  ticks = 5;
+        long start = System.currentTimeMillis();
+
+        for (int tick = 0; tick < ticks; tick++) {
+            var results = pipeline.executeBatch(
+                    List.of("a", "b", "c", "d", "e"),
+                    (id, session) -> {
+                        session.query("prompt " + id).subscribe().asStream().count();
+                        return "ok-" + id;
+                    },
+                    1, Duration.ofSeconds(10));
+
+            long succeeded = results.values().stream()
+                                    .filter(java.util.Objects::nonNull).count();
+            assertThat(succeeded)
+                    .as("Tick %d: all 5 should succeed with slow sessions", tick)
+                    .isEqualTo(5);
+        }
+
+        long elapsed = System.currentTimeMillis() - start;
+        assertThat(elapsed).as("5 ticks with 200ms sessions should complete in <5s")
+                           .isLessThan(5000);
+        assertThat(pipeline.availablePermits()).isEqualTo(5);
+
+        slowSessionManager.shutdown();
+        slowRegistry.shutdown();
+    }
+
+    @Test
+    void multiTickWithObservationPhaseAndBackgroundWorkDoesNotStall() throws Exception {
+        var slowBackend = new SlowBackend(200);
+        var decl = new PoolDeclaration("slow-pool", "test", "slow",
+                                       0, 10, null, Map.of(), Map.of());
+        var slowRegistry       = new SessionPoolRegistry(List.of(decl), slowBackendRegistry(slowBackend));
+        var slowSessionManager = new SessionLifecycleManager(slowRegistry);
+        pipeline = new SessionPipeline(slowSessionManager, "slow", 5, 50_000);
+
+        var ids = List.of("a", "b", "c", "d", "e");
+        for (String id : ids) {
+            pipeline.openSession(id, AgentSessionInit.of("system prompt"));
+        }
+
+        int ticks = 5;
+        for (int tick = 0; tick < ticks; tick++) {
+            // Phase 1: observation building in parallel virtual threads (like orchestrator)
+            var prompts  = new java.util.concurrent.ConcurrentHashMap<String, String>();
+            var obsLatch = new java.util.concurrent.CountDownLatch(ids.size());
+            for (String id : ids) {
+                Thread.ofVirtual().name(id + "-obs-" + tick).start(() -> {
+                    try {
+                        Thread.sleep(10); // simulate observation building
+                        prompts.put(id, "prompt for " + id);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        obsLatch.countDown();
+                    }
+                });
+            }
+            assertThat(obsLatch.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("Tick %d: observation phase must complete", tick)
+                    .isTrue();
+
+            // Phase 2: pipeline batch with slow sessions
+            var results = pipeline.executeBatch(
+                    prompts.keySet(),
+                    (id, session) -> {
+                        session.query(prompts.get(id)).subscribe().asStream().count();
+                        return "ok-" + id;
+                    },
+                    1, Duration.ofSeconds(5));
+
+            assertThat(results.values().stream().filter(java.util.Objects::nonNull).count())
+                    .as("Tick %d: all 5 should succeed", tick)
+                    .isEqualTo(5);
+
+            // Background work between ticks (like narrator)
+            Thread.ofVirtual().name("narrator-" + tick).start(() -> {
+                try {Thread.sleep(300);} catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+
+        assertThat(pipeline.availablePermits()).isEqualTo(5);
+
+        slowSessionManager.shutdown();
+        slowRegistry.shutdown();
+    }
+
+
+    static class SlowBackend implements io.casehub.platform.agent.AgentBackend {
+        private final long delayMs;
+
+        SlowBackend(long delayMs) {this.delayMs = delayMs;}
+
+        @Override
+        public String key()       {return "slow";}
+
+        @Override
+        public io.smallrye.mutiny.Multi<io.casehub.platform.agent.AgentEvent> invoke(
+                io.casehub.platform.agent.AgentSessionConfig config) {
+            return io.smallrye.mutiny.Multi.createFrom().item(
+                    new io.casehub.platform.agent.AgentEvent.TextDelta("response"));
+        }
+
+        @Override
+        public io.casehub.platform.agent.AgentSession openSession(
+                io.casehub.platform.agent.AgentSessionInit init) {
+            return new SlowSession(delayMs);
+        }
+    }
+
+    static class SlowSession implements io.casehub.platform.agent.AgentSession {
+        private final long delayMs;
+
+        SlowSession(long delayMs) {this.delayMs = delayMs;}
+
+        @Override
+        public io.smallrye.mutiny.Multi<io.casehub.platform.agent.AgentEvent> query(String prompt) {
+            try {Thread.sleep(delayMs);} catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return io.smallrye.mutiny.Multi.createFrom().item(
+                    (io.casehub.platform.agent.AgentEvent) new io.casehub.platform.agent.AgentEvent.TextDelta("slow-response"));
+        }
+
+        @Override
+        public io.smallrye.mutiny.Uni<Void> interrupt() {
+            return io.smallrye.mutiny.Uni.createFrom().voidItem();
+        }
+
+        @Override
+        public void clear()                 {}
+
+        @Override
+        public void close(Duration timeout) {}
+    }
+
+    static io.casehub.platform.agent.BackendInstanceRegistry slowBackendRegistry(SlowBackend backend) {
+        return new io.casehub.platform.agent.BackendInstanceRegistry() {
+            @Override
+            public void register(io.casehub.platform.agent.AgentBackend b) {}
+
+            @Override
+            public java.util.Optional<io.casehub.platform.agent.AgentBackend> resolve(String key, String instanceId) {
+                return "slow".equals(key) ? java.util.Optional.of(backend) : java.util.Optional.empty();
+            }
+
+            @Override
+            public java.util.List<io.casehub.platform.agent.AgentBackend> resolveByKey(String key) {
+                return "slow".equals(key) ? java.util.List.of(backend) : java.util.List.of();
+            }
+        };
+    }
+
+
     // --- Infrastructure ---
 
     private void openSessions(String... ids) {

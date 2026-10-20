@@ -127,6 +127,35 @@ class SessionLifecycleManagerTest {
         assertThat(manager.hasSession("appraisal")).isFalse();
     }
 
+    @Test
+    void queryIncrementsMetrics() {
+        var session = manager.acquire("appraisal", "stub", init());
+
+        session.query("p1").collect().asList().await().atMost(Duration.ofSeconds(5));
+        session.query("p2").collect().asList().await().atMost(Duration.ofSeconds(5));
+
+        assertThat(session.metrics().totalQueries()).isEqualTo(2);
+    }
+
+    @Test
+    void clearIncrementsMetrics() {
+        var session = manager.acquire("appraisal", "stub", init());
+
+        session.query("p1").collect().asList().await().atMost(Duration.ofSeconds(5));
+        session.clear();
+
+        assertThat(session.metrics().totalClears()).isEqualTo(1);
+    }
+
+    @Test
+    void metricsAccessibleFromPool() {
+        manager.acquire("appraisal", "stub", init());
+
+        var poolMetrics = poolRegistry.findPool("stub", null).orElseThrow().metrics();
+        assertThat(poolMetrics.sessionsOpened()).isEqualTo(1);
+    }
+
+
     // --- Infrastructure ---
 
     private static AgentSessionInit init() {

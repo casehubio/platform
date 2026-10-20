@@ -16,15 +16,18 @@ public class ManagedSession implements AgentSession {
     private final ClearingPolicy clearingPolicy;
     private final int clearAfterTurns;
     private final AtomicInteger turnCount = new AtomicInteger(0);
+    private final SessionMetrics metrics;
+
 
     ManagedSession(PooledSession pooledSession, String conversationId,
                    SessionLifecycleManager manager, ClearingPolicy clearingPolicy,
-                   int clearAfterTurns) {
-        this.pooledSession = pooledSession;
-        this.conversationId = conversationId;
-        this.manager = manager;
-        this.clearingPolicy = clearingPolicy;
+                   int clearAfterTurns, SessionMetrics metrics) {
+        this.pooledSession   = pooledSession;
+        this.conversationId  = conversationId;
+        this.manager         = manager;
+        this.clearingPolicy  = clearingPolicy;
         this.clearAfterTurns = clearAfterTurns;
+        this.metrics         = metrics;
     }
 
     public String conversationId() { return conversationId; }
@@ -34,12 +37,15 @@ public class ManagedSession implements AgentSession {
     @Override
     public Multi<AgentEvent> query(String prompt) {
         int turn = turnCount.incrementAndGet();
+        metrics.queryStarted();
 
         if (clearingPolicy == ClearingPolicy.EVERY_CALL && turn > 1) {
             pooledSession.delegate().clear();
+            metrics.clearTriggered();
         } else if (clearingPolicy == ClearingPolicy.AFTER_N_TURNS
-                && clearAfterTurns > 0 && turn % clearAfterTurns == 0) {
+                   && clearAfterTurns > 0 && turn % clearAfterTurns == 0) {
             pooledSession.delegate().clear();
+            metrics.clearTriggered();
         }
 
         return pooledSession.delegate().query(prompt);
@@ -54,6 +60,7 @@ public class ManagedSession implements AgentSession {
     public void clear() {
         pooledSession.delegate().clear();
         turnCount.set(0);
+        metrics.clearTriggered();
     }
 
     @Override
@@ -67,4 +74,7 @@ public class ManagedSession implements AgentSession {
     }
 
     int turnCount() { return turnCount.get(); }
+
+    public SessionMetrics metrics() {return metrics;}
+
 }

@@ -5,11 +5,13 @@ import io.casehub.platform.agent.gemini.GeminiNativeChatModel;
 import io.casehub.platform.agent.router.ChatModelBackend;
 import io.casehub.platform.agent.router.SimpleChatModelBackend;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
 @ConditionalOnClass(GeminiNativeChatModel.class)
+@ConditionalOnBean(GeminiAgentProperties.class)
 public class GeminiChatModelManualConfig {
 
     @Bean

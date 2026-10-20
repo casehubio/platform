@@ -88,9 +88,9 @@ public class SessionPipeline {
     }
 
     private <R> R executeWithRetry(String id, BiFunction<String, ManagedSession, R> queryFn,
-                                    int maxAttempts, Duration timeout) {
-        long deadline = System.currentTimeMillis() + timeout.toMillis();
-        ManagedSession session = sessions.get(id);
+                                   int maxAttempts, Duration timeout) {
+        long           deadline = System.currentTimeMillis() + timeout.toMillis();
+        ManagedSession session  = sessions.get(id);
         if (session == null) {
             LOG.warnf("No session for identity '%s'", id);
             return null;
@@ -98,7 +98,7 @@ public class SessionPipeline {
 
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             long remaining = deadline - System.currentTimeMillis();
-            if (remaining <= 0) break;
+            if (remaining <= 0) {break;}
 
             try {
                 if (!tickets.tryAcquire(remaining, TimeUnit.MILLISECONDS)) {
@@ -115,9 +115,15 @@ public class SessionPipeline {
                 lastSuccessTime.set(System.currentTimeMillis());
                 tickets.release();
                 return result;
+            } catch (SessionCapacityException e) {
+                // LLM capacity exhausted — don't release ticket (shrinks window)
+                LOG.debugf("%s: capacity exhausted (attempt %d/%d): %s",
+                           id, attempt + 1, maxAttempts, e.getMessage());
             } catch (Exception e) {
+                // Non-capacity error (parse, timeout, etc.) — release ticket
+                tickets.release();
                 LOG.debugf("%s: query failed (attempt %d/%d): %s",
-                        id, attempt + 1, maxAttempts, e.getMessage());
+                           id, attempt + 1, maxAttempts, e.getMessage());
             }
         }
 

@@ -315,6 +315,99 @@ class SessionPipelineTest {
         assertThat(pipeline.availablePermits()).isEqualTo(3);
     }
 
+    @Test
+    void callbackExceptionAfterSuccessfulWorkConsumesTicket() {
+        pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
+        openSessions("a", "b", "c");
+
+        // Tick 1: "b" throws AFTER doing successful work (e.g., parse error on valid LLM response)
+        pipeline.executeBatch(
+                List.of("a", "b", "c"),
+                (id, session) -> {
+                    session.query("work").subscribe().asStream().count();
+                    if (id.equals("b")) {throw new RuntimeException("parse error");}
+                    return "ok";
+                },
+                1, Duration.ofSeconds(5));
+
+        // BUG: ticket consumed by parse error. Only 2 permits remain instead of 3.
+        // On tick 5+ with repeated parse errors, ALL tickets consumed → deadlock.
+        int permitsAfterTick1 = pipeline.availablePermits();
+
+        // Tick 2: if permits leaked, this batch will block or timeout
+        var results = pipeline.executeBatch(
+                List.of("a", "b", "c"),
+                (id, session) -> "ok",
+                1, Duration.ofSeconds(2));
+
+        long succeeded = results.values().stream().filter(java.util.Objects::nonNull).count();
+
+        // THIS IS THE FAILURE: permits should be 3 but are < 3 if tickets leak
+        assertThat(permitsAfterTick1)
+                .as("Parse error should NOT consume tickets — LLM capacity is fine")
+                .isEqualTo(3);
+        assertThat(succeeded)
+                .as("All 3 should succeed if permits not leaked")
+                .isEqualTo(3);
+    }
+
+    @Test
+    void repeatedCallbackExceptionsProgressivelyDeadlock() {
+        pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
+        pipeline.setRecoveryIntervalMs(60_000);
+        openSessions("a", "b", "c");
+
+        // Each tick: 1 character throws parse error. Without the fix, tickets leak.
+        String[] failingId = {"a", "b", "c"};
+        for (int tick = 0; tick < 3; tick++) {
+            int t = tick;
+            pipeline.executeBatch(
+                    List.of("a", "b", "c"),
+                    (id, session) -> {
+                        session.query("work").subscribe().asStream().count();
+                        if (id.equals(failingId[t])) {throw new RuntimeException("parse error");}
+                        return "ok";
+                    },
+                    1, Duration.ofSeconds(2));
+        }
+
+        // After fix: tickets should NOT be consumed by parse errors
+        assertThat(pipeline.availablePermits())
+                .as("Parse errors must not consume tickets")
+                .isEqualTo(3);
+
+        // Tick 4 should succeed — no deadlock
+        var results = pipeline.executeBatch(
+                List.of("a", "b", "c"),
+                (id, session) -> "ok",
+                1, Duration.ofSeconds(2));
+
+        assertThat(results.values().stream().filter(java.util.Objects::nonNull).count())
+                .as("All queries must succeed with full ticket capacity")
+                .isEqualTo(3);
+    }
+
+    @Test
+    void capacityExceptionConsumeTicketForAdaptation() {
+        pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
+        pipeline.setRecoveryIntervalMs(60_000);
+        openSessions("a", "b", "c");
+
+        pipeline.executeBatch(
+                List.of("a", "b", "c"),
+                (id, session) -> {
+                    if (id.equals("b")) {throw new SessionCapacityException("LLM overloaded");}
+                    return "ok";
+                },
+                1, Duration.ofSeconds(2));
+
+        // Capacity exception SHOULD consume ticket — adaptive shrinking
+        assertThat(pipeline.availablePermits())
+                .as("Capacity exception consumes 1 ticket, 2 remain")
+                .isEqualTo(2);
+    }
+
+
     // --- Infrastructure ---
 
     private void openSessions(String... ids) {

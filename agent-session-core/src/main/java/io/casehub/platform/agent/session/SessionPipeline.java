@@ -1,6 +1,8 @@
 package io.casehub.platform.agent.session;
 
+import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.SessionRegistry;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
@@ -15,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 
-public class SessionPipeline {
+public class SessionPipeline implements SessionRegistry {
 
     private static final Logger LOG = Logger.getLogger(SessionPipeline.class);
 

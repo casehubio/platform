@@ -114,7 +114,6 @@ class SessionPipelineTest {
     @Test
     void allFailuresReturnNullAfterMaxAttempts() {
         pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
-        pipeline.setRecoveryIntervalMs(100);
         openSessions("a", "b", "c");
 
         var results = pipeline.executeBatch(
@@ -271,9 +270,8 @@ class SessionPipelineTest {
     }
 
     @Test
-    void recoveryTimerInjectsPermitAfterTotalFailure() {
+    void aimdRecoveryAfterFailures() {
         pipeline = new SessionPipeline(sessionManager, "stub", 2, 50_000);
-        pipeline.setRecoveryIntervalMs(100);
         openSessions("a", "b");
 
         var callCount = new AtomicInteger();
@@ -354,10 +352,9 @@ class SessionPipelineTest {
     @Test
     void repeatedCallbackExceptionsProgressivelyDeadlock() {
         pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
-        pipeline.setRecoveryIntervalMs(60_000);
         openSessions("a", "b", "c");
 
-        // Each tick: 1 character throws parse error. Without the fix, tickets leak.
+        // Each tick: 1 character throws parse error. Without the fix, permits leak.
         String[] failingId = {"a", "b", "c"};
         for (int tick = 0; tick < 3; tick++) {
             int t = tick;
@@ -388,9 +385,8 @@ class SessionPipelineTest {
     }
 
     @Test
-    void capacityExceptionConsumeTicketForAdaptation() {
+    void capacityExceptionTriggersAimdRollback() {
         pipeline = new SessionPipeline(sessionManager, "stub", 3, 50_000);
-        pipeline.setRecoveryIntervalMs(60_000);
         openSessions("a", "b", "c");
 
         pipeline.executeBatch(
@@ -401,10 +397,10 @@ class SessionPipelineTest {
                 },
                 1, Duration.ofSeconds(2));
 
-        // Capacity exception SHOULD consume ticket — adaptive shrinking
-        assertThat(pipeline.availablePermits())
-                .as("Capacity exception consumes 1 ticket, 2 remain")
-                .isEqualTo(2);
+        // Capacity exception triggers AIMD rollback — window halved from 3 to 1
+        assertThat(pipeline.admission().currentWindow())
+                .as("Capacity exception should halve the AIMD window")
+                .isLessThan(3);
     }
 
 

@@ -1,21 +1,22 @@
 package io.casehub.platform.agent.session;
 
+import io.casehub.platform.agent.AgentRateLimitException;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.SessionRegistry;
+import io.casehub.platform.agent.gate.AimdAdmissionStrategy;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public class SessionPipeline implements SessionRegistry {
 
@@ -23,36 +24,24 @@ public class SessionPipeline implements SessionRegistry {
 
     private final SessionLifecycleManager sessionManager;
     private final String backendKey;
-    private final int maxConcurrency;
-    private final int maxSessions;
     private final int clearAtTokens;
-    private final Semaphore tickets;
-    private final Semaphore sessionSlots;
+    private final AimdAdmissionStrategy admission;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService recovery;
-    private final AtomicLong lastSuccessTime = new AtomicLong(System.currentTimeMillis());
-    private volatile long recoveryIntervalMs = 10_000;
+    private final ConcurrentHashMap<String, Instant> lastUsed = new ConcurrentHashMap<>();
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
-                           int maxConcurrency, int clearAtTokens) {
-        this(sessionManager, backendKey, maxConcurrency, Integer.MAX_VALUE, clearAtTokens);
+                           int ceiling, int clearAtTokens) {
+        this(sessionManager, backendKey,
+             new AimdAdmissionStrategy(ceiling, 5, Duration.ofSeconds(10)),
+             clearAtTokens);
     }
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
-                           int maxConcurrency, int maxSessions, int clearAtTokens) {
+                           AimdAdmissionStrategy admission, int clearAtTokens) {
         this.sessionManager = sessionManager;
         this.backendKey = backendKey;
-        this.maxConcurrency = maxConcurrency;
-        this.maxSessions = maxSessions;
+        this.admission = admission;
         this.clearAtTokens = clearAtTokens;
-        this.tickets = new Semaphore(maxConcurrency, true);
-        this.sessionSlots = new Semaphore(maxSessions, true);
-        this.recovery = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "pipeline-recovery");
-            t.setDaemon(true);
-            return t;
-        });
-        recovery.scheduleWithFixedDelay(this::injectRecoveryPermit, 1, 1, TimeUnit.SECONDS);
     }
 
     public ManagedSession openSession(String id, AgentSessionInit init) {
@@ -61,44 +50,28 @@ public class SessionPipeline implements SessionRegistry {
 
     public ManagedSession openSession(String id, AgentSessionInit init, Duration timeout) {
         ManagedSession existing = sessions.get(id);
-        if (existing != null) return existing;
-
-        try {
-            if (timeout != null) {
-                if (!sessionSlots.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                    return null;
-                }
-            } else {
-                sessionSlots.acquire();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
+        if (existing != null) {
+            lastUsed.put(id, Instant.now());
+            return existing;
         }
 
-        boolean[] created = {false};
-        ManagedSession session = sessions.computeIfAbsent(id, k -> {
-            created[0] = true;
-            return sessionManager.acquire("pipeline:" + k, backendKey, init,
-                    ClearingPolicy.SIZE_AWARE, clearAtTokens);
-        });
+        ManagedSession session = sessions.computeIfAbsent(id, k ->
+            sessionManager.acquire("pipeline:" + k, backendKey, init,
+                    ClearingPolicy.SIZE_AWARE, clearAtTokens));
 
-        if (!created[0]) {
-            sessionSlots.release();
-        }
-
+        lastUsed.put(id, Instant.now());
         return session;
     }
 
     public void releaseSession(String id) {
         ManagedSession session = sessions.remove(id);
+        lastUsed.remove(id);
         if (session != null) {
             try {
                 sessionManager.release("pipeline:" + id);
             } catch (Exception e) {
                 LOG.debugf("Failed to release session [id=%s]: %s", id, e.getMessage());
             }
-            sessionSlots.release();
         }
     }
 
@@ -143,10 +116,104 @@ public class SessionPipeline implements SessionRegistry {
         return results;
     }
 
+    public <T> T executeSingle(String sessionId,
+                               Function<AgentSession, T> queryFn,
+                               Duration timeout) {
+        try {
+            if (!admission.tryAcquire(timeout)) {
+                throw new AgentSessionLimitException(admission.activeCount());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during permit acquisition", e);
+        }
+        try {
+            lastUsed.put(sessionId, Instant.now());
+            T result = queryFn.apply(sessionFor(sessionId));
+            admission.release();
+            return result;
+        } catch (Exception e) {
+            if (isCapacityError(e)) {
+                admission.rollback();
+            } else {
+                admission.release();
+            }
+            throw e;
+        }
+    }
+
+    public <T> T executeSinglePriority(String sessionId,
+                                        Function<AgentSession, T> queryFn,
+                                        Duration timeout) {
+        try {
+            if (!admission.tryAcquirePriority(timeout)) {
+                throw new AgentSessionLimitException(admission.activeCount());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during permit acquisition", e);
+        }
+        try {
+            lastUsed.put(sessionId, Instant.now());
+            T result = queryFn.apply(sessionFor(sessionId));
+            admission.release();
+            return result;
+        } catch (Exception e) {
+            if (isCapacityError(e)) {
+                admission.rollback();
+            } else {
+                admission.release();
+            }
+            throw e;
+        }
+    }
+
+    public void evictIdleSessions(Duration idleThreshold) {
+        Instant cutoff = Instant.now().minus(idleThreshold);
+        lastUsed.forEach((id, lastAccess) -> {
+            if (lastAccess.isBefore(cutoff)) {
+                releaseSession(id);
+                LOG.infof("Evicted idle session [id=%s, idle since %s]", id, lastAccess);
+            }
+        });
+    }
+
+    public int availablePermits() {
+        return admission.availablePermits();
+    }
+
+    public AimdAdmissionStrategy admission() {
+        return admission;
+    }
+
+    static boolean isCapacityError(Exception e) {
+        if (e instanceof SessionCapacityException) return true;
+        if (e instanceof AgentRateLimitException) return true;
+        if (e instanceof AgentSessionLimitException) return true;
+        String msg = e.getMessage();
+        if (msg != null) {
+            String lower = msg.toLowerCase();
+            if (lower.contains("429") || lower.contains("rate limit")) return true;
+        }
+        return false;
+    }
+
+    public void shutdown() {
+        sessions.forEach((id, session) -> {
+            try {
+                sessionManager.release("pipeline:" + id);
+            } catch (Exception e) {
+                LOG.debugf("Failed to release session on shutdown [id=%s]: %s", id, e.getMessage());
+            }
+        });
+        sessions.clear();
+        lastUsed.clear();
+    }
+
     private <R> R executeWithRetry(String id, BiFunction<String, ManagedSession, R> queryFn,
                                    int maxAttempts, Duration timeout) {
-        long           deadline = System.currentTimeMillis() + timeout.toMillis();
-        ManagedSession session  = sessions.get(id);
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        ManagedSession session = sessions.get(id);
         if (session == null) {
             LOG.warnf("No session for identity '%s'", id);
             return null;
@@ -154,10 +221,10 @@ public class SessionPipeline implements SessionRegistry {
 
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             long remaining = deadline - System.currentTimeMillis();
-            if (remaining <= 0) {break;}
+            if (remaining <= 0) { break; }
 
             try {
-                if (!tickets.tryAcquire(remaining, TimeUnit.MILLISECONDS)) {
+                if (!admission.tryAcquire(Duration.ofMillis(remaining))) {
                     LOG.debugf("%s: timeout waiting for capacity (attempt %d)", id, attempt + 1);
                     break;
                 }
@@ -167,52 +234,23 @@ public class SessionPipeline implements SessionRegistry {
             }
 
             try {
+                lastUsed.put(id, Instant.now());
                 R result = queryFn.apply(id, session);
-                lastSuccessTime.set(System.currentTimeMillis());
-                tickets.release();
+                admission.release();
                 return result;
-            } catch (SessionCapacityException e) {
-                // LLM capacity exhausted — don't release ticket (shrinks window)
-                LOG.debugf("%s: capacity exhausted (attempt %d/%d): %s",
-                           id, attempt + 1, maxAttempts, e.getMessage());
             } catch (Exception e) {
-                // Non-capacity error (parse, timeout, etc.) — release ticket
-                tickets.release();
-                LOG.debugf("%s: query failed (attempt %d/%d): %s",
-                           id, attempt + 1, maxAttempts, e.getMessage());
+                if (isCapacityError(e)) {
+                    admission.rollback();
+                    LOG.debugf("%s: capacity exhausted (attempt %d/%d): %s",
+                               id, attempt + 1, maxAttempts, e.getMessage());
+                } else {
+                    admission.release();
+                    LOG.debugf("%s: query failed (attempt %d/%d): %s",
+                               id, attempt + 1, maxAttempts, e.getMessage());
+                }
             }
         }
 
         return null;
-    }
-
-    private void injectRecoveryPermit() {
-        if (System.currentTimeMillis() - lastSuccessTime.get() > recoveryIntervalMs) {
-            if (tickets.availablePermits() < maxConcurrency) {
-                tickets.release();
-                LOG.debugf("Recovery: injected permit (available=%d)", tickets.availablePermits());
-            }
-        }
-    }
-
-    public void setRecoveryIntervalMs(long ms) {
-        this.recoveryIntervalMs = ms;
-    }
-
-    public int availablePermits() {
-        return tickets.availablePermits();
-    }
-
-    public void shutdown() {
-        recovery.shutdownNow();
-        sessions.forEach((id, session) -> {
-            try {
-                sessionManager.release("pipeline:" + id);
-            } catch (Exception e) {
-                LOG.debugf("Failed to release session on shutdown [id=%s]: %s", id, e.getMessage());
-            }
-            sessionSlots.release();
-        });
-        sessions.clear();
     }
 }

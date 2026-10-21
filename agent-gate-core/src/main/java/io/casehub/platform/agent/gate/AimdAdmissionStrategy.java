@@ -130,6 +130,16 @@ public class AimdAdmissionStrategy implements AdmissionStrategy {
         }
     }
 
+
+    public int availablePermits() {
+        lock.lock();
+        try {
+            return available;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public int activeCount() {
         lock.lock();
         try {

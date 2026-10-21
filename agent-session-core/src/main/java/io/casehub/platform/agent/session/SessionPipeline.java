@@ -28,6 +28,8 @@ public class SessionPipeline implements SessionRegistry {
     private final AimdAdmissionStrategy admission;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastUsed = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AimdAdmissionStrategy> companions = new ConcurrentHashMap<>();
+
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
                            int ceiling, int clearAtTokens) {
@@ -185,6 +187,12 @@ public class SessionPipeline implements SessionRegistry {
     public AimdAdmissionStrategy admission() {
         return admission;
     }
+
+    public AimdAdmissionStrategy companionAdmission(String name, int ceiling) {
+        return companions.computeIfAbsent(name, k ->
+                                                        new AimdAdmissionStrategy(ceiling, 5, Duration.ofSeconds(10)));
+    }
+
 
     static boolean isCapacityError(Exception e) {
         if (e instanceof SessionCapacityException) return true;

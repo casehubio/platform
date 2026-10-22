@@ -8,7 +8,7 @@
 
 The `preferences-editor/` module exposes CRUD endpoints for preference values, but
 all values are raw strings. The blocks-ui `<preferences-editor>` component
-(casehubio/blocks-ui#92) needs type metadata to render appropriate editors —
+(casehubio/agency-ui#92) needs type metadata to render appropriate editors —
 number inputs, toggles, dropdowns, duration pickers. The platform already holds
 this information in `PreferenceKey<T>`'s type parameter and the `Preference` type
 hierarchy, but nothing exposes it over REST.

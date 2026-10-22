@@ -10,7 +10,7 @@ Promote neocortex's `SealedHierarchyModule` to the shared `casehub-schema-genera
 module alongside `EnumInliningModule` and `UnevaluatedPropertiesModule`. The module is
 fully generic — uses `Class.getPermittedSubclasses()` with configurable discriminator
 overrides. Blocks needs it for ~35 sealed interfaces in its YAML DSL parity work
-(casehubio/blocks#165).
+(casehubio/agency#165).
 
 ## Approach
 
@@ -106,4 +106,4 @@ File issue on casehubio/neocortex to migrate from local
 - `io.casehub.schema.generator.PlatformSchemaGenerator` — target module's entry point
 - `io.casehub.schema.generator.module.EnumInliningModule` — existing shared module (pattern reference)
 - `docs/specs/2026-08-29-shared-schema-generator-design.md` — original schema-generator extraction spec
-- casehubio/blocks#165 — primary consumer (YAML DSL parity, ~35 sealed interfaces)
+- casehubio/agency#165 — primary consumer (YAML DSL parity, ~35 sealed interfaces)

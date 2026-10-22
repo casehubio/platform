@@ -210,5 +210,5 @@ Layer placement: `preferences-editor/` is placed at L4 (Platform Extensions) as 
 - Role-based access control (admin-only writes)
 - Pagination on list endpoint
 - Cross-tenant admin write API
-- UI component (lives in casehubio/blocks-ui#92)
+- UI component (lives in casehubio/agency-ui#92)
 - Write-time validation against `PreferenceKey<T>` parsers

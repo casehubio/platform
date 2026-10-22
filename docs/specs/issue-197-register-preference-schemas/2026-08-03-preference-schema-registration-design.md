@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-03
 **Issue:** casehubio/platform#197
-**Consumer:** casehubio/blocks-ui#92 (preference editor UI)
+**Consumer:** casehubio/agency-ui#92 (preference editor UI)
 **Prerequisite:** casehubio/platform#195 (PreferenceSchemaRegistry SPI)
 
 ## Context

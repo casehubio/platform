@@ -178,6 +178,146 @@ class ManifestLoaderTest {
         assertThat(manifest.defaults().backend()).isEqualTo("claude");
     }
 
+    @Test
+    void profileMergesProvidersFromBothBaseAndProfile(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                                                                providers:
+                                                                  - vendor: anthropic
+                                                                    credential: env:ANTHROPIC_KEY
+                                                                defaults:
+                                                                  backend: claude
+                                                                """);
+        Files.writeString(tempDir.resolve("agent-config-test.yaml"), """
+                                                                     providers:
+                                                                       - vendor: simulation
+                                                                     defaults:
+                                                                       backend: simulation
+                                                                     """);
+        var manifest = loader.load(tempDir, "test");
+        assertThat(manifest.providers().stream().map(ProviderDeclaration::vendor))
+                .contains("anthropic", "simulation");
+        assertThat(manifest.defaults().backend()).isEqualTo("simulation");
+    }
+
+    @Test
+    void profileOverridesBaseDefaultsBackend(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                                                                providers:
+                                                                  - vendor: anthropic
+                                                                    credential: env:ANTHROPIC_KEY
+                                                                defaults:
+                                                                  backend: claude
+                                                                """);
+        Files.writeString(tempDir.resolve("agent-config-dev.yaml"), """
+                                                                    providers:
+                                                                      - vendor: ollama
+                                                                    defaults:
+                                                                      backend: ollama
+                                                                    """);
+        var manifest = loader.load(tempDir, "dev");
+        assertThat(manifest.defaults().backend()).isEqualTo("ollama");
+    }
+
+    @Test
+    void noProfileUsesBaseProvidersOnly(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                providers:
+                  - vendor: anthropic
+                    credential: env:ANTHROPIC_KEY
+                defaults:
+                  backend: claude
+                """);
+        Files.writeString(tempDir.resolve("agent-config-test.yaml"), """
+                providers:
+                  - vendor: test-only-vendor
+                defaults:
+                  backend: test-only-vendor
+                """);
+        var manifest = loader.load(tempDir, null);
+        assertThat(manifest.providers().stream().map(ProviderDeclaration::vendor))
+                .contains("anthropic")
+                .doesNotContain("test-only-vendor");
+        assertThat(manifest.defaults().backend()).isEqualTo("claude");
+    }
+
+    @Test
+    void profileOverridesSameVendorProvider(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                                                                providers:
+                                                                  - vendor: ollama
+                                                                    host: http://localhost:11434
+                                                                defaults:
+                                                                  backend: ollama
+                                                                """);
+        Files.writeString(tempDir.resolve("agent-config-ci.yaml"), """
+                                                                   providers:
+                                                                     - vendor: ollama
+                                                                       host: http://ci-ollama:11434
+                                                                   """);
+        var manifest = loader.load(tempDir, "ci");
+        var ollamaProvider = manifest.providers().stream()
+                .filter(p -> "ollama".equals(p.vendor())).findFirst().orElseThrow();
+        assertThat(ollamaProvider.host()).isEqualTo("http://ci-ollama:11434");
+    }
+
+    @Test
+    void profileMergesAliasesWithBase(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                                                                aliases:
+                                                                  fast:
+                                                                    tier: FAST
+                                                                  reasoning:
+                                                                    tier: FLAGSHIP
+                                                                defaults:
+                                                                  backend: claude
+                                                                """);
+        Files.writeString(tempDir.resolve("agent-config-test.yaml"), """
+                                                                     aliases:
+                                                                       fast:
+                                                                         tier: FAST
+                                                                         backend-key: simulation
+                                                                     """);
+        var manifest = loader.load(tempDir, "test");
+        assertThat(manifest.aliases()).hasSize(2);
+        assertThat(manifest.aliases().get("fast").backendKey()).isEqualTo("simulation");
+        assertThat(manifest.aliases().get("reasoning").tier()).isEqualTo("FLAGSHIP");
+    }
+
+    @Test
+    void profileMergesModelsFromBothFiles(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("agent-config.yaml"), """
+                models:
+                  - id: claude-opus-5
+                    apiModelId: claude-opus-5
+                    backendKey: claude
+                    vendor: anthropic
+                    family: claude
+                    displayName: Claude Opus 5
+                    tier: FLAGSHIP
+                    capabilities: [text]
+                    contextWindow: 200000
+                    maxOutput: 16384
+                    locality: CLOUD
+                """);
+        Files.writeString(tempDir.resolve("agent-config-test.yaml"), """
+                models:
+                  - id: sim-fast
+                    apiModelId: sim-fast
+                    backendKey: simulation
+                    vendor: simulation
+                    family: simulation
+                    displayName: Simulation Fast
+                    tier: FAST
+                    capabilities: [text]
+                    contextWindow: 100000
+                    maxOutput: 4096
+                    locality: LOCAL
+                """);
+        var manifest = loader.load(tempDir, "test");
+        assertThat(manifest.models().stream().map(ModelDescriptor::id))
+                .contains("claude-opus-5", "sim-fast");
+    }
+
 
     @Test
     void loadFileParsesPools(@TempDir Path tempDir) throws IOException {

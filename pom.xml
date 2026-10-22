@@ -184,6 +184,7 @@
         <module>confirmation-spring</module>
         <module>confirmation-generator</module>
         <module>yaml-core</module>
+        <module>playbook-compiler</module>
         <module>yaml-codegen</module>
         <module>yaml-jackson</module>
         <module>yaml-plugin-api</module>

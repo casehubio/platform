@@ -194,7 +194,7 @@ public class SessionPipeline implements SessionRegistry {
     }
 
 
-    static boolean isCapacityError(Exception e) {
+    public static boolean isCapacityError(Exception e) {
         if (e instanceof SessionCapacityException) return true;
         if (e instanceof AgentRateLimitException) return true;
         if (e instanceof AgentSessionLimitException) return true;

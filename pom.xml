@@ -30,6 +30,7 @@
         <module>platform-observability-core</module>
         <module>platform-observability</module>
         <module>platform-core</module>
+        <module>coordination-core</module>
         <module>platform</module>
         <module>authn-core</module>
         <module>authn-inmem</module>

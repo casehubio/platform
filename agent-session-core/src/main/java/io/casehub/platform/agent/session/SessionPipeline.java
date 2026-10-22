@@ -14,6 +14,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -22,10 +24,14 @@ public class SessionPipeline implements SessionRegistry {
 
     private static final Logger LOG = Logger.getLogger(SessionPipeline.class);
 
+    private static final Duration DEFAULT_IDLE_TIMEOUT = Duration.ofMinutes(5);
+
     private final SessionLifecycleManager sessionManager;
     private final String backendKey;
     private final int clearAtTokens;
+    private final Duration idleTimeout;
     private final AimdAdmissionStrategy admission;
+    private final ScheduledExecutorService evictionScheduler;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastUsed = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AgentSessionInit> sessionInits = new ConcurrentHashMap<>();
@@ -34,17 +40,37 @@ public class SessionPipeline implements SessionRegistry {
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
                            int ceiling, int clearAtTokens) {
+        this(sessionManager, backendKey, ceiling, clearAtTokens, DEFAULT_IDLE_TIMEOUT);
+    }
+
+    public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
+                           int ceiling, int clearAtTokens, Duration idleTimeout) {
         this(sessionManager, backendKey,
              new AimdAdmissionStrategy(ceiling, 5, Duration.ofSeconds(10)),
-             clearAtTokens);
+             clearAtTokens, idleTimeout);
     }
 
     public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
                            AimdAdmissionStrategy admission, int clearAtTokens) {
+        this(sessionManager, backendKey, admission, clearAtTokens, DEFAULT_IDLE_TIMEOUT);
+    }
+
+    public SessionPipeline(SessionLifecycleManager sessionManager, String backendKey,
+                           AimdAdmissionStrategy admission, int clearAtTokens, Duration idleTimeout) {
         this.sessionManager = sessionManager;
         this.backendKey = backendKey;
         this.admission = admission;
         this.clearAtTokens = clearAtTokens;
+        this.idleTimeout = idleTimeout;
+        this.evictionScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "session-pipeline-evictor-" + backendKey);
+            t.setDaemon(true);
+            return t;
+        });
+        long evictIntervalMs = Math.max(idleTimeout.toMillis() / 2, 50);
+        evictionScheduler.scheduleWithFixedDelay(
+                () -> evictIdleSessions(this.idleTimeout),
+                evictIntervalMs, evictIntervalMs, TimeUnit.MILLISECONDS);
     }
 
     public ManagedSession openSession(String id, AgentSessionInit init) {
@@ -220,6 +246,7 @@ public class SessionPipeline implements SessionRegistry {
     }
 
     public void shutdown() {
+        evictionScheduler.shutdownNow();
         sessions.forEach((id, session) -> {
             try {
                 sessionManager.release("pipeline:" + id);

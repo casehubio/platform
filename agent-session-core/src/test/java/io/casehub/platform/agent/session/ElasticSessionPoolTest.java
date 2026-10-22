@@ -374,6 +374,87 @@ class ElasticSessionPoolTest {
         }
     }
 
+    // --- 10. Scheduled eviction runs automatically ---
+
+    @Test
+    void scheduledEvictionRemovesIdleSessions() throws Exception {
+        // Pipeline with 100ms idle timeout — eviction runs every 50ms
+        pipeline = new SessionPipeline(sessionManager, "simulation", 3, 50_000,
+                Duration.ofMillis(100));
+
+        pipeline.openSession("short-lived", AgentSessionInit.of("system"));
+        assertThat(pipeline.sessionCount()).isEqualTo(1);
+
+        // Wait for the session to become idle past the threshold + eviction interval
+        Thread.sleep(300);
+
+        assertThat(pipeline.sessionCount())
+                .as("Idle session should be evicted by the scheduled reaper")
+                .isEqualTo(0);
+    }
+
+    @Test
+    void scheduledEvictionPreservesActiveSessions() throws Exception {
+        pipeline = new SessionPipeline(sessionManager, "simulation", 3, 50_000,
+                Duration.ofMillis(200));
+
+        pipeline.openSession("kept-alive", AgentSessionInit.of("system"));
+
+        // Keep the session active by touching it every 100ms for 500ms
+        for (int i = 0; i < 5; i++) {
+            Thread.sleep(100);
+            pipeline.executeSingle("kept-alive",
+                    session -> {
+                        session.query("ping").subscribe().asStream().count();
+                        return "ok";
+                    },
+                    Duration.ofSeconds(5));
+        }
+
+        assertThat(pipeline.sessionCount())
+                .as("Actively used session must survive scheduled eviction")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void scheduledEvictionAllowsTransparentRecreation() throws Exception {
+        pipeline = new SessionPipeline(sessionManager, "simulation", 3, 50_000,
+                Duration.ofMillis(100));
+
+        pipeline.openSession("phoenix", AgentSessionInit.of("system"));
+        var original = pipeline.sessionFor("phoenix");
+
+        // Wait for eviction
+        Thread.sleep(300);
+        assertThat(pipeline.sessionCount()).isEqualTo(0);
+
+        // Access recreates transparently
+        var recreated = pipeline.sessionFor("phoenix");
+        assertThat(recreated).isNotNull();
+        assertThat(recreated).isNotSameAs(original);
+
+        // And it works
+        var result = pipeline.executeSingle("phoenix",
+                session -> {
+                    session.query("risen").subscribe().asStream().count();
+                    return "ok";
+                },
+                Duration.ofSeconds(5));
+        assertThat(result).isEqualTo("ok");
+    }
+
+    @Test
+    void shutdownStopsScheduledEviction() throws Exception {
+        pipeline = new SessionPipeline(sessionManager, "simulation", 3, 50_000,
+                Duration.ofMillis(100));
+
+        pipeline.openSession("pre-shutdown", AgentSessionInit.of("system"));
+        pipeline.shutdown();
+
+        // After shutdown, no NPEs or scheduler exceptions
+        Thread.sleep(200);
+    }
+
     // --- Infrastructure ---
 
     static BackendInstanceRegistry simBackendRegistry() {

@@ -52,13 +52,17 @@ class PipelineSessionReaperTest {
     @Test
     void sweepKeepsRecentlyUsedSessions() throws Exception {
         pipeline.openSession("a", AgentSessionInit.of("prompt"));
+        var originalA = pipeline.sessionFor("a");
         Thread.sleep(150);
         pipeline.openSession("b", AgentSessionInit.of("prompt"));
 
         pipeline.evictIdleSessions(Duration.ofMillis(100));
         assertThat(pipeline.sessionCount()).isEqualTo(1);
         assertThat(pipeline.sessionFor("b")).isNotNull();
-        assertThat(pipeline.sessionFor("a")).isNull();
+        // "a" was evicted from the session map but transparently recreates on access
+        var recreatedA = pipeline.sessionFor("a");
+        assertThat(recreatedA).isNotNull();
+        assertThat(recreatedA).isNotSameAs(originalA);
     }
 
     @Test

@@ -69,12 +69,13 @@ class SessionPoolTest {
     }
 
     @Test
-    void maxActiveBlocksWhenExhausted() throws Exception {
+    void checkoutNeverBlocksRegardlessOfMaxActive() throws Exception {
         var backend = new StubBackend();
         var pool = new SessionPool(backend, config(0, 1));
 
         var session1 = pool.checkout(init());
 
+        // Second checkout should succeed immediately — no semaphore blocking
         var future = CompletableFuture.supplyAsync(() -> {
             try {
                 return pool.checkout(init());
@@ -83,12 +84,9 @@ class SessionPoolTest {
             }
         });
 
-        assertThatThrownBy(() -> future.get(200, TimeUnit.MILLISECONDS))
-                .isInstanceOf(TimeoutException.class);
-
-        session1.close();
-        var session2 = future.get(5, TimeUnit.SECONDS);
+        var session2 = future.get(1, TimeUnit.SECONDS);
         assertThat(session2).isNotNull();
+        session1.close();
         session2.close();
     }
 

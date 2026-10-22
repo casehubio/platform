@@ -5,7 +5,6 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
-import io.casehub.platform.agent.AgentSessionLimitException;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
 
@@ -14,7 +13,6 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,7 +25,6 @@ public class SessionPool {
     private final ScheduledExecutorService scheduler;
 
     private final    BlockingDeque<WarmEntry> warm     = new LinkedBlockingDeque<>();
-    private final    Semaphore                slots;
     private final    AtomicBoolean            shutdown = new AtomicBoolean(false);
     private volatile AgentSessionInit         lastInit;
     private final    SessionMetrics           metrics;
@@ -38,7 +35,6 @@ public class SessionPool {
     public SessionPool(AgentBackend backend, SessionPoolConfig config) {
         this.backend   = backend;
         this.config    = config;
-        this.slots     = new Semaphore(config.maxActive());
         this.metrics   = new SessionMetrics(config.name());
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "session-pool-" + backend.key());
@@ -63,23 +59,9 @@ public class SessionPool {
             return new PooledSession(entry.session(), this, backend.key());
         }
 
-        try {
-            if (!slots.tryAcquire(config.checkoutTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
-                throw new AgentSessionLimitException(config.maxActive());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AgentSessionLimitException(config.maxActive());
-        }
-
-        try {
-            AgentSession session = backend.openSession(init);
-            metrics.sessionOpened();
-            return new PooledSession(session, this, backend.key());
-        } catch (Exception e) {
-            slots.release();
-            throw e;
-        }
+        AgentSession session = backend.openSession(init);
+        metrics.sessionOpened();
+        return new PooledSession(session, this, backend.key());
     }
 
     public Multi<AgentEvent> invokeViaSession(AgentSessionConfig sessionConfig) {
@@ -102,7 +84,6 @@ public class SessionPool {
 
         if (shutdown.get()) {
             pooledSession.destroyDelegate();
-            slots.release();
             return;
         }
 
@@ -123,7 +104,6 @@ public class SessionPool {
         } catch (Exception e) {
             LOG.warnf("Failed to close session during release: %s", e.getMessage());
         }
-        slots.release();
 
         schedulePreWarm();
     }
@@ -135,13 +115,11 @@ public class SessionPool {
 
         scheduler.execute(() -> {
             if (shutdown.get() || warm.size() >= config.minActive()) {return;}
-            if (!slots.tryAcquire()) {return;}
             try {
                 AgentSession session = backend.openSession(init);
                 warm.offer(new WarmEntry(session, Instant.now()));
                 LOG.debugf("Pre-warmed session for backend %s (warm=%d)", backend.key(), warm.size());
             } catch (Exception e) {
-                slots.release();
                 LOG.debugf("Pre-warm failed for backend %s: %s", backend.key(), e.getMessage());
             }
         });
@@ -160,7 +138,6 @@ public class SessionPool {
                     } catch (Exception e) {
                         LOG.debugf("Failed to close evicted session: %s", e.getMessage());
                     }
-                    slots.release();
                     LOG.debugf("Evicted idle session for backend %s (warm=%d)", backend.key(), warm.size());
                 }
             }
@@ -175,13 +152,10 @@ public class SessionPool {
             try {
                 entry.session().close();
             } catch (Exception ignored) {}
-            slots.release();
         }
     }
 
     int warmCount()      {return warm.size();}
-
-    int availableSlots() {return slots.availablePermits();}
 
     public SessionMetrics metrics() {return metrics;}
 

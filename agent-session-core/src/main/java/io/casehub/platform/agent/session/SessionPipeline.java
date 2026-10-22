@@ -28,6 +28,7 @@ public class SessionPipeline implements SessionRegistry {
     private final AimdAdmissionStrategy admission;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastUsed = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AgentSessionInit> sessionInits = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AimdAdmissionStrategy> companions = new ConcurrentHashMap<>();
 
 
@@ -51,11 +52,7 @@ public class SessionPipeline implements SessionRegistry {
     }
 
     public ManagedSession openSession(String id, AgentSessionInit init, Duration timeout) {
-        ManagedSession existing = sessions.get(id);
-        if (existing != null) {
-            lastUsed.put(id, Instant.now());
-            return existing;
-        }
+        sessionInits.put(id, init);
 
         ManagedSession session = sessions.computeIfAbsent(id, k ->
             sessionManager.acquire("pipeline:" + k, backendKey, init,
@@ -68,6 +65,7 @@ public class SessionPipeline implements SessionRegistry {
     public void releaseSession(String id) {
         ManagedSession session = sessions.remove(id);
         lastUsed.remove(id);
+        sessionInits.remove(id);
         if (session != null) {
             try {
                 sessionManager.release("pipeline:" + id);
@@ -82,7 +80,14 @@ public class SessionPipeline implements SessionRegistry {
     }
 
     public ManagedSession sessionFor(String id) {
-        return sessions.get(id);
+        ManagedSession session = sessions.get(id);
+        if (session == null) {
+            AgentSessionInit init = sessionInits.get(id);
+            if (init != null) {
+                return openSession(id, init);
+            }
+        }
+        return session;
     }
 
     public <R> Map<String, R> executeBatch(Collection<String> ids,
@@ -174,7 +179,15 @@ public class SessionPipeline implements SessionRegistry {
         Instant cutoff = Instant.now().minus(idleThreshold);
         lastUsed.forEach((id, lastAccess) -> {
             if (lastAccess.isBefore(cutoff)) {
-                releaseSession(id);
+                ManagedSession session = sessions.remove(id);
+                lastUsed.remove(id);
+                if (session != null) {
+                    try {
+                        sessionManager.release("pipeline:" + id);
+                    } catch (Exception e) {
+                        LOG.debugf("Failed to evict session [id=%s]: %s", id, e.getMessage());
+                    }
+                }
                 LOG.infof("Evicted idle session [id=%s, idle since %s]", id, lastAccess);
             }
         });
@@ -216,6 +229,7 @@ public class SessionPipeline implements SessionRegistry {
         });
         sessions.clear();
         lastUsed.clear();
+        sessionInits.clear();
     }
 
     private <R> R executeWithRetry(String id, BiFunction<String, ManagedSession, R> queryFn,

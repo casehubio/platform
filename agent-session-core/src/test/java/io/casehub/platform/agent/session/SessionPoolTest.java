@@ -175,6 +175,58 @@ class SessionPoolTest {
 
     // --- Test infrastructure ---
 
+
+    @Test
+    void checkoutIncrementsSessionsOpened() {
+        var backend = new StubBackend();
+        var pool    = new SessionPool(backend, config(1, 2));
+
+        var session = pool.checkout(init());
+
+        assertThat(pool.metrics().sessionsOpened()).isEqualTo(1);
+        assertThat(pool.metrics().currentActive()).isEqualTo(1);
+        session.close();
+    }
+
+    @Test
+    void releaseDecrementsCurrentActive() {
+        var backend = new ClearableBackend();
+        var pool    = new SessionPool(backend, config(0, 2));
+
+        var s1 = pool.checkout(init());
+        var s2 = pool.checkout(init());
+        assertThat(pool.metrics().currentActive()).isEqualTo(2);
+        assertThat(pool.metrics().peakConcurrent()).isEqualTo(2);
+
+        s1.close();
+        assertThat(pool.metrics().currentActive()).isEqualTo(1);
+        assertThat(pool.metrics().peakConcurrent()).isEqualTo(2);
+
+        s2.close();
+        assertThat(pool.metrics().currentActive()).isZero();
+    }
+
+    @Test
+    void metricsTrackPeakConcurrentAcrossCheckouts() {
+        var backend = new ClearableBackend();
+        var pool    = new SessionPool(backend, config(0, 4));
+
+        var s1 = pool.checkout(init());
+        var s2 = pool.checkout(init());
+        var s3 = pool.checkout(init());
+        assertThat(pool.metrics().peakConcurrent()).isEqualTo(3);
+
+        s1.close();
+        s2.close();
+        s3.close();
+
+        var s4 = pool.checkout(init());
+        assertThat(pool.metrics().peakConcurrent()).isEqualTo(3);
+        assertThat(pool.metrics().sessionsOpened()).isEqualTo(4);
+        s4.close();
+    }
+
+
     private static SessionPoolConfig config(int min, int max) {
         return new SessionPoolConfig("test", "stub", min, max, null, null);
     }

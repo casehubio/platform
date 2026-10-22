@@ -30,6 +30,8 @@ public class SessionPool {
     private final    Semaphore                slots;
     private final    AtomicBoolean            shutdown = new AtomicBoolean(false);
     private volatile AgentSessionInit         lastInit;
+    private final    SessionMetrics           metrics;
+
 
     record WarmEntry(AgentSession session, Instant returnedAt) {}
 
@@ -37,6 +39,7 @@ public class SessionPool {
         this.backend   = backend;
         this.config    = config;
         this.slots     = new Semaphore(config.maxActive());
+        this.metrics   = new SessionMetrics(config.name());
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "session-pool-" + backend.key());
             t.setDaemon(true);
@@ -56,6 +59,7 @@ public class SessionPool {
 
         WarmEntry entry = warm.poll();
         if (entry != null) {
+            metrics.sessionOpened();
             return new PooledSession(entry.session(), this, backend.key());
         }
 
@@ -70,6 +74,7 @@ public class SessionPool {
 
         try {
             AgentSession session = backend.openSession(init);
+            metrics.sessionOpened();
             return new PooledSession(session, this, backend.key());
         } catch (Exception e) {
             slots.release();
@@ -93,6 +98,8 @@ public class SessionPool {
     }
 
     void release(PooledSession pooledSession) {
+        metrics.sessionClosed();
+
         if (shutdown.get()) {
             pooledSession.destroyDelegate();
             slots.release();
@@ -175,4 +182,7 @@ public class SessionPool {
     int warmCount()      {return warm.size();}
 
     int availableSlots() {return slots.availablePermits();}
+
+    public SessionMetrics metrics() {return metrics;}
+
 }

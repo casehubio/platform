@@ -29,7 +29,7 @@ public class SessionLifecycleManager {
             PooledSession pooled = pool.checkout(init);
             LOG.infof("Acquired managed session [conversationId=%s, backend=%s, policy=%s]",
                       conversationId, backendKey, clearingPolicy);
-            return new ManagedSession(pooled, conversationId, this, clearingPolicy, clearAfterTurns);
+            return new ManagedSession(pooled, conversationId, this, clearingPolicy, clearAfterTurns, pool.metrics());
         });
     }
 

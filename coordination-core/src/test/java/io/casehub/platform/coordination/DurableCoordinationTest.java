@@ -53,7 +53,7 @@ class DurableCoordinationTest {
       coordinator.register(barrier);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("barrier-test", "test", "0.1.0")
@@ -99,7 +99,7 @@ class DurableCoordinationTest {
       coordinator.register(semaphore);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("sem-test", "test", "0.1.0")
@@ -139,7 +139,7 @@ class DurableCoordinationTest {
       coordinator.register(signal);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("signal-test", "test", "0.1.0")
@@ -180,7 +180,7 @@ class DurableCoordinationTest {
       coordinator.register(quorum);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("quorum-test", "test", "0.1.0")
@@ -241,7 +241,7 @@ class DurableCoordinationTest {
       coordinator.register(sm);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("sm-test", "test", "0.1.0")
@@ -280,7 +280,7 @@ class DurableCoordinationTest {
       coordinator.register(channel);
 
       try (WorkflowApplication app =
-          WorkflowApplication.builder().withListener(coordinator).build()) {
+          WorkflowApplication.builder().withListener(coordinator).withListener(coordinator.postPersistenceListener()).build()) {
 
         Workflow workflow =
             WorkflowBuilder.workflow("channel-test", "test", "0.1.0")

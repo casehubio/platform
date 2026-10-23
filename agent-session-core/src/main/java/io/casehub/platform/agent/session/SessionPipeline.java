@@ -74,18 +74,22 @@ public class SessionPipeline implements SessionRegistry {
     }
 
     public ManagedSession openSession(String id, AgentSessionInit init) {
-        return openSession(id, init, null);
+        return openSession(id, init, ClearingPolicy.SIZE_AWARE);
     }
 
-    public ManagedSession openSession(String id, AgentSessionInit init, Duration timeout) {
+    public ManagedSession openSession(String id, AgentSessionInit init, ClearingPolicy policy) {
         sessionInits.put(id, init);
 
         ManagedSession session = sessions.computeIfAbsent(id, k ->
             sessionManager.acquire("pipeline:" + k, backendKey, init,
-                    ClearingPolicy.SIZE_AWARE, clearAtTokens));
+                    policy, clearAtTokens));
 
         lastUsed.put(id, Instant.now());
         return session;
+    }
+
+    public ManagedSession openSession(String id, AgentSessionInit init, Duration timeout) {
+        return openSession(id, init, ClearingPolicy.SIZE_AWARE);
     }
 
     public void releaseSession(String id) {

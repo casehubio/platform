@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-platform-parent</artifactId>
+        <version>0.4-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>casehub-platform-playbook-compiler</artifactId>
+    <packaging>jar</packaging>
+    <name>CaseHub Platform Playbook Compiler</name>
+    <description>Compiles CaseHub YAML playbooks to SWF SDK Workflow objects at runtime.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-yaml-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openworkflow.sdk</groupId>
+            <artifactId>openworkflow-types</artifactId>
+            <version>8.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openworkflow.sdk</groupId>
+            <artifactId>openworkflow-coordination</artifactId>
+            <version>8.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

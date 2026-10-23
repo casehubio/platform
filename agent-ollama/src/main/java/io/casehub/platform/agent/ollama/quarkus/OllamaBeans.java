@@ -1,6 +1,8 @@
 package io.casehub.platform.agent.ollama.quarkus;
 
+import io.casehub.platform.agent.AgentConcurrencyGate;
 import io.casehub.platform.agent.ollama.OllamaAgentBackend;
+import io.casehub.platform.agent.ollama.OllamaAgentProperties;
 import io.casehub.platform.agent.ollama.config.OllamaAgentConfig;
 import io.casehub.platform.agent.openai.OpenAiNativeChatModel;
 import io.casehub.platform.agent.router.ChatModelBackend;
@@ -9,6 +11,8 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 
+import java.time.Duration;
+
 @ApplicationScoped
 public class OllamaBeans {
 
@@ -16,8 +20,14 @@ public class OllamaBeans {
 
     @Produces
     @ApplicationScoped
-    public OllamaAgentBackend ollamaAgentBackend(OllamaAgentConfig config) {
-        backend = new OllamaAgentBackend(config);
+    public OllamaAgentBackend ollamaAgentBackend(OllamaAgentConfig config, AgentConcurrencyGate gate) {
+        OllamaAgentProperties props = gate.isActive() ? new OllamaAgentProperties() {
+            public String host() { return config.host(); }
+            public String defaultModel() { return config.defaultModel(); }
+            public Duration defaultTimeout() { return config.defaultTimeout(); }
+            public int maxConcurrentSessions() { return 0; }
+        } : config;
+        backend = new OllamaAgentBackend(props);
         return backend;
     }
 

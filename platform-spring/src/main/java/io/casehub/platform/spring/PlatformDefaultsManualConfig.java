@@ -60,6 +60,13 @@ public class PlatformDefaultsManualConfig {
     }
 
     @Bean
+    @ConditionalOnMissingBean(io.casehub.platform.agent.AgentConcurrencyGate.class)
+    public io.casehub.platform.agent.AgentConcurrencyGate noOpAgentConcurrencyGate() {
+        return () -> false;
+    }
+
+
+    @Bean
     @ConditionalOnMissingBean(ProcessExecutor.class)
     public ProcessExecutor processExecutor(
             @Value("${casehub.invoke.process.allowed-commands:}") List<String> allowedCommands) {

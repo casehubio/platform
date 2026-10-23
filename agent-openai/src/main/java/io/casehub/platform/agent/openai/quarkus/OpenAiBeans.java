@@ -1,6 +1,8 @@
 package io.casehub.platform.agent.openai.quarkus;
 
+import io.casehub.platform.agent.AgentConcurrencyGate;
 import io.casehub.platform.agent.openai.OpenAiAgentBackend;
+import io.casehub.platform.agent.openai.OpenAiAgentProperties;
 import io.casehub.platform.agent.openai.OpenAiNativeChatModel;
 import io.casehub.platform.agent.openai.OpenAiNativeEmbeddingModel;
 import io.casehub.platform.agent.openai.config.OpenAiAgentConfig;
@@ -9,6 +11,9 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 
+import java.time.Duration;
+import java.util.Optional;
+
 @ApplicationScoped
 public class OpenAiBeans {
 
@@ -16,8 +21,15 @@ public class OpenAiBeans {
 
     @Produces
     @ApplicationScoped
-    public OpenAiAgentBackend openAiAgentBackend(OpenAiAgentConfig config) {
-        backend = new OpenAiAgentBackend(config);
+    public OpenAiAgentBackend openAiAgentBackend(OpenAiAgentConfig config, AgentConcurrencyGate gate) {
+        OpenAiAgentProperties props = gate.isActive() ? new OpenAiAgentProperties() {
+            public Optional<String> apiKey() { return config.apiKey(); }
+            public String defaultModel() { return config.defaultModel(); }
+            public String promptCacheRetention() { return config.promptCacheRetention(); }
+            public Duration defaultTimeout() { return config.defaultTimeout(); }
+            public int maxConcurrentSessions() { return 0; }
+        } : config;
+        backend = new OpenAiAgentBackend(props);
         return backend;
     }
 

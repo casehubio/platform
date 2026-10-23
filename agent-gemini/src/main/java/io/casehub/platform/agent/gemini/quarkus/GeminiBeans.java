@@ -1,12 +1,17 @@
 package io.casehub.platform.agent.gemini.quarkus;
 
+import io.casehub.platform.agent.AgentConcurrencyGate;
 import io.casehub.platform.agent.gemini.GeminiAgentBackend;
+import io.casehub.platform.agent.gemini.GeminiAgentProperties;
 import io.casehub.platform.agent.gemini.GeminiNativeChatModel;
 import io.casehub.platform.agent.gemini.config.GeminiAgentConfig;
 import io.casehub.platform.agent.router.ChatModelBackend;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
+
+import java.time.Duration;
+import java.util.Optional;
 
 @ApplicationScoped
 public class GeminiBeans {
@@ -15,8 +20,15 @@ public class GeminiBeans {
 
     @Produces
     @ApplicationScoped
-    public GeminiAgentBackend geminiAgentBackend(GeminiAgentConfig config) {
-        backend = new GeminiAgentBackend(config);
+    public GeminiAgentBackend geminiAgentBackend(GeminiAgentConfig config, AgentConcurrencyGate gate) {
+        GeminiAgentProperties props = gate.isActive() ? new GeminiAgentProperties() {
+            public Optional<String> apiKey() { return config.apiKey(); }
+            public String defaultModel() { return config.defaultModel(); }
+            public Duration cacheTtl() { return config.cacheTtl(); }
+            public Duration defaultTimeout() { return config.defaultTimeout(); }
+            public int maxConcurrentSessions() { return 0; }
+        } : config;
+        backend = new GeminiAgentBackend(props);
         return backend;
     }
 

@@ -31,6 +31,16 @@ public class AgentGateSpringAutoConfiguration {
     }
 
     @Bean
+    io.casehub.platform.agent.AgentConcurrencyGate agentConcurrencyGate(AgentGateProperties properties) {
+        var     cc     = properties.concurrency();
+        var     tb     = properties.tokenBucket();
+        var     sw     = properties.slidingWindow();
+        boolean active = cc.max() > 0 || tb.permitsPerSecond() > 0 || sw.maxActions() > 0;
+        return () -> active;
+    }
+
+
+    @Bean
     SessionLeakReaper sessionLeakReaper(SessionRegistry registry,
                                          AgentGateProperties properties) {
         var reaper = properties.reaper();

@@ -857,7 +857,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     }
                 }
                 if (needsVirtualThread) {
-                    out.println("import io.smallrye.common.annotation.RunOnVirtualThread;");
                     out.println("import jakarta.transaction.Transactional;");
                 }
 
@@ -1014,7 +1013,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     out.println("import jakarta.ws.rs.QueryParam;");
                 }
                 if (needsVirtualThread) {
-                    out.println("import io.smallrye.common.annotation.RunOnVirtualThread;");
                     out.println("import jakarta.transaction.Transactional;");
                 }
 
@@ -1178,7 +1176,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
         if (!isUniReturn) {
             out.println("    @Transactional");
-            out.println("    @RunOnVirtualThread");
         }
         out.println("    @" + httpVerb);
         out.println("    @Path(\"" + pathSuffix + "\")");
@@ -1587,7 +1584,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         boolean isUniReturn = op.returnTypeStr().startsWith("Uni<");
         if (!isUniReturn) {
             out.println("    @Transactional");
-            out.println("    @RunOnVirtualThread");
         }
 
         StringBuilder params = new StringBuilder();

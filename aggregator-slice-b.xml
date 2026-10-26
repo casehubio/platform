@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Slice B — Identity/Auth/Data: authn, acl, identity, scim, persistence,
+  datasource, registry, config, expression, governance, subscriptions.
+  57 modules, 15 @QuarkusTest. Independent of slices A and C.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-aggregator-slice-b</artifactId>
+  <version>0.4-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CaseHub :: Platform :: Slice B (Identity/Auth)</name>
+
+  <modules>
+    <!-- Testing support -->
+    <module>testing</module>
+
+    <!-- Config -->
+    <module>config-core</module>
+    <module>config</module>
+
+    <!-- Expression -->
+    <module>expression-core</module>
+    <module>expression</module>
+
+    <!-- OIDC -->
+    <module>oidc</module>
+
+    <!-- Persistence -->
+    <module>persistence-jpa-common</module>
+    <module>persistence-jpa</module>
+    <module>persistence-mongodb</module>
+
+    <!-- Endpoints -->
+    <module>endpoints-memory-core</module>
+    <module>endpoints-memory</module>
+    <module>endpoints-config-core</module>
+    <module>endpoints-config</module>
+
+    <!-- Registry -->
+    <module>registry-inmem-core</module>
+    <module>registry-inmem</module>
+    <module>registry-jpa-common</module>
+    <module>registry-jpa</module>
+    <module>registry-client</module>
+    <module>registry-client-quarkus</module>
+
+    <!-- Datasource -->
+    <module>datasource-alpha</module>
+    <module>datasource-inmem-core</module>
+    <module>datasource-inmem</module>
+    <module>datasource-jpa-common</module>
+    <module>datasource-jpa</module>
+
+    <!-- SCIM -->
+    <module>scim-core</module>
+    <module>scim</module>
+
+    <!-- Identity -->
+    <module>identity-core</module>
+    <module>identity</module>
+
+    <!-- Credentials -->
+    <module>credentials-quarkus</module>
+
+    <!-- ACL -->
+    <module>acl-inmem-core</module>
+    <module>acl-inmem</module>
+    <module>acl-jpa-common</module>
+    <module>acl-jpa</module>
+    <module>acl-admin-core</module>
+    <module>acl-admin</module>
+    <module>acl-worker-core</module>
+    <module>acl-worker</module>
+
+    <!-- Auth -->
+    <module>authn-core</module>
+    <module>authn-inmem</module>
+    <module>authn-webauthn-core</module>
+    <module>authn-social-core</module>
+    <module>session-jpa-common</module>
+    <module>session-jpa</module>
+    <module>authn-webauthn-jpa-common</module>
+    <module>authn-webauthn-jpa</module>
+    <module>authn-social-jpa-common</module>
+    <module>authn-social-jpa</module>
+    <module>authn</module>
+    <module>authn-spring</module>
+
+    <!-- Governance -->
+    <module>governance-core</module>
+    <module>governance</module>
+
+    <!-- Subscriptions -->
+    <module>subscriptions-core</module>
+    <module>subscriptions</module>
+    <module>subscriptions-inmem-core</module>
+    <module>subscriptions-inmem</module>
+    <module>subscriptions-jpa-common</module>
+    <module>subscriptions-jpa</module>
+  </modules>
+</project>

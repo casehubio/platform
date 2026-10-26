@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Convergence slice — the platform module itself, Spring Boot starters,
+  generators, and all Spring-side modules.
+  39 modules, 5 @QuarkusTest. Depends on all three parallel slices.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-aggregator-convergence</artifactId>
+  <version>0.4-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CaseHub :: Platform :: Convergence (Spring)</name>
+
+  <modules>
+    <!-- Platform module (depends on agents, callbacks, yaml) -->
+    <module>platform</module>
+    <module>platform-spring</module>
+    <module>platform-spring-actuator</module>
+
+    <!-- Generator infrastructure -->
+    <module>generator-common</module>
+    <module>spring-generator</module>
+    <module>rest-spring-generator</module>
+    <module>graphql-spring-generator</module>
+    <module>mcp-spring-generator</module>
+
+    <!-- Spring modules from Slice A -->
+    <module>agent-spring</module>
+    <module>mcp-spring</module>
+
+    <!-- Spring modules from Slice B -->
+    <module>expression-spring</module>
+    <module>identity-spring</module>
+    <module>credentials-spring</module>
+    <module>oidc-spring</module>
+    <module>security-spring</module>
+    <module>scim-spring</module>
+    <module>persistence-spring-jpa</module>
+    <module>persistence-spring-mongodb</module>
+    <module>datasource-spring-jpa</module>
+    <module>registry-spring-jpa</module>
+    <module>acl-spring-jpa</module>
+    <module>acl-worker-spring</module>
+    <module>session-spring-jpa</module>
+    <module>authn-webauthn-spring-jpa</module>
+    <module>authn-social-spring-jpa</module>
+    <module>subscriptions-spring-jpa</module>
+
+    <!-- Spring modules from Slice C -->
+    <module>streams-spring</module>
+    <module>notifications-spring-jpa</module>
+    <module>notification-settings-spring-jpa</module>
+    <module>digest-spring-jpa</module>
+    <module>delivery-tracking-spring-jpa</module>
+    <module>platform-view-spring-jpa</module>
+    <module>confirmation-spring</module>
+    <module>callback-spring</module>
+
+    <!-- Spring Boot starters -->
+    <module>spring-boot-starter</module>
+    <module>spring-boot-starter-agent</module>
+    <module>spring-boot-starter-streams</module>
+    <module>spring-boot-starter-authn</module>
+
+    <!-- Spring testing -->
+    <module>spring-testing</module>
+    <module>spring-integration-test</module>
+  </modules>
+</project>

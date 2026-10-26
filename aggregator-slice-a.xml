@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Slice A — Agent/AI: agents, simulation, yaml, mcp, llm-config, observability.
+  60 modules, 14 @QuarkusTest. Independent of slices B and C.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-aggregator-slice-a</artifactId>
+  <version>0.4-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CaseHub :: Platform :: Slice A (Agent/AI)</name>
+
+  <modules>
+    <!-- Agent modules -->
+    <module>agent-api</module>
+    <module>agent-runtime-core</module>
+    <module>agent-runtime</module>
+    <module>agent-claude-core</module>
+    <module>agent-claude</module>
+    <module>agent-openai-core</module>
+    <module>agent-openai</module>
+    <module>agent-ollama-core</module>
+    <module>agent-ollama</module>
+    <module>agent-codex-core</module>
+    <module>agent-codex</module>
+    <module>agent-gemini-core</module>
+    <module>agent-gemini</module>
+    <module>agent-gemini-cli-core</module>
+    <module>agent-gemini-cli</module>
+    <module>agent-config-core</module>
+    <module>agent-config</module>
+    <module>agent-session-core</module>
+    <module>agent-session</module>
+    <module>agent-react-core</module>
+    <module>agent-router-core</module>
+    <module>agent-router</module>
+    <module>agent-gate-core</module>
+    <module>agent-gate</module>
+    <module>agent-langchain4j-core</module>
+    <module>agent-langchain4j</module>
+
+    <!-- Simulation modules -->
+    <module>simulation-api</module>
+    <module>simulation-core</module>
+    <module>simulation-inmem</module>
+    <module>simulation-generator</module>
+    <module>rest-client-simulation-generator</module>
+    <module>agent-simulation-core</module>
+    <module>simulation-config-core</module>
+    <module>simulation-config</module>
+    <module>memory-simulation-core</module>
+    <module>platform-simulation-core</module>
+    <module>simulation-testing</module>
+    <module>simulation-starter</module>
+    <module>event-simulation-core</module>
+    <module>event-simulation</module>
+
+    <!-- YAML modules -->
+    <module>yaml-core</module>
+    <module>yaml-codegen</module>
+    <module>yaml-jackson</module>
+    <module>yaml-plugin-api</module>
+    <module>schema-generator</module>
+    <module>yaml-plugin-processor</module>
+    <module>yaml-statemachine-generator</module>
+    <module>yaml-step-runtime</module>
+    <module>yaml-step-testing</module>
+
+    <!-- MCP -->
+    <module>mcp-core</module>
+    <module>mcp</module>
+
+    <!-- LLM config -->
+    <module>llm-config-core</module>
+    <module>llm-config</module>
+    <module>llm-config-vertex</module>
+    <module>llm-config-bedrock</module>
+
+    <!-- Observability -->
+    <module>platform-observability-core</module>
+    <module>platform-observability</module>
+
+    <!-- Misc -->
+    <module>callback-api</module>
+    <module>drift-detection</module>
+    <module>platform-pdf</module>
+    <module>platform-signing</module>
+  </modules>
+</project>

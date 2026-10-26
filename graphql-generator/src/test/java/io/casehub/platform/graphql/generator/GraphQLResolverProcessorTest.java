@@ -559,7 +559,7 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void nonStreamingRestHasMethodLevelVirtualThread() throws Exception {
+    void nonStreamingRestSkipsVirtualThread() throws Exception {
         var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
                 "test.PlainApi",
                 """
@@ -581,7 +581,7 @@ class GraphQLResolverProcessorTest {
         String content = compilation.generatedSourceFile(
                 "test.rest.PlainResource")
                 .get().getCharContent(true).toString();
-        assertThat(content).contains("@RunOnVirtualThread");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
         assertThat(content).contains("public Response getItem(");
     }
 
@@ -618,7 +618,7 @@ class GraphQLResolverProcessorTest {
     }
 
     @Test
-    void graphQLQueryHasVirtualThreadAndTransactional() throws Exception {
+    void graphQLQuerySkipsVirtualThreadButHasTransactional() throws Exception {
         var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
                 "test.GqlTxApi",
                 """
@@ -645,9 +645,9 @@ class GraphQLResolverProcessorTest {
         String content = compilation.generatedSourceFile(
                                             "test.graphql.GqlTxResolver")
                                     .get().getCharContent(true).toString();
-        assertThat(content).contains("import io.smallrye.common.annotation.RunOnVirtualThread;");
+        assertThat(content).doesNotContain("import io.smallrye.common.annotation.RunOnVirtualThread;");
         assertThat(content).contains("import jakarta.transaction.Transactional;");
-        assertThat(content).contains("@RunOnVirtualThread");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
         assertThat(content).contains("@Transactional");
     }
 

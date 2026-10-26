@@ -34,6 +34,10 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
+        if (skip) {
+            getLog().info("Skipping " + getGeneratorName() + " (casehub.generators.skip=true)");
+            return;
+        }
         List<File> modules = resolveModules();
         IndexView resolveIndex = loadCompositeIndex();
 

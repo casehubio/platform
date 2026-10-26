@@ -14,6 +14,10 @@ public abstract class AbstractVerifyMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
+        if (skip) {
+            getLog().info("Skipping " + getGeneratorName() + " verification (casehub.generators.skip=true)");
+            return;
+        }
         IndexView index = loadCompositeIndex();
 
         Set<String> sourceTypes = collectSourceTypes(index);

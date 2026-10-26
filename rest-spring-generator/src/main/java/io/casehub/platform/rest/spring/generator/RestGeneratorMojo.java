@@ -30,6 +30,10 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
+        if (skip) {
+            getLog().info("Skipping " + getGeneratorName() + " (casehub.generators.skip=true)");
+            return;
+        }
         IndexView index = loadJandexIndex();
 
         var scanner = new RestResourceScanner();

@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.jar.JarFile;
 
 public abstract class AbstractGeneratorMojo extends AbstractMojo {
+    @Parameter(property = "casehub.generators.skip", defaultValue = "false")
+    protected boolean skip;
+
 
     @Parameter
     protected File quarkusModule;

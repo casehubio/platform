@@ -41,9 +41,6 @@
     <module>agent-router</module>
     <module>agent-gate-core</module>
     <module>agent-gate</module>
-    <module>agent-langchain4j-core</module>
-    <module>agent-langchain4j</module>
-
     <!-- Simulation modules -->
     <module>simulation-api</module>
     <module>simulation-core</module>

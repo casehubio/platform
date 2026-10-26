@@ -47,7 +47,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Phase 1: Build slices A/B/C in parallel"
+      - name: "Phase 1: Build slices A/B/C/D in parallel"
         run: |
           mvn install -T 1C -f aggregator-slice-a.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[A] /' &
           PID_A=$!
@@ -55,11 +55,14 @@ jobs:
           PID_B=$!
           mvn install -T 1C -f aggregator-slice-c.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[C] /' &
           PID_C=$!
+          mvn install -T 1C -f aggregator-slice-d.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[D] /' &
+          PID_D=$!
 
           FAILED=0
           wait $PID_A || FAILED=$((FAILED + 1))
           wait $PID_B || FAILED=$((FAILED + 1))
           wait $PID_C || FAILED=$((FAILED + 1))
+          wait $PID_D || FAILED=$((FAILED + 1))
 
           if [ $FAILED -gt 0 ]; then
             echo "::error::$FAILED slice(s) failed"

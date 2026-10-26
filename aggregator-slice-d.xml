@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Slice D — YAML/Tooling: yaml processors, observability, signing, PDF.
+  15 modules, 0 @QuarkusTest (all fast unit tests).
+  Independent of slices A, B, and C.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-platform-aggregator-slice-d</artifactId>
+  <version>0.4-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CaseHub :: Platform :: Slice D (YAML/Tooling)</name>
+
+  <modules>
+    <!-- YAML modules -->
+    <module>yaml-core</module>
+    <module>yaml-codegen</module>
+    <module>yaml-jackson</module>
+    <module>yaml-plugin-api</module>
+    <module>schema-generator</module>
+    <module>yaml-plugin-processor</module>
+    <module>yaml-statemachine-generator</module>
+    <module>yaml-step-runtime</module>
+    <module>yaml-step-testing</module>
+
+    <!-- Observability -->
+    <module>platform-observability-core</module>
+    <module>platform-observability</module>
+
+    <!-- Misc tooling -->
+    <module>callback-api</module>
+    <module>drift-detection</module>
+    <module>platform-pdf</module>
+    <module>platform-signing</module>
+  </modules>
+</project>

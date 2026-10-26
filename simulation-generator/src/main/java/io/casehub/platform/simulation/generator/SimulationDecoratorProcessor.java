@@ -156,6 +156,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("import jakarta.inject.Inject;\n");
         sb.append("import io.casehub.platform.simulation.SimulationRuntime;\n");
         sb.append("import io.casehub.platform.simulation.DataRealism;\n");
+        sb.append("import io.casehub.platform.simulation.DataRealismContext;\n");
         sb.append("import io.casehub.platform.simulation.SimulationStrategy;\n");
         sb.append("import io.casehub.platform.api.identity.CurrentPrincipal;\n");
         sb.append("import ").append(spiFullName).append(";\n");
@@ -175,7 +176,8 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
 
         sb.append("    @Inject @Delegate ").append(spiSimpleName).append(" delegate;\n");
         sb.append("    @Inject SimulationRuntime simulation;\n");
-        sb.append("    @Inject CurrentPrincipal currentPrincipal;\n\n");
+        sb.append("    @Inject CurrentPrincipal currentPrincipal;\n");
+        sb.append("    @Inject DataRealismContext dataRealismContext;\n\n");
 
         for (final MethodInfo method : spiClass.methods()) {
             if (!isOverridable(method)) {continue;}
@@ -214,7 +216,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("    @Override\n");
         sb.append("    public ").append(returnType).append(" ").append(method.name()).append("() {\n");
         sb.append("        return new ").append(wrapperName)
-          .append("(delegate.").append(method.name()).append("(), simulation, currentPrincipal);\n");
+          .append("(delegate.").append(method.name()).append("(), simulation, currentPrincipal, dataRealismContext);\n");
         sb.append("    }\n\n");
     }
 
@@ -228,13 +230,15 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
           .append(" implements ").append(capSimpleName).append(" {\n");
         sb.append("        private final ").append(capSimpleName).append(" delegate;\n");
         sb.append("        private final SimulationRuntime simulation;\n");
-        sb.append("        private final CurrentPrincipal currentPrincipal;\n\n");
+        sb.append("        private final CurrentPrincipal currentPrincipal;\n");
+        sb.append("        private final DataRealismContext dataRealismContext;\n\n");
 
         sb.append("        ").append(wrapperName).append("(")
-          .append(capSimpleName).append(" delegate, SimulationRuntime simulation, CurrentPrincipal currentPrincipal) {\n");
+          .append(capSimpleName).append(" delegate, SimulationRuntime simulation, CurrentPrincipal currentPrincipal, DataRealismContext dataRealismContext) {\n");
         sb.append("            this.delegate = delegate;\n");
         sb.append("            this.simulation = simulation;\n");
         sb.append("            this.currentPrincipal = currentPrincipal;\n");
+        sb.append("            this.dataRealismContext = dataRealismContext;\n");
         sb.append("        }\n\n");
 
         final String           dottedPrefix = spiName + "." + capName;
@@ -390,23 +394,29 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         if (isVoid) {
             sb.append(indent).append("        strategy.get().resolve(").append(inputExpr).append(");\n");
             sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, strategy.get().dataRealism());\n");
+            sb.append(indent).append("        dataRealismContext.set(qualifiedName, strategy.get().dataRealism());\n");
             sb.append(indent).append("        return;\n");
         } else {
             sb.append(indent).append("        Object simResult = strategy.get().resolve(").append(inputExpr).append(");\n");
             sb.append(indent).append("        simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", simResult, strategy.get().dataRealism());\n");
+            sb.append(indent).append("        dataRealismContext.set(qualifiedName, strategy.get().dataRealism());\n");
             sb.append(indent).append("        return (").append(returnType).append(") simResult;\n");
         }
         sb.append(indent).append("    }\n");
 
         if (isVoid) {
             sb.append(indent).append("    delegate.").append(method.name()).append("(").append(args).append(");\n");
-            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, simulation.fallthroughRealism(qualifiedName));\n");
+            sb.append(indent).append("    DataRealism __ftRealism = simulation.fallthroughRealism(qualifiedName);\n");
+            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", null, __ftRealism);\n");
+            sb.append(indent).append("    dataRealismContext.set(qualifiedName, __ftRealism);\n");
             sb.append(indent).append("    if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append(indent).append("        simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", null);\n");
             sb.append(indent).append("    }\n");
         } else {
             sb.append(indent).append("    ").append(returnType).append(" result = delegate.").append(method.name()).append("(").append(args).append(");\n");
-            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", result, simulation.fallthroughRealism(qualifiedName));\n");
+            sb.append(indent).append("    DataRealism __ftRealism = simulation.fallthroughRealism(qualifiedName);\n");
+            sb.append(indent).append("    simulation.recordJournal(qualifiedName, __simTenancyId, ").append(inputExpr).append(", result, __ftRealism);\n");
+            sb.append(indent).append("    dataRealismContext.set(qualifiedName, __ftRealism);\n");
             sb.append(indent).append("    if (simulation.captureEnabled(qualifiedName)) {\n");
             sb.append(indent).append("        simulation.capture(qualifiedName, currentPrincipal.tenancyId(), ").append(inputExpr).append(", result);\n");
             sb.append(indent).append("    }\n");

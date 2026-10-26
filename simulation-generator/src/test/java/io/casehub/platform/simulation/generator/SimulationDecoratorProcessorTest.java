@@ -204,7 +204,8 @@ class SimulationDecoratorProcessorTest {
         final List<SimulationDecoratorProcessor.GeneratedSource> sources = processor.generateFromIndex(index);
         final String code = findSource(sources, "TestSimpleService");
 
-        assertThat(code).contains("simulation.fallthroughRealism(qualifiedName))");
+        assertThat(code).contains("DataRealism __ftRealism = simulation.fallthroughRealism(qualifiedName)");
+        assertThat(code).contains("__ftRealism)");
         assertThat(code).doesNotContain("result, null)");
     }
 
@@ -337,7 +338,7 @@ class SimulationDecoratorProcessorTest {
         var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
         String source  = findSource(sources, "SimulatedTestCapabilitySpi");
         assertThat(source).contains("static class DoWork_Wrapper implements TestCapability");
-        assertThat(source).contains("new DoWork_Wrapper(delegate.doWork(), simulation, currentPrincipal)");
+        assertThat(source).contains("new DoWork_Wrapper(delegate.doWork(), simulation, currentPrincipal, dataRealismContext)");
     }
 
     @Test
@@ -406,6 +407,46 @@ class SimulationDecoratorProcessorTest {
         String source  = findSource(sources, "SimulatedTestCapabilitySpi");
         assertThat(source).contains("import io.casehub.platform.simulation.generator.test.TestCapability;");
     }
+// --- DataRealismContext injection ---
+
+    @Test
+    void generatedDecoratorInjectsDataRealismContext() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+        final String                                             code      = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("@Inject DataRealismContext dataRealismContext");
+        assertThat(code).contains("import io.casehub.platform.simulation.DataRealismContext;");
+    }
+
+    @Test
+    void simulatedPathSetsDataRealismContext() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+        final String                                             code      = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("dataRealismContext.set(qualifiedName, strategy.get().dataRealism())");
+    }
+
+    @Test
+    void fallthroughPathSetsDataRealismContextWithCapturedVariable() {
+        final var                                                processor = new SimulationDecoratorProcessor();
+        final List<SimulationDecoratorProcessor.GeneratedSource> sources   = processor.generateFromIndex(index);
+        final String                                             code      = findSource(sources, "TestSimpleService");
+
+        assertThat(code).contains("DataRealism __ftRealism = simulation.fallthroughRealism(qualifiedName)");
+        assertThat(code).contains("dataRealismContext.set(qualifiedName, __ftRealism)");
+    }
+
+    @Test
+    void capabilityWrapperReceivesDataRealismContextInConstructor() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestCapabilitySpi");
+
+        assertThat(source).contains("private final DataRealismContext dataRealismContext;");
+        assertThat(source).contains("new DoWork_Wrapper(delegate.doWork(), simulation, currentPrincipal, dataRealismContext)");
+    }
+
 
     private static int occurrences(final String text, final String sub) {
         int count = 0;

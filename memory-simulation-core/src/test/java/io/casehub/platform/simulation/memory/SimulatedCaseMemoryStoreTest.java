@@ -13,6 +13,7 @@ import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.SimulationConfig;
+import io.casehub.platform.simulation.DataRealismContext;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.generated.SimulatedCaseMemoryStore;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
@@ -219,6 +220,10 @@ class SimulatedCaseMemoryStoreTest {
             var principalField = SimulatedCaseMemoryStore.class.getDeclaredField("currentPrincipal");
             principalField.setAccessible(true);
             principalField.set(instance, new StubPrincipal());
+
+            var contextField = SimulatedCaseMemoryStore.class.getDeclaredField("dataRealismContext");
+            contextField.setAccessible(true);
+            contextField.set(instance, new DataRealismContext());
 
             return instance;
         } catch (Exception e) {

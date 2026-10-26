@@ -6,6 +6,7 @@ import io.casehub.platform.api.acl.ResourceId;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.SimulationConfig;
+import io.casehub.platform.simulation.DataRealismContext;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.generated.SimulatedAccessControlProvider;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
@@ -65,6 +66,7 @@ class SimulatedAccessControlProviderTest {
         inject(decorator, "delegate", noOpDelegate);
         inject(decorator, "simulation", runtime);
         inject(decorator, "currentPrincipal", principal);
+        inject(decorator, "dataRealismContext", new DataRealismContext());
     }
 
     @Test

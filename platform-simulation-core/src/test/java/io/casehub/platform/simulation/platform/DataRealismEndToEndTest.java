@@ -5,6 +5,7 @@ import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.path.Path;
 import io.casehub.platform.simulation.DataRealism;
+import io.casehub.platform.simulation.DataRealismContext;
 import io.casehub.platform.simulation.InvocationRecord;
 import io.casehub.platform.simulation.MapSimulationConfig;
 import io.casehub.platform.simulation.SimulationRuntime;
@@ -26,6 +27,7 @@ class DataRealismEndToEndTest {
 
     private SimulationRuntime runtime;
     private SimulatedEndpointRegistry decorator;
+    private DataRealismContext dataRealismContext;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -50,6 +52,8 @@ class DataRealismEndToEndTest {
         inject(decorator, "delegate", noOpDelegate);
         inject(decorator, "simulation", runtime);
         inject(decorator, "currentPrincipal", principal);
+        dataRealismContext = new DataRealismContext();
+        inject(decorator, "dataRealismContext", dataRealismContext);
     }
 
     @Test
@@ -72,6 +76,10 @@ class DataRealismEndToEndTest {
 
         final var verifier = SimulationVerifier.on(overlay);
         verifier.method(EndpointRegistryQN.DISCOVER).allSimulated();
+
+        assertThat(dataRealismContext.current()).isNotNull();
+        assertThat(dataRealismContext.current().qualifiedName()).isEqualTo(EndpointRegistryQN.DISCOVER);
+        assertThat(dataRealismContext.dataRealism()).isEqualTo(DataRealism.STRUCTURALLY_VALID);
     }
 
     @Test
@@ -88,6 +96,10 @@ class DataRealismEndToEndTest {
         assertThat(journal).hasSize(1);
         assertThat(journal.get(0).dataRealism())
                 .isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
+
+        assertThat(dataRealismContext.current()).isNotNull();
+        assertThat(dataRealismContext.current().qualifiedName()).isEqualTo(EndpointRegistryQN.RESOLVE);
+        assertThat(dataRealismContext.dataRealism()).isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
     }
 
     @Test
@@ -103,6 +115,10 @@ class DataRealismEndToEndTest {
 
         final var verifier = SimulationVerifier.on(overlay);
         verifier.method(EndpointRegistryQN.REGISTER).noneSimulated();
+
+        assertThat(dataRealismContext.current()).isNotNull();
+        assertThat(dataRealismContext.current().qualifiedName()).isEqualTo(EndpointRegistryQN.REGISTER);
+        assertThat(dataRealismContext.dataRealism()).isNull();
     }
 
     @Test
@@ -120,6 +136,10 @@ class DataRealismEndToEndTest {
         assertThat(journal).hasSize(1);
         assertThat(journal.get(0).dataRealism())
                 .isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
+
+        assertThat(dataRealismContext.current()).isNotNull();
+        assertThat(dataRealismContext.current().qualifiedName()).isEqualTo(EndpointRegistryQN.DEREGISTER);
+        assertThat(dataRealismContext.dataRealism()).isEqualTo(DataRealism.DOMAIN_PLAUSIBLE);
     }
 
     private static void inject(final Object target, final String fieldName,

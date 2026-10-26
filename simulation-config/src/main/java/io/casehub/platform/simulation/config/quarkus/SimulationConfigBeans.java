@@ -1,6 +1,7 @@
 package io.casehub.platform.simulation.config.quarkus;
 
 import io.casehub.platform.agent.simulation.SimulatedAgentBackend;
+import io.casehub.platform.simulation.DataRealismContext;
 import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
@@ -16,6 +17,7 @@ import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.RequestScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
@@ -67,6 +69,13 @@ public class SimulationConfigBeans {
                                                SimulationCorpus corpus) {
         return new SimulationRuntime(config, corpus);
     }
+
+    @Produces
+    @RequestScoped
+    public DataRealismContext dataRealismContext() {
+        return new DataRealismContext();
+    }
+
 
     @Produces
     @ApplicationScoped

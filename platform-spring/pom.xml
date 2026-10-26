@@ -82,8 +82,14 @@
             <artifactId>casehub-platform-view-core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Quarkus modules referenced by rest-spring-generator plugin (filesystem Jandex paths).
+        <!-- Quarkus modules referenced by spring/rest-spring-generator plugins (filesystem Jandex paths).
              Provided-scope creates reactor ordering edge without polluting runtime classpath. -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-streams-webhook</artifactId>

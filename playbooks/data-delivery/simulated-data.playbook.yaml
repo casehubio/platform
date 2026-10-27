@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: simulated-demo
 meta:
   title: "Simulated Data"
@@ -9,24 +10,24 @@ meta:
     - simulated
     - data injection
     - data-delivery
-steps:
-  - simulated:
-      dataset: orders
-      data:
-        id: 1001
-        product: "Widget Pro"
-        quantity: 25
-        status: shipped
-  - simulated:
-      dataset: orders
-      data:
-        id: 1002
-        product: "Gadget X"
-        quantity: 10
-        status: pending
-  - simulated:
-      dataset: metrics
-      data:
-        cpu: 72
-        memory: 4096
-        disk_io: 340
+---
+- simulated:
+    dataset: orders
+    data:
+      id: 1001
+      product: "Widget Pro"
+      quantity: 25
+      status: shipped
+- simulated:
+    dataset: orders
+    data:
+      id: 1002
+      product: "Gadget X"
+      quantity: 10
+      status: pending
+- simulated:
+    dataset: metrics
+    data:
+      cpu: 72
+      memory: 4096
+      disk_io: 340

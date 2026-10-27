@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: mixed-delivery-demo
 meta:
   title: "Mixed Delivery"
@@ -11,22 +12,22 @@ meta:
     - concurrent
     - mixed
     - data-delivery
-steps:
-  - concurrent:
-      data-pump:
-        - simulated:
-            dataset: events
-            data:
-              type: login
-              user: alice
-        - delay: 500ms
-        - simulated:
-            dataset: events
-            data:
-              type: purchase
-              user: alice
-              amount: 49.99
-      ui-flow:
-        - click: { role: button, name: "Submit" }
-        - delay: 800ms
-        - click: { role: button, name: "Reset" }
+---
+- concurrent:
+    data-pump:
+      - simulated:
+          dataset: events
+          data:
+            type: login
+            user: alice
+      - delay: 500ms
+      - simulated:
+          dataset: events
+          data:
+            type: purchase
+            user: alice
+            amount: 49.99
+    ui-flow:
+      - click: { role: button, name: "Submit" }
+      - delay: 800ms
+      - click: { role: button, name: "Reset" }

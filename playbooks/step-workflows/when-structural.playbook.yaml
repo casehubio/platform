@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: when-structural-demo
 meta:
   title: "When (structural)"
@@ -10,14 +11,14 @@ meta:
     - structural
     - conditional
     - step-workflows
-steps:
-  # ── structural form: when guards a group of steps ──
-  # "when ${params.enabled}" is the YAML key; the steps array is its value.
-  # Equivalent to: block: [...] + when: "${params.enabled}"
-  - when ${params.enabled}:
-      - click: { role: button, name: "A" }
-      - click: { role: button, name: "B" }
+---
+# ── structural form: when guards a group of steps ──
+# "when ${params.enabled}" is the YAML key; the steps array is its value.
+# Equivalent to: block: [...] + when: "${params.enabled}"
+- when ${params.enabled}:
+    - click: { role: button, name: "A" }
+    - click: { role: button, name: "B" }
 
-  # ── decorator form (unchanged): when on a single step ──
-  - click: { role: button, name: "C" }
-    when: true
+# ── decorator form (unchanged): when on a single step ──
+- click: { role: button, name: "C" }
+  when: true

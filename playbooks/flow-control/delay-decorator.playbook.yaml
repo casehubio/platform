@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: delay-decorator-demo
 meta:
   title: "Delay (decorator)"
@@ -9,9 +10,9 @@ meta:
     - delay
     - decorator
     - flow-control
-steps:
-  - click: { role: button, name: "A" }
-    delay: 1000ms
-  - click: { role: button, name: "B" }
-    delay: 500ms
-  - click: { role: button, name: "C" }
+---
+- click: { role: button, name: "A" }
+  delay: 1000ms
+- click: { role: button, name: "B" }
+  delay: 500ms
+- click: { role: button, name: "C" }

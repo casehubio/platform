@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: retry-structural-demo
 meta:
   title: "Retry (structural)"
@@ -10,14 +11,14 @@ meta:
     - structural
     - block
     - step-workflows
-steps:
-  # ── structural form: retry wraps child steps ──
-  # "retry 3" is the YAML key; the steps array is its value.
-  # Equivalent to: block: [...] + retry: 3
-  - retry 3:
-      - click: { role: button, name: "A" }
-      - click: { role: button, name: "B" }
+---
+# ── structural form: retry wraps child steps ──
+# "retry 3" is the YAML key; the steps array is its value.
+# Equivalent to: block: [...] + retry: 3
+- retry 3:
+    - click: { role: button, name: "A" }
+    - click: { role: button, name: "B" }
 
-  # ── decorator form (unchanged): retry on a single step ──
-  - click: { role: button, name: "C" }
-    retry: 3
+# ── decorator form (unchanged): retry on a single step ──
+- click: { role: button, name: "C" }
+  retry: 3

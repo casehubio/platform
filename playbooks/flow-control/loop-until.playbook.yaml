@@ -1,6 +1,7 @@
 playbook: "1.0"
 schema: client
 ---
+
 playbook: loop-until-demo
 meta:
   title: "Loop (until)"
@@ -9,9 +10,9 @@ meta:
     - loop
     - decorator
     - flow-control
-steps:
-  - click: { role: button, name: "A" }
-    loop: { count: 3 }
-  - click: { role: button, name: "B" }
-    loop: { count: 5, until: true }
-  - click: { role: button, name: "C" }
+---
+- click: { role: button, name: "A" }
+  loop: { count: 3 }
+- click: { role: button, name: "B" }
+  loop: { count: 5, until: true }
+- click: { role: button, name: "C" }

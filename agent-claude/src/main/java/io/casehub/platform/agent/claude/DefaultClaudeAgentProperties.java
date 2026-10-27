@@ -10,6 +10,6 @@ record DefaultClaudeAgentProperties(
 ) implements ClaudeAgentProperties {
 
     DefaultClaudeAgentProperties() {
-        this(Optional.empty(), Duration.ofMinutes(5), 4);
+        this(Optional.empty(), Duration.ofMinutes(5), 18);
     }
 }

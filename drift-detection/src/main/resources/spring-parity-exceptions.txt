@@ -122,3 +122,7 @@ yaml-step-runtime
 
 # Framework-neutral JSON/YAML resource catalog — no Java classes or CDI beans
 playbook-catalog
+# Build-time YAML→SWF compiler — no CDI beans, framework-neutral
+playbook-compiler
+# Durable coordination primitives — framework-neutral, no CDI beans
+coordination-core

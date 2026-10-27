@@ -8,6 +8,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import org.openworkflow.sdk.impl.TaskContextData;
 import org.openworkflow.sdk.impl.coordination.CoordinationPrimitive;
+import org.openworkflow.sdk.impl.coordination.CoordinationStateStore;
 import org.openworkflow.sdk.impl.coordination.DurableBarrier;
 import org.openworkflow.sdk.impl.coordination.DurableChannel;
 import org.openworkflow.sdk.impl.coordination.DurableCoordinationListener;
@@ -28,7 +29,7 @@ public record CoordinationSpec(List<PrimitiveSpec> primitives) {
     }
 
     public DurableCoordinationListener configure() {
-        var listener = new DurableCoordinationListener();
+        var listener = new DurableCoordinationListener(CoordinationStateStore.noOp());
         for (PrimitiveSpec spec : primitives) {
             listener.register(spec.toPrimitive());
         }

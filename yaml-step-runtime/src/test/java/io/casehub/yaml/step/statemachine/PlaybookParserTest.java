@@ -142,4 +142,102 @@ class PlaybookParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("mapping");
     }
+
+    @Test
+    void parseThreeDocFormat_mergesStepsFromBareList() {
+        String yaml = """
+                playbook: "1.0"
+                schema: client
+                ---
+                playbook: barrier-demo
+                meta:
+                  title: "Barrier"
+                orchestration:
+                  barriers:
+                    all-ready: { count: 3 }
+                ---
+                - click: { role: button, name: "A" }
+                - delay: 1000ms
+                """;
+
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+
+        assertThat(doc.hasPlaybookHeader()).isTrue();
+        assertThat(doc.version()).isEqualTo("1.0");
+        assertThat(doc.schema()).isEqualTo("client");
+        assertThat(doc.frontMatter().name()).isEqualTo("barrier-demo");
+        assertThat(doc.content()).containsKey("orchestration");
+        assertThat(doc.content()).containsKey("steps");
+        assertThat(doc.content()).containsKey("meta");
+        assertThat(doc.content().get("steps")).isInstanceOf(java.util.List.class);
+        @SuppressWarnings("unchecked")
+        var steps = (java.util.List<java.util.Map<String, Object>>) doc.content().get("steps");
+        assertThat(steps).hasSize(2);
+    }
+
+    @Test
+    void parseThreeDocFormat_withoutPlaybookNameInDoc1() {
+        String yaml = """
+                playbook: "1.0"
+                schema: client
+                ---
+                meta:
+                  title: "REST"
+                  description: "REST binding"
+                ---
+                - rest-request:
+                    method: GET
+                    url: /api/users
+                """;
+
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+
+        assertThat(doc.hasPlaybookHeader()).isTrue();
+        assertThat(doc.schema()).isEqualTo("client");
+        assertThat(doc.frontMatter().name()).isNull();
+        assertThat(doc.content()).containsKey("meta");
+        assertThat(doc.content()).containsKey("steps");
+    }
+
+    @Test
+    void parseThreeDocFormat_moduleComposition_noStepsKey() {
+        String yaml = """
+                playbook: "1.0"
+                schema: client
+                ---
+                meta:
+                  title: "Modules"
+                ---
+                name: status-panel
+                parameters:
+                  title: { type: "STRING", required: true }
+                """;
+
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+
+        assertThat(doc.hasPlaybookHeader()).isTrue();
+        assertThat(doc.content()).containsKey("meta");
+        assertThat(doc.content()).containsKey("name");
+        assertThat(doc.content()).containsKey("parameters");
+        assertThat(doc.content()).doesNotContainKey("steps");
+    }
+
+    @Test
+    void parseThreeDocFormat_preservesFrontMatterName() {
+        String yaml = """
+                playbook: "1.0"
+                schema: server
+                name: explicit-name
+                ---
+                playbook: doc1-name
+                meta:
+                  title: "Test"
+                ---
+                - log: { message: "hello" }
+                """;
+
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+
+        assertThat(doc.frontMatter().name()).isEqualTo("explicit-name");
+    }
 }

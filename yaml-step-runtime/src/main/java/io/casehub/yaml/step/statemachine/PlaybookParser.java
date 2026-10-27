@@ -5,6 +5,7 @@ import io.casehub.yaml.core.playbook.PlaybookFrontMatter;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class PlaybookParser {
@@ -45,8 +46,34 @@ public final class PlaybookParser {
             return new PlaybookDocument(null, merged);
         }
 
-        var content = asMap(documents.get(1));
         var frontMatter = extractFrontMatter(firstDoc);
+
+        if (documents.size() >= 3) {
+            var metadata = new LinkedHashMap<>(asMap(documents.get(1)));
+
+            String playbookName = null;
+            if (metadata.containsKey(PLAYBOOK_KEY)) {
+                playbookName = String.valueOf(metadata.remove(PLAYBOOK_KEY));
+            }
+            if (frontMatter.name() == null && playbookName != null) {
+                frontMatter = new PlaybookFrontMatter(
+                        frontMatter.version(), frontMatter.schema(),
+                        playbookName, frontMatter.metadata());
+            }
+
+            Object thirdDoc = documents.get(2);
+            if (thirdDoc instanceof List<?> stepList) {
+                metadata.put("steps", stepList);
+            } else if (thirdDoc instanceof Map<?, ?> mapDoc) {
+                @SuppressWarnings("unchecked")
+                var typedMap = (Map<String, Object>) mapDoc;
+                metadata.putAll(typedMap);
+            }
+
+            return new PlaybookDocument(frontMatter, metadata);
+        }
+
+        var content = asMap(documents.get(1));
         return new PlaybookDocument(frontMatter, content);
     }
 

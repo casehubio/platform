@@ -21,14 +21,14 @@
             <artifactId>casehub-platform-yaml-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.openworkflow.sdk</groupId>
-            <artifactId>openworkflow-types</artifactId>
-            <version>8.0.0-SNAPSHOT</version>
+            <groupId>io.serverlessworkflow</groupId>
+            <artifactId>serverlessworkflow-types</artifactId>
+            <version>7.35.3.Final</version>
         </dependency>
         <dependency>
-            <groupId>org.openworkflow.sdk</groupId>
-            <artifactId>openworkflow-coordination</artifactId>
-            <version>8.0.0-SNAPSHOT</version>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-coordination-core</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -6,17 +6,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import org.openworkflow.sdk.impl.TaskContextData;
-import org.openworkflow.sdk.impl.coordination.CoordinationPrimitive;
-import org.openworkflow.sdk.impl.coordination.CoordinationStateStore;
-import org.openworkflow.sdk.impl.coordination.DurableBarrier;
-import org.openworkflow.sdk.impl.coordination.DurableChannel;
-import org.openworkflow.sdk.impl.coordination.DurableCoordinationListener;
-import org.openworkflow.sdk.impl.coordination.DurableQuorum;
-import org.openworkflow.sdk.impl.coordination.DurableSagaTracker;
-import org.openworkflow.sdk.impl.coordination.DurableSemaphore;
-import org.openworkflow.sdk.impl.coordination.DurableSignal;
-import org.openworkflow.sdk.impl.coordination.DurableStateMachine;
+import io.serverlessworkflow.impl.TaskContextData;
+import io.casehub.platform.coordination.CoordinationPrimitive;
+import io.casehub.platform.coordination.CoordinationStateStore;
+import io.casehub.platform.coordination.DurableBarrier;
+import io.casehub.platform.coordination.DurableChannel;
+import io.casehub.platform.coordination.DurableCoordinationListener;
+import io.casehub.platform.coordination.DurableQuorum;
+import io.casehub.platform.coordination.DurableSagaTracker;
+import io.casehub.platform.coordination.DurableSemaphore;
+import io.casehub.platform.coordination.DurableSignal;
+import io.casehub.platform.coordination.DurableStateMachine;
 
 public record CoordinationSpec(List<PrimitiveSpec> primitives) {
 

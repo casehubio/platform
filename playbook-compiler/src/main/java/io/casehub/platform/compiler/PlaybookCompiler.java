@@ -2,26 +2,26 @@ package io.casehub.platform.compiler;
 
 import io.casehub.yaml.core.orchestration.DurationParser;
 import io.casehub.yaml.core.playbook.PlaybookDocument;
-import org.openworkflow.sdk.api.types.Document;
-import org.openworkflow.sdk.api.types.DoTask;
-import org.openworkflow.sdk.api.types.FlowDirective;
-import org.openworkflow.sdk.api.types.FlowDirectiveEnum;
-import org.openworkflow.sdk.api.types.RetryLimit;
-import org.openworkflow.sdk.api.types.RetryLimitAttempt;
-import org.openworkflow.sdk.api.types.RetryPolicy;
-import org.openworkflow.sdk.api.types.Retry;
-import org.openworkflow.sdk.api.types.SetTask;
-import org.openworkflow.sdk.api.types.SwitchCase;
-import org.openworkflow.sdk.api.types.SwitchItem;
-import org.openworkflow.sdk.api.types.SwitchTask;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
-import org.openworkflow.sdk.api.types.TaskTimeout;
-import org.openworkflow.sdk.api.types.Timeout;
-import org.openworkflow.sdk.api.types.TimeoutAfter;
-import org.openworkflow.sdk.api.types.TryTask;
-import org.openworkflow.sdk.api.types.TryTaskCatch;
-import org.openworkflow.sdk.api.types.Workflow;
+import io.serverlessworkflow.api.types.Document;
+import io.serverlessworkflow.api.types.DoTask;
+import io.serverlessworkflow.api.types.FlowDirective;
+import io.serverlessworkflow.api.types.FlowDirectiveEnum;
+import io.serverlessworkflow.api.types.RetryLimit;
+import io.serverlessworkflow.api.types.RetryLimitAttempt;
+import io.serverlessworkflow.api.types.RetryPolicy;
+import io.serverlessworkflow.api.types.Retry;
+import io.serverlessworkflow.api.types.SetTask;
+import io.serverlessworkflow.api.types.SwitchCase;
+import io.serverlessworkflow.api.types.SwitchItem;
+import io.serverlessworkflow.api.types.SwitchTask;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
+import io.serverlessworkflow.api.types.TaskTimeout;
+import io.serverlessworkflow.api.types.Timeout;
+import io.serverlessworkflow.api.types.TimeoutAfter;
+import io.serverlessworkflow.api.types.TryTask;
+import io.serverlessworkflow.api.types.TryTaskCatch;
+import io.serverlessworkflow.api.types.Workflow;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -183,7 +183,7 @@ public final class PlaybookCompiler {
 
     private void setTimeoutOnTask(Task task, TaskTimeout timeout) {
         Object active = task.get();
-        if (active instanceof org.openworkflow.sdk.api.types.TaskBase tb) {
+        if (active instanceof io.serverlessworkflow.api.types.TaskBase tb) {
             tb.withTimeout(timeout);
         }
     }

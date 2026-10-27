@@ -1,11 +1,27 @@
 package io.casehub.platform.compiler;
 
 import java.util.List;
+import io.casehub.platform.coordination.DurableBarrier;
+import io.casehub.platform.coordination.DurableSemaphore;
+import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionCompletableListener;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CoordinationSpecTest {
+
+    @Test
+    void configure_registersLocalCoordinationPrimitives() {
+        var matcher = new CoordinationSpec.TaskMatcher.Prefix("work");
+        var spec = new CoordinationSpec(List.of(
+                new CoordinationSpec.BarrierSpec("sync", 3, matcher),
+                new CoordinationSpec.SemaphoreSpec("mutex", 1, matcher)));
+
+        WorkflowExecutionCompletableListener listener = spec.configure();
+        var coordination = (io.casehub.platform.coordination.DurableCoordinationListener) listener;
+        assertThat(coordination.<DurableBarrier>primitive("sync")).isInstanceOf(DurableBarrier.class);
+        assertThat(coordination.<DurableSemaphore>primitive("mutex")).isInstanceOf(DurableSemaphore.class);
+    }
 
     @Test
     void empty_hasNoPrimitives() {

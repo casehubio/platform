@@ -12,6 +12,10 @@
     <name>CaseHub :: Platform :: Coordination Core</name>
     <dependencies>
         <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-yaml-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-impl-core</artifactId>
             <version>7.35.3.Final</version>

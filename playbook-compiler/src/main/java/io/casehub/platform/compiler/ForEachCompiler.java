@@ -1,10 +1,10 @@
 package io.casehub.platform.compiler;
 
-import org.openworkflow.sdk.api.types.ForIn;
-import org.openworkflow.sdk.api.types.ForTask;
-import org.openworkflow.sdk.api.types.ForTaskConfiguration;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
+import io.serverlessworkflow.api.types.ForIn;
+import io.serverlessworkflow.api.types.ForTask;
+import io.serverlessworkflow.api.types.ForTaskConfiguration;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
 
 import java.util.List;
 import java.util.Map;

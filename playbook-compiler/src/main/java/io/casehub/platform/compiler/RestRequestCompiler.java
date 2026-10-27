@@ -1,12 +1,12 @@
 package io.casehub.platform.compiler;
 
-import org.openworkflow.sdk.api.types.CallHTTP;
-import org.openworkflow.sdk.api.types.CallTask;
-import org.openworkflow.sdk.api.types.Endpoint;
-import org.openworkflow.sdk.api.types.HTTPArguments;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
-import org.openworkflow.sdk.api.types.UriTemplate;
+import io.serverlessworkflow.api.types.CallHTTP;
+import io.serverlessworkflow.api.types.CallTask;
+import io.serverlessworkflow.api.types.Endpoint;
+import io.serverlessworkflow.api.types.HTTPArguments;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
+import io.serverlessworkflow.api.types.UriTemplate;
 
 import java.net.URI;
 import java.util.Map;

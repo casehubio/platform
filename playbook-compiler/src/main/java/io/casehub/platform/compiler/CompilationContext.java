@@ -1,6 +1,6 @@
 package io.casehub.platform.compiler;
 
-import org.openworkflow.sdk.api.types.TaskItem;
+import io.serverlessworkflow.api.types.TaskItem;
 
 import java.util.ArrayList;
 import java.util.List;

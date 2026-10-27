@@ -1,11 +1,11 @@
 package io.casehub.platform.compiler;
 
 import io.casehub.yaml.core.orchestration.DurationParser;
-import org.openworkflow.sdk.api.types.DurationInline;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
-import org.openworkflow.sdk.api.types.TimeoutAfter;
-import org.openworkflow.sdk.api.types.WaitTask;
+import io.serverlessworkflow.api.types.DurationInline;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
+import io.serverlessworkflow.api.types.TimeoutAfter;
+import io.serverlessworkflow.api.types.WaitTask;
 
 import java.time.Duration;
 import java.util.Map;

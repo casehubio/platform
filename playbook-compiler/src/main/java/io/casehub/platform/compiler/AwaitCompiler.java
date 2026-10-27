@@ -1,8 +1,8 @@
 package io.casehub.platform.compiler;
 
-import org.openworkflow.sdk.api.types.SetTask;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
+import io.serverlessworkflow.api.types.SetTask;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
 
 import java.util.Map;
 

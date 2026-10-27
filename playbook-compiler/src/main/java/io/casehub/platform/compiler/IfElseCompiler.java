@@ -1,13 +1,13 @@
 package io.casehub.platform.compiler;
 
-import org.openworkflow.sdk.api.types.DoTask;
-import org.openworkflow.sdk.api.types.FlowDirective;
-import org.openworkflow.sdk.api.types.FlowDirectiveEnum;
-import org.openworkflow.sdk.api.types.SwitchCase;
-import org.openworkflow.sdk.api.types.SwitchItem;
-import org.openworkflow.sdk.api.types.SwitchTask;
-import org.openworkflow.sdk.api.types.Task;
-import org.openworkflow.sdk.api.types.TaskItem;
+import io.serverlessworkflow.api.types.DoTask;
+import io.serverlessworkflow.api.types.FlowDirective;
+import io.serverlessworkflow.api.types.FlowDirectiveEnum;
+import io.serverlessworkflow.api.types.SwitchCase;
+import io.serverlessworkflow.api.types.SwitchItem;
+import io.serverlessworkflow.api.types.SwitchTask;
+import io.serverlessworkflow.api.types.Task;
+import io.serverlessworkflow.api.types.TaskItem;
 
 import java.util.ArrayList;
 import java.util.List;

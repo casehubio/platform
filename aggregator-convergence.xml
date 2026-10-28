@@ -35,6 +35,7 @@
     <module>mcp-spring-generator</module>
 
     <!-- Spring modules from Slice A -->
+    <module>agent-rest-spring</module>
     <module>agent-spring</module>
     <module>mcp-spring</module>
 

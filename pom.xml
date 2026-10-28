@@ -134,6 +134,7 @@
         <module>streams-camel</module>
         <module>governance-core</module>
         <module>governance</module>
+        <module>governance-spring</module>
         <module>credentials-quarkus</module>
         <module>delivery-channel-inmem-core</module>
         <module>delivery-channel-inmem</module>

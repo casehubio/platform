@@ -30,5 +30,10 @@
             <artifactId>casehub-platform-agent-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-rest-spring</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>

@@ -162,6 +162,9 @@
         <module>agent-session-core</module>
         <module>agent-session</module>
         <module>agent-react-core</module>
+        <module>agent-rest-core</module>
+        <module>agent-rest</module>
+        <module>agent-rest-spring</module>
         <module>agent-router-core</module>
         <module>agent-router</module>
         <module>agent-gate-core</module>

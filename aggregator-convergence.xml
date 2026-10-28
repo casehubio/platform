@@ -19,6 +19,11 @@
   <modules>
     <!-- Platform module (depends on agents, callbacks, yaml) -->
     <module>platform</module>
+    <!-- Governance modules — needed here because spring-generator reads Jandex from
+         governance/target/classes/ via filesystem path. The slices run on separate CI
+         runners, so governance/target/ from slice-b is not available here. -->
+    <module>governance-core</module>
+    <module>governance</module>
     <module>platform-spring</module>
     <module>platform-spring-actuator</module>
 

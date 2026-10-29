@@ -17,18 +17,28 @@
   <name>CaseHub :: Platform :: Convergence (Spring)</name>
 
   <modules>
-    <!-- Modules built in slices but needed here as dependencies of convergence modules -->
+    <!-- Modules built in slices but needed here as dependencies or Jandex sources.
+         Spring generator reads Jandex from paired Quarkus module target/classes/.
+         If the downloaded Jandex artifact is corrupt, having the source module here
+         lets Maven regenerate it. -->
     <module>agent-api</module>
     <module>agent-http-core</module>
+    <module>agent-http</module>
     <module>agent-router-core</module>
     <module>agent-session-core</module>
     <module>mcp-core</module>
+    <module>mcp</module>
     <module>drift-detection</module>
+    <module>expression</module>
+    <module>identity</module>
+    <module>oidc</module>
+    <module>scim</module>
+    <module>acl-worker</module>
+    <module>confirmation</module>
+    <module>callback</module>
     <!-- Platform module (depends on agents, callbacks, yaml) -->
     <module>platform</module>
-    <!-- Governance modules — needed here because spring-generator reads Jandex from
-         governance/target/classes/ via filesystem path. The slices run on separate CI
-         runners, so governance/target/ from slice-b is not available here. -->
+    <!-- Governance modules — spring-generator reads Jandex from target/classes/ -->
     <module>governance-core</module>
     <module>governance</module>
     <module>platform-spring</module>

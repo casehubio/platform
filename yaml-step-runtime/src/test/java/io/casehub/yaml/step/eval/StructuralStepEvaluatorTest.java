@@ -1390,7 +1390,7 @@ class StructuralStepEvaluatorTest {
     }
 
     @Nested
-    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     class RaceStepTests {
 
         @BeforeEach

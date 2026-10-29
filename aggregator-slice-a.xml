@@ -18,8 +18,8 @@
   <modules>
     <!-- Agent modules -->
     <module>agent-api</module>
-    <module>agent-rest-core</module>
-    <module>agent-rest</module>
+    <module>agent-http-core</module>
+    <module>agent-http</module>
     <module>agent-runtime-core</module>
     <module>agent-runtime</module>
     <module>agent-claude-core</module>

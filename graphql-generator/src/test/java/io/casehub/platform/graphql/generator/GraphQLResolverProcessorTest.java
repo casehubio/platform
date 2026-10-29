@@ -2033,4 +2033,177 @@ class GraphQLResolverProcessorTest {
         assertThat(restContent).contains("@Path(\"/{eventId}\")");
     }
 
+    @Test
+    void streamingMutationRestProducesPostSse() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamMutApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("stream-mut")
+                public interface StreamMutApi {
+                    @PlatformMutation(value = "Invoke streaming", streaming = true)
+                    Multi<String> invokeStream(String config, String agentId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=stream-mut", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        var restSource = compilation.generatedSourceFile("test.rest.StreamMutResource");
+        assertThat(restSource).isPresent();
+
+        String content = restSource.get().getCharContent(true).toString();
+        assertThat(content).contains("@POST");
+        assertThat(content).contains("@Produces(MediaType.SERVER_SENT_EVENTS)");
+        assertThat(content).contains("RestStreamElementType(MediaType.APPLICATION_JSON)");
+        assertThat(content).contains("public Multi<String> invokeStream(");
+        assertThat(content).doesNotContain("Response.ok");
+        assertThat(content).doesNotContain("@RunOnVirtualThread");
+        assertThat(content).doesNotContain("@Transactional");
+    }
+
+    @Test
+    void streamingMutationRestWithBodyParam() throws Exception {
+        var configType = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.InvokeConfig",
+                """
+                package test;
+                public record InvokeConfig(String model, int maxTokens) {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamBodyApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("stream-body")
+                public interface StreamBodyApi {
+                    @PlatformMutation(value = "Invoke with body", streaming = true)
+                    Multi<String> invoke(InvokeConfig config, String agentId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=stream-body", "-AgenerateGraphQL=false")
+                .compile(spi, configType);
+
+        String content = compilation.generatedSourceFile("test.rest.StreamBodyResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("@POST");
+        assertThat(content).contains("@Consumes(MediaType.APPLICATION_JSON)");
+        assertThat(content).contains("@jakarta.validation.Valid InvokeConfig config");
+    }
+
+    @Test
+    void streamingMutationGraphqlProducesSubscription() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamMutGqlApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("stream-mut-gql")
+                public interface StreamMutGqlApi {
+                    @PlatformMutation(value = "Invoke streaming", streaming = true)
+                    Multi<String> invokeStream(String prompt);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=stream-mut-gql", "-AgenerateRest=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.graphql.StreamMutGqlResolver")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("Subscription");
+        assertThat(content).doesNotContain("@Mutation");
+        assertThat(content).contains("public Multi<String> invokeStream(");
+        assertThat(content).doesNotContain("@Transactional");
+    }
+
+    @Test
+    void streamingMutationCoexistsWithRegularOps() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MixedStreamApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.smallrye.mutiny.Multi;
+
+                @McpDomain("mixed-stream")
+                public interface MixedStreamApi {
+                    @PlatformQuery("List items")
+                    java.util.List<String> listItems();
+
+                    @PlatformMutation("Create item")
+                    String createItem(String name);
+
+                    @PlatformMutation(value = "Stream invoke", streaming = true)
+                    Multi<String> streamInvoke(String prompt);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=mixed-stream")
+                .compile(spi);
+
+        var restSource = compilation.generatedSourceFile("test.rest.MixedStreamResource");
+        assertThat(restSource).isPresent();
+        String restContent = restSource.get().getCharContent(true).toString();
+        assertThat(restContent).contains("listItems");
+        assertThat(restContent).contains("createItem");
+        assertThat(restContent).contains("streamInvoke");
+
+        var gqlSource = compilation.generatedSourceFile("test.graphql.MixedStreamResolver");
+        assertThat(gqlSource).isPresent();
+        String gqlContent = gqlSource.get().getCharContent(true).toString();
+        assertThat(gqlContent).contains("listItems");
+        assertThat(gqlContent).contains("createItem");
+        assertThat(gqlContent).contains("streamInvoke");
+    }
+
+    @Test
+    void httpVerbMapping_streamingMutation_isPOST() {
+        assertThat(GraphQLResolverProcessor.resolveHttpVerb(GraphQLResolverProcessor.OperationType.STREAMING_MUTATION, null)).isEqualTo("POST");
+    }
+
+    @Test
+    void streamingMutationWithFlowPublisherConvertedToMulti() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.FlowStreamApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import java.util.concurrent.Flow;
+
+                @McpDomain("flow-stream")
+                public interface FlowStreamApi {
+                    @PlatformMutation(value = "Stream via Flow.Publisher", streaming = true)
+                    Flow.Publisher<String> streamFlow(String input);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=flow-stream", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile("test.rest.FlowStreamResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("@POST");
+        assertThat(content).contains("@Produces(MediaType.SERVER_SENT_EVENTS)");
+        assertThat(content).contains("streamFlow(");
+    }
+
 }

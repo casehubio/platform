@@ -31,4 +31,7 @@ public interface SampleDomainSpi {
 
     @PlatformStream("Watch item changes")
     Multi<String> watchItems(String tenancyId);
+
+    @PlatformMutation(value = "Invoke streaming", streaming = true)
+    Multi<String> invokeStream(String config, String agentId);
 }

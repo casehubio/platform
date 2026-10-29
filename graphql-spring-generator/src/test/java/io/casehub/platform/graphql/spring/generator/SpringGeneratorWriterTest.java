@@ -209,6 +209,44 @@ class SpringGeneratorWriterTest {
     }
 
     @Test
+    void generatesSubscriptionMappingForStreamingMutation() {
+        var writer = new SpringGraphqlControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        assertThat(source).contains("@SubscriptionMapping");
+        assertThat(source).contains("invokeStream");
+    }
+
+    @Test
+    void streamingMutationGraphqlNotMutationMapping() {
+        var writer = new SpringGraphqlControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        long mutationCount = source.lines()
+                .filter(l -> l.contains("@MutationMapping"))
+                .count();
+        assertThat(mutationCount).isEqualTo(1);
+    }
+
+    @Test
+    void streamingMutationRestUsesPostMapping() {
+        var writer = new SpringDomainRestControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        String invokeStreamSection = source.substring(source.indexOf("invokeStream") - 200, source.indexOf("invokeStream") + 100);
+        assertThat(invokeStreamSection).contains("@PostMapping");
+        assertThat(invokeStreamSection).contains("TEXT_EVENT_STREAM_VALUE");
+    }
+
+    @Test
+    void streamingMutationRestReturnsSseEmitter() {
+        var writer = new SpringDomainRestControllerWriter();
+        String source = writer.generate(domain, "test.spring").toString();
+
+        assertThat(source).contains("SseEmitter invokeStream(");
+    }
+
+    @Test
     void classBasedDomainGeneratesRestController() throws Exception {
         var indexer = new Indexer();
         indexer.indexClass(SampleDomainImpl.class);

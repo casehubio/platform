@@ -10,15 +10,18 @@ import io.casehub.platform.agent.AgentResolver;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInfo;
+import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.SessionHandle;
 import io.casehub.platform.agent.SessionInfo;
 import io.casehub.platform.api.mcp.ComponentStatus;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelQuery;
+import io.casehub.platform.api.model.ModelRegistry;
 import io.smallrye.mutiny.Multi;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,13 +36,19 @@ public class AgentHttpService implements AgentHttpApi {
     private final AgentProvider agentProvider;
     private final AgentResolver agentResolver;
     private final HttpSessionManager sessionManager;
+    private final BackendInstanceRegistry backendRegistry;
+    private final ModelRegistry modelRegistry;
 
     public AgentHttpService(AgentProvider agentProvider,
                             AgentResolver agentResolver,
-                            HttpSessionManager sessionManager) {
+                            HttpSessionManager sessionManager,
+                            BackendInstanceRegistry backendRegistry,
+                            ModelRegistry modelRegistry) {
         this.agentProvider = Objects.requireNonNull(agentProvider);
         this.agentResolver = agentResolver;
         this.sessionManager = sessionManager;
+        this.backendRegistry = backendRegistry;
+        this.modelRegistry = modelRegistry;
     }
 
     @Override
@@ -104,12 +113,17 @@ public class AgentHttpService implements AgentHttpApi {
 
     @Override
     public List<BackendInfo> listBackends() {
-        return List.of();
+        if (backendRegistry == null) return List.of();
+        return backendRegistry.keys().stream()
+                .sorted()
+                .map(key -> new BackendInfo(key, backendRegistry.resolveByKey(key).size()))
+                .toList();
     }
 
     @Override
     public List<ModelDescriptor> listModels(ModelQuery query) {
-        return List.of();
+        if (modelRegistry == null) return List.of();
+        return query != null ? modelRegistry.query(query) : modelRegistry.all();
     }
 
     @Override
@@ -122,8 +136,13 @@ public class AgentHttpService implements AgentHttpApi {
         Set<String> capabilities = new LinkedHashSet<>();
         capabilities.add("invoke");
         if (sessionManager != null) capabilities.add("sessions");
+        if (backendRegistry != null) capabilities.add("backends");
+        if (modelRegistry != null) capabilities.add("models");
         int activeSessions = sessionManager != null ? sessionManager.activeCount() : 0;
-        return new AgentHttpStatus(capabilities, Map.of(), activeSessions, ComponentStatus.AVAILABLE);
+        Map<String, Object> pools = new LinkedHashMap<>();
+        if (backendRegistry != null) pools.put("backendCount", backendRegistry.keys().size());
+        if (modelRegistry != null) pools.put("modelCount", modelRegistry.all().size());
+        return new AgentHttpStatus(capabilities, pools, activeSessions, ComponentStatus.AVAILABLE);
     }
 
     private void requireSessions() {

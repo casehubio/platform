@@ -3,10 +3,12 @@ package io.casehub.platform.agent.http.spring;
 import io.casehub.platform.agent.AgentDescriptor;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentResolver;
+import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.ResolvedAgent;
 import io.casehub.platform.agent.SessionRegistry;
 import io.casehub.platform.agent.http.AgentHttpService;
 import io.casehub.platform.agent.http.HttpSessionManager;
+import io.casehub.platform.api.model.ModelRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -41,11 +43,18 @@ public class AgentHttpAutoConfiguration {
     AgentHttpService agentHttpService(
             AgentProvider agentProvider,
             AgentResolver agentResolver,
-            ObjectProvider<SessionRegistry> sessionRegistry) {
+            ObjectProvider<SessionRegistry> sessionRegistry,
+            ObjectProvider<BackendInstanceRegistry> backendRegistry,
+            ObjectProvider<ModelRegistry> modelRegistry) {
         SessionRegistry registry = sessionRegistry.getIfAvailable();
         HttpSessionManager sessionManager = registry != null
                 ? new HttpSessionManager(registry, agentProvider)
                 : null;
-        return new AgentHttpService(agentProvider, agentResolver, sessionManager);
+        return new AgentHttpService(
+                agentProvider,
+                agentResolver,
+                sessionManager,
+                backendRegistry.getIfAvailable(),
+                modelRegistry.getIfAvailable());
     }
 }

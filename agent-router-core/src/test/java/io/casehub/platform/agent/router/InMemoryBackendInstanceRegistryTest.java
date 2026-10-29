@@ -47,6 +47,21 @@ class InMemoryBackendInstanceRegistryTest {
         assertThat(registry.resolveByKey("any")).isEmpty();
     }
 
+    @Test
+    void keysReturnsAllRegisteredKeys() {
+        var ollama = stubBackend("ollama");
+        var claude = stubBackend("claude");
+        var registry = InMemoryBackendInstanceRegistry.of(ollama, claude);
+
+        assertThat(registry.keys()).containsExactlyInAnyOrder("ollama", "claude");
+    }
+
+    @Test
+    void keysReturnsEmptyForEmptyRegistry() {
+        var registry = InMemoryBackendInstanceRegistry.of();
+        assertThat(registry.keys()).isEmpty();
+    }
+
     private AgentBackend stubBackend(String key) {
         return new AgentBackend() {
             @Override public String key() { return key; }

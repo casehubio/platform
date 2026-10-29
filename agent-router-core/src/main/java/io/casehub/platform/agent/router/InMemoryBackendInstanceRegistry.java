@@ -7,7 +7,9 @@ import io.casehub.platform.agent.BackendRef;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** In-memory BackendInstanceRegistry backed by ConcurrentHashMap. */
 public class InMemoryBackendInstanceRegistry implements BackendInstanceRegistry {
@@ -38,5 +40,12 @@ public class InMemoryBackendInstanceRegistry implements BackendInstanceRegistry 
                 .filter(e -> e.getKey().key().equals(key))
                 .map(Map.Entry::getValue)
                 .toList();
+    }
+
+    @Override
+    public Set<String> keys() {
+        return instances.keySet().stream()
+                .map(BackendRef::key)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

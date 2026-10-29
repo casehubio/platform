@@ -1,5 +1,6 @@
 package io.casehub.platform.agent.http;
 
+import io.casehub.platform.agent.AgentBackend;
 import io.casehub.platform.agent.AgentDescriptor;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentInvocationResult;
@@ -8,9 +9,15 @@ import io.casehub.platform.agent.AgentResolver;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.BackendInstanceRegistry;
 import io.casehub.platform.agent.ResolvedAgent;
 import io.casehub.platform.agent.SessionRegistry;
 import io.casehub.platform.api.mcp.ComponentStatus;
+import io.casehub.platform.api.model.ModelDescriptor;
+import io.casehub.platform.api.model.ModelLocality;
+import io.casehub.platform.api.model.ModelQuery;
+import io.casehub.platform.api.model.ModelRegistry;
+import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -32,6 +40,8 @@ class AgentHttpServiceTest {
     private AgentResolver agentResolver;
     private SessionRegistry sessionRegistry;
     private HttpSessionManager sessionManager;
+    private BackendInstanceRegistry backendRegistry;
+    private ModelRegistry modelRegistry;
     private AgentHttpService service;
     private AgentHttpService serviceNoSessions;
 
@@ -40,9 +50,11 @@ class AgentHttpServiceTest {
         agentProvider = mock(AgentProvider.class);
         agentResolver = mock(AgentResolver.class);
         sessionRegistry = mock(SessionRegistry.class);
+        backendRegistry = mock(BackendInstanceRegistry.class);
+        modelRegistry = mock(ModelRegistry.class);
         sessionManager = new HttpSessionManager(sessionRegistry, agentProvider);
-        service = new AgentHttpService(agentProvider, agentResolver, sessionManager);
-        serviceNoSessions = new AgentHttpService(agentProvider, agentResolver, null);
+        service = new AgentHttpService(agentProvider, agentResolver, sessionManager, backendRegistry, modelRegistry);
+        serviceNoSessions = new AgentHttpService(agentProvider, agentResolver, null, null, null);
     }
 
     @Test
@@ -150,7 +162,7 @@ class AgentHttpServiceTest {
 
     @Test
     void listAgents_returnsEmptyWhenNoResolver() {
-        var noResolver = new AgentHttpService(agentProvider, null, null);
+        var noResolver = new AgentHttpService(agentProvider, null, null, null, null);
         assertEquals(List.of(), noResolver.listAgents());
     }
 
@@ -184,5 +196,85 @@ class AgentHttpServiceTest {
 
         verify(mockSession).close(any(Duration.class));
         verify(sessionRegistry).releaseSession(handle.sessionId());
+    }
+
+    @Test
+    void listBackends_delegatesToRegistry() {
+        var backend1 = mock(AgentBackend.class);
+        var backend2 = mock(AgentBackend.class);
+        when(backendRegistry.keys()).thenReturn(Set.of("claude", "openai"));
+        when(backendRegistry.resolveByKey("claude")).thenReturn(List.of(backend1));
+        when(backendRegistry.resolveByKey("openai")).thenReturn(List.of(backend2));
+
+        var result = service.listBackends();
+
+        assertEquals(2, result.size());
+        assertEquals("claude", result.get(0).backendKey());
+        assertEquals(1, result.get(0).instanceCount());
+        assertEquals("openai", result.get(1).backendKey());
+    }
+
+    @Test
+    void listBackends_returnsEmptyWhenNoRegistry() {
+        assertEquals(List.of(), serviceNoSessions.listBackends());
+    }
+
+    @Test
+    void listModels_delegatesToRegistry() {
+        var descriptor = testModel("gpt-4", "openai", "OpenAI");
+        var query = ModelQuery.builder().vendor("OpenAI").build();
+        when(modelRegistry.query(query)).thenReturn(List.of(descriptor));
+
+        var result = service.listModels(query);
+
+        assertEquals(1, result.size());
+        assertEquals("gpt-4", result.get(0).id());
+        verify(modelRegistry).query(query);
+    }
+
+    @Test
+    void listModels_returnsAllWhenQueryNull() {
+        var descriptor = testModel("claude-opus", "claude", "Anthropic");
+        when(modelRegistry.all()).thenReturn(List.of(descriptor));
+
+        var result = service.listModels(null);
+
+        assertEquals(1, result.size());
+        verify(modelRegistry).all();
+        verify(modelRegistry, never()).query(any());
+    }
+
+    @Test
+    void listModels_returnsEmptyWhenNoRegistry() {
+        assertEquals(List.of(), serviceNoSessions.listModels(null));
+    }
+
+    @Test
+    void status_includesBackendAndModelCounts() {
+        when(backendRegistry.keys()).thenReturn(Set.of("claude", "openai"));
+        when(modelRegistry.all()).thenReturn(List.of(testModel("m1", "k", "v")));
+
+        var status = service.status();
+
+        assertTrue(status.availableCapabilities().contains("backends"));
+        assertTrue(status.availableCapabilities().contains("models"));
+        assertEquals(2, status.pools().get("backendCount"));
+        assertEquals(1, status.pools().get("modelCount"));
+    }
+
+    @Test
+    void status_omitsBackendsAndModelsWhenNull() {
+        var status = serviceNoSessions.status();
+
+        assertFalse(status.availableCapabilities().contains("backends"));
+        assertFalse(status.availableCapabilities().contains("models"));
+        assertFalse(status.pools().containsKey("backendCount"));
+        assertFalse(status.pools().containsKey("modelCount"));
+    }
+
+    private static ModelDescriptor testModel(String id, String backendKey, String vendor) {
+        return new ModelDescriptor(id, id, backendKey, null, vendor, "test-family",
+                id, ModelTier.STANDARD, Set.of(), 4096, 1024,
+                ModelLocality.CLOUD, null, null, Map.of());
     }
 }

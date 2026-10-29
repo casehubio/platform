@@ -64,7 +64,7 @@ public class SpringGraphqlControllerWriter {
         ClassName mappingAnnotation = switch (op.type()) {
             case QUERY -> QUERY_MAPPING;
             case MUTATION -> MUTATION_MAPPING;
-            case STREAM -> SUBSCRIPTION_MAPPING;
+            case STREAM, STREAMING_MUTATION -> SUBSCRIPTION_MAPPING;
             case WEBHOOK -> throw new IllegalStateException("WEBHOOK operations should be filtered before buildMethod");
         };
 

@@ -11,4 +11,9 @@ public interface SessionRegistry {
     void releaseSession(String id);
 
     int sessionCount();
+
+    default java.util.Optional<AgentSession> get(String id) {
+        return java.util.Optional.empty();
+    }
+
 }

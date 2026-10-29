@@ -94,7 +94,7 @@ public final class GeneratorUtils {
         }
         return switch (type) {
             case QUERY, STREAM -> "GET";
-            case MUTATION, WEBHOOK -> "POST";
+            case MUTATION, STREAMING_MUTATION, WEBHOOK -> "POST";
         };
     }
 

@@ -82,10 +82,12 @@ public class GraphQLModelScanner {
                                 buildOperationFromMethod(method, beanClass,
                                                          OperationDescriptor.OperationType.QUERY, desc));
                     } else if (method.isAnnotationPresent(PlatformMutation.class)) {
-                        String desc = method.getAnnotation(PlatformMutation.class).value();
+                        PlatformMutation mutAnn = method.getAnnotation(PlatformMutation.class);
+                        OperationDescriptor.OperationType mutType = mutAnn.streaming()
+                                ? OperationDescriptor.OperationType.STREAMING_MUTATION
+                                : OperationDescriptor.OperationType.MUTATION;
                         domainOps.get(domain).add(
-                                buildOperationFromMethod(method, beanClass,
-                                                         OperationDescriptor.OperationType.MUTATION, desc));
+                                buildOperationFromMethod(method, beanClass, mutType, mutAnn.value()));
                     } else if (method.isAnnotationPresent(PlatformStream.class)) {
                         String desc = method.getAnnotation(PlatformStream.class).value();
                         domainOps.get(domain).add(
@@ -138,10 +140,12 @@ public class GraphQLModelScanner {
                                 buildOperationFromMethod(method, beanClass,
                                                          OperationDescriptor.OperationType.QUERY, desc));
                     } else if (method.isAnnotationPresent(PlatformMutation.class)) {
-                        String desc = method.getAnnotation(PlatformMutation.class).value();
+                        PlatformMutation mutAnn = method.getAnnotation(PlatformMutation.class);
+                        OperationDescriptor.OperationType mutType = mutAnn.streaming()
+                                ? OperationDescriptor.OperationType.STREAMING_MUTATION
+                                : OperationDescriptor.OperationType.MUTATION;
                         domainOps.get(domain).add(
-                                buildOperationFromMethod(method, beanClass,
-                                                         OperationDescriptor.OperationType.MUTATION, desc));
+                                buildOperationFromMethod(method, beanClass, mutType, mutAnn.value()));
                     } else if (method.isAnnotationPresent(PlatformStream.class)) {
                         String desc = method.getAnnotation(PlatformStream.class).value();
                         domainOps.get(domain).add(

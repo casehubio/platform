@@ -341,8 +341,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 AnnotationInstance webhookAnn = method.annotation(PLATFORM_WEBHOOK);
 
                 if (queryAnn != null || mutAnn != null || streamAnn != null || webhookAnn != null) {
+                    boolean isStreamingMutation = mutAnn != null && mutAnn.value("streaming") != null && mutAnn.value("streaming").asBoolean();
                     OperationType opType = webhookAnn != null ? OperationType.WEBHOOK
                                          : streamAnn != null ? OperationType.STREAM
+                                         : isStreamingMutation ? OperationType.STREAMING_MUTATION
                                          : queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
                     AnnotationInstance descAnn = webhookAnn != null ? webhookAnn : streamAnn != null ? streamAnn : queryAnn != null ? queryAnn : mutAnn;
                     String desc = descAnn.value() != null ? descAnn.value().asString() : "";
@@ -495,6 +497,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return "";
     }
 
+    private boolean extractAnnotationBooleanValue(javax.lang.model.element.AnnotationMirror am, String attributeName) {
+        for (var entry : am.getElementValues().entrySet()) {
+            if (entry.getKey().getSimpleName().contentEquals(attributeName)) {
+                Object val = entry.getValue().getValue();
+                return val instanceof Boolean b && b;
+            }
+        }
+        return false;
+    }
+
+
     private String typeMirrorToJava(javax.lang.model.type.TypeMirror type) {
         return switch (type.getKind()) {
             case VOID -> "void";
@@ -639,8 +652,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                                                              "io.casehub.platform.api.mcp.PlatformWebhook");
                 if (queryAnn == null && mutAnn == null && streamAnn == null && webhookAnn == null) {continue;}
 
+                boolean isStreamingMut = mutAnn != null && extractAnnotationBooleanValue(mutAnn, "streaming");
                 OperationType opType = webhookAnn != null ? OperationType.WEBHOOK
                                      : streamAnn != null ? OperationType.STREAM
+                                     : isStreamingMut ? OperationType.STREAMING_MUTATION
                                      : queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
                 javax.lang.model.element.AnnotationMirror descAnn = webhookAnn != null ? webhookAnn : streamAnn != null ? streamAnn : queryAnn != null ? queryAnn : mutAnn;
                 String desc = extractAnnotationStringValue(descAnn);
@@ -852,7 +867,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 boolean needsVirtualThread = false;
                 for (ResolvedOperation genOp : toGenerate) {
                     boolean isUni = genOp.returnTypeStr().startsWith("Uni<");
-                    if (genOp.type() != OperationType.STREAM && !isUni) {
+                    if (genOp.type() != OperationType.STREAM && genOp.type() != OperationType.STREAMING_MUTATION && !isUni) {
                         needsVirtualThread = true;
                     }
                 }
@@ -981,7 +996,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     String verb = resolveHttpVerb(genOp.type(), genOp.restMethodOverride());
                     usedVerbs.add(verb);
                     boolean isUni = genOp.returnTypeStr().startsWith("Uni<");
-                    if (genOp.type() != OperationType.STREAM && genOp.type() != OperationType.WEBHOOK && !isUni) {
+                    if (genOp.type() != OperationType.STREAM && genOp.type() != OperationType.STREAMING_MUTATION && genOp.type() != OperationType.WEBHOOK && !isUni) {
                         needsVirtualThread = true;
                     }
                     if (genOp.type() == OperationType.WEBHOOK) {
@@ -1097,6 +1112,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private void generateRestMethod(PrintWriter out, ResolvedOperation op, String restBasePath) {
         if (op.type() == OperationType.STREAM) {
             generateRestStreamMethod(out, op, restBasePath);
+            return;
+        }
+        if (op.type() == OperationType.STREAMING_MUTATION) {
+            generateRestStreamingMutationMethod(out, op, restBasePath);
             return;
         }
         if (op.type() == OperationType.WEBHOOK) {
@@ -1347,6 +1366,108 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         out.println();
     }
 
+    private void generateRestStreamingMutationMethod(PrintWriter out, ResolvedOperation op, String restBasePath) {
+        List<String> pathParams           = new ArrayList<>();
+        Set<Integer> pathParamPositions   = new HashSet<>();
+        Set<Integer> headerParamPositions = new HashSet<>();
+        Set<Integer> queryParamPositions  = new HashSet<>();
+        int          bodyParamIndex       = -1;
+
+        for (int i = 0; i < op.params().size(); i++) {
+            ResolvedParam p = op.params().get(i);
+            if (p.isPathParam()) {
+                pathParams.add(p.pathParamName() != null ? p.pathParamName() : p.name());
+                pathParamPositions.add(i);
+            } else if (p.isHeaderParam()) {
+                headerParamPositions.add(i);
+            } else if (p.isQueryParam()) {
+                queryParamPositions.add(i);
+            } else if (p.isContextParam()) {
+                // handled separately
+            } else if (!p.isSimpleType() && bodyParamIndex < 0) {
+                bodyParamIndex = i;
+            }
+        }
+
+        StringBuilder pathSuffix   = new StringBuilder();
+        String        resolvedPath = resolveRestPath(op.restPathOverride(), op.methodName());
+        if (resolvedPath.startsWith("/")) {
+            pathSuffix.append(resolvedPath);
+        } else {
+            pathSuffix.append("/").append(resolvedPath);
+        }
+        for (String pp : pathParams) {
+            if (!resolvedPath.contains("{" + pp + "}") && !restBasePath.contains("{" + pp + "}")) {
+                pathSuffix.append("/{").append(pp).append("}");
+            }
+        }
+
+        if (!op.description().isEmpty() && isOpenApiAvailable()) {
+            out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
+        }
+        out.println("    @POST");
+        out.println("    @Path(\"" + pathSuffix + "\")");
+        out.println("    @Produces(MediaType.SERVER_SENT_EVENTS)");
+        out.println("    @org.jboss.resteasy.reactive.RestStreamElementType(MediaType.APPLICATION_JSON)");
+        if (bodyParamIndex >= 0) {
+            out.println("    @Consumes(MediaType.APPLICATION_JSON)");
+        }
+
+        StringBuilder params     = new StringBuilder();
+        boolean       firstParam = true;
+        for (int i = 0; i < op.params().size(); i++) {
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {continue;}
+
+            if (!firstParam) {params.append(", ");}
+            firstParam = false;
+
+            if (pathParamPositions.contains(i)) {
+                String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
+                params.append("@jakarta.ws.rs.PathParam(\"").append(pathName).append("\") ");
+            } else if (headerParamPositions.contains(i)) {
+                String headerName = p.headerParamName() != null ? p.headerParamName() : p.name();
+                params.append("@jakarta.ws.rs.HeaderParam(\"").append(headerName).append("\") ");
+            } else if (queryParamPositions.contains(i)) {
+                String qpName = p.restName() != null ? p.restName() : p.name();
+                params.append("@QueryParam(\"").append(qpName).append("\") ");
+            } else if (i == bodyParamIndex) {
+                params.append("@jakarta.validation.Valid ");
+            } else {
+                String qpName = p.restName() != null ? p.restName() : p.name();
+                params.append("@QueryParam(\"").append(qpName).append("\") ");
+            }
+            params.append(p.typeStr()).append(" ").append(p.name());
+        }
+
+        String        returnType = op.returnTypeStr();
+        String        fieldName  = decapitalize(op.declaringClassSimple());
+        StringBuilder args       = new StringBuilder();
+        for (int i = 0; i < op.params().size(); i++) {
+            if (i > 0) {args.append(", ");}
+            ResolvedParam p = op.params().get(i);
+            if (p.isContextParam()) {
+                args.append(contextParamResolution(p.contextParamKey()));
+            } else {
+                args.append(p.name());
+            }
+        }
+
+        String delegateCall;
+        if (returnType.startsWith("Flow.Publisher<") || returnType.startsWith("java.util.concurrent.Flow.Publisher<")) {
+            String typeArg = extractTypeArgument(returnType);
+            returnType   = "io.smallrye.mutiny.Multi<" + typeArg + ">";
+            delegateCall = "io.smallrye.mutiny.Multi.createFrom().publisher(" + fieldName + "." + op.methodName() + "(" + args + "))";
+        } else {
+            delegateCall = fieldName + "." + op.methodName() + "(" + args + ")";
+        }
+        out.println("    public " + returnType + " " + op.methodName() + "(" + params + ") {");
+        out.println("        return " + delegateCall + ";");
+        out.println("    }");
+        out.println();
+    }
+
+
     private static String extractTypeArgument(String parameterizedType) {
         int start = parameterizedType.indexOf('<');
         int end = parameterizedType.lastIndexOf('>');
@@ -1568,7 +1689,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private void generateMethod(PrintWriter out, ResolvedOperation op) {
-        if (op.type() == OperationType.STREAM) {
+        if (op.type() == OperationType.STREAM || op.type() == OperationType.STREAMING_MUTATION) {
             generateGraphQLStreamMethod(out, op);
             return;
         }
@@ -1870,7 +1991,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
         return switch (type) {
             case QUERY, STREAM -> "GET";
-            case MUTATION, WEBHOOK -> "POST";
+            case MUTATION, STREAMING_MUTATION, WEBHOOK -> "POST";
         };
     }
 
@@ -2004,7 +2125,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
 
-    enum OperationType {QUERY, MUTATION, STREAM, WEBHOOK}
+    enum OperationType {QUERY, MUTATION, STREAM, STREAMING_MUTATION, WEBHOOK}
 
     enum Source {JANDEX, ROUND_ENV}
 

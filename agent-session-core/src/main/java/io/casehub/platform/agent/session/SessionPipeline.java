@@ -109,6 +109,12 @@ public class SessionPipeline implements SessionRegistry {
         return sessions.size();
     }
 
+    @Override
+    public java.util.Optional<AgentSession> get(String id) {
+        return java.util.Optional.ofNullable(sessions.get(id));
+    }
+
+
     public ManagedSession sessionFor(String id) {
         ManagedSession session = sessions.get(id);
         if (session == null) {

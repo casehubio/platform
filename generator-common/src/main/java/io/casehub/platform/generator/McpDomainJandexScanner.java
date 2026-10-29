@@ -93,8 +93,10 @@ public class McpDomainJandexScanner {
 
                 if (queryAnn == null && mutAnn == null && streamAnn == null && webhookAnn == null) { continue; }
 
+                boolean isStreamingMut = mutAnn != null && mutAnn.value("streaming") != null && mutAnn.value("streaming").asBoolean();
                 OperationType opType = webhookAnn != null ? OperationType.WEBHOOK
                         : streamAnn != null ? OperationType.STREAM
+                        : isStreamingMut ? OperationType.STREAMING_MUTATION
                         : queryAnn != null ? OperationType.QUERY : OperationType.MUTATION;
                 AnnotationInstance descAnn = webhookAnn != null ? webhookAnn
                         : streamAnn != null ? streamAnn : queryAnn != null ? queryAnn : mutAnn;

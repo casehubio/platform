@@ -77,7 +77,7 @@ public class SpringDomainRestControllerWriter {
         classBuilder.addMethod(ctorBuilder.build());
 
         for (ResolvedOperation op : domain.operations()) {
-            if (op.type() == OperationType.STREAM) {
+            if (op.type() == OperationType.STREAM || op.type() == OperationType.STREAMING_MUTATION) {
                 classBuilder.addMethod(buildStreamMethod(op, fieldName, domain.resolvedBasePath()));
             } else if (op.type() == OperationType.WEBHOOK) {
                 classBuilder.addMethod(buildWebhookMethod(op, fieldName, domain.resolvedBasePath()));
@@ -221,11 +221,21 @@ public class SpringDomainRestControllerWriter {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(op.methodName())
                                                .addModifiers(Modifier.PUBLIC)
                                                .returns(SSE_EMITTER)
-                                               .addAnnotation(AnnotationSpec.builder(GET_MAPPING)
+                                               .addAnnotation(AnnotationSpec.builder(op.type() == OperationType.STREAMING_MUTATION ? POST_MAPPING : GET_MAPPING)
                                                                             .addMember("value", "$S", pathSuffix.toString())
                                                                             .addMember("produces", "$T.TEXT_EVENT_STREAM_VALUE", MEDIA_TYPE)
                                                                             .build());
 
+        boolean isPostStream = op.type() == OperationType.STREAMING_MUTATION;
+        int bodyParamIdx = -1;
+        if (isPostStream) {
+            for (int i = 0; i < op.params().size(); i++) {
+                ResolvedParam p = op.params().get(i);
+                if (!p.isPathParam() && !p.isContextParam() && !p.isSimpleType() && bodyParamIdx < 0) {
+                    bodyParamIdx = i;
+                }
+            }
+        }
         for (int i = 0; i < op.params().size(); i++) {
             ResolvedParam p = op.params().get(i);
             if (p.isContextParam()) {continue;}
@@ -234,6 +244,8 @@ public class SpringDomainRestControllerWriter {
                 String pathName = p.pathParamName() != null ? p.pathParamName() : p.name();
                 paramBuilder.addAnnotation(AnnotationSpec.builder(PATH_VARIABLE)
                                                          .addMember("value", "$S", pathName).build());
+            } else if (isPostStream && i == bodyParamIdx) {
+                paramBuilder.addAnnotation(AnnotationSpec.builder(ClassName.get("org.springframework.web.bind.annotation", "RequestBody")).build());
             } else {
                 String qpName = p.restName() != null ? p.restName() : p.name();
                 paramBuilder.addAnnotation(AnnotationSpec.builder(REQUEST_PARAM)

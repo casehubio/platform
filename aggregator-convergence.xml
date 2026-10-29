@@ -21,6 +21,7 @@
     <module>agent-api</module>
     <module>agent-http-core</module>
     <module>agent-router-core</module>
+    <module>agent-session-core</module>
     <module>mcp-core</module>
     <module>drift-detection</module>
     <!-- Platform module (depends on agents, callbacks, yaml) -->

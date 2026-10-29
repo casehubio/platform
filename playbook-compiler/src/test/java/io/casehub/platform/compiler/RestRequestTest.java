@@ -71,6 +71,44 @@ class RestRequestTest {
         assertThat(result.coordinationSpec().isEmpty()).isTrue();
     }
 
+
+    @Test
+    void restRequest_expressionVariableInUrl() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("rest-request", Map.of(
+                        "method", "GET",
+                        "url", "https://api.example.com/contractors/${input.contractorName}"))));
+
+        var outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+
+        var result = ((CompilationOutcome.Success) outcome).result();
+        var task = result.workflow().getDo().getFirst().getTask();
+        var httpArgs = task.getCallTask().getCallHTTP().getWith();
+        assertThat(httpArgs.getMethod()).isEqualTo("GET");
+        assertThat(httpArgs.getEndpoint().getUriTemplate().getLiteralUriTemplate())
+                .isEqualTo("https://api.example.com/contractors/${input.contractorName}");
+    }
+
+    @Test
+    void restRequest_pureExpressionUrl() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("rest-request", Map.of(
+                        "method", "POST",
+                        "url", "${config.apiBaseUrl}",
+                        "body", Map.of("key", "value")))));
+
+        var outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+
+        var result = ((CompilationOutcome.Success) outcome).result();
+        var task = result.workflow().getDo().getFirst().getTask();
+        var httpArgs = task.getCallTask().getCallHTTP().getWith();
+        assertThat(httpArgs.getEndpoint().getRuntimeExpression())
+                .isEqualTo("${config.apiBaseUrl}");
+    }
+
+
     @Test
     void decoratedRestRequest_retryAndTimeout() {
         var step = new LinkedHashMap<String, Object>();

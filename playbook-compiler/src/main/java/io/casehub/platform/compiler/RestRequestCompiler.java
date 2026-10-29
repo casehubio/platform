@@ -8,7 +8,6 @@ import io.serverlessworkflow.api.types.Task;
 import io.serverlessworkflow.api.types.TaskItem;
 import io.serverlessworkflow.api.types.UriTemplate;
 
-import java.net.URI;
 import java.util.Map;
 
 class RestRequestCompiler implements StepCompiler {
@@ -22,8 +21,13 @@ class RestRequestCompiler implements StepCompiler {
         String method = String.valueOf(config.getOrDefault("method", "GET"));
         String url = String.valueOf(config.get("url"));
 
-        var uriTemplate = new UriTemplate().withLiteralUri(URI.create(url));
-        var endpoint = new Endpoint().withUriTemplate(uriTemplate);
+        Endpoint endpoint;
+        if (url.matches("^\\s*\\$\\{.+}\\s*$")) {
+            endpoint = new Endpoint().withRuntimeExpression(url.strip());
+        } else {
+            var uriTemplate = new UriTemplate().withLiteralUriTemplate(url);
+            endpoint = new Endpoint().withUriTemplate(uriTemplate);
+        }
         var httpArgs = new HTTPArguments(method, endpoint);
 
         if (config.containsKey("body")) {

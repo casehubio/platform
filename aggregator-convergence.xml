@@ -17,10 +17,12 @@
   <name>CaseHub :: Platform :: Convergence (Spring)</name>
 
   <modules>
-    <!-- Agent API + REST/router modules — built in Slice A but needed here for compilation -->
+    <!-- Modules built in slices but needed here as dependencies of convergence modules -->
     <module>agent-api</module>
     <module>agent-http-core</module>
     <module>agent-router-core</module>
+    <module>mcp-core</module>
+    <module>drift-detection</module>
     <!-- Platform module (depends on agents, callbacks, yaml) -->
     <module>platform</module>
     <!-- Governance modules — needed here because spring-generator reads Jandex from

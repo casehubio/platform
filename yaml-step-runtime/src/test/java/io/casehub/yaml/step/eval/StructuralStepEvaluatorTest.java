@@ -580,6 +580,7 @@ class StructuralStepEvaluatorTest {
     // ── SelectStep ──────────────────────────────────────────────────
 
     @Nested
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     class SelectStepTests {
 
         @Test

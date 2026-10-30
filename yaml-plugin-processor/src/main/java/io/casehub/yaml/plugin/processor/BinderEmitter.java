@@ -83,7 +83,7 @@ class BinderEmitter {
         }
     }
 
-    private String paramExtraction(String type, String fieldName) {
+    static String paramExtraction(String type, String fieldName) {
         return switch (type) {
             case "int" -> "((Number) parameters.getOrDefault(\"" + fieldName + "\", 0)).intValue()";
             case "long" -> "((Number) parameters.getOrDefault(\"" + fieldName + "\", 0L)).longValue()";

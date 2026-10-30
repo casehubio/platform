@@ -65,6 +65,7 @@ public final class Walker {
         Set<String>        seenNames = new java.util.HashSet<>();
         List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames);
         validateBarrierQuorumReferences(result, seenNames);
+        result = io.casehub.yaml.step.eval.FusionPass.fuse(result, registry);
         return result;
     }
 

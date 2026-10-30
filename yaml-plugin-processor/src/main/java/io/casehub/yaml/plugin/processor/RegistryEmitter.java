@@ -23,7 +23,20 @@ class RegistryEmitter {
             w.println("  \"pluginClass\": \"" + model.pluginClass().getQualifiedName() + "\",");
             w.println("  \"actionClass\": \"" + actionFqcn + "\",");
             w.println("  \"portability\": \"" + model.portability() + "\",");
-            w.println("  \"schemaResource\": \"META-INF/yaml-plugins/" + model.name() + ".schema.json\"");
+            w.print("  \"schemaResource\": \"META-INF/yaml-plugins/" + model.name() + ".schema.json\"");
+            if (model.streaming()) {
+                w.println(",");
+                w.println("  \"streaming\": {");
+                w.println("    \"inputType\": \"" + model.streamingInputType() + "\",");
+                w.println("    \"outputType\": \"" + model.streamingOutputType() + "\",");
+                w.println("    \"inputKey\": \"" + model.streamingInputKey() + "\",");
+                String streamingStepFqcn = model.pluginClass().getEnclosingElement().toString()
+                    + "." + model.pluginClass().getSimpleName() + "StreamingStep";
+                w.println("    \"streamingStepClass\": \"" + streamingStepFqcn + "\"");
+                w.println("  }");
+            } else {
+                w.println();
+            }
             w.println("}");
         }
     }

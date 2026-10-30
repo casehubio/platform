@@ -3,6 +3,7 @@ package io.casehub.yaml.plugin.api;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public record Definition(
         String name,
@@ -11,7 +12,8 @@ public record Definition(
         Map<String, Parameter> outputs,
         Portability portability,
         Action action,
-        String capability) {
+        String capability,
+        Optional<StreamingTypeInfo> streamingType) {
 
     public Definition {
         if (name == null || name.isBlank()) {throw new IllegalArgumentException("Definition requires a name");}
@@ -20,6 +22,13 @@ public record Definition(
         if (portability == null) {portability = Portability.JAVA;}
         if (action == null) {throw new IllegalArgumentException("Definition requires an action");}
         if (capability == null || capability.isBlank()) {capability = "steps";}
+        if (streamingType == null) {streamingType = Optional.empty();}
+    }
+
+    public Definition(String name, String description,
+                      Map<String, Parameter> inputs, Map<String, Parameter> outputs,
+                      Portability portability, Action action, String capability) {
+        this(name, description, inputs, outputs, portability, action, capability, Optional.empty());
     }
 
     public static Builder of(String name) {return new Builder(name);}
@@ -27,11 +36,12 @@ public record Definition(
     public static final class Builder {
         private final String                           name;
         private       String                           description;
-        private final LinkedHashMap<String, Parameter> inputs      = new LinkedHashMap<>();
-        private final LinkedHashMap<String, Parameter> outputs     = new LinkedHashMap<>();
-        private       Portability                      portability = Portability.JAVA;
+        private final LinkedHashMap<String, Parameter> inputs         = new LinkedHashMap<>();
+        private final LinkedHashMap<String, Parameter> outputs        = new LinkedHashMap<>();
+        private       Portability                      portability    = Portability.JAVA;
         private       Action                           action;
         private       String                           capability;
+        private       Optional<StreamingTypeInfo>      streamingType  = Optional.empty();
 
         private Builder(String name)                   {this.name = name;}
 
@@ -75,11 +85,16 @@ public record Definition(
                                                                 return this;
                                                             }
 
+        public Builder streamingType(StreamingTypeInfo info) {
+                                                                 this.streamingType = Optional.ofNullable(info);
+                                                                 return this;
+                                                             }
+
         public Definition build() {
             return new Definition(name, description,
                                   Collections.unmodifiableMap(new LinkedHashMap<>(inputs)),
                                   Collections.unmodifiableMap(new LinkedHashMap<>(outputs)),
-                                  portability, action, capability);
+                                  portability, action, capability, streamingType);
         }
     }
 }

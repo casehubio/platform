@@ -69,17 +69,58 @@ public class StepPluginProcessor extends AbstractProcessor {
 
         ExecutableElement executeMethod = executeMethods.get(0);
         TypeMirror returnType = executeMethod.getReturnType();
-        if (!returnType.toString().equals(Result.class.getCanonicalName())) {
-            error(executeMethod, "@Execute method must return Result, found " + returnType);
-            return null;
+        boolean streaming = annotation.streaming();
+
+        if (streaming) {
+            if (returnType.getKind() == javax.lang.model.type.TypeKind.VOID) {
+                error(executeMethod, "@Plugin(streaming=true) @Execute method must not return void");
+                return null;
+            }
+            if (returnType.toString().equals(Result.class.getCanonicalName())) {
+                error(executeMethod, "@Plugin(streaming=true) @Execute method must return the typed output, not Result");
+                return null;
+            }
+            if (executeMethod.getParameters().isEmpty()) {
+                error(executeMethod, "@Plugin(streaming=true) @Execute method must have at least one parameter (the streaming input)");
+                return null;
+            }
+            var firstParamType = executeMethod.getParameters().get(0).asType();
+            if (firstParamType instanceof javax.lang.model.type.DeclaredType dt && !dt.getTypeArguments().isEmpty()) {
+                error(executeMethod, "@Plugin(streaming=true) first parameter must be a non-generic concrete class, found " + firstParamType);
+                return null;
+            }
+        } else {
+            if (!returnType.toString().equals(Result.class.getCanonicalName())) {
+                error(executeMethod, "@Execute method must return Result, found " + returnType);
+                return null;
+            }
         }
 
         List<RecordComponentElement> fields = new ArrayList<>(typeElement.getRecordComponents());
+
+        String streamingInputType = null;
+        String streamingOutputType = null;
+        String streamingInputKey = null;
         List<PluginModel.ServiceParam> serviceParams = new ArrayList<>();
-        for (var param : executeMethod.getParameters()) {
-            serviceParams.add(new PluginModel.ServiceParam(
-                param.asType().toString(),
-                param.asType().toString()));
+
+        if (streaming) {
+            var firstParam = executeMethod.getParameters().get(0);
+            streamingInputType = firstParam.asType().toString();
+            streamingOutputType = returnType.toString();
+            streamingInputKey = BinderEmitter.toKebabCase(firstParam.getSimpleName().toString());
+
+            for (int i = 1; i < executeMethod.getParameters().size(); i++) {
+                var param = executeMethod.getParameters().get(i);
+                serviceParams.add(new PluginModel.ServiceParam(
+                    param.asType().toString(),
+                    param.asType().toString()));
+            }
+        } else {
+            for (var param : executeMethod.getParameters()) {
+                serviceParams.add(new PluginModel.ServiceParam(
+                    param.asType().toString(),
+                    param.asType().toString()));
+            }
         }
 
         RequiresConfirmation confirmationAnn = executeMethod.getAnnotation(RequiresConfirmation.class);
@@ -89,13 +130,18 @@ public class StepPluginProcessor extends AbstractProcessor {
         return new PluginModel(annotation.value(), annotation.description(),
             annotation.portability().name(), annotation.capability(),
             typeElement, fields, executeMethod, serviceParams,
-            requiresConfirmation, confirmationSummary);
+            requiresConfirmation, confirmationSummary,
+            streaming, streamingInputType, streamingOutputType, streamingInputKey);
     }
 
     private void generate(PluginModel model) {
         try {
             new SchemaEmitter().emit(model, processingEnv.getFiler());
-            new BinderEmitter().emit(model, processingEnv.getFiler());
+            if (model.streaming()) {
+                new StreamBinderEmitter().emit(model, processingEnv.getFiler());
+            } else {
+                new BinderEmitter().emit(model, processingEnv.getFiler());
+            }
             new RegistryEmitter().emit(model, processingEnv.getFiler());
         } catch (Exception e) {
             error(model.pluginClass(),

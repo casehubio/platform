@@ -2,14 +2,14 @@ package io.casehub.platform.compiler;
 
 import io.casehub.yaml.core.orchestration.DurationParser;
 import io.casehub.yaml.core.playbook.PlaybookDocument;
-import io.serverlessworkflow.api.types.Document;
 import io.serverlessworkflow.api.types.DoTask;
+import io.serverlessworkflow.api.types.Document;
 import io.serverlessworkflow.api.types.FlowDirective;
 import io.serverlessworkflow.api.types.FlowDirectiveEnum;
+import io.serverlessworkflow.api.types.Retry;
 import io.serverlessworkflow.api.types.RetryLimit;
 import io.serverlessworkflow.api.types.RetryLimitAttempt;
 import io.serverlessworkflow.api.types.RetryPolicy;
-import io.serverlessworkflow.api.types.Retry;
 import io.serverlessworkflow.api.types.SetTask;
 import io.serverlessworkflow.api.types.SwitchCase;
 import io.serverlessworkflow.api.types.SwitchItem;
@@ -54,6 +54,18 @@ public final class PlaybookCompiler {
     public void register(String stepType, StepCompiler compiler) {
         registry.put(stepType, compiler);
     }
+
+    private io.casehub.yaml.plugin.api.PluginRegistry pluginRegistry;
+
+    public PlaybookCompiler(io.casehub.yaml.plugin.api.PluginRegistry pluginRegistry) {
+        this();
+        this.pluginRegistry = pluginRegistry;
+    }
+
+    public java.util.Optional<io.casehub.yaml.plugin.api.PluginRegistry> pluginRegistry() {
+        return java.util.Optional.ofNullable(pluginRegistry);
+    }
+
 
     public CompilationOutcome compile(PlaybookDocument doc) {
         String name = doc.hasPlaybookHeader() && doc.frontMatter().name() != null

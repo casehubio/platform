@@ -7,6 +7,9 @@ import io.casehub.yaml.plugin.api.Parameter;
 import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Portability;
+import io.casehub.yaml.plugin.api.StreamingStep;
+import io.casehub.yaml.plugin.api.StreamingStepFactory;
+import io.casehub.yaml.plugin.api.StreamingTypeInfo;
 
 import java.io.File;
 import java.io.IOException;
@@ -127,6 +130,22 @@ public class AptPluginSource {
             }
         }
 
+        Map<String, Object> streaming = (Map<String, Object>) manifest.get("streaming");
+        if (streaming != null) {
+            String inputTypeName = (String) streaming.get("inputType");
+            String outputTypeName = (String) streaming.get("outputType");
+            String inputKey = (String) streaming.get("inputKey");
+            String streamingStepClassName = (String) streaming.get("streamingStepClass");
+            try {
+                Class<?> inputType = Class.forName(inputTypeName);
+                Class<?> outputType = Class.forName(outputTypeName);
+                builder.streamingType(new StreamingTypeInfo(inputType, outputType, inputKey,
+                    loadStreamingStepFactory(streamingStepClassName, actionClass)));
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException("Failed to load streaming types for plugin: " + name, e);
+            }
+        }
+
         return builder.build();
     }
 
@@ -138,4 +157,49 @@ public class AptPluginSource {
             throw new IllegalStateException("Failed to instantiate StepAction: " + className, e);
         }
     }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private StreamingStepFactory<?, ?> loadStreamingStepFactory(String streamingStepClassName, String actionClassName) {
+        try {
+            Class<?> stepClass    = Class.forName(streamingStepClassName);
+            var      constructors = stepClass.getDeclaredConstructors();
+            return (params, services) -> {
+                try {
+                    var ctor       = constructors[0];
+                    var paramTypes = ctor.getParameterTypes();
+                    var args       = new Object[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        args[i] = params.get(toKebabCase(ctor.getParameters()[i].getName()));
+                        if (args[i] == null && !paramTypes[i].isPrimitive()) {
+                            try {args[i] = services.lookup(paramTypes[i]);} catch (Exception e) {
+                                java.util.logging.Logger.getLogger(AptPluginSource.class.getName())
+                                    .fine("No param or service for " + ctor.getParameters()[i].getName() + ": " + e.getMessage());
+                            }
+                        }
+                    }
+                    return (StreamingStep) ctor.newInstance(args);
+                } catch (Exception e) {
+                    throw new IllegalStateException("Failed to create streaming step: " + streamingStepClassName, e);
+                }
+            };
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to load streaming step class: " + streamingStepClassName, e);
+        }
+    }
+
+    private static String toKebabCase(String camelCase) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < camelCase.length(); i++) {
+            char c = camelCase.charAt(i);
+            if (Character.isUpperCase(c) && i > 0) {
+                sb.append('-');
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+
 }

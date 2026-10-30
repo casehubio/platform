@@ -24,6 +24,7 @@ public final class StructuralStepEvaluator {
     private final ConditionEvaluator conditionEvaluator;
     private final ExecutionScope     scope;
     private final DecoratorChain     decoratorChain;
+    private final io.casehub.yaml.core.runtime.SpeedMultiplier speedMultiplier;
     private final io.casehub.yaml.core.resolver.ObjectVariableSource resultSource;
     private final java.util.concurrent.ConcurrentHashMap<String, java.util.List<io.casehub.yaml.core.orchestration.OrcLatch>> stepLatches = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
@@ -36,8 +37,8 @@ public final class StructuralStepEvaluator {
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
-        this.decoratorChain     = new DecoratorChain(conditionEvaluator,
-                                                     io.casehub.yaml.core.runtime.SpeedMultiplier.identity(), scope);
+        this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
+        this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
     }
 
@@ -114,8 +115,105 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.RaceStep r -> evaluateRace(r, ctx, runner);
             case ResolvedStep.PluginStep ps -> runner.run(ps, ctx.resolver());
             case ResolvedStep.InvokeStep is -> runner.run(is, ctx.resolver());
+            case ResolvedStep.FusedPipelineStep fps -> evaluateFusedPipeline(fps, ctx, runner);
         };
     }
+
+    private Result evaluateFusedPipeline(ResolvedStep.FusedPipelineStep fps, StepContext ctx, StepRunner runner) {
+        var stages = fps.stages();
+        if (stages.isEmpty()) {
+            return Result.of(Map.of());
+        }
+
+        try {
+            var resolvedSteps  = new java.util.ArrayList<io.casehub.yaml.plugin.api.StreamingStep<?, ?>>();
+            var resolvedParams = new java.util.ArrayList<Map<String, Object>>();
+            var services       = new io.casehub.yaml.plugin.api.MapServiceRegistry();
+
+            for (var stage : stages) {
+                Map<String, Object> params = stage.params();
+                if (ctx.resolver() != null) {
+                    Map<String, Object> resolved = new java.util.LinkedHashMap<>();
+                    for (var entry : params.entrySet()) {
+                        if (entry.getValue() instanceof String s) {
+                            resolved.put(entry.getKey(), ctx.resolver().resolveString(s, stage.stepName()));
+                        } else {
+                            resolved.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    params = resolved;
+                }
+                resolvedParams.add(params);
+                resolvedSteps.add(stage.factory().create(params, services));
+            }
+
+            // Extract first step's input using inputKey
+            String inputKey = stages.get(0).inputKey();
+            Object input    = resolvedParams.get(0).get(inputKey);
+
+            // Build composed function with inline decorators
+            var sm = this.speedMultiplier;
+
+            Object lastIntermediate = null;
+            Object current          = input;
+            for (int i = 0; i < resolvedSteps.size(); i++) {
+                @SuppressWarnings("unchecked")
+                var step = (io.casehub.yaml.plugin.api.StreamingStep<Object, Object>) resolvedSteps.get(i);
+
+                java.util.function.Function<Object, Object> fn = step::apply;
+
+                // Apply per-step fusible decorators
+                Map<String, Object> decs = stages.get(i).decorators();
+                if (!decs.isEmpty()) {
+                    if (decs.containsKey("timeout")) {
+                        java.time.Duration timeout = io.casehub.yaml.core.orchestration.DurationParser.parse(
+                                String.valueOf(decs.get("timeout")));
+                        fn = InlineDecoratorWrappers.withTimeout(fn, timeout, sm);
+                    }
+                    if (decs.containsKey("retry")) {
+                        Object             retryVal = decs.get("retry");
+                        int                max      = 3;
+                        String             backoff  = "fixed";
+                        java.time.Duration delay    = java.time.Duration.ofSeconds(1);
+                        if (retryVal instanceof Map<?, ?> rm) {
+                            if (rm.containsKey("max")) {max = ((Number) rm.get("max")).intValue();}
+                            if (rm.containsKey("backoff")) {backoff = String.valueOf(rm.get("backoff"));}
+                            if (rm.containsKey("delay")) {
+                                delay = io.casehub.yaml.core.orchestration.DurationParser.parse(String.valueOf(rm.get("delay")));
+                            }
+                        }
+                        fn = InlineDecoratorWrappers.withRetry(fn, max, delay, backoff, sm);
+                    }
+                    if (decs.containsKey("delay")) {
+                        java.time.Duration d = io.casehub.yaml.core.orchestration.DurationParser.parse(
+                                String.valueOf(decs.get("delay")));
+                        fn = InlineDecoratorWrappers.withDelay(fn, d, sm);
+                    }
+                }
+
+                try {
+                    current          = fn.apply(current);
+                    lastIntermediate = current;
+                } catch (Exception e) {
+                    if (lastIntermediate instanceof AutoCloseable ac) {
+                        try {ac.close();} catch (Exception suppressed) {e.addSuppressed(suppressed);}
+                    } else if (i == 0 && input instanceof AutoCloseable ac) {
+                        try {ac.close();} catch (Exception suppressed) {e.addSuppressed(suppressed);}
+                    }
+                    var chainEx = new FusedChainException(
+                            stages.get(i).stepName(), stages.get(i).actionName(),
+                            i, fps.name(), e);
+                    return Result.failed(chainEx.getMessage(), e.getClass().getSimpleName());
+                }
+            }
+
+            return Result.of(Map.of(io.casehub.yaml.plugin.api.StreamingStep.OUTPUT_KEY, current));
+
+        } catch (Exception e) {
+            return Result.failed("Fused chain assembly failed: " + e.getMessage());
+        }
+    }
+
 
     private Result evaluateBlock(ResolvedStep.BlockStep block,
                                  StepContext ctx, StepRunner runner) {

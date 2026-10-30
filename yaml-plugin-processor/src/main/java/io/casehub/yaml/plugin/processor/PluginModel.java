@@ -15,7 +15,11 @@ record PluginModel(
         ExecutableElement executeMethod,
         List<ServiceParam> serviceParams,
         boolean requiresConfirmation,
-        String confirmationSummary
+        String confirmationSummary,
+        boolean streaming,
+        String streamingInputType,
+        String streamingOutputType,
+        String streamingInputKey
 ) {
     record ServiceParam(String typeName, String qualifiedTypeName) {}
 }

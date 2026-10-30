@@ -1,5 +1,6 @@
 package io.casehub.yaml.step.catalog;
 
+import io.casehub.yaml.plugin.api.StreamingStepFactory;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +16,8 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.BarrierStep,
                                      ResolvedStep.QuorumStep,
                                      ResolvedStep.ControlStep,
-                                     ResolvedStep.RaceStep {
+                                     ResolvedStep.RaceStep,
+                                     ResolvedStep.FusedPipelineStep {
 
     Map<String, Object> decorators();
 
@@ -207,6 +209,30 @@ public sealed interface ResolvedStep permits
                 throw new IllegalArgumentException("race requires at least 2 branches");
             }
             branches   = List.copyOf(branches);
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record FusedStageDescriptor(
+            String stepName,
+            String actionName,
+            Map<String, Object> params,
+            Map<String, Object> decorators,
+            String inputKey,
+            StreamingStepFactory<?, ?> factory
+    ) {
+        public FusedStageDescriptor {
+            params     = Map.copyOf(params);
+            decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record FusedPipelineStep(
+            String name,
+            List<FusedStageDescriptor> stages,
+            Map<String, Object> decorators) implements ResolvedStep {
+        public FusedPipelineStep {
+            stages     = List.copyOf(stages);
             decorators = Map.copyOf(decorators);
         }
     }

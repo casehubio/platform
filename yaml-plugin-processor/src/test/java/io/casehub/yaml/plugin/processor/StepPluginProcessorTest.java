@@ -149,4 +149,70 @@ class StepPluginProcessorTest {
 
         assertThat(content).contains("\"capability\": \"orchestration\"");
     }
+
+    @Test
+    void streamingPluginCompiles() {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+    }
+
+    @Test
+    void streamingPluginGeneratesStreamingStepAndAction() {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        assertThat(compilation).generatedSourceFile("test.plugins.StreamingPluginStreamingStep");
+        assertThat(compilation).generatedSourceFile("test.plugins.StreamingPluginAction");
+    }
+
+    @Test
+    void streamingPluginGeneratesCorrectTypeTokens() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        JavaFileObject generated = compilation.generatedSourceFile("test.plugins.StreamingPluginStreamingStep").get();
+        String         source    = generated.getCharContent(false).toString();
+        assertThat(source).contains("implements StreamingStep<java.lang.String, java.lang.String>");
+        assertThat(source).contains("java.lang.String.class");
+    }
+
+    @Test
+    void streamingPluginWithConfigGeneratesCorrectTypes() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingWithConfigPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        JavaFileObject generated = compilation.generatedSourceFile("test.plugins.StreamingWithConfigPluginStreamingStep").get();
+        String         source    = generated.getCharContent(false).toString();
+        assertThat(source).contains("implements StreamingStep<java.io.InputStream, java.io.InputStream>");
+        assertThat(source).contains("java.io.InputStream.class");
+    }
+
+    @Test
+    void streamingPluginManifestIncludesStreamingMetadata() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        JavaFileObject manifest = compilation.generatedFile(StandardLocation.CLASS_OUTPUT,
+                                                            "META-INF/yaml-plugins/uppercase-stream.json").get();
+        String json = manifest.getCharContent(false).toString();
+        assertThat(json).contains("\"streaming\"");
+        assertThat(json).contains("\"inputType\": \"java.lang.String\"");
+        assertThat(json).contains("\"outputType\": \"java.lang.String\"");
+        assertThat(json).contains("\"inputKey\": \"input\"");
+    }
+
+    @Test
+    void streamingPluginWithVoidReturnFails() {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/StreamingVoidPlugin.java"));
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("must not return void");
+    }
 }

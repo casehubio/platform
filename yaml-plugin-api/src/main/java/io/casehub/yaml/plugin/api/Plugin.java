@@ -15,4 +15,6 @@ public @interface Plugin {
 
 
     String capability() default "steps";
+
+    boolean streaming() default false;
 }

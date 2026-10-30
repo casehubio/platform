@@ -42,15 +42,7 @@ public final class DecoratorChain {
     }
 
     private static long computeDelay(Duration baseDelay, String backoff, int attempt) {
-        long base = baseDelay.toMillis();
-        return switch (backoff) {
-            case "exponential" -> base * (1L << attempt);
-            case "exponential-with-jitter" -> {
-                long exp = base * (1L << attempt);
-                yield exp + (long) (Math.random() * exp);
-            }
-            default -> base;
-        };
+        return InlineDecoratorWrappers.computeDelay(baseDelay.toMillis(), backoff, attempt);
     }
 
     public DecoratedExecution apply(Map<String, Object> decorators, DecoratedExecution inner) {

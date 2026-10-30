@@ -11,7 +11,9 @@ import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Required;
 import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.plugin.api.ServiceRegistry;
+import io.casehub.yaml.plugin.api.StreamingStep;
+import io.casehub.yaml.plugin.api.StreamingStepFactory;
+import io.casehub.yaml.plugin.api.StreamingTypeInfo;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -39,7 +41,11 @@ public class PluginScanner {
         Map<String, Parameter> inputs = buildInputs(pluginClass);
 
         Action action = createAction(pluginClass, executeMethod, inputs);
-        registry.register(new Definition(name, description, inputs, Map.of(), portability, action, capability));
+        java.util.Optional<StreamingTypeInfo> streamingType = java.util.Optional.empty();
+        if (annotation.streaming()) {
+            streamingType = buildStreamingTypeInfo(pluginClass, executeMethod);
+        }
+        registry.register(new Definition(name, description, inputs, Map.of(), portability, action, capability, streamingType));
     }
 
     private Method findExecuteMethod(Class<?> pluginClass) {
@@ -97,6 +103,60 @@ public class PluginScanner {
             }
         };
     }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private java.util.Optional<StreamingTypeInfo> buildStreamingTypeInfo(Class<?> pluginClass, Method executeMethod) {
+        java.lang.reflect.Parameter[] params = executeMethod.getParameters();
+        if (params.length == 0) {return java.util.Optional.empty();}
+
+        Class<?> inputType  = params[0].getType();
+        Class<?> outputType = executeMethod.getReturnType();
+        String   inputKey   = toKebabCase(params[0].getName());
+
+        StreamingStepFactory<?, ?> factory = (resolvedParams, services) -> {
+            try {
+                RecordComponent[] components = pluginClass.getRecordComponents();
+                Object[]          ctorArgs   = new Object[components.length];
+                Class<?>[]        ctorTypes  = new Class<?>[components.length];
+                for (int i = 0; i < components.length; i++) {
+                    ctorTypes[i] = components[i].getType();
+                    ctorArgs[i]  = extractParam(resolvedParams, toKebabCase(components[i].getName()), components[i].getType());
+                }
+                Constructor<?> ctor     = pluginClass.getDeclaredConstructor(ctorTypes);
+                Object         instance = ctor.newInstance(ctorArgs);
+
+                Object[] serviceArgs = new Object[params.length - 1];
+                for (int i = 1; i < params.length; i++) {
+                    serviceArgs[i - 1] = services.lookup(params[i].getType());
+                }
+
+                return new StreamingStep() {
+                    @Override
+                    public Class inputType()  {return inputType;}
+
+                    @Override
+                    public Class outputType() {return outputType;}
+
+                    @Override
+                    public Object apply(Object input) {
+                        try {
+                            Object[] allArgs = new Object[params.length];
+                            allArgs[0] = input;
+                            System.arraycopy(serviceArgs, 0, allArgs, 1, serviceArgs.length);
+                            return executeMethod.invoke(instance, allArgs);
+                        } catch (Exception e) {
+                            throw new RuntimeException("Streaming step execution failed", e);
+                        }
+                    }
+                };
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to create streaming step for " + pluginClass.getName(), e);
+            }
+        };
+
+        return java.util.Optional.of(new StreamingTypeInfo(inputType, outputType, inputKey, factory));
+    }
+
 
     private Object extractParam(Map<String, Object> params, String key, Class<?> type) {
         Object value = params.get(key);

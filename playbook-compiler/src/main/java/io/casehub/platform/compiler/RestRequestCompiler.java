@@ -8,6 +8,7 @@ import io.serverlessworkflow.api.types.Task;
 import io.serverlessworkflow.api.types.TaskItem;
 import io.serverlessworkflow.api.types.UriTemplate;
 
+import java.net.URI;
 import java.util.Map;
 
 class RestRequestCompiler implements StepCompiler {
@@ -25,7 +26,12 @@ class RestRequestCompiler implements StepCompiler {
         if (url.matches("^\\s*\\$\\{.+}\\s*$")) {
             endpoint = new Endpoint().withRuntimeExpression(url.strip());
         } else {
-            var uriTemplate = new UriTemplate().withLiteralUriTemplate(url);
+            UriTemplate uriTemplate;
+            try {
+                uriTemplate = new UriTemplate().withLiteralUriTemplate(url);
+            } catch (IllegalArgumentException e) {
+                uriTemplate = new UriTemplate().withLiteralUri(URI.create(url));
+            }
             endpoint = new Endpoint().withUriTemplate(uriTemplate);
         }
         var httpArgs = new HTTPArguments(method, endpoint);

@@ -18,7 +18,13 @@ def run(*argv, cwd):
 
 
 def version(pom):
-    return ET.parse(pom).getroot().findtext('{*}version')
+    root = ET.parse(pom).getroot()
+    v = root.findtext('{*}version')
+    if not v:
+        parent = root.find('{*}parent')
+        if parent is not None:
+            v = parent.findtext('{*}version')
+    return v
 
 
 def install(root, pom, modules):

@@ -427,6 +427,13 @@
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>3.2.0</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>

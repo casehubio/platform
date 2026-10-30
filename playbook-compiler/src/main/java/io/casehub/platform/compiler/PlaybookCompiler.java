@@ -49,6 +49,7 @@ public final class PlaybookCompiler {
         register("rest-request", new RestRequestCompiler());
         register("signal", new SignalCompiler());
         register("await", new AwaitCompiler());
+        register("advisory", new AdvisoryCompiler());
     }
 
     public void register(String stepType, StepCompiler compiler) {

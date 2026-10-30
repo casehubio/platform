@@ -4,9 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.casehub</groupId>
+    <parent>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-parent</artifactId>
+        <version>0.4-SNAPSHOT</version>
+        <relativePath/>
+    </parent>
+
     <artifactId>casehub-platform-parent</artifactId>
-    <version>0.4-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -232,8 +237,6 @@
     </modules>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <quarkus.platform.version>3.39.3</quarkus.platform.version>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <jandex-maven-plugin.version>3.3.1</jandex-maven-plugin.version>
@@ -246,38 +249,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- REST Assured 6.0 — overrides Quarkus BOM's 5.5 (incompatible with Groovy 5) -->
-            <dependency>
-                <groupId>io.rest-assured</groupId>
-                <artifactId>rest-assured</artifactId>
-                <version>6.0.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.rest-assured</groupId>
-                <artifactId>rest-assured-common</artifactId>
-                <version>6.0.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.rest-assured</groupId>
-                <artifactId>json-path</artifactId>
-                <version>6.0.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.rest-assured</groupId>
-                <artifactId>xml-path</artifactId>
-                <version>6.0.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.casehub</groupId>
-                <artifactId>casehub-parent</artifactId>
-                <version>${project.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
+            <!-- Quarkus BOM — kept explicit for version visibility -->
             <dependency>
                 <groupId>io.quarkus.platform</groupId>
                 <artifactId>quarkus-bom</artifactId>
@@ -342,26 +314,6 @@
                 <version>0.6.0</version>
             </dependency>
             <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-api</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-core</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>io.cloudevents</groupId>
-                <artifactId>cloudevents-json-jackson</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-core</artifactId>
-                <version>${version.dev.langchain4j}</version>
-            </dependency>
-            <dependency>
                 <groupId>com.anthropic</groupId>
                 <artifactId>anthropic-java-client-okhttp</artifactId>
                 <version>${version.com.anthropic}</version>
@@ -417,30 +369,6 @@
         <url>https://github.com/casehubio/platform</url>
     </scm>
 
-    <repositories>
-        <repository>
-            <id>central</id>
-            <name>Maven Central</name>
-            <url>https://repo.maven.apache.org/maven2</url>
-            <releases><enabled>true</enabled></releases>
-            <snapshots><enabled>false</enabled></snapshots>
-        </repository>
-        <repository>
-            <id>github</id>
-            <name>casehubio GitHub Packages</name>
-            <url>https://maven.pkg.github.com/casehubio/*</url>
-            <releases><enabled>false</enabled></releases>
-
-            <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-        <repository>
-            <id>jboss-snapshots</id>
-            <name>JBoss Nexus Snapshots</name>
-            <url>https://repository.jboss.org/nexus/content/repositories/snapshots/</url>
-            <releases><enabled>false</enabled></releases>
-            <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-    </repositories>
 
     <build>
         <pluginManagement>
@@ -449,18 +377,6 @@
                     <groupId>io.smallrye</groupId>
                     <artifactId>jandex-maven-plugin</artifactId>
                     <version>${jandex-maven-plugin.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-deploy-plugin</artifactId>
-                    <version>3.2.0</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-surefire-plugin</artifactId>
-                    <configuration>
-                        <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
-                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -475,20 +391,23 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.5.0</version>
                 <executions>
                     <execution>
-                        <id>enforce</id>
+                        <id>ban-dependency-typos</id>
                         <goals><goal>enforce</goal></goals>
                         <configuration>
                             <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>io.quarkus:quarkus-junit5</exclude>
+                                    </excludes>
+                                </bannedDependencies>
                                 <dependencyConvergence>
                                     <excludes>
                                         <exclude>org.bouncycastle:*</exclude>
                                     </excludes>
                                 </dependencyConvergence>
                             </rules>
-                            <fail>true</fail>
                         </configuration>
                     </execution>
                 </executions>

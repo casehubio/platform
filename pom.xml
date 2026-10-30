@@ -334,6 +334,11 @@
                 <artifactId>jsonschema-module-jackson</artifactId>
                 <version>4.36.0</version>
             </dependency>
+            <dependency>
+                <groupId>com.github.victools</groupId>
+                <artifactId>jsonschema-module-jakarta-validation</artifactId>
+                <version>4.36.0</version>
+            </dependency>
             <!-- Convergence pin: Spring AI (2.0.0) vs claude-code-sdk (0.15.0) -->
             <dependency>
                 <groupId>io.modelcontextprotocol.sdk</groupId>

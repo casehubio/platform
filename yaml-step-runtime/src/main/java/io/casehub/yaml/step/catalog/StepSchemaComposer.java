@@ -12,13 +12,7 @@ import java.util.Set;
 
 public final class StepSchemaComposer {
 
-    private static final Set<String> DECORATOR_KEYS = Set.of(
-            "if", "on-success", "on-failure", "forEach", "loop",
-            "retry", "timeout", "delay", "on-error", "trigger",
-            "transform", "signal", "publish", "transition",
-            "semaphore", "barrier", "quorum",
-            "at", "on-complete", "resource", "priority",
-            "cancel", "background", "from");
+    private static final Set<String> DECORATOR_KEYS = StepKeywords.DECORATOR_KEYS;
 
     private StepSchemaComposer() {}
 

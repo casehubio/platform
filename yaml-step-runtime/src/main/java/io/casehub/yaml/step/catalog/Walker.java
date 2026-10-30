@@ -13,17 +13,7 @@ public final class Walker {
 
     private static final Logger LOG = Logger.getLogger(Walker.class.getName());
 
-    private static final Set<String> RESERVED_KEYS = Set.of(
-            "step", "invoke",
-            "if", "then", "else", "match", "cases", "block",
-            "try", "catch", "finally", "select",
-            "on-success", "on-failure", "forEach", "loop",
-            "retry", "timeout", "delay", "on-error", "trigger",
-            "transform", "signal", "publish", "transition",
-            "parallel", "semaphore", "barrier", "quorum", "race",
-            "pause", "resume",
-            "from", "cancel", "background", "at", "on-complete",
-            "resource", "priority", "wait", "mutex", "when");
+    private static final Set<String> RESERVED_KEYS = StepKeywords.RESERVED_KEYS;
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
     private static final Set<String> PROMOTABLE_DECORATORS = Set.of(

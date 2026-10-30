@@ -43,6 +43,9 @@ class StepSchemaComposerTest {
         assertThat(props.has("step")).isTrue();
         assertThat(props.has("if")).isTrue();
         assertThat(props.has("timeout")).isTrue();
+        assertThat(props.has("wait")).as("wait decorator").isTrue();
+        assertThat(props.has("mutex")).as("mutex decorator").isTrue();
+        assertThat(props.has("when")).as("when decorator").isTrue();
     }
 
     @Test

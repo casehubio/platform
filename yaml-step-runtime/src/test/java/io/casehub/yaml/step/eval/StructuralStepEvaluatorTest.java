@@ -12,8 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -580,7 +578,6 @@ class StructuralStepEvaluatorTest {
     // ── SelectStep ──────────────────────────────────────────────────
 
     @Nested
-    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     class SelectStepTests {
 
         @Test
@@ -736,6 +733,11 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
 
+        @AfterEach
+        void tearDown() {
+            scope.close();
+        }
+
         @Test
         void evaluate_namedStep_recordsSuccessToStore() {
             var step = new ResolvedStep.InvokeStep("risk-eval", Map.of("id", "a"), Map.of());
@@ -816,6 +818,11 @@ class StructuralStepEvaluatorTest {
             scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @AfterEach
+        void tearDown() {
+            scope.close();
         }
 
         @Test
@@ -901,6 +908,11 @@ class StructuralStepEvaluatorTest {
             scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @AfterEach
+        void tearDown() {
+            scope.close();
         }
 
         @Test
@@ -1011,6 +1023,11 @@ class StructuralStepEvaluatorTest {
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
         }
 
+        @AfterEach
+        void tearDown() {
+            scope.close();
+        }
+
         @Test
         void quorum_proceedsOnRequiredCount() {
             var a = new ResolvedStep.InvokeStep("a", Map.of("id", "a"), Map.of());
@@ -1080,6 +1097,11 @@ class StructuralStepEvaluatorTest {
             scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @AfterEach
+        void tearDown() {
+            scope.close();
         }
 
         @Test
@@ -1163,6 +1185,11 @@ class StructuralStepEvaluatorTest {
             scope = new DefaultExecutionScope();
             var condEval = new ConditionEvaluator(null);
             scopedEvaluator = new StructuralStepEvaluator(condEval, scope);
+        }
+
+        @AfterEach
+        void tearDown() {
+            scope.close();
         }
 
         @Test
@@ -1391,18 +1418,7 @@ class StructuralStepEvaluatorTest {
     }
 
     @Nested
-    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     class RaceStepTests {
-
-        @BeforeEach
-        void traceStart(TestInfo testInfo) {
-            System.err.println("RaceStepTests START " + testInfo.getDisplayName());
-        }
-
-        @AfterEach
-        void traceEnd(TestInfo testInfo) {
-            System.err.println("RaceStepTests END " + testInfo.getDisplayName());
-        }
 
         @Test
         void raceFirstSuccessfulBranchWins() throws Exception {
@@ -1523,6 +1539,11 @@ class StructuralStepEvaluatorTest {
         void setUp() {
             testScope  = new DefaultExecutionScope();
             scopedEval = new StructuralStepEvaluator(new ConditionEvaluator(null), testScope);
+        }
+
+        @AfterEach
+        void tearDown() {
+            testScope.close();
         }
 
         @Test

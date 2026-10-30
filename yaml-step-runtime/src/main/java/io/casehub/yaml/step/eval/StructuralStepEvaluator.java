@@ -12,6 +12,7 @@ import io.casehub.yaml.step.catalog.ResolvedStep;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -234,12 +235,14 @@ public final class StructuralStepEvaluator {
         @SuppressWarnings("unchecked")
         Future<Object>[] futureSlots = new Future[branchCount];
 
+        var allSubmitted = new CountDownLatch(1);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < branchCount; i++) {
                 int                       branchIdx = i;
                 ResolvedStep.SelectBranch branch    = select.branches().get(i);
                 futureSlots[i] = executor.submit(() -> {
                     try {
+                        allSubmitted.await();
                         Object payload;
                         if (branch.type() == ResolvedStep.SelectBranchType.WAIT) {
                             OrcSignal signal = scope.signal(branch.name());
@@ -253,8 +256,7 @@ public final class StructuralStepEvaluator {
                             winnerPayload.set(payload);
                             for (int j = 0; j < branchCount; j++) {
                                 if (j != branchIdx) {
-                                    Future<?> other = futureSlots[j];
-                                    if (other != null) {other.cancel(true);}
+                                    futureSlots[j].cancel(true);
                                 }
                             }
                         }
@@ -264,12 +266,21 @@ public final class StructuralStepEvaluator {
                     return null;
                 });
             }
+            allSubmitted.countDown();
 
-            for (Future<Object> f : futureSlots) {
-                try {
-                    f.get();
-                } catch (ExecutionException | java.util.concurrent.CancellationException e) {
-                    // expected for cancelled branches
+            try {
+                for (Future<Object> f : futureSlots) {
+                    try {
+                        f.get();
+                    } catch (ExecutionException | java.util.concurrent.CancellationException e) {
+                        // expected for cancelled branches
+                    }
+                }
+            } finally {
+                for (Future<Object> f : futureSlots) {
+                    if (f != null) {
+                        f.cancel(true);
+                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -499,17 +510,19 @@ public final class StructuralStepEvaluator {
         var         branchFailures = new AtomicReference[branchCount];
         Future<?>[] futures        = new Future<?>[branchCount];
 
+        var allSubmitted = new CountDownLatch(1);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < branchCount; i++) {
                 int idx = i;
                 branchFailures[idx] = new AtomicReference<String>();
                 ResolvedStep branch = race.branches().get(i);
                 futures[i] = executor.submit(() -> {
+                    try { allSubmitted.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
                     Result result = evaluateInternal(branch, ctx, runner);
                     if (result.isSuccess() && winnerIndex.compareAndSet(-1, idx)) {
                         winnerResult.set(result);
                         for (int j = 0; j < branchCount; j++) {
-                            if (j != idx && futures[j] != null) {
+                            if (j != idx) {
                                 futures[j].cancel(true);
                             }
                         }
@@ -519,6 +532,7 @@ public final class StructuralStepEvaluator {
                     }
                 });
             }
+            allSubmitted.countDown();
             try {
                 for (Future<?> f : futures) {
                     try {

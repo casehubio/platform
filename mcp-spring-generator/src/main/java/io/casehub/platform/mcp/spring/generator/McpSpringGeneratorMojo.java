@@ -48,7 +48,7 @@ public class McpSpringGeneratorMojo extends AbstractGeneratorMojo {
 
             for (var entry : grouped.entrySet()) {
                 String sourceClassName = entry.getKey();
-                String targetPackage = deriveSpringPackage(sourceClassName);
+                String targetPackage = deriveTargetPackage(sourceClassName);
                 JavaFile javaFile = writer.generate(sourceClassName, entry.getValue(), targetPackage);
                 javaFile.writeTo(outputDirectory);
                 count++;
@@ -63,9 +63,5 @@ public class McpSpringGeneratorMojo extends AbstractGeneratorMojo {
         }
     }
 
-    static String deriveSpringPackage(String quarkusClassName) {
-        int lastDot = quarkusClassName.lastIndexOf('.');
-        String basePackage = lastDot >= 0 ? quarkusClassName.substring(0, lastDot) : quarkusClassName;
-        return basePackage + ".spring";
-    }
+
 }

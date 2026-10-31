@@ -26,6 +26,8 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
     @Parameter(defaultValue = "${project.basedir}/src/main/java")
     private File sourceDir;
 
+
+
     @Override
     protected File getOutputDirectory() { return outputDirectory; }
 
@@ -97,7 +99,7 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
             }
 
             try {
-                String sourcePackage = deriveSpringPackage(descriptors.get(0).producerClassName());
+                String sourcePackage = deriveTargetPackage(descriptors.get(0).producerClassName());
                 String configClassName = deriveConfigClassName(module.getName());
 
                 var writer = new AutoConfigurationWriter();
@@ -136,14 +138,7 @@ public class SpringGeneratorMojo extends AbstractGeneratorMojo {
         registerSourceRoot();
     }
 
-    private String deriveSpringPackage(String quarkusClassName) {
-        int lastDot = quarkusClassName.lastIndexOf('.');
-        String basePackage = lastDot >= 0 ? quarkusClassName.substring(0, lastDot) : quarkusClassName;
-        if (basePackage.endsWith(".quarkus")) {
-            basePackage = basePackage.substring(0, basePackage.length() - ".quarkus".length());
-        }
-        return basePackage + ".spring";
-    }
+
 
     String deriveConfigClassName(String moduleName) {
         String[] parts = moduleName.replace("platform-", "").split("-");

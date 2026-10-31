@@ -27,6 +27,12 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
 
     @Parameter
     protected List<File> quarkusModules;
+    @Parameter(property = "casehub.generators.source-package-suffix", defaultValue = "quarkus")
+    protected String     sourcePackageSuffix;
+
+    @Parameter(property = "casehub.generators.target-package-suffix", defaultValue = "spring")
+    protected String targetPackageSuffix;
+
 
     @Parameter(defaultValue = "${project}")
     protected MavenProject project;
@@ -34,6 +40,11 @@ public abstract class AbstractGeneratorMojo extends AbstractMojo {
     protected abstract File getOutputDirectory();
 
     protected abstract String getGeneratorName();
+
+    protected String deriveTargetPackage(String fqcn) {
+        return GeneratorUtils.deriveTargetPackage(fqcn, sourcePackageSuffix, targetPackageSuffix);
+    }
+
 
     protected IndexView loadJandexIndex() throws MojoExecutionException {
         List<File> modules = resolveModules();

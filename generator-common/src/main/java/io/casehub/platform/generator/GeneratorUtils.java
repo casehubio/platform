@@ -115,6 +115,16 @@ public final class GeneratorUtils {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
+    public static String deriveTargetPackage(String fqcn, String sourceSuffix, String targetSuffix) {
+        int    lastDot     = fqcn.lastIndexOf('.');
+        String basePackage = lastDot >= 0 ? fqcn.substring(0, lastDot) : fqcn;
+        if (sourceSuffix != null && !sourceSuffix.isEmpty() && basePackage.endsWith("." + sourceSuffix)) {
+            basePackage = basePackage.substring(0, basePackage.length() - sourceSuffix.length() - 1);
+        }
+        return basePackage + "." + targetSuffix;
+    }
+
+
     private static boolean hasStaticStringMethod(ClassInfo ci, String methodName) {
         DotName stringType = DotName.createSimple("java.lang.String");
         for (MethodInfo m : ci.methods()) {

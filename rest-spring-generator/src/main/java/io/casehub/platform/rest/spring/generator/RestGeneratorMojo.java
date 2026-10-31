@@ -59,7 +59,7 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
             var writer = new RestControllerWriter();
             int count = 0;
             for (RestResourceDescriptor desc : descriptors) {
-                String targetPackage = deriveSpringPackage(desc.className());
+                String targetPackage = deriveTargetPackage(desc.className());
                 JavaFile javaFile = writer.generate(desc, targetPackage);
                 javaFile.writeTo(outputDirectory);
                 count++;
@@ -67,7 +67,7 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
 
             var providerWriter = new ProviderWriter();
             for (ProviderDescriptor provider : providers) {
-                String targetPackage = deriveSpringPackage(provider.className());
+                String targetPackage = deriveTargetPackage(provider.className());
                 JavaFile javaFile = providerWriter.generate(provider, targetPackage);
                 javaFile.writeTo(outputDirectory);
                 count++;
@@ -82,9 +82,5 @@ public class RestGeneratorMojo extends AbstractGeneratorMojo {
         }
     }
 
-    static String deriveSpringPackage(String quarkusClassName) {
-        int lastDot = quarkusClassName.lastIndexOf('.');
-        String basePackage = lastDot >= 0 ? quarkusClassName.substring(0, lastDot) : quarkusClassName;
-        return basePackage + ".spring";
-    }
+
 }

@@ -53,8 +53,13 @@ public class DomainModelRegistry {
     }
 
     public void discoverAppCapabilities(ClassLoader classLoader) {
+        loadAppCapabilitiesFrom(classLoader, "META-INF/mcp-domain-app.properties");
+        loadAppCapabilitiesFrom(classLoader, "META-INF/casehub-mcp-app.properties");
+    }
+
+    private void loadAppCapabilitiesFrom(ClassLoader classLoader, String resourceName) {
         try {
-            Enumeration<URL> resources = classLoader.getResources("META-INF/casehub-mcp-app.properties");
+            Enumeration<URL> resources = classLoader.getResources(resourceName);
             while (resources.hasMoreElements()) {
                 URL url = resources.nextElement();
                 try (InputStream is = url.openStream()) {

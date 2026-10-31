@@ -1,12 +1,9 @@
 package io.casehub.platform.callback.spring;
 
-import io.casehub.platform.api.callback.CallbackRegistration;
-import io.casehub.platform.api.callback.CallbackRegistrationRequest;
 import io.casehub.platform.api.callback.CallbackRegistry;
 import io.casehub.platform.api.governance.ExecutionPolicy;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.mcp.CallbackEligible;
-import io.casehub.platform.callback.CallbackInvoker;
 import io.casehub.platform.callback.inmem.InMemoryCallbackRegistry;
 import io.casehub.platform.governance.PolicyEnforcer;
 import org.junit.jupiter.api.Test;

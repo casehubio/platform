@@ -1783,12 +1783,12 @@ What this layer adds:
 
 #### Key files
 
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — domain marker annotation (class-level)
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformQuery.java` — QUERY operation binding
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformMutation.java` — MUTATION operation binding
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformStream.java` — STREAM (SSE) operation binding
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformWebhook.java` — WEBHOOK operation binding (REST only, custom consumes)
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/ContextParam.java` — context parameter injection
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — domain marker annotation (class-level)
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformQuery.java` — QUERY operation binding
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformMutation.java` — MUTATION operation binding
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformStream.java` — STREAM (SSE) operation binding
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformWebhook.java` — WEBHOOK operation binding (REST only, custom consumes)
+- `mcp-api/src/main/java/io/casehub/platform/api/mcp/ContextParam.java` — context parameter injection
 - `graphql-generator/src/main/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessor.java` — APT annotation processor
 
 #### Key wiring

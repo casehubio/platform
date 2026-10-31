@@ -4,7 +4,6 @@ import io.casehub.platform.api.mcp.CallbackEligible;
 import io.casehub.platform.callback.generator.test.TestDefaultNameSpi;
 import io.casehub.platform.callback.generator.test.TestProvisioner;
 import io.casehub.platform.callback.generator.test.TestSelector;
-import org.jboss.jandex.Index;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.Indexer;
 import org.junit.jupiter.api.BeforeAll;

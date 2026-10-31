@@ -19,7 +19,7 @@
     <dependencies>
         <dependency>
             <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-api</artifactId>
+            <artifactId>casehub-mcp-api</artifactId>
             <version>${project.version}</version>
         </dependency>
 

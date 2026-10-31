@@ -198,6 +198,50 @@ class DeclarationParserTest {
         assertThat(file.actions().get("test").inputs().get("name").required()).isFalse();
     }
 
+
+    @Test
+    void parsesSessionOpenBinding() {
+        Map<String, Object> invoke = Map.of("agent-session-open",
+                                            mapOf("session", "analyst", "system", "You are a data analyst",
+                                                  "model", "claude-opus-4", "pool", "analysis-pool",
+                                                  "timeout", "60s", "checkout-timeout", "10s"));
+        var binding = (InvokeBinding.SessionOpen) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("analyst");
+        assertThat(binding.system()).isEqualTo("You are a data analyst");
+        assertThat(binding.model()).isEqualTo("claude-opus-4");
+        assertThat(binding.pool()).isEqualTo("analysis-pool");
+        assertThat(binding.timeout()).isEqualTo("60s");
+        assertThat(binding.checkoutTimeout()).isEqualTo("10s");
+    }
+
+    @Test
+    void parsesSessionQueryBinding() {
+        Map<String, Object> invoke = Map.of("agent-query",
+                                            mapOf("session", "analyst", "user", "Summarize this",
+                                                  "output", "result", "priority", true));
+        var binding = (InvokeBinding.SessionQuery) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("analyst");
+        assertThat(binding.user()).isEqualTo("Summarize this");
+        assertThat(binding.output()).isEqualTo("result");
+        assertThat(binding.priority()).isTrue();
+    }
+
+    @Test
+    void parsesSessionClearBinding() {
+        Map<String, Object> invoke = Map.of("agent-session-clear",
+                                            Map.of("session", "analyst"));
+        var binding = (InvokeBinding.SessionClear) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("analyst");
+    }
+
+    @Test
+    void parsesSessionCloseBinding() {
+        Map<String, Object> invoke = Map.of("agent-session-close",
+                                            Map.of("session", "analyst"));
+        var binding = (InvokeBinding.SessionClose) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("analyst");
+    }
+
     @SuppressWarnings("unchecked")
     private static <K, V> Map<K, V> mapOf(Object... kvs) {
         var map = new LinkedHashMap<K, V>();

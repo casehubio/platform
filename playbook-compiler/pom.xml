@@ -21,6 +21,11 @@
             <artifactId>casehub-platform-yaml-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-agent-config-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-types</artifactId>
             <version>7.35.3.Final</version>

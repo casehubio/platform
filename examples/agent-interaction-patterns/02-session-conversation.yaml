@@ -1,0 +1,29 @@
+# 02 — Session Conversation
+# Builds on 01: multiple queries to the same session.
+# The session preserves context between turns, so the agent remembers
+# what was discussed earlier.
+
+steps:
+  - agent-session-open:
+      session: analyst
+      system: >
+        You are a financial analyst. Answer questions about the portfolio
+        provided. Be concise.
+
+  - agent-query:
+      session: analyst
+      user: "The portfolio has 60% equities, 30% bonds, 10% cash. What's the risk profile?"
+      output: risk_assessment
+
+  - agent-query:
+      session: analyst
+      user: "Given that risk profile, what rebalancing would you suggest for a downturn?"
+      output: rebalancing_advice
+
+  - agent-query:
+      session: analyst
+      user: "Summarize your recommendations in three bullet points."
+      output: summary
+
+  - agent-session-close:
+      session: analyst

@@ -688,6 +688,51 @@ The `CaseMemoryStore` SPI and related types (`MemoryDomain`, `MemoryPermissions`
 - **Dynamic tool schema:** The operation catalog is injected into the `casehub_action` tool definition at runtime, providing contextual tool descriptions.
 - `@McpDomain` interfaces discovered directly with `@PlatformQuery`/`@PlatformMutation` annotations. The `graphql-generator` APT generates both `@GraphQLApi` resolvers and `@Path` JAX-RS REST resources from these interfaces. Discovery sources: Jandex indexes from dependency JARs + RoundEnvironment (consumer SPIs in the current compilation unit are found automatically). Use `@RestMethod(HttpMethod.DELETE)` for non-POST mutations, `@PathParam` for path segments. Processor options: `-AdomainFilter` to scope generation per module, `-AgenerateGraphQL=false` to suppress GraphQL output, `-AgenerateRest=false` to suppress REST output. NOTE-level diagnostic logging reports received options, discovered domains (with source: JANDEX or ROUND_ENV), and filter decisions; WARNING emitted when domainFilter matches zero domains.
 
+### YAML Agent Interaction Steps
+
+YAML playbooks can express agent sessions, pools, and scheduling via 4 step types:
+
+| Step | Purpose |
+|------|---------|
+| `agent-session-open` | Open a named session with system prompt, model, and optional pool |
+| `agent-query` | Send a user prompt to a named session (supports `priority: true`) |
+| `agent-session-clear` | Clear conversation context without closing the session |
+| `agent-session-close` | Close and release the session |
+
+**Minimal multi-turn session:**
+
+```yaml
+steps:
+  - agent-session-open:
+      session: analyst
+      system: "You are a financial analyst."
+  - agent-query:
+      session: analyst
+      user: "What's the risk profile of 60/30/10 equities/bonds/cash?"
+      output: risk_assessment
+  - agent-session-close:
+      session: analyst
+```
+
+**Pool configuration** can be declared inline in the playbook or in `agent-config.yaml`:
+
+```yaml
+pools:
+  voice:
+    agent-id: voice-agent
+    backend: claude
+    max-active: 10
+    salience: 2
+    clearing:
+      policy: every-call
+```
+
+Pool fields: `salience` (int, default 0 — higher monopolizes capacity while active), `clearing` (object: `policy` one of `every-call`/`turn-count`/`size-aware`/`explicit`, optional `threshold`/`turns`), `max-prompt-tokens` (int, default 0 = unlimited).
+
+**Salience scheduling:** When multiple pools share backend capacity, higher-salience pools get priority. Every pool is guaranteed a minimum allocation to prevent starvation. When the high-salience pool is idle, capacity flows to lower pools.
+
+See `examples/agent-interaction-patterns/` for 8 layered examples progressing from direct invoke through multi-channel salience scheduling.
+
 ---
 
 ## Configuration

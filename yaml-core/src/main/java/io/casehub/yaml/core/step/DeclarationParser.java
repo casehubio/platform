@@ -111,9 +111,22 @@ public final class DeclarationParser {
         if ("aria".equals(invokeMap.get("kind"))) {
             return new InvokeBinding.Aria((String) invokeMap.get("action"));
         }
+        if (invokeMap.containsKey("agent-session-open")) {
+            return parseSessionOpenBinding(invokeMap.get("agent-session-open"));
+        }
+        if (invokeMap.containsKey("agent-query")) {
+            return parseSessionQueryBinding(invokeMap.get("agent-query"));
+        }
+        if (invokeMap.containsKey("agent-session-clear")) {
+            return parseSessionClearBinding(invokeMap.get("agent-session-clear"));
+        }
+        if (invokeMap.containsKey("agent-session-close")) {
+            return parseSessionCloseBinding(invokeMap.get("agent-session-close"));
+        }
 
         throw new IllegalArgumentException(
-                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, python, agent, process, aria. "
+                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, python, agent, process, aria, "
+                + "agent-session-open, agent-query, agent-session-clear, agent-session-close. "
                 + "Got keys: " + invokeMap.keySet());
     }
 
@@ -139,8 +152,14 @@ public final class DeclarationParser {
         String timeout = (String) map.get("timeout");
         Boolean structuredOutput = (Boolean) map.getOrDefault("structured-output",
                 map.get("structuredOutput"));
+        String pool = (String) map.get("pool");
+        List<Object> modelChain = (List<Object>) map.getOrDefault("model-chain",
+                map.get("modelChain"));
+        Object responseFormat = map.getOrDefault("response-format",
+                map.get("responseFormat"));
         return new InvokeBinding.Agent(descriptor, model, modelQuery, system, user, timeout,
-                structuredOutput != null && structuredOutput);
+                structuredOutput != null && structuredOutput,
+                pool, modelChain, responseFormat);
     }
 
     @SuppressWarnings("unchecked")
@@ -169,4 +188,43 @@ public final class DeclarationParser {
                 map.get("onError"));
         return new InvokeBinding.Process(command, args, output, timeout, env, workingDir, onError);
     }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionOpen parseSessionOpenBinding(Object raw) {
+        Map<String, Object> map = (Map<String, Object>) raw;
+        return new InvokeBinding.SessionOpen(
+                (String) map.get("session"),
+                (String) map.get("system"),
+                (String) map.get("model"),
+                (Map<String, Object>) map.getOrDefault("model-query", map.get("modelQuery")),
+                (List<Object>) map.getOrDefault("model-chain", map.get("modelChain")),
+                (String) map.get("pool"),
+                (String) map.get("timeout"),
+                (String) map.getOrDefault("checkout-timeout", map.get("checkoutTimeout")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionQuery parseSessionQueryBinding(Object raw) {
+        Map<String, Object> map      = (Map<String, Object>) raw;
+        Boolean             priority = (Boolean) map.get("priority");
+        return new InvokeBinding.SessionQuery(
+                (String) map.get("session"),
+                (String) map.get("user"),
+                map.getOrDefault("response-format", map.get("responseFormat")),
+                (String) map.get("output"),
+                priority != null && priority);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionClear parseSessionClearBinding(Object raw) {
+        Map<String, Object> map = (Map<String, Object>) raw;
+        return new InvokeBinding.SessionClear((String) map.get("session"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionClose parseSessionCloseBinding(Object raw) {
+        Map<String, Object> map = (Map<String, Object>) raw;
+        return new InvokeBinding.SessionClose((String) map.get("session"));
+    }
+
 }

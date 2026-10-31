@@ -1,0 +1,73 @@
+# 07 — Salience-Based Priority
+# Builds on 06: pools have salience levels for capacity scheduling.
+# Voice (salience=2) monopolizes capacity while active — calls can't wait.
+# Chat (salience=1) gets priority over email (salience=0).
+# Email runs in leftover capacity but is guaranteed a minimum allocation.
+
+pools:
+  voice:
+    agent-id: voice-agent
+    backend: claude
+    max-active: 10
+    salience: 2
+    clearing:
+      policy: every-call
+  chat:
+    agent-id: chat-agent
+    backend: claude
+    max-active: 8
+    salience: 1
+    clearing:
+      policy: turn-count
+      turns: 20
+  email:
+    agent-id: email-agent
+    backend: claude
+    max-active: 5
+    salience: 0
+    clearing:
+      policy: size-aware
+      threshold: 16000
+
+steps:
+  # Voice call arrives — gets immediate capacity
+  - agent-session-open:
+      session: call-7721
+      pool: voice
+      system: "You are a voice agent. Be concise. One sentence max."
+
+  - agent-query:
+      session: call-7721
+      user: "I need to cancel my subscription effective immediately."
+      output: voice_response
+
+  - agent-session-close:
+      session: call-7721
+
+  # While voice is idle, chat and email can run
+  - agent-session-open:
+      session: chat-user-88
+      pool: chat
+      system: "You are a chat agent. Friendly, helpful, use emoji sparingly."
+
+  - agent-query:
+      session: chat-user-88
+      user: "How do I export my data?"
+      output: chat_response
+
+  - agent-session-close:
+      session: chat-user-88
+
+  # Email uses remaining capacity
+  - agent-session-open:
+      session: email-ticket-99
+      pool: email
+      system: "You are an email agent. Professional tone, include ticket reference."
+
+  - agent-query:
+      session: email-ticket-99
+      user: "Ticket #99: Request for enterprise pricing for 500-seat deployment."
+      output: email_response
+
+  - agent-session-close:
+      session: email-ticket-99

@@ -1,0 +1,49 @@
+# 08 — Structured Output and Priority Queries
+# Builds on 05: demonstrates response format for JSON output and
+# priority queries that bypass normal admission queuing.
+
+pools:
+  extractors:
+    agent-id: data-extractor
+    backend: claude
+    max-active: 5
+    max-prompt-tokens: 50000
+
+steps:
+  - agent-session-open:
+      session: extractor
+      pool: extractors
+      system: >
+        You are a structured data extractor. Always respond with valid JSON
+        matching the requested schema. No markdown, no explanation — just JSON.
+
+  # Normal query with structured output
+  - agent-query:
+      session: extractor
+      user: >
+        Extract from this invoice:
+        "ACME Corp, Invoice #INV-2024-0891, Date: 2024-03-15,
+        Items: Widget A x10 @ $25.00, Widget B x5 @ $42.00,
+        Subtotal: $460.00, Tax: $36.80, Total: $496.80,
+        Due: Net-30, PO: PO-7742"
+      response-format:
+        type: json
+        name: invoice
+        schema: |
+          {"type":"object","properties":{"vendor":{"type":"string"},"invoiceNumber":{"type":"string"},"date":{"type":"string"},"lineItems":{"type":"array","items":{"type":"object","properties":{"description":{"type":"string"},"quantity":{"type":"integer"},"unitPrice":{"type":"number"}}}},"total":{"type":"number"},"paymentTerms":{"type":"string"},"poNumber":{"type":"string"}}}
+      output: extracted_invoice
+
+  # Priority query — jumps the admission queue (e.g., urgent correction)
+  - agent-query:
+      session: extractor
+      user: "Correction: the tax rate should be 9% not 8%. Recalculate."
+      priority: true
+      response-format:
+        type: json
+        name: corrected-invoice
+        schema: |
+          {"type":"object","properties":{"total":{"type":"number"},"tax":{"type":"number"},"taxRate":{"type":"string"}}}
+      output: corrected_totals
+
+  - agent-session-close:
+      session: extractor

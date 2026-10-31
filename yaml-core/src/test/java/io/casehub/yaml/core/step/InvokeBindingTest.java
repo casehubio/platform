@@ -52,6 +52,40 @@ class InvokeBindingTest {
     }
 
     @Test
+    void agentBindingWithPoolAndResponseFormat() {
+        var agent = new InvokeBinding.Agent("summarizer", "claude-sonnet-5",
+                                            null, "You are...", "Summarize", "30s", false,
+                                            "my-pool", null, Map.of("type", "json", "name", "summary"));
+        assertThat(agent.pool()).isEqualTo("my-pool");
+        assertThat(((Map<?, ?>) agent.responseFormat()).get("type")).isEqualTo("json");
+    }
+
+    @Test
+    void agentBindingWithModelChain() {
+        var agent = new InvokeBinding.Agent("classifier", null,
+                                            null, "You classify", "Classify this", "30s", false,
+                                            null, List.of("claude-opus-4", "claude-sonnet-5"), null);
+        assertThat(agent.modelChain()).containsExactly("claude-opus-4", "claude-sonnet-5");
+    }
+
+    @Test
+    void agentBindingBackwardCompatConstructor() {
+        var agent = new InvokeBinding.Agent("analyst", "claude-sonnet-5", "30s", true);
+        assertThat(agent.pool()).isNull();
+        assertThat(agent.modelChain()).isNull();
+        assertThat(agent.responseFormat()).isNull();
+    }
+
+    @Test
+    void agentBindingFullConstructorBackwardCompat() {
+        var agent = new InvokeBinding.Agent("desc", "model", null, "sys", "usr", "10s", false);
+        assertThat(agent.pool()).isNull();
+        assertThat(agent.modelChain()).isNull();
+        assertThat(agent.responseFormat()).isNull();
+    }
+
+
+    @Test
     void processBindingRequiresCommand() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new InvokeBinding.Process(null, null, null, null, null, null, null))
@@ -84,8 +118,8 @@ class InvokeBindingTest {
     }
 
     @Test
-    void sealedInterfacePermitsSevenTypes() {
-        assertThat(InvokeBinding.class.getPermittedSubclasses()).hasSize(7);
+    void sealedInterfacePermitsAllTypes() {
+        assertThat(InvokeBinding.class.getPermittedSubclasses()).hasSize(11);
     }
 
     @Test
@@ -131,4 +165,66 @@ class InvokeBindingTest {
                 .isThrownBy(() -> new InvokeBinding.Aria(""))
                 .withMessageContaining("requires action");
     }
+
+    @Test
+    void sessionOpen_allFields() {
+        var open = new InvokeBinding.SessionOpen(
+                "analyst", "You are a data analyst", "claude-opus-4",
+                null, null, "analysis-pool", "60s", "10s");
+        assertThat(open.session()).isEqualTo("analyst");
+        assertThat(open.system()).isEqualTo("You are a data analyst");
+        assertThat(open.model()).isEqualTo("claude-opus-4");
+        assertThat(open.pool()).isEqualTo("analysis-pool");
+        assertThat(open.timeout()).isEqualTo("60s");
+        assertThat(open.checkoutTimeout()).isEqualTo("10s");
+    }
+
+    @Test
+    void sessionOpen_requiresSession() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.SessionOpen(
+                        null, "system", null, null, null, null, null, null))
+                .withMessageContaining("session");
+    }
+
+    @Test
+    void sessionQuery_allFields() {
+        var query = new InvokeBinding.SessionQuery(
+                "analyst", "Summarize this", Map.of("type", "json"), "result", true);
+        assertThat(query.session()).isEqualTo("analyst");
+        assertThat(query.user()).isEqualTo("Summarize this");
+        assertThat(query.priority()).isTrue();
+        assertThat(query.output()).isEqualTo("result");
+    }
+
+    @Test
+    void sessionQuery_requiresSessionAndUser() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.SessionQuery(
+                        null, "prompt", null, null, false))
+                .withMessageContaining("session");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.SessionQuery(
+                        "sess", null, null, null, false))
+                .withMessageContaining("user");
+    }
+
+    @Test
+    void sessionClear_requiresSession() {
+        var clear = new InvokeBinding.SessionClear("analyst");
+        assertThat(clear.session()).isEqualTo("analyst");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.SessionClear(null))
+                .withMessageContaining("session");
+    }
+
+    @Test
+    void sessionClose_requiresSession() {
+        var close = new InvokeBinding.SessionClose("analyst");
+        assertThat(close.session()).isEqualTo("analyst");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new InvokeBinding.SessionClose(null))
+                .withMessageContaining("session");
+    }
+
 }

@@ -40,16 +40,29 @@ public sealed interface InvokeBinding {
                  String system,
                  String user,
                  String timeout,
-                 boolean structuredOutput) implements InvokeBinding {
+                 boolean structuredOutput,
+                 String pool,
+                 List<Object> modelChain,
+                 Object responseFormat) implements InvokeBinding {
         public Agent {
             if (descriptor == null && system == null)
                 throw new IllegalArgumentException(
                         "Agent binding requires descriptor or system prompt");
             if (modelQuery != null) modelQuery = Map.copyOf(modelQuery);
+            if (modelChain != null) modelChain = List.copyOf(modelChain);
+        }
+
+        public Agent(String descriptor, String model,
+                     Map<String, Object> modelQuery,
+                     String system, String user,
+                     String timeout, boolean structuredOutput) {
+            this(descriptor, model, modelQuery, system, user, timeout,
+                    structuredOutput, null, null, null);
         }
 
         public Agent(String descriptor, String model, String timeout, boolean structuredOutput) {
-            this(descriptor, model, null, null, null, timeout, structuredOutput);
+            this(descriptor, model, null, null, null, timeout,
+                    structuredOutput, null, null, null);
         }
     }
 
@@ -74,4 +87,47 @@ public sealed interface InvokeBinding {
                 throw new IllegalArgumentException("Aria binding requires action");
         }
     }
+
+    record SessionOpen(String session, String system, String model,
+                       Map<String, Object> modelQuery, List<Object> modelChain,
+                       String pool, String timeout, String checkoutTimeout)
+            implements InvokeBinding {
+        public SessionOpen {
+            if (session == null || session.isEmpty()) {
+                throw new IllegalArgumentException("SessionOpen requires session name");
+            }
+            if (modelQuery != null) {modelQuery = Map.copyOf(modelQuery);}
+            if (modelChain != null) {modelChain = List.copyOf(modelChain);}
+        }
+    }
+
+    record SessionQuery(String session, String user,
+                        Object responseFormat, String output, boolean priority)
+            implements InvokeBinding {
+        public SessionQuery {
+            if (session == null || session.isEmpty()) {
+                throw new IllegalArgumentException("SessionQuery requires session name");
+            }
+            if (user == null || user.isEmpty()) {
+                throw new IllegalArgumentException("SessionQuery requires user prompt");
+            }
+        }
+    }
+
+    record SessionClear(String session) implements InvokeBinding {
+        public SessionClear {
+            if (session == null || session.isEmpty()) {
+                throw new IllegalArgumentException("SessionClear requires session name");
+            }
+        }
+    }
+
+    record SessionClose(String session) implements InvokeBinding {
+        public SessionClose {
+            if (session == null || session.isEmpty()) {
+                throw new IllegalArgumentException("SessionClose requires session name");
+            }
+        }
+    }
+
 }

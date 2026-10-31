@@ -1,0 +1,49 @@
+# Manifest for running examples against real LLMs.
+# Pools reference backends configured here. For simulation tests,
+# the test harness substitutes SimulatedAgentBackend.
+#
+# To run with a real backend, set the appropriate environment variable:
+#   ANTHROPIC_API_KEY for claude
+#   OPENAI_API_KEY for openai
+#   OLLAMA_HOST for ollama (default: localhost:11434)
+
+pools:
+  analysts:
+    agent-id: financial-analyst
+    backend: claude
+    max-active: 5
+    clearing:
+      policy: size-aware
+      threshold: 8000
+
+  extractors:
+    agent-id: data-extractor
+    backend: claude
+    max-active: 5
+    max-prompt-tokens: 50000
+
+  voice:
+    agent-id: voice-agent
+    backend: claude
+    max-active: 10
+    salience: 2
+    clearing:
+      policy: every-call
+
+  chat:
+    agent-id: chat-agent
+    backend: claude
+    max-active: 8
+    salience: 1
+    clearing:
+      policy: turn-count
+      turns: 20
+
+  email:
+    agent-id: email-agent
+    backend: claude
+    max-active: 5
+    salience: 0
+    clearing:
+      policy: size-aware
+      threshold: 16000

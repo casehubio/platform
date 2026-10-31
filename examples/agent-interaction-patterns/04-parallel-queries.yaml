@@ -1,0 +1,40 @@
+# 04 — Parallel Queries
+# Builds on 02: multiple independent sessions queried concurrently.
+# Each session gets its own system prompt and runs in parallel.
+# Results are collected after all complete.
+
+steps:
+  - agent-session-open:
+      session: legal-reviewer
+      system: "You are a legal reviewer. Identify contract risks. Be brief."
+
+  - agent-session-open:
+      session: financial-reviewer
+      system: "You are a financial reviewer. Assess payment terms. Be brief."
+
+  - agent-session-open:
+      session: compliance-reviewer
+      system: "You are a compliance reviewer. Check regulatory adherence. Be brief."
+
+  - parallel:
+      - agent-query:
+          session: legal-reviewer
+          user: "Review this clause: 'Termination for convenience with 30-day notice.'"
+          output: legal_review
+
+      - agent-query:
+          session: financial-reviewer
+          user: "Review: 'Net-90 payment terms with 2% early payment discount.'"
+          output: financial_review
+
+      - agent-query:
+          session: compliance-reviewer
+          user: "Review: 'Data stored in EU region only, GDPR article 28 processor agreement.'"
+          output: compliance_review
+
+  - agent-session-close:
+      session: legal-reviewer
+  - agent-session-close:
+      session: financial-reviewer
+  - agent-session-close:
+      session: compliance-reviewer

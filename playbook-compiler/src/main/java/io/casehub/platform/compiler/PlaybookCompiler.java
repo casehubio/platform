@@ -50,6 +50,10 @@ public final class PlaybookCompiler {
         register("signal", new SignalCompiler());
         register("await", new AwaitCompiler());
         register("advisory", new AdvisoryCompiler());
+        register("agent-session-open", new AgentSessionStepCompiler("agent-session-open"));
+        register("agent-query", new AgentSessionStepCompiler("agent-query"));
+        register("agent-session-clear", new AgentSessionStepCompiler("agent-session-clear"));
+        register("agent-session-close", new AgentSessionStepCompiler("agent-session-close"));
     }
 
     public void register(String stepType, StepCompiler compiler) {
@@ -88,6 +92,10 @@ public final class PlaybookCompiler {
             parseOrchestration((Map<String, Object>) content.get("orchestration"), coordination);
         }
 
+        var poolDeclarations = content.containsKey("pools")
+                ? parsePools((Map<String, Object>) content.get("pools"), diagnostics)
+                : List.<io.casehub.platform.agent.config.PoolDeclaration>of();
+
         List<?> steps = content.containsKey("steps") ? (List<?>) content.get("steps") : List.of();
 
         var rootCtx = new CompilationContext("/do", 0, sourceMap, coordination, diagnostics, this);
@@ -111,7 +119,7 @@ public final class PlaybookCompiler {
         var workflow = new Workflow(doc, taskItems);
 
         return new CompilationOutcome.Success(
-                new CompilationResult(workflow, coordination.build(), sourceMap.build()));
+                new CompilationResult(workflow, coordination.build(), sourceMap.build(), poolDeclarations));
     }
 
     TaskItem compileStep(Map<String, Object> step, CompilationContext ctx) {
@@ -229,6 +237,52 @@ public final class PlaybookCompiler {
             }
         }
         return null;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private List<io.casehub.platform.agent.config.PoolDeclaration> parsePools(
+            Map<String, Object> poolsMap, List<CompilationDiagnostic> diagnostics) {
+        var result = new ArrayList<io.casehub.platform.agent.config.PoolDeclaration>();
+        for (var entry : poolsMap.entrySet()) {
+            String poolName = entry.getKey();
+            if (!(entry.getValue() instanceof Map)) {
+                diagnostics.add(new CompilationDiagnostic(
+                        CompilationDiagnostic.Severity.ERROR,
+                        "Pool '" + poolName + "' must be a map", "/pools/" + poolName, -1));
+                continue;
+            }
+            var    config  = (Map<String, Object>) entry.getValue();
+            String agentId = (String) config.get("agent-id");
+            if (agentId == null) {
+                diagnostics.add(new CompilationDiagnostic(
+                        CompilationDiagnostic.Severity.ERROR,
+                        "Pool '" + poolName + "' missing required field: agent-id",
+                        "/pools/" + poolName, -1));
+                continue;
+            }
+            String backend = (String) config.get("backend");
+            int minActive = config.containsKey("min-active")
+                            ? ((Number) config.get("min-active")).intValue() : 0;
+            int maxActive = config.containsKey("max-active")
+                            ? ((Number) config.get("max-active")).intValue() : 10;
+            String workingDir = (String) config.get("working-dir");
+            Map<String, Object> scaling = config.containsKey("scaling")
+                                          ? (Map<String, Object>) config.get("scaling") : null;
+            Map<String, Object> extensions = config.containsKey("extensions")
+                                             ? (Map<String, Object>) config.get("extensions") : null;
+            int salience = config.containsKey("salience")
+                           ? ((Number) config.get("salience")).intValue() : 0;
+            Map<String, Object> clearing = config.containsKey("clearing")
+                                           ? (Map<String, Object>) config.get("clearing") : null;
+            int maxPromptTokens = config.containsKey("max-prompt-tokens")
+                                  ? ((Number) config.get("max-prompt-tokens")).intValue() : 0;
+
+            result.add(new io.casehub.platform.agent.config.PoolDeclaration(
+                    poolName, agentId, backend, minActive, maxActive, workingDir,
+                    scaling, extensions, salience, clearing, maxPromptTokens));
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")

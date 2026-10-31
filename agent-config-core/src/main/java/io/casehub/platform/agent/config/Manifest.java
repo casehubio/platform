@@ -27,7 +27,8 @@ public record Manifest(
                 var p = e.getValue();
                 injected.put(e.getKey(), new PoolDeclaration(
                         e.getKey(), p.agentId(), p.backend(), p.minActive(), p.maxActive(),
-                        p.workingDir(), p.scaling(), p.extensions()));
+                        p.workingDir(), p.scaling(), p.extensions(),
+                        p.salience(), p.clearing(), p.maxPromptTokens()));
             }
             pools = Map.copyOf(injected);
         } else {

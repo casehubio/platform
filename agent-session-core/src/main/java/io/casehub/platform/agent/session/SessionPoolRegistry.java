@@ -15,6 +15,8 @@ public class SessionPoolRegistry {
     private static final Logger LOG = Logger.getLogger(SessionPoolRegistry.class);
 
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
+    private final Map<String, SessionPool> poolsByName = new ConcurrentHashMap<>();
+
 
     public SessionPoolRegistry(List<PoolDeclaration> declarations,
                                 BackendInstanceRegistry backends) {
@@ -24,6 +26,7 @@ public class SessionPoolRegistry {
             if (backend.isPresent()) {
                 var pool = new SessionPool(backend.get(), config);
                 pools.put(poolKey(config.backendKey(), null), pool);
+                poolsByName.put(config.name(), pool);
                 LOG.infof("Session pool created: %s (min=%d, max=%d, backend=%s)",
                         config.name(), config.minActive(), config.maxActive(), config.backendKey());
             } else {
@@ -37,6 +40,11 @@ public class SessionPoolRegistry {
         return Optional.ofNullable(pools.get(poolKey(backendKey, model)))
                 .or(() -> Optional.ofNullable(pools.get(poolKey(backendKey, null))));
     }
+
+    public Optional<SessionPool> findByName(String name) {
+        return Optional.ofNullable(poolsByName.get(name));
+    }
+
 
     public void shutdown() {
         pools.values().forEach(SessionPool::shutdown);

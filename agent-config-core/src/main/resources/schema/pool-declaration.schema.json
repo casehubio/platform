@@ -36,6 +36,39 @@
     "extensions": {
       "type": "object",
       "description": "Consumer-specific configuration (e.g. model-chain, budget, eviction)"
+    },
+    "salience": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Scheduling priority — higher-salience pools monopolise capacity while active, yielding when idle"
+    },
+    "clearing": {
+      "type": "object",
+      "description": "Context clearing policy for pool sessions",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": ["every-call", "turn-count", "size-aware", "explicit"],
+          "description": "When to clear conversation context"
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Token threshold for size-aware clearing"
+        },
+        "turns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Turn count for turn-count clearing"
+        }
+      }
+    },
+    "max-prompt-tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Maximum prompt tokens before rejecting — 0 means unlimited"
     }
   },
   "additionalProperties": false

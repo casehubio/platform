@@ -1,0 +1,35 @@
+# 03 — Session with Context Clear
+# Builds on 02: explicit context clearing between unrelated queries.
+# The session stays open (no pool checkout overhead) but the agent forgets
+# the previous conversation, starting fresh for the next topic.
+
+steps:
+  - agent-session-open:
+      session: support
+      system: >
+        You are a customer support agent. Help with one issue at a time.
+        Be empathetic and solution-oriented.
+
+  # First customer issue
+  - agent-query:
+      session: support
+      user: "My order #4521 hasn't arrived. It's been 10 days."
+      output: shipping_response
+
+  - agent-query:
+      session: support
+      user: "Can you expedite replacement shipping?"
+      output: expedite_response
+
+  # Clear context — next customer, different issue
+  - agent-session-clear:
+      session: support
+
+  # Second customer issue (agent has no memory of the first)
+  - agent-query:
+      session: support
+      user: "I was charged twice for subscription renewal."
+      output: billing_response
+
+  - agent-session-close:
+      session: support

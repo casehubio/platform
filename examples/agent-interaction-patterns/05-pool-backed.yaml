@@ -1,0 +1,32 @@
+# 05 — Pool-Backed Sessions
+# Builds on 02: sessions are backed by a named pool declared inline.
+# The pool manages session lifecycle — checkout, reuse, and eviction.
+# Requires agent-config.yaml manifest (see companion file).
+
+pools:
+  analysts:
+    agent-id: financial-analyst
+    backend: claude
+    max-active: 5
+    clearing:
+      policy: size-aware
+      threshold: 8000
+
+steps:
+  - agent-session-open:
+      session: analyst-1
+      pool: analysts
+      system: "You are a senior financial analyst specializing in equity markets."
+
+  - agent-query:
+      session: analyst-1
+      user: "What are the key indicators for tech sector performance in Q4?"
+      output: q4_outlook
+
+  - agent-query:
+      session: analyst-1
+      user: "Which specific stocks would you watch based on those indicators?"
+      output: stock_picks
+
+  - agent-session-close:
+      session: analyst-1

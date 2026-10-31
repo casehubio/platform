@@ -1,7 +1,9 @@
 package io.casehub.platform.agent.config;
 
-import java.util.Map;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -66,4 +68,59 @@ class PoolDeclarationTest {
         assertThatThrownBy(() -> pool.scaling().put("x", "y"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void poolDeclaration_withClearingSalienceAndPromptLimit() {
+        var clearing = Map.<String, Object>of("policy", "size-aware", "threshold", 8000);
+        var pool = new PoolDeclaration("voice", "voice-agent", "claude",
+                                       2, 10, null, Map.of(), Map.of(),
+                                       1, clearing, 50000);
+        assertThat(pool.salience()).isEqualTo(1);
+        assertThat(pool.clearing()).containsEntry("policy", "size-aware");
+        assertThat(pool.clearing()).containsEntry("threshold", 8000);
+        assertThat(pool.maxPromptTokens()).isEqualTo(50000);
+    }
+
+    @Test
+    void poolDeclaration_defaultsForNewFields() {
+        var pool = new PoolDeclaration("basic", "agent", "claude",
+                                       0, 5, null, Map.of(), Map.of());
+        assertThat(pool.salience()).isZero();
+        assertThat(pool.clearing()).isNull();
+        assertThat(pool.maxPromptTokens()).isZero();
+    }
+
+    @Test
+    void clearingIsDefensivelyCopied() {
+        var clearing = new java.util.HashMap<String, Object>();
+        clearing.put("policy", "every-call");
+        var pool = new PoolDeclaration("p", "a", null, 0, 1, null, null, null,
+                                       0, clearing, 0);
+        assertThatThrownBy(() -> pool.clearing().put("x", "y"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void nullClearingRemainsNull() {
+        var pool = new PoolDeclaration("p", "a", null, 0, 1, null, null, null,
+                                       0, null, 0);
+        assertThat(pool.clearing()).isNull();
+    }
+
+    @Test
+    void negativeSalienceThrows() {
+        assertThatThrownBy(() -> new PoolDeclaration("p", "a", null, 0, 1, null, null, null,
+                                                     -1, null, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("salience");
+    }
+
+    @Test
+    void negativeMaxPromptTokensThrows() {
+        assertThatThrownBy(() -> new PoolDeclaration("p", "a", null, 0, 1, null, null, null,
+                                                     0, null, -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxPromptTokens");
+    }
+
 }

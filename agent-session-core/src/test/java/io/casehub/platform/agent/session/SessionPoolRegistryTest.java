@@ -47,6 +47,36 @@ class SessionPoolRegistryTest {
         assertThat(registry.findPool("nonexistent", null)).isEmpty();
     }
 
+
+    @Test
+    void findByName_returnsPoolByDeclaredName() {
+        var decl = new PoolDeclaration("voice", "agent", "stub", 0, 5,
+                                       null, Map.of(), Map.of(), 1, Map.of("policy", "every-call"), 0);
+        var registry = new SessionPoolRegistry(List.of(decl), stubBackendRegistry());
+        assertThat(registry.findByName("voice")).isPresent();
+    }
+
+    @Test
+    void findByName_returnsEmptyForUnknownName() {
+        var decl = new PoolDeclaration("voice", "agent", "stub", 0, 5,
+                                       null, Map.of(), Map.of());
+        var registry = new SessionPoolRegistry(List.of(decl), stubBackendRegistry());
+        assertThat(registry.findByName("email")).isEmpty();
+    }
+
+    @Test
+    void findByName_multiplePoolsSameBackend() {
+        var voice = new PoolDeclaration("voice", "agent", "stub", 0, 10,
+                                        null, Map.of(), Map.of(), 1, null, 0);
+        var email = new PoolDeclaration("email", "agent", "stub", 0, 5,
+                                        null, Map.of(), Map.of(), 0, null, 0);
+        var registry = new SessionPoolRegistry(List.of(voice, email), stubBackendRegistry());
+        assertThat(registry.findByName("voice")).isPresent();
+        assertThat(registry.findByName("email")).isPresent();
+        assertThat(registry.findByName("voice").get())
+                .isNotSameAs(registry.findByName("email").get());
+    }
+
     private static BackendInstanceRegistry stubBackendRegistry() {
         return new BackendInstanceRegistry() {
             private final AgentBackend stub = new SessionPoolTest.StubBackend();

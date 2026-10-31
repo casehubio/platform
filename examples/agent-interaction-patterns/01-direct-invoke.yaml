@@ -1,0 +1,18 @@
+# 01 — Direct Invoke
+# Simplest pattern: a single-shot agent call with no session or pool.
+# The agent receives a system prompt and user prompt, returns a response.
+
+steps:
+  - agent-session-open:
+      session: classifier
+      system: >
+        You are a document classifier. Respond with exactly one word:
+        INVOICE, CONTRACT, RECEIPT, or UNKNOWN.
+
+  - agent-query:
+      session: classifier
+      user: "Classify this document: 'Payment of $5,000 due by March 15'"
+      output: classification
+
+  - agent-session-close:
+      session: classifier

@@ -1,0 +1,55 @@
+# 06 — Multi-Channel with Separate Pools
+# Builds on 05: multiple pools for different communication channels.
+# Each channel has its own pool configuration — voice gets more capacity,
+# email gets larger context windows.
+
+pools:
+  voice:
+    agent-id: voice-agent
+    backend: claude
+    max-active: 10
+    clearing:
+      policy: every-call
+  email:
+    agent-id: email-agent
+    backend: claude
+    max-active: 5
+    clearing:
+      policy: size-aware
+      threshold: 16000
+
+steps:
+  # Voice channel — short, conversational exchanges
+  - agent-session-open:
+      session: voice-customer-1
+      pool: voice
+      system: >
+        You are a voice support agent. Keep responses under 2 sentences.
+        Be warm and direct.
+
+  - agent-query:
+      session: voice-customer-1
+      user: "Hi, I need to change my delivery address."
+      output: voice_greeting
+
+  - agent-session-close:
+      session: voice-customer-1
+
+  # Email channel — longer, more detailed responses
+  - agent-session-open:
+      session: email-ticket-42
+      pool: email
+      system: >
+        You are an email support agent. Write complete, professional responses
+        with greeting and sign-off. Reference the ticket number.
+
+  - agent-query:
+      session: email-ticket-42
+      user: >
+        Ticket #42: Customer reports intermittent API timeouts when calling
+        /v2/payments endpoint. Happens ~3 times per day, always between
+        14:00-16:00 UTC. No error codes returned, just timeout after 30s.
+      output: email_response
+
+  - agent-session-close:
+      session: email-ticket-42

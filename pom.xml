@@ -53,6 +53,8 @@
         <module>authn-social-core</module>
         <module>session-jpa-common</module>
         <module>session-jpa</module>
+        <module>challenge-jpa-common</module>
+        <module>challenge-jpa</module>
         <module>authn-webauthn-jpa-common</module>
         <module>authn-webauthn-jpa</module>
         <module>authn-social-jpa-common</module>
@@ -234,6 +236,7 @@
         <module>oidc-spring</module>
         <module>security-spring</module>
         <module>session-spring-jpa</module>
+        <module>challenge-spring-jpa</module>
         <module>authn-webauthn-spring-jpa</module>
         <module>authn-social-spring-jpa</module>
         <module>scim-spring</module>

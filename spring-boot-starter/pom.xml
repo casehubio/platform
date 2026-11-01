@@ -129,6 +129,20 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Registration (optional) -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-registration-spring</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-user-spring-jpa</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Actuator health/metrics/info -->
         <dependency>
             <groupId>io.casehub</groupId>

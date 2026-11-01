@@ -21,6 +21,12 @@
         <module>registration-api</module>
         <module>user-inmem-core</module>
         <module>registration-core</module>
+        <module>user-jpa-common</module>
+        <module>user-jpa</module>
+        <module>user-inmem</module>
+        <module>registration</module>
+        <module>user-spring-jpa</module>
+        <module>registration-spring</module>
         <module>simulation-api</module>
         <module>simulation-core</module>
         <module>simulation-inmem</module>

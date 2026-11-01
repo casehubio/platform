@@ -459,6 +459,38 @@ casehub:
         redirect-uri: https://example.com/auth/github/callback
 ```
 
+### User Registration
+
+Self-signup and user provisioning for deployments without an external SCIM directory. Three registration paths: social login (Google/GitHub/Apple), email/password, and admin-initiated invitations. Configurable per-tenant policy: `OPEN` (auto-approve), `APPROVAL_REQUIRED` (admin gate), `INVITATION_ONLY` (no self-signup).
+
+| Artifact | What it provides |
+|----------|------------------|
+| `casehub-platform-registration-api` | SPIs — UserStore, RegistrationService, UserProvisioner, PasswordHasher, InvitationStore, EmailVerificationStore, RegistrationPolicy |
+| `casehub-platform-registration-core` | Ceremony logic — RegistrationServiceCore, UserStoreProvisioner, PasswordAuthenticationProviderCore (Argon2id) |
+| `casehub-platform-registration` | Quarkus CDI wiring + REST endpoints (graphql-generator APT) |
+| `casehub-platform-registration-spring` | Spring Boot auto-configuration |
+| `casehub-platform-user-inmem-core` | In-memory stores (test/ephemeral) |
+| `casehub-platform-user-inmem` | Quarkus CDI wiring for in-memory stores |
+| `casehub-platform-user-jpa-common` | JPA entities + Flyway V9000-V9003 |
+| `casehub-platform-user-jpa` | Quarkus JPA store implementations |
+| `casehub-platform-user-spring-jpa` | Spring Data JPA stores |
+
+**Registration policy** — set via tenant preference `casehub.registration.mode`:
+
+| Mode | Behaviour |
+|------|-----------|
+| `OPEN` | Self-signup allowed. Email verified → ACTIVE immediately |
+| `APPROVAL_REQUIRED` | Self-signup allowed. Email verified → PENDING_APPROVAL. Admin approves via `/register/approve/{userId}` |
+| `INVITATION_ONLY` | No self-signup. Admin creates invitations via `/register/invitations`. Invitees register with the token |
+
+**Social login integration** — when a user logs in via Google/GitHub/Apple and no existing identity is found, `UserProvisioner.provisionFromSocialLogin()` creates a `UserRecord` if the tenant policy allows it. `UserResolver` stays read-only (CQS-compliant). Account-takeover mitigation: the provisioner never auto-links a social login to an existing account.
+
+**Events** — all implement `SubscribableEvent` for the notification pipeline:
+- `io.casehub.registration.user.registered` — user created, may be pending verification
+- `io.casehub.registration.user.activated` — user fully active
+- `io.casehub.registration.approved` / `rejected` — admin decision on pending approval
+- `io.casehub.registration.invitation.created` — new invitation issued
+
 ### Path
 
 Hierarchical, scope-labelling type for case types, preference scopes, label paths. Not a filesystem path -- strict validation, no empty segments, no leading/trailing slashes.

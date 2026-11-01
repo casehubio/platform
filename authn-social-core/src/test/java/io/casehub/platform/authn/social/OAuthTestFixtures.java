@@ -61,9 +61,11 @@ final class OAuthTestFixtures {
     }
 
     static class StubUserResolver implements UserResolver {
+        PrincipalId resolvedPrincipal;
+
         @Override
         public Optional<PrincipalId> resolveByEmail(String email, String tenancyId) {
-            return Optional.empty();
+            return Optional.ofNullable(resolvedPrincipal);
         }
     }
 

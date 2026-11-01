@@ -9,7 +9,9 @@ import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.RefreshTokenStore;
 import io.casehub.platform.api.authn.SessionStore;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
 import io.casehub.platform.api.authn.WebAuthnCredentialStore;
+import io.casehub.platform.registration.UserProvisioner;
 import io.casehub.platform.authn.AuthenticationRouterCore;
 import io.casehub.platform.authn.JwtIssuerCore;
 import io.casehub.platform.authn.SessionManagerCore;
@@ -65,7 +67,9 @@ public class AuthnBeans {
             OAuthTokenStore tokenStore,
             IdentityBindingStore bindingStore,
             UserResolver userResolver,
-            AuthenticationEventListener eventListener) {
+            AuthenticationEventListener eventListener,
+            UserProvisioner userProvisioner,
+            UserStatusResolver userStatusResolver) {
         var providers = new ArrayList<AuthenticationProvider>();
 
         config.webauthn().ifPresent(wc -> {
@@ -94,14 +98,14 @@ public class AuthnBeans {
             providers.add(new GoogleAuthenticationProvider(
                     new GoogleAuthenticationProvider.GoogleConfig(
                             sc.clientId(), sc.clientSecret(), sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener, userProvisioner, userStatusResolver));
         }
         if (social.containsKey("github")) {
             var sc = social.get("github");
             providers.add(new GitHubAuthenticationProvider(
                     new GitHubAuthenticationProvider.GitHubConfig(
                             sc.clientId(), sc.clientSecret(), sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener, userProvisioner, userStatusResolver));
         }
         if (social.containsKey("apple")) {
             var sc = social.get("apple");
@@ -112,7 +116,7 @@ public class AuthnBeans {
                             sc.keyId().orElse(""),
                             sc.privateKey().orElse(""),
                             sc.redirectUri()),
-                    httpClient, tokenStore, bindingStore, userResolver, eventListener));
+                    httpClient, tokenStore, bindingStore, userResolver, eventListener, userProvisioner, userStatusResolver));
         }
 
         return List.copyOf(providers);

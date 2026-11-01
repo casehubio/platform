@@ -4,5 +4,6 @@ import java.util.Set;
 
 public record SocialLoginCompleted(
     String provider, String actorId, String tenancyId,
-    Set<String> grantedScopes, boolean firstLogin
+    Set<String> grantedScopes, boolean firstLogin,
+    boolean emailVerified
 ) {}

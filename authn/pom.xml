@@ -38,6 +38,11 @@
             <artifactId>casehub-platform-authn-social-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-registration-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>jakarta.enterprise</groupId>

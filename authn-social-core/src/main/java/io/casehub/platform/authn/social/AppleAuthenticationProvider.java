@@ -5,6 +5,8 @@ import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
+import io.casehub.platform.registration.UserProvisioner;
 
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +27,19 @@ public class AppleAuthenticationProvider extends AbstractOAuthAuthenticationProv
                                        UserResolver userResolver,
                                        AuthenticationEventListener eventListener) {
         super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener);
+        this.appleConfig = config;
+    }
+
+    public AppleAuthenticationProvider(AppleConfig config,
+                                       OAuthHttpClient httpClient,
+                                       OAuthTokenStore tokenStore,
+                                       IdentityBindingStore bindingStore,
+                                       UserResolver userResolver,
+                                       AuthenticationEventListener eventListener,
+                                       UserProvisioner userProvisioner,
+                                       UserStatusResolver userStatusResolver) {
+        super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener,
+              userProvisioner, userStatusResolver);
         this.appleConfig = config;
     }
 
@@ -61,7 +76,8 @@ public class AppleAuthenticationProvider extends AbstractOAuthAuthenticationProv
         }
 
         String email = (String) claims.get("email");
-        return new OAuthIdentity(sub, email, null);
+        boolean verified = Boolean.TRUE.equals(claims.get("email_verified"));
+        return new OAuthIdentity(sub, email, null, verified);
     }
 
 

@@ -4,6 +4,8 @@ import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
+import io.casehub.platform.registration.UserProvisioner;
 
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +27,19 @@ public class GitHubAuthenticationProvider extends AbstractOAuthAuthenticationPro
                                         UserResolver userResolver,
                                         AuthenticationEventListener eventListener) {
         super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener);
+        this.httpClient = httpClient;
+    }
+
+    public GitHubAuthenticationProvider(GitHubConfig config,
+                                        OAuthHttpClient httpClient,
+                                        OAuthTokenStore tokenStore,
+                                        IdentityBindingStore bindingStore,
+                                        UserResolver userResolver,
+                                        AuthenticationEventListener eventListener,
+                                        UserProvisioner userProvisioner,
+                                        UserStatusResolver userStatusResolver) {
+        super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener,
+              userProvisioner, userStatusResolver);
         this.httpClient = httpClient;
     }
 
@@ -59,7 +74,7 @@ public class GitHubAuthenticationProvider extends AbstractOAuthAuthenticationPro
             name = (String) user.get("login");
         }
 
-        return new OAuthIdentity(externalId, email, name);
+        return new OAuthIdentity(externalId, email, name, false);
     }
 
     public record GitHubConfig(

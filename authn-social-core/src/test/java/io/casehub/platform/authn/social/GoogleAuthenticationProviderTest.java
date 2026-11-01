@@ -107,6 +107,7 @@ class GoogleAuthenticationProviderTest {
 
     @Test
     void verifyExtractsIdentityFromIdToken() {
+        userResolver.resolvedPrincipal = PrincipalId.human("google-user-123");
         String idToken = OAuthTestFixtures.buildIdToken("google-user-123", "user@gmail.com", "Jane Doe", true);
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", "refresh-token", idToken, 3600, "Bearer", "openid email profile");
@@ -148,6 +149,7 @@ class GoogleAuthenticationProviderTest {
 
     @Test
     void verifyFallsBackToUserInfoWhenNoIdToken() {
+        userResolver.resolvedPrincipal = PrincipalId.human("google-user-456");
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", null, null, 3600, "Bearer", "openid email");
         httpClient.nextUserInfo = Map.of(
@@ -171,6 +173,7 @@ class GoogleAuthenticationProviderTest {
 
     @Test
     void verifyStoresTokenAndBinding() {
+        userResolver.resolvedPrincipal = PrincipalId.human("google-user-789");
         String idToken = OAuthTestFixtures.buildIdToken("google-user-789", "user@gmail.com", "Jane", true);
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", "refresh-token", idToken, 3600, "Bearer", "openid email");

@@ -12,8 +12,11 @@ import io.casehub.platform.api.authn.InvalidChallengeException;
 import io.casehub.platform.api.authn.OAuthTokenRecord;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.SocialLoginCompleted;
+import io.casehub.platform.api.authn.UnknownIdentityException;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
 import io.casehub.platform.api.identity.PrincipalId;
+import io.casehub.platform.registration.UserProvisioner;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +38,8 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
     private final IdentityBindingStore              bindingStore;
     private final UserResolver                      userResolver;
     private final AuthenticationEventListener       eventListener;
+    private final UserProvisioner                   userProvisioner;
+    private final UserStatusResolver                userStatusResolver;
     private final ConcurrentHashMap<String, String> pendingStates = new ConcurrentHashMap<>();
 
     protected AbstractOAuthAuthenticationProvider(OAuthConfig config,
@@ -42,12 +48,27 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
                                                   IdentityBindingStore bindingStore,
                                                   UserResolver userResolver,
                                                   AuthenticationEventListener eventListener) {
-        this.config        = Objects.requireNonNull(config, "config");
-        this.httpClient    = Objects.requireNonNull(httpClient, "httpClient");
-        this.tokenStore    = Objects.requireNonNull(tokenStore, "tokenStore");
-        this.bindingStore  = Objects.requireNonNull(bindingStore, "bindingStore");
-        this.userResolver  = Objects.requireNonNull(userResolver, "userResolver");
-        this.eventListener = Objects.requireNonNull(eventListener, "eventListener");
+        this(config, httpClient, tokenStore, bindingStore, userResolver, eventListener,
+             (email, tenancyId, provider, emailVerified) -> Optional.empty(),
+             (actorId, tenancyId) -> Optional.empty());
+    }
+
+    protected AbstractOAuthAuthenticationProvider(OAuthConfig config,
+                                                  OAuthHttpClient httpClient,
+                                                  OAuthTokenStore tokenStore,
+                                                  IdentityBindingStore bindingStore,
+                                                  UserResolver userResolver,
+                                                  AuthenticationEventListener eventListener,
+                                                  UserProvisioner userProvisioner,
+                                                  UserStatusResolver userStatusResolver) {
+        this.config             = Objects.requireNonNull(config, "config");
+        this.httpClient         = Objects.requireNonNull(httpClient, "httpClient");
+        this.tokenStore         = Objects.requireNonNull(tokenStore, "tokenStore");
+        this.bindingStore       = Objects.requireNonNull(bindingStore, "bindingStore");
+        this.userResolver       = Objects.requireNonNull(userResolver, "userResolver");
+        this.eventListener      = Objects.requireNonNull(eventListener, "eventListener");
+        this.userProvisioner    = Objects.requireNonNull(userProvisioner, "userProvisioner");
+        this.userStatusResolver = Objects.requireNonNull(userStatusResolver, "userStatusResolver");
     }
 
     protected abstract String authorizationEndpoint();
@@ -135,20 +156,25 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
 
         try {
             eventListener.onSocialLoginCompleted(new SocialLoginCompleted(
-                    method(), actorId, tenancyId, grantedScopes, firstLogin));
+                    method(), actorId, tenancyId, grantedScopes, firstLogin,
+                    identity.emailVerified()));
         } catch (Exception ex) {
             java.util.logging.Logger.getLogger(AbstractOAuthAuthenticationProvider.class.getName())
                     .log(java.util.logging.Level.WARNING, "Authentication event listener failed", ex);
         }
+
+        var metadata = new LinkedHashMap<String, Object>(Map.of(
+                "externalId", identity.externalId(),
+                "firstLogin", firstLogin));
+        userStatusResolver.resolveStatus(actorId, tenancyId)
+            .ifPresent(status -> metadata.put("userStatus", status));
 
         return new AuthenticationResult(
                 PrincipalId.human(actorId),
                 tenancyId,
                 Set.of(),
                 method(),
-                Map.of(
-                        "externalId", identity.externalId(),
-                        "firstLogin", firstLogin));
+                metadata);
     }
 
     private String resolveOrCreateActorId(OAuthIdentity identity, String tenancyId) {
@@ -157,8 +183,15 @@ public abstract class AbstractOAuthAuthenticationProvider implements Authenticat
             if (resolved.isPresent()) {
                 return resolved.get().id();
             }
+            var provisioned = userProvisioner.provisionFromSocialLogin(
+                identity.email(), tenancyId, method(), identity.emailVerified());
+            if (provisioned.isPresent()) {
+                return provisioned.get().id();
+            }
         }
-        return identity.externalId();
+        throw new UnknownIdentityException(method(),
+            "No identity resolved for provider " + method()
+            + (identity.email() != null ? " (email: " + identity.email() + ")" : " (no email)"));
     }
 
     private String buildAuthorizationUrl(String state, Set<String> scopes, Map<String, String> extraParams) {

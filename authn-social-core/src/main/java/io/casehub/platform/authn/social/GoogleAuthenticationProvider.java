@@ -5,6 +5,8 @@ import io.casehub.platform.api.authn.AuthenticationEventListener;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.OAuthTokenStore;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
+import io.casehub.platform.registration.UserProvisioner;
 
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +28,19 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
                                         UserResolver userResolver,
                                         AuthenticationEventListener eventListener) {
         super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener);
+        this.httpClient = httpClient;
+    }
+
+    public GoogleAuthenticationProvider(GoogleConfig config,
+                                        OAuthHttpClient httpClient,
+                                        OAuthTokenStore tokenStore,
+                                        IdentityBindingStore bindingStore,
+                                        UserResolver userResolver,
+                                        AuthenticationEventListener eventListener,
+                                        UserProvisioner userProvisioner,
+                                        UserStatusResolver userStatusResolver) {
+        super(config, httpClient, tokenStore, bindingStore, userResolver, eventListener,
+              userProvisioner, userStatusResolver);
         this.httpClient = httpClient;
     }
 
@@ -69,13 +84,13 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
         }
 
         String email = (String) claims.get("email");
-        Object emailVerified = claims.get("email_verified");
-        if (email != null && !Boolean.TRUE.equals(emailVerified)) {
+        boolean verified = Boolean.TRUE.equals(claims.get("email_verified"));
+        if (email != null && !verified) {
             throw new OAuthException("Google email not verified for: " + email);
         }
 
         String name = (String) claims.get("name");
-        return new OAuthIdentity(sub, email, name);
+        return new OAuthIdentity(sub, email, name, verified);
     }
 
     private OAuthIdentity extractFromUserInfo(String accessToken) {
@@ -87,13 +102,13 @@ public class GoogleAuthenticationProvider extends AbstractOAuthAuthenticationPro
         }
 
         String email = (String) userInfo.get("email");
-        Object emailVerified = userInfo.get("email_verified");
-        if (email != null && !Boolean.TRUE.equals(emailVerified)) {
+        boolean verified = Boolean.TRUE.equals(userInfo.get("email_verified"));
+        if (email != null && !verified) {
             throw new OAuthException("Google email not verified for: " + email);
         }
 
         String name = (String) userInfo.get("name");
-        return new OAuthIdentity(sub, email, name);
+        return new OAuthIdentity(sub, email, name, verified);
     }
 
 

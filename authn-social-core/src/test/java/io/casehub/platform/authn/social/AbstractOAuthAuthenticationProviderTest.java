@@ -6,8 +6,11 @@ import io.casehub.platform.api.authn.IdentityBinding;
 import io.casehub.platform.api.authn.IdentityBindingStore;
 import io.casehub.platform.api.authn.InvalidChallengeException;
 import io.casehub.platform.api.authn.OAuthTokenStore;
+import io.casehub.platform.api.authn.UnknownIdentityException;
 import io.casehub.platform.api.authn.UserResolver;
+import io.casehub.platform.api.authn.UserStatusResolver;
 import io.casehub.platform.api.identity.PrincipalId;
+import io.casehub.platform.registration.UserProvisioner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,16 +33,22 @@ class AbstractOAuthAuthenticationProviderTest {
     private OAuthTestFixtures.StubOAuthHttpClient httpClient;
     private TestOAuthProvider provider;
 
+    private StubUserProvisioner provisioner;
+    private StubUserStatusResolver statusResolver;
+
     @BeforeEach
     void setUp() {
         tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         bindingStore = new OAuthTestFixtures.InMemIdentityBindingStore();
         userResolver = new OAuthTestFixtures.StubUserResolver();
         httpClient = new OAuthTestFixtures.StubOAuthHttpClient();
+        provisioner = new StubUserProvisioner();
+        statusResolver = new StubUserStatusResolver();
 
         var config = new TestOAuthConfig("client-id", "client-secret",
                 "https://example.com/callback", Set.of("openid", "email"));
-        provider = new TestOAuthProvider(config, httpClient, tokenStore, bindingStore, userResolver);
+        provider = new TestOAuthProvider(config, httpClient, tokenStore, bindingStore,
+                userResolver, provisioner, statusResolver);
     }
 
     @Test
@@ -75,6 +84,7 @@ class AbstractOAuthAuthenticationProviderTest {
 
     @Test
     void verifyExchangesCodeAndReturnsResult() {
+        provisioner.nextResult = Optional.of(PrincipalId.human("ext-user-1"));
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", "refresh-token", null, 3600, "Bearer", "openid email");
 
@@ -97,6 +107,7 @@ class AbstractOAuthAuthenticationProviderTest {
 
     @Test
     void verifyStoresTokens() {
+        provisioner.nextResult = Optional.of(PrincipalId.human("ext-user-1"));
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", "refresh-token", null, 3600, "Bearer", "openid email");
 
@@ -118,6 +129,7 @@ class AbstractOAuthAuthenticationProviderTest {
 
     @Test
     void verifyCreatesIdentityBinding() {
+        provisioner.nextResult = Optional.of(PrincipalId.human("ext-user-1"));
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "access-token", null, null, 3600, "Bearer", "openid");
 
@@ -173,14 +185,82 @@ class AbstractOAuthAuthenticationProviderTest {
                 .hasMessageContaining("code");
     }
 
+    @Test
+    void verifyWithUserResolverMatch_doesNotCallProvisioner() {
+        userResolver.resolvedPrincipal = PrincipalId.human("resolved-user");
+        provisioner.nextResult = Optional.of(PrincipalId.human("should-not-be-used"));
+        httpClient.nextTokenResponse = new OAuthTokenResponse(
+                "access-token", null, null, 3600, "Bearer", "openid");
+
+        var context = new AuthenticationContext("test-provider", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+        var challenge = new ChallengeRecord(response.challengeId(), "test-provider", TENANT,
+                null, Instant.now(), response.expiresAt());
+
+        var result = provider.verify(challenge, Map.of("code", "auth-code", "state", response.challengeId()));
+
+        assertThat(result.principal()).isEqualTo(PrincipalId.human("resolved-user"));
+        assertThat(provisioner.called).isFalse();
+    }
+
+    @Test
+    void verifyWithProvisionerSuccess_returnsProvisionedId() {
+        provisioner.nextResult = Optional.of(PrincipalId.human("provisioned-user"));
+        httpClient.nextTokenResponse = new OAuthTokenResponse(
+                "access-token", null, null, 3600, "Bearer", "openid");
+
+        var context = new AuthenticationContext("test-provider", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+        var challenge = new ChallengeRecord(response.challengeId(), "test-provider", TENANT,
+                null, Instant.now(), response.expiresAt());
+
+        var result = provider.verify(challenge, Map.of("code", "auth-code", "state", response.challengeId()));
+
+        assertThat(result.principal()).isEqualTo(PrincipalId.human("provisioned-user"));
+        assertThat(provisioner.called).isTrue();
+    }
+
+    @Test
+    void verifyWithBothEmpty_throwsUnknownIdentityException() {
+        httpClient.nextTokenResponse = new OAuthTokenResponse(
+                "access-token", null, null, 3600, "Bearer", "openid");
+
+        var context = new AuthenticationContext("test-provider", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+        var challenge = new ChallengeRecord(response.challengeId(), "test-provider", TENANT,
+                null, Instant.now(), response.expiresAt());
+
+        assertThatThrownBy(() -> provider.verify(challenge, Map.of("code", "auth-code", "state", response.challengeId())))
+                .isInstanceOf(UnknownIdentityException.class)
+                .hasMessageContaining("No identity resolved");
+    }
+
+    @Test
+    void verifyIncludesUserStatusInMetadata() {
+        provisioner.nextResult = Optional.of(PrincipalId.human("prov-user"));
+        statusResolver.nextStatus = Optional.of("PENDING_APPROVAL");
+        httpClient.nextTokenResponse = new OAuthTokenResponse(
+                "access-token", null, null, 3600, "Bearer", "openid");
+
+        var context = new AuthenticationContext("test-provider", TENANT, ORIGIN, Optional.empty(), Map.of());
+        var response = (OAuthChallengeResponse) provider.initiate(context);
+        var challenge = new ChallengeRecord(response.challengeId(), "test-provider", TENANT,
+                null, Instant.now(), response.expiresAt());
+
+        var result = provider.verify(challenge, Map.of("code", "auth-code", "state", response.challengeId()));
+
+        assertThat(result.metadata()).containsEntry("userStatus", "PENDING_APPROVAL");
+    }
+
     // --- stubs ---
 
     private static class TestOAuthProvider extends AbstractOAuthAuthenticationProvider {
         TestOAuthProvider(OAuthConfig config, OAuthHttpClient httpClient,
                           OAuthTokenStore tokenStore, IdentityBindingStore bindingStore,
-                          UserResolver userResolver) {
+                          UserResolver userResolver, UserProvisioner provisioner,
+                          UserStatusResolver statusResolver) {
             super(config, httpClient, tokenStore, bindingStore, userResolver,
-                  OAuthTestFixtures.NO_OP_LISTENER);
+                  OAuthTestFixtures.NO_OP_LISTENER, provisioner, statusResolver);
         }
 
         @Override
@@ -194,7 +274,28 @@ class AbstractOAuthAuthenticationProviderTest {
 
         @Override
         protected OAuthIdentity extractIdentity(OAuthTokenResponse tokens) {
-            return new OAuthIdentity("ext-user-1", "user@test.com", "Test User");
+            return new OAuthIdentity("ext-user-1", "user@test.com", "Test User", true);
+        }
+    }
+
+    private static class StubUserProvisioner implements UserProvisioner {
+        Optional<PrincipalId> nextResult = Optional.empty();
+        boolean called;
+
+        @Override
+        public Optional<PrincipalId> provisionFromSocialLogin(String email, String tenancyId,
+                                                               String provider, boolean emailVerified) {
+            called = true;
+            return nextResult;
+        }
+    }
+
+    private static class StubUserStatusResolver implements UserStatusResolver {
+        Optional<String> nextStatus = Optional.empty();
+
+        @Override
+        public Optional<String> resolveStatus(String actorId, String tenancyId) {
+            return nextStatus;
         }
     }
 

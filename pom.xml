@@ -20,6 +20,7 @@
         <module>platform-api</module>
         <module>registration-api</module>
         <module>user-inmem-core</module>
+        <module>registration-core</module>
         <module>simulation-api</module>
         <module>simulation-core</module>
         <module>simulation-inmem</module>

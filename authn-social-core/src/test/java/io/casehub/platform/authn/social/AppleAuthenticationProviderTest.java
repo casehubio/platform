@@ -21,6 +21,7 @@ class AppleAuthenticationProviderTest {
     private OAuthTestFixtures.InMemOAuthTokenStore tokenStore;
     private OAuthTestFixtures.InMemIdentityBindingStore bindingStore;
     private OAuthTestFixtures.StubOAuthHttpClient httpClient;
+    private OAuthTestFixtures.StubUserResolver userResolver;
     private AppleAuthenticationProvider provider;
 
     @BeforeEach
@@ -28,7 +29,7 @@ class AppleAuthenticationProviderTest {
         tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         bindingStore = new OAuthTestFixtures.InMemIdentityBindingStore();
         httpClient = new OAuthTestFixtures.StubOAuthHttpClient();
-        var userResolver = new OAuthTestFixtures.StubUserResolver();
+        userResolver = new OAuthTestFixtures.StubUserResolver();
 
         var config = new AppleAuthenticationProvider.AppleConfig(
                 "com.example.service",
@@ -56,6 +57,7 @@ class AppleAuthenticationProviderTest {
 
     @Test
     void verifyExtractsIdentityFromIdToken() {
+        userResolver.resolvedPrincipal = PrincipalId.human("apple-user-001");
         String idToken = OAuthTestFixtures.buildIdToken("apple-user-001", "user@privaterelay.appleid.com", null, true);
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "apple-access-token", "apple-refresh-token", idToken, 3600, "Bearer", "openid email");
@@ -76,7 +78,8 @@ class AppleAuthenticationProviderTest {
 
     @Test
     void verifyUsesFirstLoginUserData() {
-        String idToken = OAuthTestFixtures.buildIdToken("apple-user-002", null, null, true);
+        userResolver.resolvedPrincipal = PrincipalId.human("apple-user-002");
+        String idToken = OAuthTestFixtures.buildIdToken("apple-user-002", "jane@example.com", null, true);
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "token", null, idToken, 3600, "Bearer", "openid");
 

@@ -20,6 +20,7 @@ class GitHubAuthenticationProviderTest {
     private OAuthTestFixtures.InMemOAuthTokenStore tokenStore;
     private OAuthTestFixtures.InMemIdentityBindingStore bindingStore;
     private OAuthTestFixtures.StubOAuthHttpClient httpClient;
+    private OAuthTestFixtures.StubUserResolver userResolver;
     private GitHubAuthenticationProvider provider;
 
     @BeforeEach
@@ -27,7 +28,7 @@ class GitHubAuthenticationProviderTest {
         tokenStore = new OAuthTestFixtures.InMemOAuthTokenStore();
         bindingStore = new OAuthTestFixtures.InMemIdentityBindingStore();
         httpClient = new OAuthTestFixtures.StubOAuthHttpClient();
-        var userResolver = new OAuthTestFixtures.StubUserResolver();
+        userResolver = new OAuthTestFixtures.StubUserResolver();
 
         var config = new GitHubAuthenticationProvider.GitHubConfig(
                 "github-client-id", "github-client-secret",
@@ -52,6 +53,7 @@ class GitHubAuthenticationProviderTest {
 
     @Test
     void verifyExtractsIdentityFromUserApi() {
+        userResolver.resolvedPrincipal = PrincipalId.human("12345");
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "gho_access_token", null, null, 0, "bearer", "user:email");
         httpClient.nextUserInfo = Map.of(
@@ -76,11 +78,13 @@ class GitHubAuthenticationProviderTest {
 
     @Test
     void verifyHandlesNumericId() {
+        userResolver.resolvedPrincipal = PrincipalId.human("99999");
         httpClient.nextTokenResponse = new OAuthTokenResponse(
                 "gho_token", null, null, 0, "bearer", "user");
         httpClient.nextUserInfo = Map.of(
                 "id", 99999,
-                "login", "devuser");
+                "login", "devuser",
+                "email", "dev@example.com");
 
         var context = new AuthenticationContext(
                 "github", TENANT, ORIGIN, Optional.empty(), Map.of());

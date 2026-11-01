@@ -39,6 +39,12 @@ public class RegistrationSpringAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public RegistrationPolicy registrationPolicy() {
+        return tenancyId -> io.casehub.platform.registration.RegistrationMode.OPEN;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public EmailSender emailSender() {
         return (to, subject, body) ->
                 LOG.warning("No EmailSender configured — email to " + to + " not sent: " + subject);

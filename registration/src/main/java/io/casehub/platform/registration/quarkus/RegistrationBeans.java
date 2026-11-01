@@ -80,7 +80,7 @@ public class RegistrationBeans {
 
     @Produces
     @ApplicationScoped
-    public PasswordAuthenticationProviderCore passwordAuthenticationProvider(
+    public io.casehub.platform.api.authn.AuthenticationProvider passwordAuthenticationProvider(
             PasswordCredentialStore credentialStore,
             UserStore userStore,
             PasswordHasher passwordHasher) {

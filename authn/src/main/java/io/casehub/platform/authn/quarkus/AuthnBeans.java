@@ -69,8 +69,13 @@ public class AuthnBeans {
             UserResolver userResolver,
             AuthenticationEventListener eventListener,
             UserProvisioner userProvisioner,
-            UserStatusResolver userStatusResolver) {
+            UserStatusResolver userStatusResolver,
+            jakarta.enterprise.inject.Instance<AuthenticationProvider> additionalProviders) {
         var providers = new ArrayList<AuthenticationProvider>();
+
+        for (var provider : additionalProviders) {
+            providers.add(provider);
+        }
 
         config.webauthn().ifPresent(wc -> {
             WebAuthnConfig webAuthnConfig = new WebAuthnConfig() {

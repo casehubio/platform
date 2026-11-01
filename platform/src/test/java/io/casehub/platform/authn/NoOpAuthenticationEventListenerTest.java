@@ -24,7 +24,7 @@ class NoOpAuthenticationEventListenerTest {
 
     @Test
     void onSocialLoginCompletedIsNoOp() {
-        listener.onSocialLoginCompleted(new SocialLoginCompleted("google", "actor-1", "tenant-1", Set.of("openid"), true));
+        listener.onSocialLoginCompleted(new SocialLoginCompleted("google", "actor-1", "tenant-1", Set.of("openid"), true, true));
     }
 
     @Test

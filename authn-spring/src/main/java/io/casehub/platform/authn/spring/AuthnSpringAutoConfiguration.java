@@ -36,8 +36,9 @@ import java.util.Set;
 public class AuthnSpringAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
-    public AuthenticationEventListener authenticationEventListener() {
-        return new AuthenticationEventListener() {};
+    public AuthenticationEventListener authenticationEventListener(
+            org.springframework.context.ApplicationEventPublisher publisher) {
+        return new SpringAuthenticationEventBridge(publisher);
     }
 
     @Bean

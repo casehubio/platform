@@ -20,6 +20,7 @@ import io.casehub.platform.registration.core.DefaultPasswordPolicy;
 import io.casehub.platform.registration.core.NoOpBreachDetector;
 import io.casehub.platform.registration.core.PasswordAuthenticationProviderCore;
 import io.casehub.platform.registration.core.RegistrationServiceCore;
+import io.casehub.platform.registration.core.SocialLoginReconciliationHandler;
 import io.casehub.platform.registration.core.UserStoreProvisioner;
 import io.casehub.platform.registration.core.UserStoreUserResolver;
 import io.casehub.platform.registration.core.UserStoreUserStatusResolver;
@@ -124,5 +125,23 @@ public class RegistrationSpringAutoConfiguration {
             UserStore userStore,
             PasswordHasher passwordHasher) {
         return new PasswordAuthenticationProviderCore(credentialStore, userStore, passwordHasher);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(UserStore.class)
+    public SocialLoginReconciliationHandler socialLoginReconciliationHandler(
+            UserStore userStore,
+            RegistrationPolicy policy,
+            RegistrationEventListener eventListener) {
+        return new SocialLoginReconciliationHandler(userStore, policy, eventListener);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(SocialLoginReconciliationHandler.class)
+    public RegistrationAuthenticationEventObserver registrationAuthenticationEventObserver(
+            SocialLoginReconciliationHandler reconciliationHandler) {
+        return new RegistrationAuthenticationEventObserver(reconciliationHandler);
     }
 }

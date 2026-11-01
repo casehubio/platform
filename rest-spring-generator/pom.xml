@@ -6,8 +6,9 @@
 
     <parent>
         <groupId>io.casehub</groupId>
-        <artifactId>casehub-platform-parent</artifactId>
+        <artifactId>casehub-generator-parent</artifactId>
         <version>0.4-SNAPSHOT</version>
+        <relativePath>../generator-parent</relativePath>
     </parent>
 
     <artifactId>casehub-platform-rest-spring-generator</artifactId>

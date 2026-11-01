@@ -6,8 +6,9 @@
 
     <parent>
         <groupId>io.casehub</groupId>
-        <artifactId>casehub-platform-parent</artifactId>
+        <artifactId>casehub-generator-parent</artifactId>
         <version>0.4-SNAPSHOT</version>
+        <relativePath>../generator-parent</relativePath>
     </parent>
 
     <artifactId>casehub-platform-spring-generator</artifactId>
@@ -51,16 +52,20 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Test -->
+        <!-- Test — CDI/Jakarta/SmallRye for scanner test fixtures -->
         <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-api</artifactId>
-            <version>${project.version}</version>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.smallrye.config</groupId>
+            <artifactId>smallrye-config-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -250,7 +250,7 @@ Verify `DomainScanResult` with `isInterface=false` produces correct Spring contr
 
 - `../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — annotation definition (`@Target(TYPE)` already correct)
 - `generator-common/src/main/java/io/casehub/platform/generator/McpDomainJandexScanner.java:42` — interface gate
-- `generator-common/src/main/java/io/casehub/platform/generator/DomainScanResult.java` — field names to rename
+- `../../../graphql-spring-generator/src/main/java/io/casehub/platform/generator/DomainScanResult.java` — field names to rename
 - `graphql-generator/src/main/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessor.java:264,470` — interface gates
 - `mcp/src/main/java/io/casehub/platform/mcp/GraphQLModelScanner.java:56-86` — runtime first pass
 - `graphql-spring-generator/src/main/java/io/casehub/platform/graphql/spring/generator/SpringGraphqlControllerWriter.java:29-30` — field name consumer

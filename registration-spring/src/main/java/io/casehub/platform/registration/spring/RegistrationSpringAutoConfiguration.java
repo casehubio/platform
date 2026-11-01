@@ -2,17 +2,22 @@ package io.casehub.platform.registration.spring;
 
 import io.casehub.platform.api.authn.UserResolver;
 import io.casehub.platform.api.authn.UserStatusResolver;
+import io.casehub.platform.registration.BreachDetector;
 import io.casehub.platform.registration.EmailSender;
 import io.casehub.platform.registration.EmailVerificationStore;
 import io.casehub.platform.registration.InvitationStore;
 import io.casehub.platform.registration.PasswordCredentialStore;
 import io.casehub.platform.registration.PasswordHasher;
+import io.casehub.platform.registration.PasswordPolicy;
+import io.casehub.platform.registration.PasswordResetStore;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationPolicy;
 import io.casehub.platform.registration.RegistrationService;
 import io.casehub.platform.registration.UserProvisioner;
 import io.casehub.platform.registration.UserStore;
 import io.casehub.platform.registration.core.Argon2PasswordHasher;
+import io.casehub.platform.registration.core.DefaultPasswordPolicy;
+import io.casehub.platform.registration.core.NoOpBreachDetector;
 import io.casehub.platform.registration.core.PasswordAuthenticationProviderCore;
 import io.casehub.platform.registration.core.RegistrationServiceCore;
 import io.casehub.platform.registration.core.UserStoreProvisioner;
@@ -39,6 +44,19 @@ public class RegistrationSpringAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public BreachDetector breachDetector() {
+        return new NoOpBreachDetector();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public PasswordPolicy passwordPolicy(BreachDetector breachDetector) {
+        return new DefaultPasswordPolicy(breachDetector);
+    }
+
+
+    @Bean
+    @ConditionalOnMissingBean
     public RegistrationPolicy registrationPolicy() {
         return tenancyId -> io.casehub.platform.registration.RegistrationMode.OPEN;
     }
@@ -60,16 +78,19 @@ public class RegistrationSpringAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnBean(UserStore.class)
     public RegistrationService registrationService(UserStore userStore,
-                                                    PasswordCredentialStore passwordStore,
-                                                    InvitationStore invitationStore,
-                                                    EmailVerificationStore verificationStore,
-                                                    RegistrationPolicy policy,
-                                                    EmailSender emailSender,
-                                                    RegistrationEventListener eventListener,
-                                                    PasswordHasher passwordHasher) {
+                                                   PasswordCredentialStore passwordStore,
+                                                   InvitationStore invitationStore,
+                                                   EmailVerificationStore verificationStore,
+                                                   RegistrationPolicy policy,
+                                                   EmailSender emailSender,
+                                                   RegistrationEventListener eventListener,
+                                                   PasswordHasher passwordHasher,
+                                                   PasswordPolicy passwordPolicy,
+                                                   PasswordResetStore passwordResetStore) {
         return new RegistrationServiceCore(
                 userStore, passwordStore, invitationStore, verificationStore,
-                policy, emailSender, eventListener, passwordHasher);
+                policy, emailSender, eventListener, passwordHasher, passwordPolicy,
+                passwordResetStore);
     }
 
     @Bean

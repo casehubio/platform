@@ -485,11 +485,17 @@ Self-signup and user provisioning for deployments without an external SCIM direc
 
 **Social login integration** — when a user logs in via Google/GitHub/Apple and no existing identity is found, `UserProvisioner.provisionFromSocialLogin()` creates a `UserRecord` if the tenant policy allows it. `UserResolver` stays read-only (CQS-compliant). Account-takeover mitigation: the provisioner never auto-links a social login to an existing account.
 
+**Password policy** — enforced on registration and password reset. Default rules: minimum 8 characters, maximum 128, at least 2 character classes (lowercase, uppercase, digit, special). Optional HaveIBeenPwned breach detection (disabled by default; provide a `BreachDetector` bean to enable — `HaveIBeenPwnedBreachDetector` uses k-anonymity API with 3-second timeout, fail-open on error). Custom policies: implement `PasswordPolicy` and register as a CDI bean / Spring `@Bean`.
+
+**Password reset** — `RegistrationService.requestPasswordReset(email, tenancyId)` sends a reset token via email (1-hour TTL). `resetPassword(token, newPassword, tenancyId)` validates the token, enforces password policy, and updates the credential. Silent on unknown emails (no user enumeration). Single-use tokens.
+
 **Events** — all implement `SubscribableEvent` for the notification pipeline:
 - `io.casehub.registration.user.registered` — user created, may be pending verification
 - `io.casehub.registration.user.activated` — user fully active
 - `io.casehub.registration.approved` / `rejected` — admin decision on pending approval
 - `io.casehub.registration.invitation.created` — new invitation issued
+- `io.casehub.registration.password.reset.requested` — password reset email sent
+- `io.casehub.registration.password.reset.completed` — password successfully changed
 
 ### Path
 

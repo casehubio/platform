@@ -2,22 +2,27 @@ package io.casehub.platform.registration.quarkus;
 
 import io.casehub.platform.api.authn.UserResolver;
 import io.casehub.platform.api.authn.UserStatusResolver;
+import io.casehub.platform.registration.BreachDetector;
 import io.casehub.platform.registration.EmailSender;
 import io.casehub.platform.registration.EmailVerificationStore;
 import io.casehub.platform.registration.InvitationStore;
 import io.casehub.platform.registration.PasswordCredentialStore;
 import io.casehub.platform.registration.PasswordHasher;
+import io.casehub.platform.registration.PasswordPolicy;
+import io.casehub.platform.registration.PasswordResetStore;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationPolicy;
 import io.casehub.platform.registration.RegistrationService;
 import io.casehub.platform.registration.UserProvisioner;
 import io.casehub.platform.registration.UserStore;
 import io.casehub.platform.registration.core.Argon2PasswordHasher;
+import io.casehub.platform.registration.core.DefaultPasswordPolicy;
+import io.casehub.platform.registration.core.NoOpBreachDetector;
 import io.casehub.platform.registration.core.PasswordAuthenticationProviderCore;
 import io.casehub.platform.registration.core.RegistrationServiceCore;
+import io.casehub.platform.registration.core.SocialLoginReconciliationHandler;
 import io.casehub.platform.registration.core.UserStoreProvisioner;
 import io.casehub.platform.registration.core.UserStoreUserResolver;
-import io.casehub.platform.registration.core.SocialLoginReconciliationHandler;
 import io.casehub.platform.registration.core.UserStoreUserStatusResolver;
 import io.quarkus.arc.DefaultBean;
 import jakarta.annotation.Priority;
@@ -35,16 +40,19 @@ public class RegistrationBeans {
     @Produces
     @ApplicationScoped
     public RegistrationService registrationService(UserStore userStore,
-                                                    PasswordCredentialStore passwordStore,
-                                                    InvitationStore invitationStore,
-                                                    EmailVerificationStore verificationStore,
-                                                    RegistrationPolicy policy,
-                                                    EmailSender emailSender,
-                                                    RegistrationEventListener eventListener,
-                                                    PasswordHasher passwordHasher) {
+                                                   PasswordCredentialStore passwordStore,
+                                                   InvitationStore invitationStore,
+                                                   EmailVerificationStore verificationStore,
+                                                   RegistrationPolicy policy,
+                                                   EmailSender emailSender,
+                                                   RegistrationEventListener eventListener,
+                                                   PasswordHasher passwordHasher,
+                                                   PasswordPolicy passwordPolicy,
+                                                   PasswordResetStore passwordResetStore) {
         return new RegistrationServiceCore(
                 userStore, passwordStore, invitationStore, verificationStore,
-                policy, emailSender, eventListener, passwordHasher);
+                policy, emailSender, eventListener, passwordHasher, passwordPolicy,
+                passwordResetStore);
     }
 
     @Produces
@@ -78,6 +86,20 @@ public class RegistrationBeans {
     public PasswordHasher argon2PasswordHasher() {
         return new Argon2PasswordHasher();
     }
+
+    @Produces
+    @DefaultBean
+    @ApplicationScoped
+    public BreachDetector noOpBreachDetector() {
+        return new NoOpBreachDetector();
+    }
+
+    @Produces
+    @ApplicationScoped
+    public PasswordPolicy defaultPasswordPolicy(BreachDetector breachDetector) {
+        return new DefaultPasswordPolicy(breachDetector);
+    }
+
 
     @Produces
     @ApplicationScoped

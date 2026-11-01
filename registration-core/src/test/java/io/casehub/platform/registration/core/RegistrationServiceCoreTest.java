@@ -1,28 +1,28 @@
 package io.casehub.platform.registration.core;
 
 import io.casehub.platform.registration.EmailSender;
-import io.casehub.platform.registration.EmailVerificationToken;
 import io.casehub.platform.registration.InvitationCreated;
 import io.casehub.platform.registration.InvitationRequest;
+import io.casehub.platform.registration.PasswordPolicy;
+import io.casehub.platform.registration.PasswordPolicyResult;
+import io.casehub.platform.registration.PasswordPolicyViolationException;
 import io.casehub.platform.registration.PasswordRegistrationRequest;
 import io.casehub.platform.registration.RegistrationApproved;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationMode;
-import io.casehub.platform.registration.RegistrationPolicy;
 import io.casehub.platform.registration.RegistrationRejected;
 import io.casehub.platform.registration.RegistrationResult;
 import io.casehub.platform.registration.UserActivated;
-import io.casehub.platform.registration.UserRecord;
 import io.casehub.platform.registration.UserRegistered;
 import io.casehub.platform.registration.UserStatus;
 import io.casehub.platform.registration.inmem.InMemoryEmailVerificationStore;
 import io.casehub.platform.registration.inmem.InMemoryInvitationStore;
 import io.casehub.platform.registration.inmem.InMemoryPasswordCredentialStore;
+import io.casehub.platform.registration.inmem.InMemoryPasswordResetStore;
 import io.casehub.platform.registration.inmem.InMemoryUserStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +39,7 @@ class RegistrationServiceCoreTest {
     private RecordingEmailSender emailSender;
     private RecordingEventListener eventListener;
     private TestPasswordHasher passwordHasher;
+    private InMemoryPasswordResetStore resetStore;
     private RegistrationMode policyMode;
     private RegistrationServiceCore service;
 
@@ -51,6 +52,7 @@ class RegistrationServiceCoreTest {
         emailSender = new RecordingEmailSender();
         eventListener = new RecordingEventListener();
         passwordHasher = new TestPasswordHasher();
+        resetStore = new InMemoryPasswordResetStore();
         policyMode = RegistrationMode.OPEN;
         rebuildService();
     }
@@ -58,7 +60,15 @@ class RegistrationServiceCoreTest {
     private void rebuildService() {
         service = new RegistrationServiceCore(
                 userStore, passwordStore, invitationStore, verificationStore,
-                tenancyId -> policyMode, emailSender, eventListener, passwordHasher);
+                tenancyId -> policyMode, emailSender, eventListener, passwordHasher,
+                password -> PasswordPolicyResult.ok(), resetStore);
+    }
+
+    private void rebuildServiceWithPolicy(PasswordPolicy policy) {
+        service = new RegistrationServiceCore(
+                userStore, passwordStore, invitationStore, verificationStore,
+                tenancyId -> policyMode, emailSender, eventListener, passwordHasher,
+                policy, resetStore);
     }
 
     @Test
@@ -243,6 +253,102 @@ class RegistrationServiceCoreTest {
 
         assertThat(invitationStore.findById(result.record().id())).isEmpty();
     }
+
+    @Test
+    void registerWithPassword_weakPassword_throwsPolicyViolation() {
+        rebuildServiceWithPolicy(new DefaultPasswordPolicy(null));
+        assertThatThrownBy(() -> service.registerWithPassword(
+                new PasswordRegistrationRequest("user@example.com", "weak", null, "t1", null)))
+                .isInstanceOf(PasswordPolicyViolationException.class)
+                .satisfies(ex -> assertThat(((PasswordPolicyViolationException) ex).violations()).isNotEmpty());
+    }
+
+    @Test
+    void registerWithPassword_strongPassword_succeeds() {
+        rebuildServiceWithPolicy(new DefaultPasswordPolicy(null));
+        var result = service.registerWithPassword(
+                new PasswordRegistrationRequest("user@example.com", "Str0ngPass!", null, "t1", null));
+        assertThat(result).isInstanceOf(RegistrationResult.PendingVerification.class);
+    }
+
+    @Test
+    void requestPasswordReset_activeUser_sendsEmail() {
+        registerAndActivateUser("user@example.com", "Str0ngPass!");
+        int emailCountBefore = emailSender.sent.size();
+        service.requestPasswordReset("user@example.com", "t1");
+        assertThat(emailSender.sent).hasSize(emailCountBefore + 1);
+        assertThat(emailSender.sent.get(emailSender.sent.size() - 1).subject()).contains("reset");
+    }
+
+    @Test
+    void requestPasswordReset_unknownEmail_silentlySucceeds() {
+        int emailCountBefore = emailSender.sent.size();
+        service.requestPasswordReset("unknown@example.com", "t1");
+        assertThat(emailSender.sent).hasSize(emailCountBefore);
+    }
+
+    @Test
+    void requestPasswordReset_inactiveUser_silentlySucceeds() {
+        service.registerWithPassword(
+                new PasswordRegistrationRequest("user@example.com", "secret", null, "t1", null));
+        int emailCountBefore = emailSender.sent.size();
+        service.requestPasswordReset("user@example.com", "t1");
+        assertThat(emailSender.sent).hasSize(emailCountBefore);
+    }
+
+    @Test
+    void resetPassword_validToken_updatesPassword() {
+        registerAndActivateUser("user@example.com", "Str0ngPass!");
+        service.requestPasswordReset("user@example.com", "t1");
+        String rawToken = extractResetToken();
+
+        var result = service.resetPassword(rawToken, "NewStr0ng!", "t1");
+        assertThat(result).isInstanceOf(RegistrationResult.Activated.class);
+    }
+
+    @Test
+    void resetPassword_invalidToken_throws() {
+        assertThatThrownBy(() -> service.resetPassword("bogus", "NewStr0ng!", "t1"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void resetPassword_weakNewPassword_throws() {
+        rebuildServiceWithPolicy(new DefaultPasswordPolicy(null));
+        registerAndActivateUser("user@example.com", "Str0ngPass!");
+        service.requestPasswordReset("user@example.com", "t1");
+        String rawToken = extractResetToken();
+
+        assertThatThrownBy(() -> service.resetPassword(rawToken, "weak", "t1"))
+                .isInstanceOf(PasswordPolicyViolationException.class);
+    }
+
+    @Test
+    void resetPassword_tenancyMismatch_throws() {
+        registerAndActivateUser("user@example.com", "Str0ngPass!");
+        service.requestPasswordReset("user@example.com", "t1");
+        String rawToken = extractResetToken();
+
+        assertThatThrownBy(() -> service.resetPassword(rawToken, "NewStr0ng!", "wrong-tenant"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private void registerAndActivateUser(String email, String password) {
+        service.registerWithPassword(
+                new PasswordRegistrationRequest(email, password, null, "t1", null));
+        String verificationToken = extractVerificationToken();
+        service.verifyEmail(verificationToken);
+        var user = userStore.findByEmail(email, "t1").orElseThrow();
+        if (user.status() == UserStatus.PENDING_APPROVAL) {
+            service.approveRegistration(user.id(), "t1");
+        }
+    }
+
+    private String extractResetToken() {
+        var lastEmail = emailSender.sent.get(emailSender.sent.size() - 1);
+        return lastEmail.body().replace("Your password reset token: ", "");
+    }
+
 
     private String extractVerificationToken() {
         assertThat(emailSender.sent).isNotEmpty();

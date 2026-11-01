@@ -12,10 +12,18 @@ import io.casehub.platform.registration.InvitationStore;
 import io.casehub.platform.registration.PasswordCredential;
 import io.casehub.platform.registration.PasswordCredentialStore;
 import io.casehub.platform.registration.PasswordHasher;
+import io.casehub.platform.registration.PasswordPolicy;
+import io.casehub.platform.registration.PasswordPolicyViolationException;
 import io.casehub.platform.registration.PasswordRegistrationRequest;
+import io.casehub.platform.registration.PasswordResetCompleted;
+import io.casehub.platform.registration.PasswordResetRequested;
+import io.casehub.platform.registration.PasswordResetStore;
+import io.casehub.platform.registration.PasswordResetToken;
+import io.casehub.platform.registration.RegistrationApproved;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationMode;
 import io.casehub.platform.registration.RegistrationPolicy;
+import io.casehub.platform.registration.RegistrationRejected;
 import io.casehub.platform.registration.RegistrationResult;
 import io.casehub.platform.registration.RegistrationService;
 import io.casehub.platform.registration.UserActivated;
@@ -23,17 +31,15 @@ import io.casehub.platform.registration.UserRecord;
 import io.casehub.platform.registration.UserRegistered;
 import io.casehub.platform.registration.UserStatus;
 import io.casehub.platform.registration.UserStore;
-import io.casehub.platform.registration.RegistrationApproved;
-import io.casehub.platform.registration.RegistrationRejected;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Set;
 
 public class RegistrationServiceCore implements RegistrationService {
 
     private static final Duration VERIFICATION_TOKEN_TTL = Duration.ofHours(24);
+    private static final Duration RESET_TOKEN_TTL = Duration.ofHours(1);
 
     private final UserStore userStore;
     private final PasswordCredentialStore passwordCredentialStore;
@@ -43,6 +49,8 @@ public class RegistrationServiceCore implements RegistrationService {
     private final EmailSender emailSender;
     private final RegistrationEventListener eventListener;
     private final PasswordHasher passwordHasher;
+    private final PasswordPolicy passwordPolicy;
+    private final PasswordResetStore passwordResetStore;
 
     public RegistrationServiceCore(UserStore userStore,
                                     PasswordCredentialStore passwordCredentialStore,
@@ -51,7 +59,9 @@ public class RegistrationServiceCore implements RegistrationService {
                                     RegistrationPolicy registrationPolicy,
                                     EmailSender emailSender,
                                     RegistrationEventListener eventListener,
-                                    PasswordHasher passwordHasher) {
+                                    PasswordHasher passwordHasher,
+                                    PasswordPolicy passwordPolicy,
+                                    PasswordResetStore passwordResetStore) {
         this.userStore = Objects.requireNonNull(userStore);
         this.passwordCredentialStore = Objects.requireNonNull(passwordCredentialStore);
         this.invitationStore = Objects.requireNonNull(invitationStore);
@@ -60,6 +70,8 @@ public class RegistrationServiceCore implements RegistrationService {
         this.emailSender = Objects.requireNonNull(emailSender);
         this.eventListener = Objects.requireNonNull(eventListener);
         this.passwordHasher = Objects.requireNonNull(passwordHasher);
+        this.passwordPolicy = Objects.requireNonNull(passwordPolicy);
+        this.passwordResetStore = Objects.requireNonNull(passwordResetStore);
     }
 
     @Override
@@ -87,6 +99,11 @@ public class RegistrationServiceCore implements RegistrationService {
             } else {
                 return new RegistrationResult.AlreadyExists(request.email());
             }
+        }
+
+        var policyResult = passwordPolicy.validate(request.password());
+        if (!policyResult.valid()) {
+            throw new PasswordPolicyViolationException(policyResult.violations());
         }
 
         String userId = UUIDv7.generate().toString();
@@ -216,4 +233,53 @@ public class RegistrationServiceCore implements RegistrationService {
     public void revokeInvitation(String id) {
         invitationStore.delete(id);
     }
+
+    @Override
+    public void requestPasswordReset(String email, String tenancyId) {
+        var user = userStore.findByEmail(email, tenancyId).orElse(null);
+        if (user == null || user.status() != UserStatus.ACTIVE) {
+            return;
+        }
+
+        String rawToken = TokenGenerator.generate();
+        var    now      = Instant.now();
+        passwordResetStore.store(new PasswordResetToken(
+                TokenGenerator.sha256Hex(rawToken),
+                user.id(),
+                tenancyId,
+                now.plus(RESET_TOKEN_TTL),
+                now));
+
+        emailSender.send(email,
+                         "Password reset request",
+                         "Your password reset token: " + rawToken);
+
+        eventListener.onPasswordResetRequested(
+                new PasswordResetRequested(user.id(), tenancyId, now));
+    }
+
+    @Override
+    public RegistrationResult resetPassword(String rawToken, String newPassword, String tenancyId) {
+        var token = passwordResetStore.consume(rawToken)
+                                      .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reset token"));
+
+        if (!token.tenancyId().equals(tenancyId)) {
+            throw new IllegalArgumentException("Tenancy mismatch");
+        }
+
+        var policyResult = passwordPolicy.validate(newPassword);
+        if (!policyResult.valid()) {
+            throw new PasswordPolicyViolationException(policyResult.violations());
+        }
+
+        String hashedPassword = passwordHasher.hash(newPassword);
+        passwordCredentialStore.updatePassword(token.userId(), tenancyId, hashedPassword);
+
+        var user = userStore.findById(token.userId(), tenancyId).orElseThrow();
+        eventListener.onPasswordResetCompleted(
+                new PasswordResetCompleted(token.userId(), tenancyId, Instant.now()));
+
+        return new RegistrationResult.Activated(user);
+    }
+
 }

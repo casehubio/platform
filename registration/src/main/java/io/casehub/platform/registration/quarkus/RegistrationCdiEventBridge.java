@@ -1,6 +1,8 @@
 package io.casehub.platform.registration.quarkus;
 
 import io.casehub.platform.registration.InvitationCreated;
+import io.casehub.platform.registration.PasswordResetCompleted;
+import io.casehub.platform.registration.PasswordResetRequested;
 import io.casehub.platform.registration.RegistrationApproved;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationRejected;
@@ -52,4 +54,21 @@ public class RegistrationCdiEventBridge implements RegistrationEventListener {
     public void onInvitationCreated(InvitationCreated event) {
         invitationCreatedEvent.fire(event);
     }
+
+    @Inject
+    Event<PasswordResetRequested> passwordResetRequestedEvent;
+
+    @Inject
+    Event<PasswordResetCompleted> passwordResetCompletedEvent;
+
+    @Override
+    public void onPasswordResetRequested(PasswordResetRequested event) {
+        passwordResetRequestedEvent.fire(event);
+    }
+
+    @Override
+    public void onPasswordResetCompleted(PasswordResetCompleted event) {
+        passwordResetCompletedEvent.fire(event);
+    }
+
 }

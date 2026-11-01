@@ -6,4 +6,9 @@ public interface RegistrationEventListener {
     default void onRegistrationApproved(RegistrationApproved event)  {}
     default void onRegistrationRejected(RegistrationRejected event)  {}
     default void onInvitationCreated(InvitationCreated event)        {}
+
+    default void onPasswordResetRequested(PasswordResetRequested event) {}
+
+    default void onPasswordResetCompleted(PasswordResetCompleted event) {}
+
 }

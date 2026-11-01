@@ -13,4 +13,9 @@ public interface RegistrationService {
     InvitationCreationResult createInvitation(InvitationRequest request);
 
     void revokeInvitation(String id);
+
+    void requestPasswordReset(String email, String tenancyId);
+
+    RegistrationResult resetPassword(String rawToken, String newPassword, String tenancyId);
+
 }

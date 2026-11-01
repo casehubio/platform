@@ -53,4 +53,15 @@ public class RegistrationEndpoint {
     public RegistrationMode getPolicy(String tenancyId) {
         return registrationPolicy.getMode(tenancyId);
     }
+
+    @PlatformMutation("Request a password reset email")
+    public void requestPasswordReset(String email, String tenancyId) {
+        registrationService.requestPasswordReset(email, tenancyId);
+    }
+
+    @PlatformMutation("Reset password with a reset token")
+    public RegistrationResult resetPassword(String token, String newPassword, String tenancyId) {
+        return registrationService.resetPassword(token, newPassword, tenancyId);
+    }
+
 }

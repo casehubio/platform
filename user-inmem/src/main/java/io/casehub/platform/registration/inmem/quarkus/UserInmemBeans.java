@@ -8,7 +8,6 @@ import io.casehub.platform.registration.inmem.InMemoryEmailVerificationStore;
 import io.casehub.platform.registration.inmem.InMemoryInvitationStore;
 import io.casehub.platform.registration.inmem.InMemoryPasswordCredentialStore;
 import io.casehub.platform.registration.inmem.InMemoryUserStore;
-import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
@@ -48,4 +47,13 @@ public class UserInmemBeans {
     public EmailVerificationStore inMemoryEmailVerificationStore() {
         return new InMemoryEmailVerificationStore();
     }
+
+    @Produces
+    @Alternative
+    @Priority(100)
+    @ApplicationScoped
+    public io.casehub.platform.registration.PasswordResetStore inMemoryPasswordResetStore() {
+        return new io.casehub.platform.registration.inmem.InMemoryPasswordResetStore();
+    }
+
 }

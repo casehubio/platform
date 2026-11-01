@@ -38,4 +38,11 @@ public class UserJpaAutoConfiguration {
     public SpringEmailVerificationStore springEmailVerificationStore(EmailVerificationEntityRepository repo) {
         return new SpringEmailVerificationStore(repo);
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public SpringPasswordResetStore springPasswordResetStore(PasswordResetTokenEntityRepository repo) {
+        return new SpringPasswordResetStore(repo);
+    }
+
 }

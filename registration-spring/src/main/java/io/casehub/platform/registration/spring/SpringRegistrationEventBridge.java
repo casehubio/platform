@@ -1,6 +1,8 @@
 package io.casehub.platform.registration.spring;
 
 import io.casehub.platform.registration.InvitationCreated;
+import io.casehub.platform.registration.PasswordResetCompleted;
+import io.casehub.platform.registration.PasswordResetRequested;
 import io.casehub.platform.registration.RegistrationApproved;
 import io.casehub.platform.registration.RegistrationEventListener;
 import io.casehub.platform.registration.RegistrationRejected;
@@ -40,4 +42,15 @@ public class SpringRegistrationEventBridge implements RegistrationEventListener 
     public void onInvitationCreated(InvitationCreated event) {
         publisher.publishEvent(event);
     }
+
+    @Override
+    public void onPasswordResetRequested(PasswordResetRequested event) {
+        publisher.publishEvent(event);
+    }
+
+    @Override
+    public void onPasswordResetCompleted(PasswordResetCompleted event) {
+        publisher.publishEvent(event);
+    }
+
 }

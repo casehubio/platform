@@ -69,6 +69,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName REST_NAME_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.RestName");
     private static final DotName CONTEXT_PARAM_ANN = DotName.createSimple("io.casehub.platform.api.mcp.ContextParam");
     private static final DotName ROLES_ALLOWED_ANN = DotName.createSimple("jakarta.annotation.security.RolesAllowed");
+    private static final DotName AUTHENTICATED_ANN = DotName.createSimple("io.quarkus.security.Authenticated");
     private static final DotName PAGINATED_ANN     = DotName.createSimple("io.casehub.platform.api.mcp.PaginatedResponse");
     private static final DotName VALID_ANN         = DotName.createSimple("jakarta.validation.Valid");
     private static final DotName DEFAULT_VALUE_ANN = DotName.createSimple("io.casehub.platform.api.mcp.DefaultValue");
@@ -337,6 +338,53 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 ops.app = ann.value("app").asString();
             }
 
+            boolean hasExistingClassSecurity = !ops.classRolesAllowed.isEmpty()
+                    || ops.classPermitAll || ops.classAuthenticated;
+
+            List<String> newClassRolesAllowed = List.of();
+            AnnotationInstance classRaAnn = classInfo.annotation(ROLES_ALLOWED_ANN);
+            if (classRaAnn != null && classRaAnn.value() != null) {
+                newClassRolesAllowed = List.of(classRaAnn.value().asStringArray());
+            }
+            boolean newClassPermitAll = classInfo.hasAnnotation(PERMIT_ALL_ANN);
+            boolean newClassAuthenticated = classInfo.hasAnnotation(AUTHENTICATED_ANN);
+
+            if (hasExistingClassSecurity) {
+                boolean conflict = !newClassRolesAllowed.equals(ops.classRolesAllowed)
+                        || newClassPermitAll != ops.classPermitAll
+                        || newClassAuthenticated != ops.classAuthenticated;
+                if (conflict) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                            "GraphQL generator: domain '" + domain
+                            + "' has conflicting class-level security annotations across contributing classes. "
+                            + "Class-level security annotations will be omitted — use method-level annotations instead.");
+                    ops.classRolesAllowed = List.of();
+                    ops.classPermitAll = false;
+                    ops.classAuthenticated = false;
+                    ops.classPassedAnnotations.clear();
+                }
+            } else {
+                ops.classRolesAllowed = newClassRolesAllowed;
+                ops.classPermitAll = newClassPermitAll;
+                ops.classAuthenticated = newClassAuthenticated;
+
+                for (AnnotationInstance classAnn : classInfo.annotations()) {
+                    if (classAnn.target() != null && classAnn.target().kind() != AnnotationTarget.Kind.CLASS) continue;
+                    String annName = classAnn.name().toString();
+                    if (annName.startsWith("jakarta.annotation.security.")
+                        && !annName.endsWith("RolesAllowed")
+                        && !annName.endsWith("PermitAll")) {
+                        ops.classPassedAnnotations.add("@" + annName);
+                    }
+                    if (jandexIndex != null) {
+                        ClassInfo annClass = jandexIndex.getClassByName(classAnn.name());
+                        if (annClass != null && annClass.hasAnnotation(NAME_BINDING_ANN)) {
+                            ops.classPassedAnnotations.add("@" + annName);
+                        }
+                    }
+                }
+            }
+
             for (MethodInfo method : classInfo.methods()) {
                 AnnotationInstance queryAnn   = method.annotation(PLATFORM_QUERY);
                 AnnotationInstance mutAnn     = method.annotation(PLATFORM_MUTATION);
@@ -432,6 +480,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
 
         boolean permitAll = method.hasAnnotation(PERMIT_ALL_ANN);
+        boolean authenticated = method.hasAnnotation(AUTHENTICATED_ANN);
 
         List<String> passedAnnotations = new ArrayList<>();
         for (AnnotationInstance ann : method.annotations()) {
@@ -473,7 +522,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 declaringClass.name().toString(), declaringClass.simpleName(),
                 opType, description, restMethodOverride, restPathOverride,
                 restStatusOverride, rolesAllowed, paginated, totalCountMethod,
-                webhookConsumes, permitAll, passedAnnotations
+                webhookConsumes, permitAll, passedAnnotations, authenticated
         );
     }
 
@@ -644,6 +693,58 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 ops.app = roundApp;
             }
 
+            boolean hasExistingClassSecurity = !ops.classRolesAllowed.isEmpty()
+                    || ops.classPermitAll || ops.classAuthenticated;
+
+            List<String> newClassRolesAllowed = List.of();
+            javax.lang.model.element.AnnotationMirror classRaAnn = findAnnotationMirror(element,
+                    "jakarta.annotation.security.RolesAllowed");
+            if (classRaAnn != null) {
+                for (var e : classRaAnn.getElementValues().entrySet()) {
+                    if (e.getKey().getSimpleName().contentEquals("value")) {
+                        @SuppressWarnings("unchecked")
+                        var values = (java.util.List<? extends javax.lang.model.element.AnnotationValue>) e.getValue().getValue();
+                        newClassRolesAllowed = values.stream().map(v -> v.getValue().toString()).toList();
+                    }
+                }
+            }
+            boolean newClassPermitAll = findAnnotationMirror(element, "jakarta.annotation.security.PermitAll") != null;
+            boolean newClassAuthenticated = findAnnotationMirror(element, "io.quarkus.security.Authenticated") != null;
+
+            if (hasExistingClassSecurity) {
+                boolean conflict = !newClassRolesAllowed.equals(ops.classRolesAllowed)
+                        || newClassPermitAll != ops.classPermitAll
+                        || newClassAuthenticated != ops.classAuthenticated;
+                if (conflict) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                            "GraphQL generator: domain '" + domain
+                            + "' has conflicting class-level security annotations across contributing classes. "
+                            + "Class-level security annotations will be omitted — use method-level annotations instead.");
+                    ops.classRolesAllowed = List.of();
+                    ops.classPermitAll = false;
+                    ops.classAuthenticated = false;
+                    ops.classPassedAnnotations.clear();
+                }
+            } else {
+                ops.classRolesAllowed = newClassRolesAllowed;
+                ops.classPermitAll = newClassPermitAll;
+                ops.classAuthenticated = newClassAuthenticated;
+
+                for (var classAnn : element.getAnnotationMirrors()) {
+                    String annFqcn = ((javax.lang.model.element.TypeElement) classAnn.getAnnotationType().asElement()).getQualifiedName().toString();
+                    if (annFqcn.startsWith("jakarta.annotation.security.")
+                        && !annFqcn.endsWith("RolesAllowed")
+                        && !annFqcn.endsWith("PermitAll")) {
+                        ops.classPassedAnnotations.add("@" + annFqcn);
+                    }
+                    if (classAnn.getAnnotationType().asElement().getAnnotationMirrors().stream()
+                            .anyMatch(a -> ((javax.lang.model.element.TypeElement) a.getAnnotationType().asElement())
+                                    .getQualifiedName().toString().equals("jakarta.ws.rs.NameBinding"))) {
+                        ops.classPassedAnnotations.add("@" + annFqcn);
+                    }
+                }
+            }
+
             for (javax.lang.model.element.Element enclosed : typeElement.getEnclosedElements()) {
                 if (enclosed.getKind() != javax.lang.model.element.ElementKind.METHOD) {continue;}
                 javax.lang.model.element.ExecutableElement method =
@@ -772,6 +873,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
 
                 boolean permitAll = findAnnotationMirror(method, "jakarta.annotation.security.PermitAll") != null;
+                boolean authenticated = findAnnotationMirror(method, "io.quarkus.security.Authenticated") != null;
 
                 List<String> passedAnnotations = new ArrayList<>();
                 for (var methodAnn : method.getAnnotationMirrors()) {
@@ -811,7 +913,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                         method.getSimpleName().toString(), returnTypeStr, params, imports,
                         classFqcn, classSimple, opType, desc, restMethodOverride, restPathOverride,
                         restStatusOverride, rolesAllowed, paginated, totalCountMethod,
-                        webhookConsumes, permitAll, passedAnnotations));
+                        webhookConsumes, permitAll, passedAnnotations, authenticated));
             }
         }
 
@@ -1060,6 +1162,21 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 out.println("@Path(\"" + restBasePath + "\")");
                 out.println("@Produces(MediaType.APPLICATION_JSON)");
                 out.println("@ApplicationScoped");
+                if (ops.classAuthenticated) {
+                    out.println("@io.quarkus.security.Authenticated");
+                }
+                if (!ops.classRolesAllowed.isEmpty()) {
+                    String roles = ops.classRolesAllowed.stream()
+                            .map(r -> "\"" + escapeJavaString(r) + "\"")
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    out.println("@jakarta.annotation.security.RolesAllowed({" + roles + "})");
+                }
+                if (ops.classPermitAll) {
+                    out.println("@jakarta.annotation.security.PermitAll");
+                }
+                for (String passed : ops.classPassedAnnotations) {
+                    out.println(passed);
+                }
                 out.println("public class " + className + " {");
                 out.println();
 
@@ -1194,6 +1311,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         if (op.permitAll()) {
             out.println("    @jakarta.annotation.security.PermitAll");
         }
+        if (op.authenticated()) {
+            out.println("    @io.quarkus.security.Authenticated");
+        }
         for (String passed : op.passedAnnotations()) {
             out.println("    " + passed);
         }
@@ -1320,6 +1440,19 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
         }
 
+        if (!op.rolesAllowed().isEmpty()) {
+            String roles = op.rolesAllowed().stream().map(r -> "\"" + escapeJavaString(r) + "\"").collect(java.util.stream.Collectors.joining(", "));
+            out.println("    @jakarta.annotation.security.RolesAllowed({" + roles + "})");
+        }
+        if (op.permitAll()) {
+            out.println("    @jakarta.annotation.security.PermitAll");
+        }
+        if (op.authenticated()) {
+            out.println("    @io.quarkus.security.Authenticated");
+        }
+        for (String passed : op.passedAnnotations()) {
+            out.println("    " + passed);
+        }
         if (!op.description().isEmpty() && isOpenApiAvailable()) {
             out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
         }
@@ -1409,6 +1542,19 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
         }
 
+        if (!op.rolesAllowed().isEmpty()) {
+            String roles = op.rolesAllowed().stream().map(r -> "\"" + escapeJavaString(r) + "\"").collect(java.util.stream.Collectors.joining(", "));
+            out.println("    @jakarta.annotation.security.RolesAllowed({" + roles + "})");
+        }
+        if (op.permitAll()) {
+            out.println("    @jakarta.annotation.security.PermitAll");
+        }
+        if (op.authenticated()) {
+            out.println("    @io.quarkus.security.Authenticated");
+        }
+        for (String passed : op.passedAnnotations()) {
+            out.println("    " + passed);
+        }
         if (!op.description().isEmpty() && isOpenApiAvailable()) {
             out.println("    @org.eclipse.microprofile.openapi.annotations.Operation(summary = \"" + escapeJavaString(op.description()) + "\")");
         }
@@ -1526,6 +1672,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
         if (op.permitAll()) {
             out.println("    @jakarta.annotation.security.PermitAll");
+        }
+        if (op.authenticated()) {
+            out.println("    @io.quarkus.security.Authenticated");
         }
         for (String passed : op.passedAnnotations()) {
             out.println("    " + passed);
@@ -2153,6 +2302,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         final List<ResolvedOperation> operations = new ArrayList<>();
         String basePath;
         String app;
+        List<String> classRolesAllowed = List.of();
+        boolean classPermitAll = false;
+        boolean classAuthenticated = false;
+        List<String> classPassedAnnotations = new ArrayList<>();
 
         DomainOperations(String domain, Source source) {
             this.domain = domain;
@@ -2177,7 +2330,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             String totalCountMethod,
             String[] webhookConsumes,
             boolean permitAll,
-            List<String> passedAnnotations
+            List<String> passedAnnotations,
+            boolean authenticated
     ) {}
 
     record ResolvedParam(

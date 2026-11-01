@@ -2206,4 +2206,198 @@ class GraphQLResolverProcessorTest {
         assertThat(content).contains("streamFlow(");
     }
 
+    // --- Class-level and @Authenticated security annotation propagation ---
+
+    @Test
+    void classLevelRolesAllowedPropagatedToRestResource() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.SecuredApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.annotation.security.RolesAllowed;
+
+                @McpDomain("secured")
+                @RolesAllowed("admin")
+                public interface SecuredApi {
+                    @PlatformQuery("Get data")
+                    String getData();
+
+                    @PlatformMutation("Update data")
+                    void updateData(String value);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=secured", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "test.rest.SecuredResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).containsPattern(
+                "@jakarta\\.annotation\\.security\\.RolesAllowed\\(\\{\"admin\"\\}\\)\\s+public class SecuredResource");
+    }
+
+    @Test
+    void classLevelAuthenticatedPropagatedToRestResource() throws Exception {
+        var authenticatedAnn = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.quarkus.security.Authenticated",
+                """
+                package io.quarkus.security;
+                import java.lang.annotation.*;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Authenticated {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.AuthApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.quarkus.security.Authenticated;
+
+                @McpDomain("auth")
+                @Authenticated
+                public interface AuthApi {
+                    @PlatformQuery("Get profile")
+                    String getProfile();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=auth", "-AgenerateGraphQL=false")
+                .compile(authenticatedAnn, spi);
+
+        String content = compilation.generatedSourceFile(
+                "test.rest.AuthResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).contains("@io.quarkus.security.Authenticated");
+        assertThat(content).containsPattern(
+                "@io\\.quarkus\\.security\\.Authenticated\\s+public class AuthResource");
+    }
+
+    @Test
+    void methodLevelAuthenticatedPropagatedToRestMethod() throws Exception {
+        var authenticatedAnn = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.quarkus.security.Authenticated",
+                """
+                package io.quarkus.security;
+                import java.lang.annotation.*;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Authenticated {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MethodAuthApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.quarkus.security.Authenticated;
+
+                @McpDomain("method-auth")
+                public interface MethodAuthApi {
+                    @PlatformQuery("Public data")
+                    String getPublicData();
+
+                    @PlatformMutation("Protected action")
+                    @Authenticated
+                    void protectedAction(String input);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=method-auth", "-AgenerateGraphQL=false")
+                .compile(authenticatedAnn, spi);
+
+        String content = compilation.generatedSourceFile(
+                "test.rest.MethodAuthResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).doesNotMatch("(?s)@io\\.quarkus\\.security\\.Authenticated\\s+public class");
+        assertThat(content).containsPattern(
+                "(?s)@io\\.quarkus\\.security\\.Authenticated\\s+@Transactional\\s+@POST");
+    }
+
+    @Test
+    void classAuthenticatedWithMethodPermitAllBothEmitted() throws Exception {
+        var authenticatedAnn = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.quarkus.security.Authenticated",
+                """
+                package io.quarkus.security;
+                import java.lang.annotation.*;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Authenticated {}
+                """);
+
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.MixedSecApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import io.quarkus.security.Authenticated;
+                import jakarta.annotation.security.PermitAll;
+
+                @McpDomain("mixed-sec")
+                @Authenticated
+                public interface MixedSecApi {
+                    @PlatformQuery("Protected query")
+                    String protectedQuery();
+
+                    @PlatformQuery("Public health check")
+                    @PermitAll
+                    String healthCheck();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=mixed-sec", "-AgenerateGraphQL=false")
+                .compile(authenticatedAnn, spi);
+
+        String content = compilation.generatedSourceFile(
+                "test.rest.MixedSecResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).containsPattern(
+                "@io\\.quarkus\\.security\\.Authenticated\\s+public class MixedSecResource");
+        assertThat(content).contains("@jakarta.annotation.security.PermitAll");
+    }
+
+    @Test
+    void classLevelPermitAllPropagatedToRestResource() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.PublicApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import jakarta.annotation.security.PermitAll;
+
+                @McpDomain("public-api")
+                @PermitAll
+                public interface PublicApi {
+                    @PlatformQuery("Get status")
+                    String getStatus();
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=public-api", "-AgenerateGraphQL=false")
+                .compile(spi);
+
+        String content = compilation.generatedSourceFile(
+                "test.rest.PublicApiResource")
+                .get().getCharContent(true).toString();
+        assertThat(content).containsPattern(
+                "@jakarta\\.annotation\\.security\\.PermitAll\\s+public class PublicApiResource");
+    }
+
 }

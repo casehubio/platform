@@ -17,6 +17,7 @@ import io.casehub.platform.registration.core.PasswordAuthenticationProviderCore;
 import io.casehub.platform.registration.core.RegistrationServiceCore;
 import io.casehub.platform.registration.core.UserStoreProvisioner;
 import io.casehub.platform.registration.core.UserStoreUserResolver;
+import io.casehub.platform.registration.core.SocialLoginReconciliationHandler;
 import io.casehub.platform.registration.core.UserStoreUserStatusResolver;
 import io.quarkus.arc.DefaultBean;
 import jakarta.annotation.Priority;
@@ -85,6 +86,15 @@ public class RegistrationBeans {
             UserStore userStore,
             PasswordHasher passwordHasher) {
         return new PasswordAuthenticationProviderCore(credentialStore, userStore, passwordHasher);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public SocialLoginReconciliationHandler socialLoginReconciliationHandler(
+            UserStore userStore,
+            RegistrationPolicy policy,
+            RegistrationEventListener eventListener) {
+        return new SocialLoginReconciliationHandler(userStore, policy, eventListener);
     }
 
     @Produces

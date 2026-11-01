@@ -7,10 +7,12 @@ import io.casehub.platform.api.authn.RefreshTokenStore;
 import io.casehub.platform.api.authn.SessionRecord;
 import io.casehub.platform.api.authn.SessionStore;
 import io.casehub.platform.api.authn.TokenPair;
+import io.casehub.platform.api.authn.UserStatusResolver;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
 
 public class SessionManagerCore {
@@ -23,15 +25,25 @@ public class SessionManagerCore {
     private final JwtIssuerCore jwtIssuer;
     private final long accessTokenTtlSeconds;
     private final long refreshTokenTtlSeconds;
+    private final UserStatusResolver userStatusResolver;
 
     public SessionManagerCore(SessionStore sessionStore, RefreshTokenStore refreshTokenStore,
                               JwtIssuerCore jwtIssuer, long accessTokenTtlSeconds,
                               long refreshTokenTtlSeconds) {
+        this(sessionStore, refreshTokenStore, jwtIssuer, accessTokenTtlSeconds,
+             refreshTokenTtlSeconds, (actorId, tenancyId) -> java.util.Optional.empty());
+    }
+
+    public SessionManagerCore(SessionStore sessionStore, RefreshTokenStore refreshTokenStore,
+                              JwtIssuerCore jwtIssuer, long accessTokenTtlSeconds,
+                              long refreshTokenTtlSeconds,
+                              UserStatusResolver userStatusResolver) {
         this.sessionStore = sessionStore;
         this.refreshTokenStore = refreshTokenStore;
         this.jwtIssuer = jwtIssuer;
         this.accessTokenTtlSeconds = accessTokenTtlSeconds;
         this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
+        this.userStatusResolver = userStatusResolver;
     }
 
     public TokenPair createSession(AuthenticationResult result) {
@@ -54,7 +66,8 @@ public class SessionManagerCore {
 
         var accessToken = jwtIssuer.issue(
                 result.tenancyId(), sessionId, result.principal().value(),
-                result.groups(), result.method(), accessTokenTtlSeconds);
+                result.groups(), result.method(), accessTokenTtlSeconds,
+                result.metadata());
 
         return new TokenPair(accessToken, refreshToken, accessTokenTtlSeconds);
     }
@@ -89,9 +102,16 @@ public class SessionManagerCore {
                 now, now.plusSeconds(accessTokenTtlSeconds), null);
         sessionStore.store(session);
 
+        Map<String, Object> refreshMetadata = null;
+        var status = userStatusResolver.resolveStatus(record.actorId(), record.tenancyId());
+        if (status.isPresent()) {
+            refreshMetadata = Map.of("userStatus", status.get());
+        }
+
         var accessToken = jwtIssuer.issue(
                 record.tenancyId(), sessionId, record.actorId(),
-                record.groups(), record.authMethod(), accessTokenTtlSeconds);
+                record.groups(), record.authMethod(), accessTokenTtlSeconds,
+                refreshMetadata);
 
         return new TokenPair(accessToken, newRefreshToken, accessTokenTtlSeconds);
     }

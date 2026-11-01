@@ -47,9 +47,11 @@ public class AuthnBeans {
     public SessionManagerCore sessionManagerCore(SessionStore sessionStore,
                                                   RefreshTokenStore refreshTokenStore,
                                                   JwtIssuerCore jwtIssuer,
-                                                  AuthnConfig config) {
+                                                  AuthnConfig config,
+                                                  UserStatusResolver userStatusResolver) {
         return new SessionManagerCore(sessionStore, refreshTokenStore, jwtIssuer,
-                config.accessTokenTtlSeconds(), config.refreshTokenTtlSeconds());
+                config.accessTokenTtlSeconds(), config.refreshTokenTtlSeconds(),
+                userStatusResolver);
     }
 
     @Produces

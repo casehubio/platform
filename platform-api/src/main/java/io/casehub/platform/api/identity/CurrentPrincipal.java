@@ -68,4 +68,6 @@ public interface CurrentPrincipal {
      * classes — never at call sites. See protocol PP-20260520-e6a5f0.
      */
     boolean isCrossTenantAdmin();
+
+    default java.util.Optional<String> userStatus() { return java.util.Optional.empty(); }
 }

@@ -7,6 +7,7 @@ import java.security.KeyPair;
 import java.security.Signature;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,13 +23,19 @@ public class JwtIssuerCore {
 
     public String issue(String tenancyId, String sessionId, String actorId,
                         Set<String> groups, String method, long ttlSeconds) {
+        return issue(tenancyId, sessionId, actorId, groups, method, ttlSeconds, null);
+    }
+
+    public String issue(String tenancyId, String sessionId, String actorId,
+                        Set<String> groups, String method, long ttlSeconds,
+                        Map<String, Object> metadata) {
         var keyPair = keyResolver.signingKeyPair(tenancyId);
         var keyId = keyResolver.keyId(tenancyId);
         var alg = algorithmFor(keyPair);
         var now = Instant.now();
 
         var header = "{\"alg\":\"" + alg.jwtName + "\",\"typ\":\"JWT\",\"kid\":\"" + escapeJson(keyId) + "\"}";
-        var payload = buildPayload(sessionId, actorId, tenancyId, groups, method, now, ttlSeconds);
+        var payload = buildPayload(sessionId, actorId, tenancyId, groups, method, now, ttlSeconds, metadata);
 
         var headerB64 = B64.encodeToString(header.getBytes(StandardCharsets.UTF_8));
         var payloadB64 = B64.encodeToString(payload.getBytes(StandardCharsets.UTF_8));
@@ -40,7 +47,8 @@ public class JwtIssuerCore {
 
     private static String buildPayload(String sessionId, String actorId, String tenancyId,
                                        Set<String> groups, String method,
-                                       Instant now, long ttlSeconds) {
+                                       Instant now, long ttlSeconds,
+                                       Map<String, Object> metadata) {
         var sb = new StringBuilder(256);
         sb.append("{\"iss\":\"casehub\"");
         sb.append(",\"sub\":\"").append(escapeJson(actorId)).append('"');
@@ -51,6 +59,12 @@ public class JwtIssuerCore {
         sb.append(",\"tid\":\"").append(escapeJson(tenancyId)).append('"');
         sb.append(",\"mth\":\"").append(escapeJson(method)).append('"');
         sb.append(",\"groups\":").append(jsonArray(groups));
+        if (metadata != null) {
+            var userStatus = metadata.get("userStatus");
+            if (userStatus instanceof String ust) {
+                sb.append(",\"ust\":\"").append(escapeJson(ust)).append('"');
+            }
+        }
         sb.append('}');
         return sb.toString();
     }

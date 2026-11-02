@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 class ClaudeAgentSession implements AgentSession {
 
@@ -35,7 +36,9 @@ class ClaudeAgentSession implements AgentSession {
 
     private enum State { IDLE, ACTIVE, CLOSED }
 
-    private final ClaudeAsyncClient sdkClient;
+    private volatile ClaudeAsyncClient sdkClient;
+    private final    Supplier<ClaudeAsyncClient> clientFactory;
+
     private final Function<String, Multi<AgentEvent>> turnFactory;
     private final Duration timeout;
     private final Semaphore semaphore;
@@ -50,18 +53,20 @@ class ClaudeAgentSession implements AgentSession {
     private volatile ScheduledFuture<?> currentTimeoutFuture;
 
     ClaudeAgentSession(final ClaudeAsyncClient sdkClient,
+                       final Supplier<ClaudeAsyncClient> clientFactory,
                        final Duration timeout,
                        final Semaphore semaphore,
                        final CopyOnWriteArraySet<ClaudeAsyncClient> activeSessions,
                        final ScheduledExecutorService timeoutScheduler,
                        final String correlationId) {
-        this.sdkClient = sdkClient;
-        this.turnFactory = null;
-        this.timeout = timeout;
-        this.semaphore = semaphore;
-        this.activeSessions = activeSessions;
+        this.sdkClient        = sdkClient;
+        this.clientFactory    = clientFactory;
+        this.turnFactory      = null;
+        this.timeout          = timeout;
+        this.semaphore        = semaphore;
+        this.activeSessions   = activeSessions;
         this.timeoutScheduler = timeoutScheduler;
-        this.correlationId = correlationId;
+        this.correlationId    = correlationId;
     }
 
     ClaudeAgentSession(final ClaudeAgentProperties properties,
@@ -69,13 +74,14 @@ class ClaudeAgentSession implements AgentSession {
                        final Semaphore semaphore,
                        final CopyOnWriteArraySet<ClaudeAsyncClient> activeSessions,
                        final ScheduledExecutorService timeoutScheduler) {
-        this.sdkClient = null;
-        this.turnFactory = turnFactory;
-        this.timeout = properties.defaultTimeout();
-        this.semaphore = semaphore;
-        this.activeSessions = activeSessions;
+        this.sdkClient        = null;
+        this.clientFactory    = null;
+        this.turnFactory      = turnFactory;
+        this.timeout          = properties.defaultTimeout();
+        this.semaphore        = semaphore;
+        this.activeSessions   = activeSessions;
         this.timeoutScheduler = timeoutScheduler;
-        this.correlationId = null;
+        this.correlationId    = null;
     }
 
     @Override
@@ -187,8 +193,30 @@ class ClaudeAgentSession implements AgentSession {
 
     @Override
     public void clear() {
-        // Claude CLI SDK 1.0.0 has no clear() — subprocess restart is the only reset path.
-        // The pool handles this by closing the session and pre-warming a replacement.
+        final State current = state.get();
+        if (current == State.CLOSED) {
+            return;
+        }
+        if (current != State.IDLE) {
+            throw new IllegalStateException("cannot clear while a turn is active");
+        }
+
+        if (clientFactory != null) {
+            final ClaudeAsyncClient newClient = clientFactory.get();
+            final ClaudeAsyncClient oldClient = this.sdkClient;
+            if (oldClient != null) {
+                activeSessions.remove(oldClient);
+                oldClient.close().subscribe();
+            }
+            activeSessions.add(newClient);
+            this.sdkClient = newClient;
+        }
+        sessionStarted.set(false);
+        turnCounter.set(0);
+
+        if (correlationId != null) {
+            LOG.infof("Agent session cleared [correlationId=%s]", correlationId);
+        }
     }
 
     private Multi<AgentEvent> buildTurnStream(final String prompt) {

@@ -1,7 +1,6 @@
 package io.casehub.platform.agent.claude;
 
 import io.casehub.platform.agent.AgentEvent;
-import io.casehub.platform.agent.ResponseFormatType;
 import io.casehub.platform.agent.AgentMcpServer;
 import io.casehub.platform.agent.AgentProcessException;
 import io.casehub.platform.agent.AgentSession;
@@ -9,6 +8,7 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
+import io.casehub.platform.agent.ResponseFormatType;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import org.jboss.logging.Logger;
@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class ClaudeAgentClient {
 
@@ -285,32 +286,35 @@ public class ClaudeAgentClient {
         try {
             if (streamFactory != null) {
                 return new ClaudeAgentSession(properties,
-                    prompt -> Multi.createFrom().empty(),
-                    semaphore, activeSessions, timeoutScheduler);
+                                              prompt -> Multi.createFrom().empty(),
+                                              semaphore, activeSessions, timeoutScheduler);
             }
 
             final Duration effectiveTimeout = init.timeout() != null
-                ? init.timeout()
-                : properties.defaultTimeout();
+                                              ? init.timeout()
+                                              : properties.defaultTimeout();
 
             var optionsBuilder = CLIOptions.builder()
-                .systemPrompt(init.systemPrompt());
+                                           .systemPrompt(init.systemPrompt());
             final Map<String, McpServerConfig> sdkMcpServers = toSdkMcpServers(init.mcpServers());
-            if (!sdkMcpServers.isEmpty()) optionsBuilder.mcpServers(sdkMcpServers);
-            if (!env.isEmpty()) optionsBuilder.env(new HashMap<>(env));
+            if (!sdkMcpServers.isEmpty()) {optionsBuilder.mcpServers(sdkMcpServers);}
+            if (!env.isEmpty()) {optionsBuilder.env(new HashMap<>(env));}
             CLIOptions cliOptions = optionsBuilder.build();
 
-            var sessionBuilder = ClaudeClient.async(cliOptions)
-                .workingDirectory(Path.of(System.getProperty("user.dir")));
-            properties.binaryPath().ifPresent(sessionBuilder::claudePath);
+            final Supplier<ClaudeAsyncClient> clientFactory = () -> {
+                var builder = ClaudeClient.async(cliOptions)
+                                          .workingDirectory(Path.of(System.getProperty("user.dir")));
+                properties.binaryPath().ifPresent(builder::claudePath);
+                return builder.build();
+            };
 
-            final ClaudeAsyncClient sdkClient = sessionBuilder.build();
+            final ClaudeAsyncClient sdkClient = clientFactory.get();
             activeSessions.add(sdkClient);
             if (init.correlationId() != null) {
                 LOG.infof("Agent session opened [correlationId=%s]", init.correlationId());
             }
-            return new ClaudeAgentSession(sdkClient, effectiveTimeout, semaphore,
-                activeSessions, timeoutScheduler, init.correlationId());
+            return new ClaudeAgentSession(sdkClient, clientFactory, effectiveTimeout, semaphore,
+                                          activeSessions, timeoutScheduler, init.correlationId());
         } catch (final Exception e) {
             semaphore.release();
             throw e;

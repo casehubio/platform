@@ -2,7 +2,6 @@ package io.casehub.platform.agent.claude;
 
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProcessException;
-import io.casehub.platform.agent.AgentSession;
 import io.smallrye.mutiny.Multi;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -16,8 +15,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ClaudeAgentSessionTest {
 
@@ -212,4 +216,66 @@ class ClaudeAgentSessionTest {
         assertThatCode(() -> s.interrupt().await().indefinitely())
             .doesNotThrowAnyException();
     }
+// ── test 10: clear() resets session and accepts new queries ─────────────
+
+    @Test
+    void clear_fromIdle_resetsAndAcceptsNewQueries() {
+        final var callCount = new AtomicInteger(0);
+        final var s = session(prompt -> {
+            callCount.incrementAndGet();
+            return Multi.createFrom().empty();
+        });
+        s.query("first").collect().asList().await().indefinitely();
+        assertThat(callCount.get()).isEqualTo(1);
+
+        s.clear();
+
+        s.query("after clear").collect().asList().await().indefinitely();
+        assertThat(callCount.get()).isEqualTo(2);
+    }
+// ── test 11: clear() while active throws ────────────────────────────────
+
+    @Test
+    void clear_fromActive_throwsIllegalStateException() {
+        final var s         = session(prompt -> Multi.createFrom().empty());
+        final var firstTurn = s.query("active");
+        assertThatIllegalStateException()
+                .isThrownBy(s::clear)
+                .withMessageContaining("cannot clear while a turn is active");
+        firstTurn.collect().asList().await().indefinitely();
+    }
+// ── test 12: clear() with factory replaces the client ────────────────────
+
+    @Test
+    void clear_withFactory_replacesClient() {
+        final var factoryCallCount = new AtomicInteger(0);
+        final var activeSessions   = new java.util.concurrent.CopyOnWriteArraySet<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient>();
+        final var semaphore        = new Semaphore(2);
+        semaphore.acquireUninterruptibly();
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient initialClient = mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        when(initialClient.close()).thenReturn(reactor.core.publisher.Mono.empty());
+        activeSessions.add(initialClient);
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient replacementClient = mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        when(replacementClient.close()).thenReturn(reactor.core.publisher.Mono.empty());
+
+        java.util.function.Supplier<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient> factory = () -> {
+            factoryCallCount.incrementAndGet();
+            return replacementClient;
+        };
+
+        session = new ClaudeAgentSession(initialClient, factory,
+                                         Duration.ofMinutes(5), semaphore, activeSessions,
+                                         java.util.concurrent.Executors.newSingleThreadScheduledExecutor(), "test-corr");
+
+        session.clear();
+
+        assertThat(factoryCallCount.get()).isEqualTo(1);
+        assertThat(activeSessions).doesNotContain(initialClient);
+        assertThat(activeSessions).contains(replacementClient);
+        verify(initialClient).close();
+    }
+
+
 }

@@ -90,11 +90,13 @@ public final class Walker {
             }
         }
 
-        Map<String, Object> decorators    = new LinkedHashMap<>();
-        Map<String, Object> companions    = new LinkedHashMap<>();
-        Map<String, Object> invokeSpec    = null;
-        String              matchedAction = null;
-        Map<String, Object> actionParams  = null;
+        Map<String, Object>                   decorators    = new LinkedHashMap<>();
+        Map<String, Object>                   companions    = new LinkedHashMap<>();
+        Map<String, Object>                   invokeSpec    = null;
+        String                                matchedAction = null;
+        Map<String, Object>                   actionParams  = null;
+        io.casehub.yaml.plugin.api.Definition matchedDef    = null;
+        List<Map.Entry<String, Object>>       unknownKeys   = new ArrayList<>();
 
         String  structuralType  = null;
         Object  structuralValue = null;
@@ -125,14 +127,14 @@ public final class Walker {
                 companions.put(key, e.getValue());
             } else if (PROMOTABLE_DECORATORS.contains(key)
                        && (e.getValue() instanceof List
-                           || (e.getValue() instanceof Map<?,?> pm && pm.size() == 1
+                           || (e.getValue() instanceof Map<?, ?> pm && pm.size() == 1
                                && pm.values().iterator().next() instanceof List))) {
                 if (structuralType != null) {
                     throw new IllegalArgumentException(
                             path + " → Step " + index + ": step has both structural type '"
                             + structuralType + "' and structural decorator '" + key + "'");
                 }
-                structuralType = key;
+                structuralType  = key;
                 structuralValue = e.getValue();
             } else if (RESERVED_KEYS.contains(key)) {
                 decorators.put(key, e.getValue());
@@ -142,15 +144,15 @@ public final class Walker {
                             path + " → Step " + index + ": step has both structural type '"
                             + structuralType + "' and structural decorator '" + key + "'");
                 }
-                int spaceIdx = key.indexOf(' ');
-                String prefix = key.substring(0, spaceIdx);
-                String param = key.substring(spaceIdx + 1);
+                int    spaceIdx = key.indexOf(' ');
+                String prefix   = key.substring(0, spaceIdx);
+                String param    = key.substring(spaceIdx + 1);
                 if (PROMOTABLE_DECORATORS.contains(prefix)) {
-                    structuralType = prefix;
+                    structuralType  = prefix;
                     structuralValue = java.util.Map.of(param, e.getValue());
                 } else {
-                    if (stepName == null) stepName = param;
-                    structuralType = prefix;
+                    if (stepName == null) {stepName = param;}
+                    structuralType  = prefix;
                     structuralValue = e.getValue();
                 }
             } else {
@@ -162,15 +164,37 @@ public final class Walker {
                                 + matchedAction + "' and '" + key + "'");
                     }
                     matchedAction = key;
-                    actionParams  = e.getValue() instanceof Map
-                                    ? (Map<String, Object>) e.getValue()
-                                    : Map.of();
+                    matchedDef    = entry.get();
+                    Object value = e.getValue();
+                    if (value instanceof Map) {
+                        actionParams = (Map<String, Object>) value;
+                    } else if (value != null) {
+                        actionParams = new LinkedHashMap<>();
+                        actionParams.put("_subject", value);
+                    } else {
+                        actionParams = new LinkedHashMap<>();
+                    }
                 } else {
-                    throw new IllegalArgumentException(
-                            path + " → Step " + index + ": unknown key '" + key
-                            + "'. Available actions: " + registry.availableActions());
+                    unknownKeys.add(e);
                 }
             }
+        }
+
+        if (matchedAction != null && matchedDef != null && matchedDef.absorbSiblings() && !unknownKeys.isEmpty()) {
+            if (!(actionParams instanceof LinkedHashMap)) {
+                actionParams = new LinkedHashMap<>(actionParams);
+            }
+            for (var unk : unknownKeys) {
+                actionParams.put(unk.getKey(), unk.getValue());
+            }
+            unknownKeys.clear();
+        }
+
+        if (!unknownKeys.isEmpty()) {
+            var first = unknownKeys.get(0);
+            throw new IllegalArgumentException(
+                    path + " → Step " + index + ": unknown key '" + first.getKey()
+                    + "'. Available actions: " + registry.availableActions());
         }
 
         if (stepName != null && !seenNames.add(stepName)) {
@@ -272,22 +296,22 @@ public final class Walker {
             var stepList = (List<Map<String, Object>>) policyMap.get("steps");
             if (stepList == null || stepList.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "parallel map form requires a non-empty 'steps' list at " + stepPath);
+                        "parallel map form requires a non-empty 'steps' list at " + stepPath);
             }
-            var resolved = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames);
+            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames);
             Object advanceAfterRaw = policyMap.get("advance-after");
-            int advanceAfter;
+            int    advanceAfter;
             if (advanceAfterRaw == null || "all".equals(advanceAfterRaw)) {
                 advanceAfter = resolved.size();
             } else if (advanceAfterRaw instanceof Number n) {
                 advanceAfter = n.intValue();
             } else {
                 throw new IllegalArgumentException(
-                    "advance-after must be a positive integer or 'all', got: " + advanceAfterRaw + " at " + stepPath);
+                        "advance-after must be a positive integer or 'all', got: " + advanceAfterRaw + " at " + stepPath);
             }
-            boolean cancelRemaining = Boolean.TRUE.equals(policyMap.get("cancel-remaining"));
+            boolean            cancelRemaining   = Boolean.TRUE.equals(policyMap.get("cancel-remaining"));
             java.time.Duration collectionTimeout = null;
-            Object ctRaw = policyMap.get("collection-timeout");
+            Object             ctRaw             = policyMap.get("collection-timeout");
             if (ctRaw != null) {
                 collectionTimeout = io.casehub.yaml.core.orchestration.DurationParser.parse(ctRaw.toString());
             }
@@ -323,7 +347,7 @@ public final class Walker {
             }
             var timeoutStr = (String) barrierMap.get("timeout");
             return new ResolvedStep.BarrierStep(stepName, awaitList,
-                    io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
+                                                io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
         }
         if ("quorum".equals(structuralType)) {
             @SuppressWarnings("unchecked")
@@ -337,7 +361,7 @@ public final class Walker {
             }
             var timeoutStr = (String) quorumMap.get("timeout");
             return new ResolvedStep.QuorumStep(stepName, required, ofList,
-                    io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
+                                               io.casehub.yaml.core.orchestration.DurationParser.parseOrNull(timeoutStr), decorators);
         }
         if ("race".equals(structuralType)) {
             @SuppressWarnings("unchecked")
@@ -356,7 +380,7 @@ public final class Walker {
                 @SuppressWarnings("unchecked")
                 var stepList = (List<Map<String, Object>>) structuralValue;
                 var resolved = resolve(stepList, registry, depth + 1,
-                        stepPath + " → " + structuralType, seenNames);
+                                       stepPath + " → " + structuralType, seenNames);
                 decorators.put(structuralType, true);
                 return new ResolvedStep.BlockStep(stepName, resolved, decorators);
             }
@@ -367,7 +391,7 @@ public final class Walker {
                         stepPath + ": structural '" + structuralType
                         + "' must have exactly one key (the parameter), got " + paramMap.size());
             }
-            var entry = paramMap.entrySet().iterator().next();
+            var    entry = paramMap.entrySet().iterator().next();
             String param = String.valueOf(entry.getKey());
             if (!(entry.getValue() instanceof List)) {
                 throw new IllegalArgumentException(
@@ -377,7 +401,7 @@ public final class Walker {
             @SuppressWarnings("unchecked")
             var stepList = (List<Map<String, Object>>) entry.getValue();
             var resolved = resolve(stepList, registry, depth + 1,
-                    stepPath + " → " + structuralType, seenNames);
+                                   stepPath + " → " + structuralType, seenNames);
             decorators.put(structuralType, param);
             return new ResolvedStep.BlockStep(stepName, resolved, decorators);
         }

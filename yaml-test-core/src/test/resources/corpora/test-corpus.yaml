@@ -1,0 +1,4 @@
+- prompt: "risk profile"
+  response: "Moderate risk: 60% equities."
+- prompt: "rebalancing"
+  response: "Shift 10% equities to bonds."

@@ -13,7 +13,8 @@ public record Definition(
         Portability portability,
         Action action,
         String capability,
-        Optional<StreamingTypeInfo> streamingType) {
+        Optional<StreamingTypeInfo> streamingType,
+        boolean absorbSiblings) {
 
     public Definition {
         if (name == null || name.isBlank()) {throw new IllegalArgumentException("Definition requires a name");}
@@ -28,7 +29,14 @@ public record Definition(
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability) {
-        this(name, description, inputs, outputs, portability, action, capability, Optional.empty());
+        this(name, description, inputs, outputs, portability, action, capability, Optional.empty(), false);
+    }
+
+    public Definition(String name, String description,
+                      Map<String, Parameter> inputs, Map<String, Parameter> outputs,
+                      Portability portability, Action action, String capability,
+                      Optional<StreamingTypeInfo> streamingType) {
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, false);
     }
 
     public static Builder of(String name) {return new Builder(name);}
@@ -42,13 +50,14 @@ public record Definition(
         private       Action                           action;
         private       String                           capability;
         private       Optional<StreamingTypeInfo>      streamingType  = Optional.empty();
+        private       boolean                          absorbSiblings = false;
 
-        private Builder(String name)                   {this.name = name;}
+        private Builder(String name) {this.name = name;}
 
         public Builder description(String description) {
-                                                           this.description = description;
-                                                           return this;
-                                                       }
+            this.description = description;
+            return this;
+        }
 
         public Builder input(String name, ParameterType type, boolean required) {
             inputs.put(name, new Parameter(type, required, null, null, null, null));
@@ -71,30 +80,35 @@ public record Definition(
         }
 
         public Builder portability(Portability portability) {
-                                                                this.portability = portability;
-                                                                return this;
-                                                            }
+            this.portability = portability;
+            return this;
+        }
 
-        public Builder capability(String capability)        {
-                                                                this.capability = capability;
-                                                                return this;
-                                                            }
+        public Builder capability(String capability) {
+            this.capability = capability;
+            return this;
+        }
 
-        public Builder execute(Action action)               {
-                                                                this.action = action;
-                                                                return this;
-                                                            }
+        public Builder execute(Action action) {
+            this.action = action;
+            return this;
+        }
 
         public Builder streamingType(StreamingTypeInfo info) {
-                                                                 this.streamingType = Optional.ofNullable(info);
-                                                                 return this;
-                                                             }
+            this.streamingType = Optional.ofNullable(info);
+            return this;
+        }
+
+        public Builder absorbSiblings(boolean absorb) {
+            this.absorbSiblings = absorb;
+            return this;
+        }
 
         public Definition build() {
             return new Definition(name, description,
                                   Collections.unmodifiableMap(new LinkedHashMap<>(inputs)),
                                   Collections.unmodifiableMap(new LinkedHashMap<>(outputs)),
-                                  portability, action, capability, streamingType);
+                                  portability, action, capability, streamingType, absorbSiblings);
         }
     }
 }

@@ -12,7 +12,7 @@ final class StepKeywords {
             "semaphore", "barrier", "quorum",
             "at", "on-complete", "resource", "priority",
             "cancel", "background", "from",
-            "wait", "mutex", "when");
+            "wait", "mutex", "when", "capture");
 
     static final Set<String> STRUCTURAL_KEYS = Set.of(
             "step", "invoke",

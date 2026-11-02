@@ -9,12 +9,14 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Plugin {
     String value();
+
     String description() default "";
 
     Portability portability() default Portability.JAVA;
 
-
     String capability() default "steps";
 
     boolean streaming() default false;
+
+    boolean absorbSiblings() default false;
 }

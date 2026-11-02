@@ -99,13 +99,13 @@ public class NotificationDispatcher {
                 final DeliveryResult result = channel.deliverer().deliver(notificationInput);
                 if (result.success()) {
                     deliveryTracker.recordSuccess(
-                            channel.channelId(), notificationInput, null,
+                            channel.channelId(), notificationInput, result.sourceId(),
                             DeliverySourceType.NOTIFICATION);
                 } else {
                     LOG.warnf("Non-user delivery failed for channel '%s', target '%s': %s",
                               channel.channelId(), targetId, result.failureReason());
                     deliveryTracker.recordFailure(
-                            channel.channelId(), notificationInput, null,
+                            channel.channelId(), notificationInput, result.sourceId(),
                             DeliverySourceType.NOTIFICATION,
                             null, result.failureReason());
                 }
@@ -173,6 +173,8 @@ public class NotificationDispatcher {
         final Set<ResolvedChannel> channels = channelRouter.route(
                 channelDefaults, suppressionResult, notificationInput.severity(), quietHoursAction);
 
+        String capturedSourceId = null;
+
         for (final ResolvedChannel channel : channels) {
             if (channel.digested()) {
                 digestBuffer.add(
@@ -193,10 +195,10 @@ public class NotificationDispatcher {
                                previous.success() ? "success" : "failure", userId);
                     if (previous.success()) {
                         deliveryTracker.recordSuccess(
-                                channel.channelId(), notificationInput, null, DeliverySourceType.NOTIFICATION);
+                                channel.channelId(), notificationInput, capturedSourceId, DeliverySourceType.NOTIFICATION);
                     } else {
                         deliveryTracker.recordFailure(
-                                channel.channelId(), notificationInput, null,
+                                channel.channelId(), notificationInput, capturedSourceId,
                                 DeliverySourceType.NOTIFICATION,
                                 null, previous.failureReason());
                     }
@@ -206,17 +208,20 @@ public class NotificationDispatcher {
 
             try {
                 final DeliveryResult result = channel.deliverer().deliver(notificationInput);
+                if (result.sourceId() != null) {
+                    capturedSourceId = result.sourceId();
+                }
                 if (channel.destinationScope() == DestinationScope.PER_TENANT) {
                     perTenantResults.put(channel.channelId(), result);
                 }
                 if (result.success()) {
                     deliveryTracker.recordSuccess(
-                            channel.channelId(), notificationInput, null, DeliverySourceType.NOTIFICATION);
+                            channel.channelId(), notificationInput, capturedSourceId, DeliverySourceType.NOTIFICATION);
                 } else {
                     LOG.warnf("Delivery failed for channel '%s', user '%s': %s",
                               channel.channelId(), userId, result.failureReason());
                     deliveryTracker.recordFailure(
-                            channel.channelId(), notificationInput, null,
+                            channel.channelId(), notificationInput, capturedSourceId,
                             DeliverySourceType.NOTIFICATION,
                             channel.guaranteedMinSeverity(), result.failureReason());
                 }
@@ -228,7 +233,7 @@ public class NotificationDispatcher {
                 LOG.warnf(e, "Delivery error for channel '%s', user '%s'",
                           channel.channelId(), userId);
                 deliveryTracker.recordFailure(
-                        channel.channelId(), notificationInput, null,
+                        channel.channelId(), notificationInput, capturedSourceId,
                         DeliverySourceType.NOTIFICATION,
                         channel.guaranteedMinSeverity(), e.getMessage());
             }

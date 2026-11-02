@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 class ReplyHintTest {
 
@@ -59,5 +61,35 @@ class ReplyHintTest {
     void rejectsNullType() {
         assertThatNullPointerException().isThrownBy(() ->
                 new ReplyHint(null, null));
+    }
+
+    @Test
+    void jacksonRoundTrip_acknowledge() throws Exception {
+        var mapper       = new com.fasterxml.jackson.databind.ObjectMapper();
+        var hint         = ReplyHint.acknowledge();
+        var json         = mapper.writeValueAsString(hint);
+        var deserialized = mapper.readValue(json, ReplyHint.class);
+        assertThat(deserialized.type()).isEqualTo(ReplyType.ACKNOWLEDGE);
+        assertThat(deserialized.options()).isNull();
+    }
+
+    @Test
+    void jacksonRoundTrip_freeText() throws Exception {
+        var mapper       = new com.fasterxml.jackson.databind.ObjectMapper();
+        var hint         = ReplyHint.freeText();
+        var json         = mapper.writeValueAsString(hint);
+        var deserialized = mapper.readValue(json, ReplyHint.class);
+        assertThat(deserialized.type()).isEqualTo(ReplyType.FREE_TEXT);
+        assertThat(deserialized.options()).isNull();
+    }
+
+    @Test
+    void jacksonRoundTrip_options() throws Exception {
+        var mapper       = new com.fasterxml.jackson.databind.ObjectMapper();
+        var hint         = ReplyHint.options(List.of("approve", "reject", "defer"));
+        var json         = mapper.writeValueAsString(hint);
+        var deserialized = mapper.readValue(json, ReplyHint.class);
+        assertThat(deserialized.type()).isEqualTo(ReplyType.OPTIONS);
+        assertThat(deserialized.options()).containsExactly("approve", "reject", "defer");
     }
 }

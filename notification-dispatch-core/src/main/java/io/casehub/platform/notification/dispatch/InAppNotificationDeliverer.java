@@ -41,8 +41,8 @@ public class InAppNotificationDeliverer implements NotificationDeliverer {
     @Override
     public DeliveryResult deliver(final NotificationInput notification) {
         try {
-            notificationStore.store(notification);
-            return new DeliveryResult(true, null);
+            var stored = notificationStore.store(notification);
+            return new DeliveryResult(true, null, stored.id());
         } catch (Exception e) {
             LOG.warnf(e, "Failed to store in-app notification for user '%s'", notification.userId());
             return new DeliveryResult(false, e.getMessage());

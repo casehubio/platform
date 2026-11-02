@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -402,6 +401,46 @@ public abstract class NotificationStoreContractTest {
     }
 
     // Helper Methods
+
+
+    // findById Contract Tests
+
+    @Test
+    void findById_returnsNotification_whenFound() {
+        var input  = createInput("user-1", "tenant-1", "Title", "category");
+        var stored = store().store(input);
+
+        var found = store().findById(stored.id(), "user-1", "tenant-1");
+
+        assertThat(found).isPresent();
+        assertThat(found.get().id()).isEqualTo(stored.id());
+        assertThat(found.get().title()).isEqualTo("Title");
+    }
+
+    @Test
+    void findById_returnsEmpty_forWrongUser() {
+        var stored = store().store(createInput("user-1", "tenant-1", "Title", "category"));
+
+        var found = store().findById(stored.id(), "wrong-user", "tenant-1");
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findById_returnsEmpty_forWrongTenant() {
+        var stored = store().store(createInput("user-1", "tenant-1", "Title", "category"));
+
+        var found = store().findById(stored.id(), "user-1", "wrong-tenant");
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findById_returnsEmpty_forNonExistent() {
+        var found = store().findById("non-existent-id", "user-1", "tenant-1");
+
+        assertThat(found).isEmpty();
+    }
 
     private NotificationInput createInput(String userId, String tenancyId, String title, String category) {
         var source = new NotificationSource("evt-123", "work-item", "wi-456", "actor-789");

@@ -164,6 +164,36 @@ class TemplateResolverTest {
         assertThat(second).isNull();
     }
 
+
+    @Test
+    void resolve_passesReplyHintThrough() {
+        var hint = io.casehub.platform.api.notification.ReplyHint.options(java.util.List.of("approve", "reject"));
+        var template = new NotificationTemplate(
+                "Title", null,
+                NotificationSeverity.INFO, "test.category",
+                null, "test-entity", "workItemId", "actor", hint);
+        var pojo  = new TestWorkItem("done", "detail", java.util.UUID.randomUUID(), "actor-1");
+        var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
+
+        assertThat(input).isNotNull();
+        assertThat(input.replyHint()).isNotNull();
+        assertThat(input.replyHint().type()).isEqualTo(io.casehub.platform.api.notification.ReplyType.OPTIONS);
+        assertThat(input.replyHint().options()).containsExactly("approve", "reject");
+    }
+
+    @Test
+    void resolve_passesNullReplyHintThrough() {
+        var template = new NotificationTemplate(
+                "Title", null,
+                NotificationSeverity.INFO, "test.category",
+                null, "test-entity", "workItemId", "actor", null);
+        var pojo  = new TestWorkItem("done", "detail", java.util.UUID.randomUUID(), "actor-1");
+        var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
+
+        assertThat(input).isNotNull();
+        assertThat(input.replyHint()).isNull();
+    }
+
     record TestWorkItem(String status, String detail, UUID workItemId, String actor) {}
 
     record TestEvent(String entityId, String actorId) {}

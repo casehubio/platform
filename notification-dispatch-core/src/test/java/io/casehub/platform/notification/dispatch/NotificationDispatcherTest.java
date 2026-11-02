@@ -1,9 +1,9 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
-import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
+import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.delivery.DigestSchedule;
@@ -378,6 +378,46 @@ class NotificationDispatcherTest {
 
         assertThat(slackCaptured).hasSize(1);
         assertThat(slackCaptured.getFirst().userId()).isEqualTo("user2");
+    }
+
+    @Test
+    void dispatch_deliveryAttempt_hasCorrectSourceId() {
+        var notificationStore = new io.casehub.platform.notification.inmem.InMemoryNotificationStore(1000, e -> {}, e -> {}, e -> {});
+        channelRegistry = new InMemoryDeliveryChannelRegistry();
+        var inAppDeliverer = new InAppNotificationDeliverer(notificationStore, channelRegistry);
+
+        var deliveryAttemptStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore(10000);
+        var objectMapper         = new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        var deliveryTracker = new DeliveryTracker(deliveryAttemptStore, objectMapper, Duration.ofSeconds(30));
+
+        var targetResolver = new TargetResolver(
+                (g, t) -> Set.of(), (et, eid, tid) -> Set.of());
+        var dispatcher = new NotificationDispatcher(
+                targetResolver, new SuppressionEvaluator(), new ChannelRouter(channelRegistry),
+                preferenceStore, suppressionStore, new CapturingDigestBuffer(), deliveryTracker,
+                input -> input.replyHint());
+
+        var sub = subscription(
+                List.of(new NotificationTarget(TargetType.USER, "user-recipient")), false);
+        var pojo = new TestEvent("wi-1", "actor-user", "completed");
+
+        dispatcher.onMatch(new SubscriptionMatched(sub, pojo));
+
+        // Verify the stored notification exists
+        var page = notificationStore.find(new io.casehub.platform.api.notification.NotificationQuery(
+                "user-recipient", TENANT, null, null, null, 10));
+        assertThat(page.notifications()).hasSize(1);
+        var storedNotification = page.notifications().getFirst();
+
+        // Verify the delivery attempt has the notification ID as sourceId
+        var attempts = deliveryAttemptStore.findBySource(
+                storedNotification.id(),
+                io.casehub.platform.api.delivery.DeliverySourceType.NOTIFICATION,
+                TENANT);
+        assertThat(attempts).as("Delivery attempt must have sourceId = notification.id()")
+                            .isNotEmpty();
+        assertThat(attempts.getFirst().channelId()).isEqualTo(DeliveryChannels.IN_APP);
     }
 
 

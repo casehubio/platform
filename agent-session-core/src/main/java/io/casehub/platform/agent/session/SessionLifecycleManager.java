@@ -1,8 +1,10 @@
 package io.casehub.platform.agent.session;
 
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.agent.SessionClearObserver;
 import org.jboss.logging.Logger;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SessionLifecycleManager {
@@ -11,10 +13,19 @@ public class SessionLifecycleManager {
 
     private final SessionPoolRegistry                       poolRegistry;
     private final ConcurrentHashMap<String, ManagedSession> sessions = new ConcurrentHashMap<>();
+    private final List<SessionClearObserver>                clearObservers;
+
 
     public SessionLifecycleManager(SessionPoolRegistry poolRegistry) {
-        this.poolRegistry = poolRegistry;
+        this(poolRegistry, List.of());
     }
+
+    public SessionLifecycleManager(SessionPoolRegistry poolRegistry,
+                                   List<SessionClearObserver> clearObservers) {
+        this.poolRegistry   = poolRegistry;
+        this.clearObservers = clearObservers.isEmpty() ? List.of() : List.copyOf(clearObservers);
+    }
+
 
     public ManagedSession acquire(String conversationId, String backendKey, AgentSessionInit init) {
         return acquire(conversationId, backendKey, init, ClearingPolicy.MANUAL, 0);
@@ -29,7 +40,7 @@ public class SessionLifecycleManager {
             PooledSession pooled = pool.checkout(init);
             LOG.infof("Acquired managed session [conversationId=%s, backend=%s, policy=%s]",
                       conversationId, backendKey, clearingPolicy);
-            return new ManagedSession(pooled, conversationId, this, clearingPolicy, clearAfterTurns, pool.metrics());
+            return new ManagedSession(pooled, conversationId, this, clearingPolicy, clearAfterTurns, pool.metrics(), clearObservers);
         });
     }
 

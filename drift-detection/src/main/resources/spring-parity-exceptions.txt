@@ -16,6 +16,8 @@ digest-inmem
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 endpoints-memory
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+label-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 registry-inmem
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 notification-settings-inmem
@@ -25,6 +27,8 @@ notifications-inmem
 view-inmem
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 subscriptions-inmem
+# In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
+user-inmem
 # In-memory dev/test — Spring uses JPA counterparts (*-spring-jpa)
 authn-inmem
 # Hand-written authn-spring auto-configuration (not generated)

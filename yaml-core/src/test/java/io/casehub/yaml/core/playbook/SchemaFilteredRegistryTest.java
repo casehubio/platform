@@ -2,7 +2,6 @@ package io.casehub.yaml.core.playbook;
 
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.PluginRegistry;
-import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,6 +79,12 @@ class SchemaFilteredRegistryTest {
     static class SimplePluginRegistry implements PluginRegistry {
         private final ConcurrentHashMap<String, Definition> defs = new ConcurrentHashMap<>();
         @Override public void register(Definition d) { defs.put(d.name(), d); }
+
+        @Override
+        public Optional<Definition> unregister(String actionName) {
+            return Optional.ofNullable(defs.remove(actionName));
+        }
+
         @Override public Optional<Definition> resolve(String name) {
             return Optional.ofNullable(defs.get(name));
         }

@@ -17,11 +17,21 @@ public class CompositePluginRegistry implements PluginRegistry {
 
     @Override
     public void register(Definition definition) {
-        Definition existing = definitions.putIfAbsent(definition.name(), definition);
+        Definition existing = definitions.put(definition.name(), definition);
         if (existing != null) {
-            LOG.log(Level.WARNING, "Duplicate plugin registration ignored: ''{0}''", definition.name());
+            LOG.log(Level.INFO, "Plugin registration overridden: ''{0}''", definition.name());
         }
     }
+
+    @Override
+    public Optional<Definition> unregister(String actionName) {
+        Definition removed = definitions.remove(actionName);
+        if (removed != null) {
+            LOG.log(Level.INFO, "Plugin unregistered: ''{0}''", actionName);
+        }
+        return Optional.ofNullable(removed);
+    }
+
 
     @Override
     public Optional<Definition> resolve(String actionName) {

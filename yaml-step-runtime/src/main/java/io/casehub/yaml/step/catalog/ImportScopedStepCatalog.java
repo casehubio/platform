@@ -25,6 +25,12 @@ public class ImportScopedStepCatalog implements PluginRegistry {
     }
 
     @Override
+    public Optional<Definition> unregister(String actionName) {
+        return delegate.unregister(actionName);
+    }
+
+
+    @Override
     public Optional<Definition> resolve(String actionName) {
         Definition imported = importedEntries.get(actionName);
         if (imported != null) return Optional.of(imported);

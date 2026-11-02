@@ -21,7 +21,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StreamingPipelineIntegrationTest {
 
@@ -242,6 +245,10 @@ class StreamingPipelineIntegrationTest {
     private static class TestRegistry implements PluginRegistry {
         private final Map<String, Definition> defs = new HashMap<>();
         @Override public void register(Definition d) { defs.put(d.name(), d); }
+
+        @Override
+        public Optional<Definition> unregister(String name) {return Optional.ofNullable(defs.remove(name));}
+
         @Override public Optional<Definition> resolve(String name) { return Optional.ofNullable(defs.get(name)); }
         @Override public Set<String> availableActions() { return defs.keySet(); }
     }

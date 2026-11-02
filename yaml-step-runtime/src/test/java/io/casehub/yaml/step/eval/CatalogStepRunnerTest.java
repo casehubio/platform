@@ -108,6 +108,12 @@ class CatalogStepRunnerTest {
         }
 
         @Override
+        public Optional<Definition> unregister(String actionName) {
+            return Optional.ofNullable(defs.remove(actionName));
+        }
+
+
+        @Override
         public Optional<Definition> resolve(String actionName) {
             return Optional.ofNullable(defs.get(actionName));
         }

@@ -33,6 +33,12 @@ public final class SchemaFilteredRegistry implements PluginRegistry {
     }
 
     @Override
+    public Optional<Definition> unregister(String actionName) {
+        return delegate.unregister(actionName);
+    }
+
+
+    @Override
     public Optional<Definition> resolve(String actionName) {
         return delegate.resolve(actionName)
                 .filter(d -> allowedCapabilities.contains(d.capability()));

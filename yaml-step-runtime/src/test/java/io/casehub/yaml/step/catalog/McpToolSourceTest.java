@@ -78,19 +78,19 @@ class McpToolSourceTest {
     }
 
     @Test
-    void firstRegistrationWins() {
+    void lastRegistrationWins() {
         Declaration decl = new Declaration("tool", null, Map.of(), Map.of(),
-                new InvokeBinding.Mcp("tool"));
+                                           new InvokeBinding.Mcp("tool"));
 
         McpToolSource source = new McpToolSource(Map.of("tool", decl),
-                (name, params) -> Map.of());
+                                                 (name, params) -> Map.of());
 
         var registry = new CompositePluginRegistry();
         registry.register(new Definition("tool", "existing", Map.of(), Map.of(),
-                Portability.JAVA, (params, services) -> Result.of(Map.of()), null));
+                                         Portability.JAVA, (params, services) -> Result.of(Map.of()), null));
 
         source.populate(registry);
 
-        assertThat(registry.resolve("tool").get().description()).isEqualTo("existing");
+        assertThat(registry.resolve("tool").get().description()).isNull();
     }
 }

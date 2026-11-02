@@ -16,7 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FusionPassTest {
 
@@ -202,6 +204,12 @@ class FusionPassTest {
         @Override public void register(Definition definition) {
             defs.put(definition.name(), definition);
         }
+
+        @Override
+        public Optional<Definition> unregister(String actionName) {
+            return Optional.ofNullable(defs.remove(actionName));
+        }
+
 
         @Override public Optional<Definition> resolve(String actionName) {
             return Optional.ofNullable(defs.get(actionName));

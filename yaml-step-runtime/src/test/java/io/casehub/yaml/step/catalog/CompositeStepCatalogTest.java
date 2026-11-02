@@ -42,13 +42,13 @@ class CompositeStepCatalogTest {
     }
 
     @Test
-    void firstRegistrationWinsOnNameCollision() {
+    void lastRegistrationWinsOnNameCollision() {
         var registry = new CompositePluginRegistry();
         registry.register(definition("shared"));
         registry.register(new Definition("shared", "second", Map.of(), Map.of(), Portability.JAVA,
-                (params, services) -> Result.failed("should not be used"), null));
+                                         (params, services) -> Result.failed("should not be used"), null));
 
         assertThat(registry.resolve("shared")).isPresent();
-        assertThat(registry.resolve("shared").get().description()).isNull();
+        assertThat(registry.resolve("shared").get().description()).isEqualTo("second");
     }
 }

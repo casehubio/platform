@@ -73,18 +73,18 @@ class AptPluginSourceTest {
     }
 
     @Test
-    void populateDoesNotOverwriteExistingEntries() {
-        var source = new AptPluginSource(mapper);
+    void populateOverridesExistingEntries() {
+        var source   = new AptPluginSource(mapper);
         var registry = new CompositePluginRegistry();
         var existing = Definition.of("process")
-                .description("pre-existing")
-                .execute((p, s) -> Result.of(Map.of()))
-                .build();
+                                 .description("pre-existing")
+                                 .execute((p, s) -> Result.of(Map.of()))
+                                 .build();
         registry.register(existing);
 
         source.populate(registry);
 
-        assertThat(registry.resolve("process").get().description()).isEqualTo("pre-existing");
+        assertThat(registry.resolve("process").get().description()).isNotEqualTo("pre-existing");
         assertThat(registry.resolve("rest-call")).isPresent();
         assertThat(registry.resolve("assert")).isPresent();
     }

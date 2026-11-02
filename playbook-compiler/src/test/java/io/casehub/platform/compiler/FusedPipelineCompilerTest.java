@@ -2,9 +2,6 @@ package io.casehub.platform.compiler;
 
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.PluginRegistry;
-import io.casehub.yaml.plugin.api.Portability;
-import io.casehub.yaml.plugin.api.Result;
-import io.casehub.yaml.plugin.api.StreamingTypeInfo;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -12,7 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FusedPipelineCompilerTest {
 
@@ -50,6 +48,12 @@ class FusedPipelineCompilerTest {
         @Override public void register(Definition definition) {
             defs.put(definition.name(), definition);
         }
+
+        @Override
+        public Optional<Definition> unregister(String actionName) {
+            return Optional.ofNullable(defs.remove(actionName));
+        }
+
 
         @Override public Optional<Definition> resolve(String actionName) {
             return Optional.ofNullable(defs.get(actionName));

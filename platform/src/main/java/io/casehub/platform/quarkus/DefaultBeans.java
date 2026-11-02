@@ -13,6 +13,7 @@ import io.casehub.platform.expression.NoOpExpressionEngineRegistry;
 import io.casehub.platform.identity.NoOpActorDIDProvider;
 import io.casehub.platform.identity.NoOpCredentialValidator;
 import io.casehub.platform.identity.NoOpDIDResolver;
+import io.casehub.platform.label.NoOpLabelRegistry;
 import io.casehub.platform.mock.MockCurrentPrincipal;
 import io.casehub.platform.mock.MockGroupMembershipProvider;
 import io.casehub.platform.mock.MockPreferenceProvider;
@@ -140,6 +141,11 @@ public class DefaultBeans {
 
     @Produces @DefaultBean @ApplicationScoped
     public NoOpEndpointRegistry noOpEndpointRegistry() { return new NoOpEndpointRegistry(); }
+
+    // --- Label ---
+
+    @Produces @DefaultBean @ApplicationScoped
+    public NoOpLabelRegistry noOpLabelRegistry() { return new NoOpLabelRegistry(); }
 
     // --- Registry ---
 

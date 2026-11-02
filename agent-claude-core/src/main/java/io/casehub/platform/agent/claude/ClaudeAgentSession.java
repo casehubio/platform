@@ -201,6 +201,22 @@ class ClaudeAgentSession implements AgentSession {
             throw new IllegalStateException("cannot clear while a turn is active");
         }
 
+        if (sdkClient != null && sessionStarted.get()) {
+            try {
+                sdkClient.query("/clear").text().block(Duration.ofSeconds(10));
+                turnCounter.set(0);
+                if (correlationId != null) {
+                    LOG.infof("Agent session cleared (lightweight) [correlationId=%s]", correlationId);
+                }
+                return;
+            } catch (final Exception e) {
+                if (correlationId != null) {
+                    LOG.warnf("Agent session clear: lightweight failed, falling back to restart [correlationId=%s, cause=%s]",
+                              correlationId, e.getMessage());
+                }
+            }
+        }
+
         if (clientFactory != null) {
             final ClaudeAsyncClient newClient = clientFactory.get();
             final ClaudeAsyncClient oldClient = this.sdkClient;
@@ -215,7 +231,7 @@ class ClaudeAgentSession implements AgentSession {
         turnCounter.set(0);
 
         if (correlationId != null) {
-            LOG.infof("Agent session cleared [correlationId=%s]", correlationId);
+            LOG.infof("Agent session cleared (restart) [correlationId=%s]", correlationId);
         }
     }
 

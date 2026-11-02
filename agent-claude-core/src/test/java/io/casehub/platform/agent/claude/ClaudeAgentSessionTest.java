@@ -277,5 +277,85 @@ class ClaudeAgentSessionTest {
         verify(initialClient).close();
     }
 
+    @Test
+    void clear_withSdkClient_sendsSlashClearInsteadOfRestart() {
+        final var activeSessions = new java.util.concurrent.CopyOnWriteArraySet<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient>();
+        final var semaphore      = new Semaphore(2);
+        semaphore.acquireUninterruptibly();
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient sdkClient = mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        when(sdkClient.close()).thenReturn(reactor.core.publisher.Mono.empty());
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec clearSpec =
+                mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec.class);
+        when(clearSpec.text()).thenReturn(reactor.core.publisher.Mono.just(""));
+        when(sdkClient.query("/clear")).thenReturn(clearSpec);
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec connectSpec =
+                mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec.class);
+        when(connectSpec.messages()).thenReturn(reactor.core.publisher.Flux.empty());
+        when(sdkClient.connect(org.mockito.ArgumentMatchers.anyString())).thenReturn(connectSpec);
+
+        final var factoryCallCount = new AtomicInteger(0);
+        java.util.function.Supplier<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient> factory = () -> {
+            factoryCallCount.incrementAndGet();
+            return mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        };
+
+        activeSessions.add(sdkClient);
+
+        session = new ClaudeAgentSession(sdkClient, factory,
+                                         Duration.ofMinutes(5), semaphore, activeSessions,
+                                         java.util.concurrent.Executors.newSingleThreadScheduledExecutor(), "test-corr");
+
+        session.query("init").collect().asList().await().indefinitely();
+
+        session.clear();
+
+        assertThat(factoryCallCount.get()).isZero();
+        assertThat(activeSessions).contains(sdkClient);
+        verify(sdkClient).query("/clear");
+    }
+
+    @Test
+    void clear_withSdkClient_fallsBackToFactoryOnFailure() {
+        final var activeSessions = new java.util.concurrent.CopyOnWriteArraySet<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient>();
+        final var semaphore      = new Semaphore(2);
+        semaphore.acquireUninterruptibly();
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient sdkClient = mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        when(sdkClient.close()).thenReturn(reactor.core.publisher.Mono.empty());
+        when(sdkClient.query("/clear")).thenThrow(new RuntimeException("unsupported"));
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec connectSpec =
+                mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.TurnSpec.class);
+        when(connectSpec.messages()).thenReturn(reactor.core.publisher.Flux.empty());
+        when(sdkClient.connect(org.mockito.ArgumentMatchers.anyString())).thenReturn(connectSpec);
+
+        final org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient replacementClient = mock(org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient.class);
+        when(replacementClient.close()).thenReturn(reactor.core.publisher.Mono.empty());
+
+        final var factoryCallCount = new AtomicInteger(0);
+        java.util.function.Supplier<org.springaicommunity.claude.agent.sdk.ClaudeAsyncClient> factory = () -> {
+            factoryCallCount.incrementAndGet();
+            return replacementClient;
+        };
+
+        activeSessions.add(sdkClient);
+
+        session = new ClaudeAgentSession(sdkClient, factory,
+                                         Duration.ofMinutes(5), semaphore, activeSessions,
+                                         java.util.concurrent.Executors.newSingleThreadScheduledExecutor(), "test-corr");
+
+        session.query("init").collect().asList().await().indefinitely();
+
+        session.clear();
+
+        assertThat(factoryCallCount.get()).isEqualTo(1);
+        assertThat(activeSessions).doesNotContain(sdkClient);
+        assertThat(activeSessions).contains(replacementClient);
+        verify(sdkClient).close();
+    }
+
 
 }

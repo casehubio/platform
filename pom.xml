@@ -289,6 +289,11 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-core</artifactId>
+                <version>${version.dev.langchain4j}</version>
+            </dependency>
             <!-- Align all BouncyCastle JARs — Quarkus BOM manages bcprov to 1.85.2
                  but DSS 6.2 pulls bcpkix/bcutil at 1.85, causing CMSSignedData failures -->
             <dependency>

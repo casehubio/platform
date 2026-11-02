@@ -29,7 +29,7 @@ class SubscriptionSpiTest {
                 "work-item",
                 "id",
                 "createdBy"
-        );
+        , null);
         assertThat(template.titlePattern()).isEqualTo("New {entityType} created");
         assertThat(template.bodyPattern()).isEqualTo("Details: {details}");
         assertThat(template.severity()).isEqualTo(NotificationSeverity.INFO);
@@ -51,7 +51,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
         assertThat(template.bodyPattern()).isNull();
     }
 
@@ -66,7 +66,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
         assertThat(template.actionUrlPattern()).isNull();
     }
 
@@ -81,7 +81,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("titlePattern");
     }
@@ -97,7 +97,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("severity");
     }
@@ -113,7 +113,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("category");
     }
@@ -129,7 +129,7 @@ class SubscriptionSpiTest {
                 null,
                 "id",
                 "actor"
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("entityType");
     }
@@ -145,7 +145,7 @@ class SubscriptionSpiTest {
                 "entity",
                 null,
                 "actor"
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("entityIdField");
     }
@@ -161,7 +161,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 null
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("actorIdField");
     }
@@ -181,7 +181,7 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
         var input = new SubscriptionInput(
                 "user-1",
                 "tenant-1",
@@ -1030,6 +1030,6 @@ class SubscriptionSpiTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
     }
 }

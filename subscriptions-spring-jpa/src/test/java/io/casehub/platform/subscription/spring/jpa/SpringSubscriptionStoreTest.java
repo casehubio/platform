@@ -63,7 +63,7 @@ class SpringSubscriptionStoreTest {
                 List.of(new NotificationTarget(TargetType.USER, OWNER)),
                 false,
                 new NotificationTemplate("{title}", null, NotificationSeverity.INFO,
-                        "test", null, "case", "entityId", "actorId"),
+                        "test", null, "case", "entityId", "actorId", null),
                 true,
                 SubscriptionScope.USER);
     }
@@ -119,7 +119,7 @@ class SpringSubscriptionStoreTest {
                 List.of(new NotificationTarget(TargetType.USER, OWNER)),
                 false,
                 new NotificationTemplate("{title}", null, NotificationSeverity.INFO,
-                        "test", null, "case", "entityId", "actorId"),
+                        "test", null, "case", "entityId", "actorId", null),
                 false, SubscriptionScope.USER));
 
         List<Subscription> enabled = store.findAllEnabled().toList();

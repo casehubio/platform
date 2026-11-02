@@ -119,6 +119,6 @@ class InMemorySubscriptionStoreTest extends SubscriptionStoreContractTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
     }
 }

@@ -163,7 +163,7 @@ class DeliveryTrackerTest {
         return new NotificationInput(
                 "user-1", "tenant-1", "Test Notification", "body",
                 "test.event", severity, null,
-                new NotificationSource("evt-1", "work-item", "wi-1", "actor-1"));
+                new NotificationSource("evt-1", "work-item", "wi-1", "actor-1"), null);
     }
 
     private DigestSummary testDigestSummary(NotificationSeverity maxSeverity) {

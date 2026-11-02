@@ -22,15 +22,15 @@ public final class NotificationCorpus {
     }
 
     public static NotificationInput input(String title, String category,
-                                            NotificationSeverity severity) {
+                                          NotificationSeverity severity) {
         return new NotificationInput("user-1", "default", title, null, category,
-                severity, null, new NotificationSource("evt-1", "system", "sys-1", "actor-1"));
+                                     severity, null, new NotificationSource("evt-1", "system", "sys-1", "actor-1"), null);
     }
 
     public static Notification fromInput(NotificationInput input) {
         return new Notification(UUIDv7.generate().toString(), input.userId(),
-                input.tenancyId(), input.title(), input.body(), input.category(),
-                input.severity(), input.actionUrl(), input.source(),
-                NotificationStatus.UNREAD, Instant.now(), null, null);
+                                input.tenancyId(), input.title(), input.body(), input.category(),
+                                input.severity(), input.actionUrl(), input.source(),
+                                NotificationStatus.UNREAD, Instant.now(), null, null, input.replyHint());
     }
 }

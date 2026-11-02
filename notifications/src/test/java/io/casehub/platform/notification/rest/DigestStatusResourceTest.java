@@ -50,17 +50,17 @@ class DigestStatusResourceTest {
                 "user-1", TenancyConstants.DEFAULT_TENANT_ID,
                 "Title 1", "Body 1", "category-1", NotificationSeverity.INFO,
                 null, new NotificationSource("event-1", "case", "case-1", "actor-1")
-        );
+        , null);
         var notification2 = new NotificationInput(
                 "user-1", TenancyConstants.DEFAULT_TENANT_ID,
                 "Title 2", "Body 2", "category-2", NotificationSeverity.INFO,
                 null, new NotificationSource("event-2", "case", "case-2", "actor-2")
-        );
+        , null);
         var notification3 = new NotificationInput(
                 "user-1", TenancyConstants.DEFAULT_TENANT_ID,
                 "Title 3", "Body 3", "category-3", NotificationSeverity.INFO,
                 null, new NotificationSource("event-3", "case", "case-3", "actor-3")
-        );
+        , null);
 
         digestBuffer.add(key1, notification1);
         digestBuffer.add(key1, notification2);
@@ -92,7 +92,7 @@ class DigestStatusResourceTest {
             "user-1", "tenant-2",
             "Title", "Body", "category", NotificationSeverity.INFO,
             null, new NotificationSource("event-1", "case", "case-1", "actor-1")
-        );
+        , null);
         digestBuffer.add(keyOtherTenant, notification);
 
         // Act: user-1 in default tenant queries
@@ -111,7 +111,7 @@ class DigestStatusResourceTest {
             "user-2", TenancyConstants.DEFAULT_TENANT_ID,
             "Title", "Body", "category", NotificationSeverity.INFO,
             null, new NotificationSource("event-1", "case", "case-1", "actor-1")
-        );
+        , null);
         digestBuffer.add(keyOtherUser, notification);
 
         // Act: user-1 queries

@@ -27,7 +27,7 @@ class TargetResolverTest {
 
     private static final NotificationTemplate TEMPLATE = new NotificationTemplate(
             "Title", null, NotificationSeverity.INFO, "test.category",
-            null, "work-item", "entityId", "actorId");
+            null, "work-item", "entityId", "actorId", null);
 
     // Stub GroupMembershipProvider that returns configurable members
     private final GroupMembershipProvider groupProvider = (groupName, tenancyId) -> {
@@ -225,7 +225,7 @@ class TargetResolverTest {
         // Override template with different entity type
         var template = new NotificationTemplate(
                 "Title", null, NotificationSeverity.INFO, "test.category",
-                null, "case", "entityId", "actorId");
+                null, "case", "entityId", "actorId", null);
         var sub = new Subscription(
                 "sub-1", "owner-1", TENANT, "Test Sub", "test.event",
                 List.of(), List.of(new NotificationTarget(TargetType.ENTITY_WATCHERS, "")),

@@ -4,9 +4,11 @@ import io.casehub.platform.api.delivery.DeliveryAttemptStore;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliverySourceType;
 import io.casehub.platform.api.delivery.EngagementType;
+import io.casehub.platform.api.identity.TenancyConstants;
+import io.casehub.platform.api.notification.NotificationClicked;
+import io.casehub.platform.api.notification.NotificationReplied;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
-import io.casehub.platform.api.identity.TenancyConstants;
 import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.api.preferences.PreferenceProvider;
 import io.casehub.platform.api.preferences.SettingsScope;
@@ -57,5 +59,35 @@ public class InAppEngagementBridge {
             return;
         }
         recorder.record(inAppAttempt, type, null);
+    }
+
+    public void onClicked(NotificationClicked event) {
+        var notification = event.notification();
+        var attempts     = store.findBySource(notification.id(), DeliverySourceType.NOTIFICATION, notification.tenancyId());
+        var inAppAttempt = attempts.stream()
+                                   .filter(a -> DeliveryChannels.IN_APP.equals(a.channelId()))
+                                   .findFirst()
+                                   .orElse(null);
+        if (inAppAttempt == null) {
+            LOG.debugf("No in-app delivery attempt for notification '%s' — skipping click engagement",
+                       notification.id());
+            return;
+        }
+        recorder.record(inAppAttempt, EngagementType.CLICKED, null);
+    }
+
+    public void onReplied(NotificationReplied event) {
+        var notification = event.notification();
+        var attempts     = store.findBySource(notification.id(), DeliverySourceType.NOTIFICATION, notification.tenancyId());
+        var inAppAttempt = attempts.stream()
+                                   .filter(a -> DeliveryChannels.IN_APP.equals(a.channelId()))
+                                   .findFirst()
+                                   .orElse(null);
+        if (inAppAttempt == null) {
+            LOG.debugf("No in-app delivery attempt for notification '%s' — skipping reply engagement",
+                       notification.id());
+            return;
+        }
+        recorder.record(inAppAttempt, EngagementType.REPLIED, event.value());
     }
 }

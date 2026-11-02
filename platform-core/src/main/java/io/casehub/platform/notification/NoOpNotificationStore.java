@@ -22,9 +22,14 @@ public class NoOpNotificationStore implements NotificationStore {
     @Override public Optional<Notification> dismiss(final String id, final String userId, final String tenancyId) { return Optional.empty(); }
     @Override public int markAllRead(final String userId, final String tenancyId) { return 0; }
 
+    @Override
+    public Optional<Notification> findById(final String id, final String userId, final String tenancyId) {return Optional.empty();}
+
+
     private Notification toNotification(final NotificationInput input) {
         return new Notification(UUIDv7.generate(), input.userId(), input.tenancyId(),
-                input.title(), input.body(), input.category(), input.severity(),
-                input.actionUrl(), input.source(), NotificationStatus.UNREAD, Instant.now(), null, null);
+                                input.title(), input.body(), input.category(), input.severity(),
+                                input.actionUrl(), input.source(), NotificationStatus.UNREAD, Instant.now(), null, null,
+                                input.replyHint());
     }
 }

@@ -46,7 +46,7 @@ class SubscriptionServiceTest {
 
 
     private static final NotificationTemplate TEMPLATE = new NotificationTemplate(
-            "title", "body", NotificationSeverity.INFO, "cat", null, "entity", "entityId", "actorId");
+            "title", "body", NotificationSeverity.INFO, "cat", null, "entity", "entityId", "actorId", null);
 
     private final StubStore store = new StubStore();
 

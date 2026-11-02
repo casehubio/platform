@@ -66,7 +66,7 @@ class SubscriptionResourceTest {
             "work-item",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput(
             "user-1",
             TenancyConstants.DEFAULT_TENANT_ID,
@@ -111,7 +111,7 @@ class SubscriptionResourceTest {
             "test-entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.event.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         store.store(input);
@@ -141,7 +141,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
 
         var enabledInput = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Enabled subscription", "test.enabled", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
@@ -175,7 +175,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
 
         for (int i = 1; i <= 3; i++) {
             var input = new SubscriptionInput(
@@ -216,7 +216,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input);
@@ -245,7 +245,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-2", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-2")), false, template, true, null
         );
         var subscription = store.store(input);
@@ -270,7 +270,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Original name", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input);
@@ -332,7 +332,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input);
@@ -373,7 +373,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, false, null
         );
         var subscription = store.store(input);
@@ -401,7 +401,7 @@ class SubscriptionResourceTest {
             "entity",
             "entityId",
             "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", TenancyConstants.DEFAULT_TENANT_ID, "Test subscription", "test.type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null
         );
         var subscription = store.store(input);
@@ -423,7 +423,7 @@ class SubscriptionResourceTest {
         return new NotificationTemplate(
                 "Title", null, NotificationSeverity.INFO, "category",
                 null, "entity", "entityId", "actorId"
-        );
+        , null);
     }
 
     private SubscriptionInput createSystemInput(String name, String eventType) {

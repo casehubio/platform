@@ -34,4 +34,14 @@ public interface NotificationApi {
     @PlatformMutation("Mark all notifications as read")
     @RestPath("mark-all-read")
     Map<String, Integer> markAllRead();
+
+    @PlatformMutation("Track notification click")
+    @RestMethod(HttpMethod.PATCH)
+    @RestPath("click")
+    Optional<Notification> trackClick(@PathParam String id);
+
+    @PlatformMutation("Reply to notification")
+    @RestMethod(HttpMethod.PATCH)
+    @RestPath("reply")
+    Optional<Notification> reply(@PathParam String id, ReplyRequest request);
 }

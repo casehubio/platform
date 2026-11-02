@@ -270,7 +270,7 @@ class DigestFlushSchedulerTest {
     private static NotificationInput sampleInput(String title) {
         return new NotificationInput(USER, TENANT, title, null, "test",
                 NotificationSeverity.INFO, null,
-                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"));
+                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"), null);
     }
 
     private static final class CapturingDigestDeliverer implements NotificationDeliverer {

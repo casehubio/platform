@@ -79,6 +79,6 @@ class InMemoryNotificationStoreTest extends NotificationStoreContractTest {
                 NotificationSeverity.INFO,
                 "/action",
                 source
-        );
+        , null);
     }
 }

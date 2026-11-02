@@ -40,7 +40,7 @@ class NoOpNotificationStoreTest {
                 NotificationSeverity.INFO,
                 "/actions/test",
                 new NotificationSource("event1", "work-item", "wi123", "actor1")
-        );
+        , null);
 
         Notification result = store.store(input);
 
@@ -71,7 +71,7 @@ class NoOpNotificationStoreTest {
                 NotificationSeverity.WARNING,
                 null,  // null actionUrl
                 new NotificationSource("event1", "case", "case123", "actor1")
-        );
+        , null);
 
         Notification result = store.store(input);
 
@@ -91,7 +91,7 @@ class NoOpNotificationStoreTest {
                 NotificationSeverity.INFO,
                 null,
                 new NotificationSource("event1", "type1", "entity1", "actor1")
-        );
+        , null);
         NotificationInput input2 = new NotificationInput(
                 "user2",
                 "tenant2",
@@ -101,7 +101,7 @@ class NoOpNotificationStoreTest {
                 NotificationSeverity.URGENT,
                 "/action2",
                 new NotificationSource("event2", "type2", "entity2", "actor2")
-        );
+        , null);
 
         List<Notification> results = store.storeAll(List.of(input1, input2));
 
@@ -204,7 +204,7 @@ class NoOpNotificationStoreTest {
                 NotificationSeverity.INFO,
                 null,
                 new NotificationSource("event1", "type1", "entity1", "actor1")
-        );
+        , null);
 
         Notification result1 = store.store(input);
         Notification result2 = store.store(input);

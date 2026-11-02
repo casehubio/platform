@@ -222,4 +222,12 @@ public class JpaNotificationStore implements NotificationStore {
     }
 
     private record CursorValue(Instant createdAt, String id) {}
+
+    @Override
+    public Optional<Notification> findById(String id, String userId, String tenancyId) {
+        var entity = em.find(NotificationEntity.class, id);
+        if (entity == null) {return Optional.empty();}
+        if (!entity.userId.equals(userId) || !entity.tenancyId.equals(tenancyId)) {return Optional.empty();}
+        return Optional.of(entity.toNotification());
+    }
 }

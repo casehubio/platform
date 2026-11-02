@@ -51,7 +51,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             "/work-items/wi-1",
             source
-        );
+        , null);
         store.store(input);
 
         // When: list notifications
@@ -81,7 +81,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var n1 = store.store(input1);
 
         var input2 = new NotificationInput(
@@ -93,7 +93,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var n2 = store.store(input2);
         store.markRead(n2.id(), "user-1", TenancyConstants.DEFAULT_TENANT_ID);
 
@@ -121,7 +121,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         store.store(input1);
 
         var input2 = new NotificationInput(
@@ -133,7 +133,7 @@ class NotificationResourceTest {
             NotificationSeverity.URGENT,
             null,
             source
-        );
+        , null);
         store.store(input2);
 
         // When: list with category filter
@@ -161,7 +161,7 @@ class NotificationResourceTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-            );
+            , null);
             store.store(input);
         }
 
@@ -190,7 +190,7 @@ class NotificationResourceTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-            );
+            , null);
             store.store(input);
         }
 
@@ -217,7 +217,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var notification = store.store(input);
 
         // When: mark as read
@@ -254,7 +254,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var notification = store.store(input);
 
         // When: try to mark as read with current principal (different tenant)
@@ -278,7 +278,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var notification = store.store(input);
 
         // When: try to mark as read with current principal (different user)
@@ -302,7 +302,7 @@ class NotificationResourceTest {
             NotificationSeverity.INFO,
             null,
             source
-        );
+        , null);
         var notification = store.store(input);
 
         // When: dismiss
@@ -340,7 +340,7 @@ class NotificationResourceTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-            );
+            , null);
             store.store(input);
         }
 

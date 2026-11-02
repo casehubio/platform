@@ -1,7 +1,5 @@
 package io.casehub.platform.notification.dispatch;
 
-import io.casehub.platform.api.preferences.BooleanPreference;
-import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliverySourceType;
@@ -14,6 +12,8 @@ import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.notification.NotificationSource;
 import io.casehub.platform.api.notification.NotificationStatus;
 import io.casehub.platform.api.notification.NotificationStatusChanged;
+import io.casehub.platform.api.preferences.BooleanPreference;
+import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.api.util.UUIDv7;
 import io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,6 +111,48 @@ class InAppEngagementBridgeTest {
         assertThat(firedEvents).hasSize(2);
     }
 
+    @Test
+    void onClickedRecordsClickedEngagement() {
+        var attempt = inAppAttempt("notif-1");
+        store.store(attempt);
+        var notification = testNotification("notif-1", NotificationStatus.READ);
+        bridge.onClicked(new io.casehub.platform.api.notification.NotificationClicked(notification));
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
+        assertThat(events).hasSize(1);
+        assertThat(events.getFirst().type()).isEqualTo(EngagementType.CLICKED);
+    }
+
+    @Test
+    void onClickedSkipsWhenNoInAppAttempt() {
+        var notification = testNotification("notif-no-attempt", NotificationStatus.READ);
+        bridge.onClicked(new io.casehub.platform.api.notification.NotificationClicked(notification));
+        assertThat(firedEvents).isEmpty();
+    }
+
+    @Test
+    void onRepliedRecordsRepliedWithMetadata() {
+        var attempt = inAppAttempt("notif-1");
+        store.store(attempt);
+        var notification = testNotification("notif-1", NotificationStatus.READ);
+        bridge.onReplied(new io.casehub.platform.api.notification.NotificationReplied(notification, "approve"));
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
+        assertThat(events).hasSize(1);
+        assertThat(events.getFirst().type()).isEqualTo(EngagementType.REPLIED);
+        assertThat(events.getFirst().metadata()).isEqualTo("approve");
+    }
+
+    @Test
+    void onRepliedRecordsNullMetadataForAcknowledge() {
+        var attempt = inAppAttempt("notif-1");
+        store.store(attempt);
+        var notification = testNotification("notif-1", NotificationStatus.READ);
+        bridge.onReplied(new io.casehub.platform.api.notification.NotificationReplied(notification, null));
+        var events = store.findEngagementsByAttemptId(attempt.id(), "tenant-1");
+        assertThat(events).hasSize(1);
+        assertThat(events.getFirst().metadata()).isNull();
+    }
+
+
     private DeliveryAttempt inAppAttempt(String notificationId) {
         return new DeliveryAttempt(
                 UUIDv7.generate(), notificationId, DeliverySourceType.NOTIFICATION, DeliveryChannels.IN_APP, "user-1", "tenant-1",
@@ -126,6 +168,6 @@ class InAppEngagementBridgeTest {
                 new NotificationSource("evt-1", "work-item", "wi-1", "actor-1"),
                 status, Instant.now(),
                 status == NotificationStatus.READ ? Instant.now() : null,
-                status == NotificationStatus.DISMISSED ? Instant.now() : null);
+                status == NotificationStatus.DISMISSED ? Instant.now() : null, null);
     }
 }

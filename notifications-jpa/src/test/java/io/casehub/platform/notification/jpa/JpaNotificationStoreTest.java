@@ -41,7 +41,7 @@ public class JpaNotificationStoreTest extends NotificationStoreContractTest {
     void entity_preservesAllSourceFields() {
         var source = new NotificationSource("evt-99", "case", "case-42", "actor-7");
         var input = new NotificationInput("user-1", "tenant-1", "Title", "Body",
-                                          "case.updated", NotificationSeverity.WARNING, "/cases/42", source);
+                                          "case.updated", NotificationSeverity.WARNING, "/cases/42", source, null);
 
         var notification = blockingStore.store(input);
 
@@ -57,7 +57,7 @@ public class JpaNotificationStoreTest extends NotificationStoreContractTest {
     void entity_handlesNullableFields() {
         var source = new NotificationSource("evt-1", "type", "id-1", "actor-1");
         var input = new NotificationInput("user-1", "tenant-1", "Title", null,
-                                          "category", NotificationSeverity.INFO, null, source);
+                                          "category", NotificationSeverity.INFO, null, source, null);
 
         var notification = blockingStore.store(input);
 
@@ -96,6 +96,6 @@ public class JpaNotificationStoreTest extends NotificationStoreContractTest {
     private NotificationInput createTestInput(String userId, String tenancyId, String title, String category) {
         var source = new NotificationSource("evt-" + System.nanoTime(), "work-item", "wi-456", "actor-789");
         return new NotificationInput(userId, tenancyId, title, "Body for " + title,
-                                     category, NotificationSeverity.INFO, "/action", source);
+                                     category, NotificationSeverity.INFO, "/action", source, null);
     }
 }

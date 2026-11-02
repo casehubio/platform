@@ -50,7 +50,7 @@ class SpringNotificationStoreTest {
         return new NotificationInput(
                 USER, TENANT, title, "body", "test.event",
                 NotificationSeverity.INFO, null,
-                new NotificationSource("evt-1", "case", "case-1", "actor-1"));
+                new NotificationSource("evt-1", "case", "case-1", "actor-1"), null);
     }
 
     @Test

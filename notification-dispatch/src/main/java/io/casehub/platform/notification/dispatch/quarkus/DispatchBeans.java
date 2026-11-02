@@ -132,9 +132,10 @@ public class DispatchBeans {
                                                           NotificationPreferenceStore preferenceStore,
                                                           SuppressionStore suppressionStore,
                                                           DigestBuffer digestBuffer,
-                                                          DeliveryTracker deliveryTracker) {
+                                                          DeliveryTracker deliveryTracker,
+                                                          io.casehub.platform.api.notification.ReplyHintResolver replyHintResolver) {
         return new NotificationDispatcher(targetResolver, suppressionEvaluator, channelRouter,
-                preferenceStore, suppressionStore, digestBuffer, deliveryTracker);
+                preferenceStore, suppressionStore, digestBuffer, deliveryTracker, replyHintResolver);
     }
 
     void onSubscriptionMatched(@ObservesAsync SubscriptionMatched event,
@@ -153,6 +154,16 @@ public class DispatchBeans {
     void onNotificationStatusChanged(@ObservesAsync NotificationStatusChanged event,
                                       InAppEngagementBridge bridge) {
         bridge.onStatusChanged(event);
+    }
+
+    void onNotificationClicked(@ObservesAsync io.casehub.platform.api.notification.NotificationClicked event,
+                                InAppEngagementBridge bridge) {
+        bridge.onClicked(event);
+    }
+
+    void onNotificationReplied(@ObservesAsync io.casehub.platform.api.notification.NotificationReplied event,
+                                InAppEngagementBridge bridge) {
+        bridge.onReplied(event);
     }
 
     // --- Self-registering deliverer ---

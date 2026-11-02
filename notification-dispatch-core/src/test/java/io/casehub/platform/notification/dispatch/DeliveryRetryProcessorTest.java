@@ -186,7 +186,7 @@ class DeliveryRetryProcessorTest {
         return new NotificationInput(
                 "user-1", "tenant-1", "Test", "body",
                 "test.event", NotificationSeverity.WARNING, null,
-                new NotificationSource("evt-1", "work-item", "wi-1", "actor-1"));
+                new NotificationSource("evt-1", "work-item", "wi-1", "actor-1"), null);
     }
 
     private DigestSummary testDigestSummary() {

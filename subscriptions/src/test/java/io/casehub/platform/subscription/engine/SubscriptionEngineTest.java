@@ -119,7 +119,7 @@ class SubscriptionEngineTest {
     void event_matchesSubscription_firesSubscriptionMatched() {
         var template = new NotificationTemplate("WorkItem {status}", null,
                 NotificationSeverity.INFO, "work-item.completed",
-                null, "work-item", "workItemId", "actor");
+                null, "work-item", "workItemId", "actor", null);
         var input = new SubscriptionInput("user-1", "tenant-1", "My sub",
                 "io.casehub.work.workitem.completed",
                 List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
@@ -347,7 +347,7 @@ class SubscriptionEngineTest {
         // Template with unresolvable entityIdField — dispatcher will handle this
         var template = new NotificationTemplate("Title", null,
                 NotificationSeverity.INFO, "test", null,
-                "entity", "missingField", "actor");
+                "entity", "missingField", "actor", null);
         var input = new SubscriptionInput("user-1", "tenant-1", "Sub",
                 "io.casehub.work.workitem.completed",
                 List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")),
@@ -516,7 +516,7 @@ class SubscriptionEngineTest {
     private NotificationTemplate defaultTemplate() {
         return new NotificationTemplate("WorkItem {status}", null,
                 NotificationSeverity.INFO, "work-item.completed",
-                null, "work-item", "workItemId", "actor");
+                null, "work-item", "workItemId", "actor", null);
     }
 
     @SuppressWarnings("unchecked")

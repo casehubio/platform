@@ -50,7 +50,7 @@ class NotificationPushServiceTest {
                 "Test Title", "Test Body", "test-category",
                 NotificationSeverity.INFO, null,
                 new NotificationSource("evt-1", "case", "case-1", "actor-1"),
-                NotificationStatus.UNREAD, Instant.now(), null, null);
+                NotificationStatus.UNREAD, Instant.now(), null, null, null);
     }
 
     @Test

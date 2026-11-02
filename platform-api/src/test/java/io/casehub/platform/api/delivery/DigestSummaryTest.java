@@ -17,7 +17,7 @@ class DigestSummaryTest {
     private static final NotificationInput SAMPLE = new NotificationInput(
             "user-1", "tenant-1", "Title", null, "test",
             NotificationSeverity.INFO, null,
-            new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"));
+            new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"), null);
 
     @Test
     void rejectsEmptyNotifications() {

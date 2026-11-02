@@ -6,6 +6,8 @@ import io.casehub.platform.api.delivery.DestinationScope;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.notification.NotificationInput;
+import io.casehub.platform.api.notification.ReplyHint;
+import io.casehub.platform.api.notification.ReplyHintResolver;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
 import io.casehub.platform.api.notification.settings.QuietHours;
@@ -33,6 +35,7 @@ public class NotificationDispatcher {
     private final SuppressionStore            suppressionStore;
     private final DigestBuffer                digestBuffer;
     private final DeliveryTracker             deliveryTracker;
+    private final ReplyHintResolver          replyHintResolver;
 
     public NotificationDispatcher(final TargetResolver targetResolver,
                                   final SuppressionEvaluator suppressionEvaluator,
@@ -40,7 +43,8 @@ public class NotificationDispatcher {
                                   final NotificationPreferenceStore preferenceStore,
                                   final SuppressionStore suppressionStore,
                                   final DigestBuffer digestBuffer,
-                                  final DeliveryTracker deliveryTracker) {
+                                  final DeliveryTracker deliveryTracker,
+                                  final ReplyHintResolver replyHintResolver) {
         this.targetResolver       = targetResolver;
         this.suppressionEvaluator = suppressionEvaluator;
         this.channelRouter        = channelRouter;
@@ -48,6 +52,7 @@ public class NotificationDispatcher {
         this.suppressionStore     = suppressionStore;
         this.digestBuffer         = digestBuffer;
         this.deliveryTracker      = deliveryTracker;
+        this.replyHintResolver    = replyHintResolver;
     }
 
     public void onMatch(final SubscriptionMatched event) {
@@ -75,11 +80,17 @@ public class NotificationDispatcher {
                                    final String tenancyId,
                                    final Subscription subscription,
                                    final Object pojo) {
-        final NotificationInput notificationInput = TemplateResolver.resolve(
+        final NotificationInput rawInput = TemplateResolver.resolve(
                 subscription.template(), pojo, targetId, tenancyId);
-        if (notificationInput == null) {
+        if (rawInput == null) {
             return;
         }
+        final ReplyHint resolvedHint = replyHintResolver.resolve(rawInput);
+        final NotificationInput notificationInput = resolvedHint != rawInput.replyHint()
+                ? new NotificationInput(rawInput.userId(), rawInput.tenancyId(),
+                        rawInput.title(), rawInput.body(), rawInput.category(),
+                        rawInput.severity(), rawInput.actionUrl(), rawInput.source(), resolvedHint)
+                : rawInput;
 
         final Set<ResolvedChannel> channels = channelRouter.routeNonUser();
 
@@ -139,11 +150,17 @@ public class NotificationDispatcher {
             return;
         }
 
-        final NotificationInput notificationInput = TemplateResolver.resolve(
+        final NotificationInput rawInput = TemplateResolver.resolve(
                 template, pojo, userId, tenancyId);
-        if (notificationInput == null) {
+        if (rawInput == null) {
             return;
         }
+        final ReplyHint resolvedHint = replyHintResolver.resolve(rawInput);
+        final NotificationInput notificationInput = resolvedHint != rawInput.replyHint()
+                ? new NotificationInput(rawInput.userId(), rawInput.tenancyId(),
+                        rawInput.title(), rawInput.body(), rawInput.category(),
+                        rawInput.severity(), rawInput.actionUrl(), rawInput.source(), resolvedHint)
+                : rawInput;
 
         final Map<String, io.casehub.platform.api.notification.settings.ChannelPreference> channelDefaults =
                 preferences.map(NotificationPreferences::channelDefaults).orElse(Map.of());

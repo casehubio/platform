@@ -77,6 +77,9 @@ public class NotificationEntity {
 
     @Column(name = "dismissed_at")
     public Instant dismissedAt;
+    @Column(name = "reply_hint", columnDefinition = "TEXT")
+    public String  replyHintJson;
+
 
     public static NotificationEntity fromInput(NotificationInput input) {
         NotificationEntity entity = new NotificationEntity();
@@ -94,24 +97,30 @@ public class NotificationEntity {
         entity.sourceActorId    = input.source().actorId();
         entity.status           = NotificationStatus.UNREAD;
         entity.createdAt        = Instant.now();
+        entity.replyHintJson    = input.replyHint() != null ? serializeReplyHint(input.replyHint()) : null;
         return entity;
     }
 
     public Notification toNotification() {
         return new Notification(
-                id,
-                userId,
-                tenancyId,
-                title,
-                body,
-                category,
-                severity,
-                actionUrl,
+                id, userId, tenancyId, title, body, category, severity, actionUrl,
                 new NotificationSource(sourceEventId, sourceEntityType, sourceEntityId, sourceActorId),
-                status,
-                createdAt,
-                readAt,
-                dismissedAt
-        );
+                status, createdAt, readAt, dismissedAt,
+                replyHintJson != null ? deserializeReplyHint(replyHintJson) : null);
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper REPLY_HINT_JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private static String serializeReplyHint(io.casehub.platform.api.notification.ReplyHint hint) {
+        try {return REPLY_HINT_JSON.writeValueAsString(hint);} catch (Exception e) {
+            throw new RuntimeException("Failed to serialize ReplyHint", e);
+        }
+    }
+
+    private static io.casehub.platform.api.notification.ReplyHint deserializeReplyHint(String json) {
+        try {
+            return REPLY_HINT_JSON.readValue(json, io.casehub.platform.api.notification.ReplyHint.class);
+        } catch (Exception e) {throw new RuntimeException("Failed to deserialize ReplyHint", e);}
     }
 }

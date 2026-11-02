@@ -66,7 +66,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 "/work-items/wi-456",
                 source
-        );
+        , null);
         assertThat(input.userId()).isEqualTo("user-1");
         assertThat(input.tenancyId()).isEqualTo("tenant-1");
         assertThat(input.title()).isEqualTo("New work item assigned");
@@ -89,7 +89,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-        );
+        , null);
         assertThat(input.body()).isNull();
         assertThat(input.actionUrl()).isNull();
     }
@@ -106,7 +106,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("userId");
     }
@@ -123,7 +123,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("tenancyId");
     }
@@ -140,7 +140,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("title");
     }
@@ -157,7 +157,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 source
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("category");
     }
@@ -174,7 +174,7 @@ class NotificationSpiTest {
                 null,
                 null,
                 source
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("severity");
     }
@@ -190,7 +190,7 @@ class NotificationSpiTest {
                 NotificationSeverity.INFO,
                 null,
                 null
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("source");
     }
@@ -218,7 +218,7 @@ class NotificationSpiTest {
                 createdAt,
                 readAt,
                 dismissedAt
-        );
+        , null);
 
         assertThat(notification.id()).isEqualTo("notif-123");
         assertThat(notification.userId()).isEqualTo("user-1");
@@ -252,7 +252,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,  // readAt
                 null   // dismissedAt
-        );
+        , null);
         assertThat(notification.body()).isNull();
         assertThat(notification.actionUrl()).isNull();
         assertThat(notification.readAt()).isNull();
@@ -276,7 +276,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,
                 null
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("id");
     }
@@ -298,7 +298,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,
                 null
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("status");
     }
@@ -320,7 +320,7 @@ class NotificationSpiTest {
                 null,  // createdAt
                 null,
                 null
-        ))
+        , null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("createdAt");
     }
@@ -435,7 +435,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,
                 null
-        );
+        , null);
         var page = new NotificationPage(List.of(notification), "cursor-next");
 
         assertThat(page.notifications()).hasSize(1);
@@ -473,7 +473,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,
                 null
-        );
+        , null);
         var mutableList = new java.util.ArrayList<>(List.of(notification));
         var page = new NotificationPage(mutableList, null);
 
@@ -510,7 +510,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 null,
                 null
-        );
+        , null);
         var event = new NotificationCreated(notification);
         assertThat(event.notification()).isEqualTo(notification);
     }
@@ -539,7 +539,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 Instant.now(),
                 null
-        );
+        , null);
         var event = new NotificationStatusChanged(notification, NotificationStatus.UNREAD);
         assertThat(event.notification()).isEqualTo(notification);
         assertThat(event.previousStatus()).isEqualTo(NotificationStatus.UNREAD);
@@ -569,7 +569,7 @@ class NotificationSpiTest {
                 Instant.now(),
                 Instant.now(),
                 null
-        );
+        , null);
         assertThatThrownBy(() -> new NotificationStatusChanged(notification, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("previousStatus");

@@ -414,6 +414,6 @@ public abstract class NotificationStoreContractTest {
                 NotificationSeverity.INFO,
                 "/action",
                 source
-        );
+        , null);
     }
 }

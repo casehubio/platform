@@ -128,4 +128,6 @@ public interface NotificationStore {
      * @return count of notifications marked as read
      */
     int markAllRead(String userId, String tenancyId);
+
+    Optional<Notification> findById(String id, String userId, String tenancyId);
 }

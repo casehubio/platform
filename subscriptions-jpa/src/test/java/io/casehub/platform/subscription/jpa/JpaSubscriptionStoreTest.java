@@ -72,7 +72,7 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 "work-item",
                 "entityId",
                 "actorId"
-        );
+        , null);
         var input = new SubscriptionInput("user-1", "tenant-1", "Template Sub", "event-type", List.of(), List.of(new NotificationTarget(TargetType.USER, "user-1")), false, template, true, null);
 
         var subscription = blockingStore.store(input);
@@ -155,6 +155,6 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
     }
 }

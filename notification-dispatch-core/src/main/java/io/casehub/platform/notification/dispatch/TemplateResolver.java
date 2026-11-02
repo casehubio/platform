@@ -66,7 +66,8 @@ public final class TemplateResolver {
                 template.category(),
                 template.severity(),
                 actionUrl,
-                source);
+                source,
+                template.replyHint());
     }
 
     public static String extractField(final Object pojo, final String fieldName) {

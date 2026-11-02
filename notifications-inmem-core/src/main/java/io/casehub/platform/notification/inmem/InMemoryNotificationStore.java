@@ -127,7 +127,8 @@ public class InMemoryNotificationStore implements NotificationStore {
                     NotificationStatus.READ,
                     notification.createdAt(),
                     now,
-                    notification.dismissedAt()
+                    notification.dismissedAt(),
+                    notification.replyHint()
             );
             return result.updated;
         });
@@ -168,7 +169,8 @@ public class InMemoryNotificationStore implements NotificationStore {
                     NotificationStatus.DISMISSED,
                     notification.createdAt(),
                     notification.readAt(),
-                    now
+                    now,
+                    notification.replyHint()
             );
             return result.updated;
         });
@@ -204,7 +206,8 @@ public class InMemoryNotificationStore implements NotificationStore {
                                 NotificationStatus.READ,
                                 current.createdAt(),
                                 now,
-                                current.dismissedAt()
+                                current.dismissedAt(),
+                                current.replyHint()
                         );
                     }
                     return current;
@@ -217,6 +220,17 @@ public class InMemoryNotificationStore implements NotificationStore {
         }
         return count[0];
     }
+
+    @Override
+    public Optional<Notification> findById(String id, String userId, String tenancyId) {
+        var notification = store.get(id);
+        if (notification == null) {return Optional.empty();}
+        if (!notification.userId().equals(userId) || !notification.tenancyId().equals(tenancyId)) {
+            return Optional.empty();
+        }
+        return Optional.of(notification);
+    }
+
 
     private Notification toNotification(NotificationInput input) {
         return new Notification(
@@ -232,7 +246,8 @@ public class InMemoryNotificationStore implements NotificationStore {
                 NotificationStatus.UNREAD,
                 Instant.now(),
                 null,
-                null
+                null,
+                input.replyHint()
         );
     }
 

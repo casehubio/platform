@@ -21,6 +21,7 @@ import io.casehub.platform.mock.NoOpPreferenceSchemaRegistry;
 import io.casehub.platform.mock.NoOpPreferenceStore;
 import io.casehub.platform.mock.NoOpSessionIsolator;
 import io.casehub.platform.notification.NoOpNotificationStore;
+import io.casehub.platform.notification.PassthroughReplyHintResolver;
 import io.casehub.platform.notification.settings.NoOpNotificationPreferenceStore;
 import io.casehub.platform.notification.settings.NoOpSuppressionStore;
 import io.casehub.platform.pdf.NoOpPdfGenerator;
@@ -103,6 +104,12 @@ public class DefaultBeans {
 
     @Produces @DefaultBean @ApplicationScoped
     public NoOpNotificationStore noOpNotificationStore() { return new NoOpNotificationStore(); }
+
+    @Produces
+    @DefaultBean
+    @ApplicationScoped
+    public PassthroughReplyHintResolver passthroughReplyHintResolver() {return new PassthroughReplyHintResolver();}
+
 
     @Produces @DefaultBean @ApplicationScoped
     public NoOpNotificationPreferenceStore noOpNotificationPreferenceStore() { return new NoOpNotificationPreferenceStore(); }

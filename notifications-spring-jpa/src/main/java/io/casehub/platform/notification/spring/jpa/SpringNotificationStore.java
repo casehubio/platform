@@ -187,4 +187,11 @@ public class SpringNotificationStore implements NotificationStore {
     }
 
     private record CursorValue(Instant createdAt, String id) {}
+
+    @Override
+    public Optional<Notification> findById(String id, String userId, String tenancyId) {
+        return repo.findById(id)
+                   .filter(e -> e.userId.equals(userId) && e.tenancyId.equals(tenancyId))
+                   .map(NotificationEntity::toNotification);
+    }
 }

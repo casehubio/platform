@@ -17,7 +17,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "WorkItem {status}: {detail}", null,
                 NotificationSeverity.INFO, "work-item.completed",
-                "/workitems/{workItemId}", "work-item", "workItemId", "actor");
+                "/workitems/{workItemId}", "work-item", "workItemId", "actor", null);
         var pojo = new TestWorkItem("completed", "Fix login bug",
                 UUID.randomUUID(), "user-2");
         var input = TemplateResolver.resolve(template, pojo, "sub-user", "tenant-1");
@@ -40,7 +40,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", "Body with {status}",
                 NotificationSeverity.WARNING, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         var pojo = new TestWorkItem("active", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -53,7 +53,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -66,7 +66,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -79,7 +79,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "missingField", "actor");
+                null, "test-entity", "missingField", "actor", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -91,7 +91,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "missingField");
+                null, "test-entity", "workItemId", "missingField", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -103,7 +103,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title {unknownField}", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -116,7 +116,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         var pojo = new TestWorkItem("done", "detail", UUID.randomUUID(), "actor-1");
         var input = TemplateResolver.resolve(template, pojo, "user-1", "tenant-1");
 
@@ -137,7 +137,7 @@ class TemplateResolverTest {
         var template = new NotificationTemplate(
                 "Title", null,
                 NotificationSeverity.INFO, "test.category",
-                null, "test-entity", "workItemId", "actor");
+                null, "test-entity", "workItemId", "actor", null);
         assertThatThrownBy(() -> TemplateResolver.resolve(template, null, "user-1", "tenant-1"))
                 .isInstanceOf(NullPointerException.class);
     }

@@ -485,6 +485,6 @@ public abstract class SubscriptionStoreContractTest {
                 "entity",
                 "id",
                 "actor"
-        );
+        , null);
     }
 }

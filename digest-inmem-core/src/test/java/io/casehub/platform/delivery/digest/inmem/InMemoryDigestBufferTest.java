@@ -157,6 +157,6 @@ class InMemoryDigestBufferTest {
     private static NotificationInput sampleInput(String title) {
         return new NotificationInput("user-1", "tenant-1", title, null, "test",
                 NotificationSeverity.INFO, null,
-                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"));
+                new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"), null);
     }
 }

@@ -48,7 +48,7 @@ class NotificationDispatcherTest {
 
     private static final NotificationTemplate TEMPLATE = new NotificationTemplate(
             "WorkItem {status}", null, NotificationSeverity.INFO, "work-item.updated",
-            null, "work-item", "entityId", "actorId");
+            null, "work-item", "entityId", "actorId", null);
 
     // Capture deliveries
     private final List<NotificationInput> deliveredNotifications = new ArrayList<>();
@@ -97,7 +97,8 @@ class NotificationDispatcherTest {
 
         dispatcher = new NotificationDispatcher(
                 targetResolver, suppressionEvaluator, channelRouter,
-                preferenceStore, suppressionStore, digestBuffer, deliveryTracker);
+                preferenceStore, suppressionStore, digestBuffer, deliveryTracker,
+                input -> input.replyHint());
     }
 
     @Test
@@ -169,7 +170,7 @@ class NotificationDispatcherTest {
         // Template references a field that doesn't exist on the POJO
         var badTemplate = new NotificationTemplate(
                 "Title", null, NotificationSeverity.INFO, "test",
-                null, "work-item", "missingField", "actorId");
+                null, "work-item", "missingField", "actorId", null);
         var sub = new Subscription(
                 "sub-1", "owner-1", TENANT, "Test", "test.event",
                 List.of(),
@@ -280,7 +281,7 @@ class NotificationDispatcherTest {
 
         var urgentTemplate = new NotificationTemplate(
                 "URGENT: {status}", null, NotificationSeverity.URGENT, "urgent.event",
-                null, "work-item", "entityId", "actorId");
+                null, "work-item", "entityId", "actorId", null);
         var sub = new Subscription("sub-1", "owner-1", TENANT, "Urgent", "test.event",
                 List.of(),
                 List.of(new NotificationTarget(TargetType.USER, "user-recipient")),

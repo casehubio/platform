@@ -107,4 +107,41 @@ class SessionMetricsTest {
 
         assertThat(metrics.name()).isEqualTo("character-pool");
     }
+
+    @Test
+    void lightweightClearSucceededIncrements() {
+        var metrics = new SessionMetrics("test-pool");
+
+        metrics.lightweightClearSucceeded();
+        metrics.lightweightClearSucceeded();
+
+        assertThat(metrics.totalLightweightClears()).isEqualTo(2);
+        assertThat(metrics.totalClears()).isEqualTo(2);
+    }
+
+    @Test
+    void fallbackClearTriggeredIncrements() {
+        var metrics = new SessionMetrics("test-pool");
+
+        metrics.fallbackClearTriggered();
+
+        assertThat(metrics.totalFallbackClears()).isEqualTo(1);
+        assertThat(metrics.totalClears()).isEqualTo(1);
+    }
+
+    @Test
+    void summaryContainsLightweightAndFallbackFields() {
+        var metrics = new SessionMetrics("test-pool");
+
+        metrics.lightweightClearSucceeded();
+        metrics.fallbackClearTriggered();
+
+        String summary = metrics.summary();
+
+        assertThat(summary).contains("clears=2");
+        assertThat(summary).contains("lightweightClears=1");
+        assertThat(summary).contains("fallbackClears=1");
+    }
+
+
 }

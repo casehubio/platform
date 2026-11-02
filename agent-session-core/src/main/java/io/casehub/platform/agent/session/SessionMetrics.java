@@ -11,6 +11,9 @@ public class SessionMetrics {
     private final AtomicInteger currentActive = new AtomicInteger();
     private final AtomicInteger totalQueries = new AtomicInteger();
     private final AtomicInteger totalClears = new AtomicInteger();
+    private final AtomicInteger lightweightClears = new AtomicInteger();
+    private final AtomicInteger fallbackClears = new AtomicInteger();
+
 
     public SessionMetrics(String name) {
         this.name = name;
@@ -35,6 +38,21 @@ public class SessionMetrics {
         totalClears.incrementAndGet();
     }
 
+    public void lightweightClearSucceeded() {
+        lightweightClears.incrementAndGet();
+        totalClears.incrementAndGet();
+    }
+
+    public void fallbackClearTriggered() {
+        fallbackClears.incrementAndGet();
+        totalClears.incrementAndGet();
+    }
+
+    public int totalLightweightClears() {return lightweightClears.get();}
+
+    public int totalFallbackClears()    {return fallbackClears.get();}
+
+
     public String name() { return name; }
     public int sessionsOpened() { return sessionsOpened.get(); }
     public int sessionsClosed() { return sessionsClosed.get(); }
@@ -45,8 +63,10 @@ public class SessionMetrics {
 
     public String summary() {
         return "sessions=" + sessionsOpened.get()
-            + " peakConcurrent=" + peakConcurrent.get()
-            + " queries=" + totalQueries.get()
-            + " clears=" + totalClears.get();
+               + " peakConcurrent=" + peakConcurrent.get()
+               + " queries=" + totalQueries.get()
+               + " clears=" + totalClears.get()
+               + " lightweightClears=" + lightweightClears.get()
+               + " fallbackClears=" + fallbackClears.get();
     }
 }

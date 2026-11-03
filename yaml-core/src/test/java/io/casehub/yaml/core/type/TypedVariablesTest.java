@@ -93,4 +93,42 @@ class TypedVariablesTest {
         assertThatThrownBy(() -> result.values().put("y", "world"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void parse_domain_type_stores_value_as_is() {
+        var raw = new LinkedHashMap<String, Object>();
+        raw.put("config:AgentSessionConfig", Map.of("model", "claude-3", "timeout", "30s"));
+
+        TypedMap result = TypedVariables.parse(raw);
+
+        assertThat(result.domainTypes()).containsEntry("config", "AgentSessionConfig");
+        assertThat(result.typeOf("config")).isNull();
+        assertThat(result.values().get("config")).isInstanceOf(Map.class);
+    }
+
+    @Test
+    void parse_mixed_scalar_and_domain_types() {
+        var raw = new LinkedHashMap<String, Object>();
+        raw.put("count:integer", 42);
+        raw.put("config:AgentSessionConfig", Map.of("model", "opus"));
+
+        TypedMap result = TypedVariables.parse(raw);
+
+        assertThat(result.schema()).containsEntry("count", ValueType.INTEGER);
+        assertThat(result.domainTypes()).containsEntry("config", "AgentSessionConfig");
+        assertThat(result.values()).containsKeys("count", "config");
+    }
+
+    @Test
+    void parse_domain_type_with_null_value_stores_null() {
+        var raw = new LinkedHashMap<String, Object>();
+        raw.put("result:AgentInvocationResult", null);
+
+        TypedMap result = TypedVariables.parse(raw);
+
+        assertThat(result.domainTypes()).containsEntry("result", "AgentInvocationResult");
+        assertThat(result.values().containsKey("result")).isTrue();
+        assertThat(result.values().get("result")).isNull();
+    }
+
 }

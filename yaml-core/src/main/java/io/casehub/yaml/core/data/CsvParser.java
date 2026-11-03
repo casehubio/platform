@@ -48,7 +48,11 @@ public final class CsvParser {
                 throw new IllegalArgumentException(
                         "Duplicate column name '" + tn.name() + "' in CSV header.");
             }
-            columns.add(new CsvColumn(tn.name(), tn.type()));
+            if (tn.scalarType() == null) {
+                throw new IllegalArgumentException(
+                    "CSV column '" + tn.name() + "' must use a scalar type (STRING, INTEGER, BOOLEAN, NUMBER), not '" + tn.typeName() + "'.");
+            }
+            columns.add(new CsvColumn(tn.name(), tn.scalarType()));
         }
         return columns;
     }

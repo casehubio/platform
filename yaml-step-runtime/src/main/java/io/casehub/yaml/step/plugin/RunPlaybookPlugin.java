@@ -38,8 +38,8 @@ public final class RunPlaybookPlugin implements Action {
         }
 
         String file = params.containsKey("_subject")
-                ? String.valueOf(params.get("_subject"))
-                : (String) params.get("file");
+                      ? String.valueOf(params.get("_subject"))
+                      : (String) params.get("file");
 
         if (file == null || file.isBlank()) {
             return Result.failed("run-playbook requires a file path");
@@ -50,9 +50,24 @@ public final class RunPlaybookPlugin implements Action {
             return Result.failed("Playbook not found: " + playbookPath);
         }
 
+        Map<String, Object> callerVars = params.containsKey("vars")
+                                         ? (Map<String, Object>) params.get("vars")
+                                         : Map.of();
+
         try {
-            var mapper = new ObjectMapper(new YAMLFactory());
-            Map<String, Object> doc = mapper.readValue(Files.newInputStream(playbookPath), Map.class);
+            var                 mapper = new ObjectMapper(new YAMLFactory());
+            Map<String, Object> doc    = mapper.readValue(Files.newInputStream(playbookPath), Map.class);
+
+            var parsed = io.casehub.yaml.core.playbook.PlaybookVariableParser.parse(doc);
+
+            Map<String, String> callerParams = new LinkedHashMap<>();
+            for (var entry : callerVars.entrySet()) {
+                callerParams.put(entry.getKey(), String.valueOf(entry.getValue()));
+            }
+
+            if (!parsed.params().isEmpty()) {
+                io.casehub.yaml.core.module.ParameterValidator.validateOrThrow(parsed.params(), callerParams);
+            }
 
             var steps = (List<Map<String, Object>>) doc.get("steps");
             if (steps == null || steps.isEmpty()) {
@@ -60,13 +75,22 @@ public final class RunPlaybookPlugin implements Action {
             }
 
             List<ResolvedStep> resolved = Walker.resolve(steps, ctx.pluginRegistry());
-            var runner = new CatalogStepRunner(ctx.pluginRegistry(), ctx.serviceRegistry());
+            var                runner   = new CatalogStepRunner(ctx.pluginRegistry(), ctx.serviceRegistry());
 
-            long start = System.nanoTime();
-            int stepCount = 0;
-            Map<String, Object> outputVars = new LinkedHashMap<>();
+            long                      start      = System.nanoTime();
+            int                       stepCount  = 0;
+            Map<String, Object>       outputVars = new LinkedHashMap<>();
             List<Map<String, Object>> stepEvents = new ArrayList<>();
-            VariableResolver resolver = ctx.variableResolver();
+
+            VariableResolver resolver = parsed.params().isEmpty() && parsed.vars().values().isEmpty()
+                                        ? ctx.variableResolver()
+                                        : io.casehub.yaml.core.resolver.VariableResolver.forParams(
+                    parsed.params(), callerParams, java.util.Set.of());
+
+            if (!parsed.vars().values().isEmpty()) {
+                resolver = resolver.withObjectScope("var",
+                                                    name -> parsed.vars().values().get(name));
+            }
 
             for (var step : resolved) {
                 stepCount++;
@@ -75,11 +99,11 @@ public final class RunPlaybookPlugin implements Action {
                         "step", stepCount,
                         "action", step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : "structural",
                         "success", stepResult.isSuccess()
-                ));
+                                     ));
 
                 if (!stepResult.isSuccess()) {
-                    long durationMs = (System.nanoTime() - start) / 1_000_000;
-                    String errorMsg = stepResult instanceof Result.Failure f ? f.message() : "Step failed";
+                    long   durationMs = (System.nanoTime() - start) / 1_000_000;
+                    String errorMsg   = stepResult instanceof Result.Failure f ? f.message() : "Step failed";
                     return Result.of(Map.of(
                             "succeeded", false,
                             "output", outputVars,
@@ -87,7 +111,7 @@ public final class RunPlaybookPlugin implements Action {
                             "duration", durationMs,
                             "stepEvents", stepEvents,
                             "error", errorMsg
-                    ));
+                                           ));
                 }
 
                 if (stepResult.output() != null) {
@@ -111,7 +135,9 @@ public final class RunPlaybookPlugin implements Action {
                     "duration", durationMs,
                     "stepEvents", stepEvents,
                     "error", ""
-            ));
+                                   ));
+        } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
+            return Result.failed("Parameter validation failed: " + e.getMessage());
         } catch (Exception e) {
             return Result.failed("Playbook execution failed: " + e.getMessage());
         }

@@ -56,7 +56,8 @@ public final class YamlTestExecutor {
 
             List<TestResult> results = new ArrayList<>(fileDescriptor.testCases().size());
             for (var testCase : fileDescriptor.testCases()) {
-                results.add(executeTestCase(testCase, fileDescriptor.file()));
+                results.add(executeTestCase(testCase, fileDescriptor.file(),
+                        fileDescriptor.varsBlock(), fileDescriptor.paramsBlock()));
             }
             return results;
         } catch (Exception e) {
@@ -72,8 +73,9 @@ public final class YamlTestExecutor {
         }
     }
 
-    private TestResult executeTestCase(TestCase testCase, Path file) {
-        long start = System.nanoTime();
+    private TestResult executeTestCase(TestCase testCase, Path file,
+                                       Map<String, Object> varsBlock, Map<String, Object> paramsBlock) {
+        long         start        = System.nanoTime();
         EventCapture eventCapture = new EventCapture();
 
         var testServices = new MapServiceRegistry();
@@ -82,17 +84,17 @@ public final class YamlTestExecutor {
         var testContext = new TestExecutionContext(pluginRegistry, testServices, resourceRoot, null);
         testServices.register(TestExecutionContext.class, testContext);
 
-        VariableResolver resolver = new VariableResolver(Map.of(), Set.of("events"));
+        VariableResolver resolver = buildResolver(varsBlock, paramsBlock);
 
         try {
             runLifecycleSteps(testCase.setupSteps(), "per-test-setup");
 
             List<ResolvedStep> resolvedSteps = Walker.resolve(testCase.steps(), pluginRegistry);
-            var runner = new CatalogStepRunner(pluginRegistry, testServices);
-            var evaluator = new StructuralStepEvaluator(CONDITION_EVALUATOR);
+            var                runner        = new CatalogStepRunner(pluginRegistry, testServices);
+            var                evaluator     = new StructuralStepEvaluator(CONDITION_EVALUATOR);
 
-            List<TestFailure> failures = new ArrayList<>();
-            int stepIndex = 0;
+            List<TestFailure> failures  = new ArrayList<>();
+            int               stepIndex = 0;
 
             for (var step : resolvedSteps) {
                 stepIndex++;
@@ -100,7 +102,7 @@ public final class YamlTestExecutor {
 
                 if (!result.isSuccess()) {
                     String stepName = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : "structural";
-                    String message = result instanceof Result.Failure f ? f.message() : "Step failed";
+                    String message  = result instanceof Result.Failure f ? f.message() : "Step failed";
                     failures.add(new TestFailure(stepIndex, stepName, message));
                 }
 
@@ -110,7 +112,7 @@ public final class YamlTestExecutor {
                         String captureName = String.valueOf(captureKey);
                         if (RESERVED_CAPTURE_NAMES.contains(captureName)) {
                             failures.add(new TestFailure(stepIndex, ps.actionName(),
-                                    "'" + captureName + "' is a reserved capture name"));
+                                                         "'" + captureName + "' is a reserved capture name"));
                         } else {
                             Map<String, Object> capturedOutput = result.output();
                             resolver = resolver.withObjectScope(captureName, capturedOutput::get);
@@ -133,6 +135,41 @@ public final class YamlTestExecutor {
             } catch (Exception ignored) {}
         }
     }
+
+    private VariableResolver buildResolver(Map<String, Object> varsBlock, Map<String, Object> paramsBlock) {
+        if (varsBlock == null && paramsBlock == null) {
+            return new VariableResolver(Map.of(), Set.of("events"));
+        }
+
+        var content = new java.util.LinkedHashMap<String, Object>();
+        if (varsBlock != null) {content.put("vars", varsBlock);}
+        if (paramsBlock != null) {content.put("params", paramsBlock);}
+
+        var parsed = io.casehub.yaml.core.playbook.PlaybookVariableParser.parse(content);
+
+        Map<String, String> callerParams = new java.util.LinkedHashMap<>();
+        if (paramsBlock != null) {
+            for (var entry : paramsBlock.entrySet()) {
+                String key       = entry.getKey();
+                int    colon     = key.indexOf(':');
+                String paramName = colon >= 0 ? key.substring(0, colon).trim() : key.trim();
+                if (entry.getValue() != null) {
+                    callerParams.put(paramName, String.valueOf(entry.getValue()));
+                }
+            }
+        }
+
+        VariableResolver resolver = VariableResolver.forParams(
+                parsed.params(), callerParams, Set.of("events"));
+
+        if (!parsed.vars().values().isEmpty()) {
+            resolver = resolver.withObjectScope("var",
+                                                name -> parsed.vars().values().get(name));
+        }
+
+        return resolver;
+    }
+
 
     private void runLifecycleSteps(List<Map<String, Object>> steps, String context) {
         if (steps == null || steps.isEmpty()) return;

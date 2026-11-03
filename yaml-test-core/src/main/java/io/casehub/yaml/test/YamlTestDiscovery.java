@@ -48,21 +48,23 @@ public final class YamlTestDiscovery {
     @SuppressWarnings("unchecked")
     static TestFileDescriptor parseTestFile(Path file) {
         try {
-            Map<String, Object> doc = MAPPER.readValue(Files.newInputStream(file), Map.class);
-            String name = (String) doc.getOrDefault("name", file.getFileName().toString());
-            Map<String, Object> simulateBlock = (Map<String, Object>) doc.get("simulate");
-            List<Map<String, Object>> fileSetup = (List<Map<String, Object>>) doc.get("setup");
-            List<Map<String, Object>> fileTeardown = (List<Map<String, Object>>) doc.get("teardown");
+            Map<String, Object>       doc           = MAPPER.readValue(Files.newInputStream(file), Map.class);
+            String                    name          = (String) doc.getOrDefault("name", file.getFileName().toString());
+            Map<String, Object>       simulateBlock = (Map<String, Object>) doc.get("simulate");
+            List<Map<String, Object>> fileSetup     = (List<Map<String, Object>>) doc.get("setup");
+            List<Map<String, Object>> fileTeardown  = (List<Map<String, Object>>) doc.get("teardown");
+            Map<String, Object>       varsBlock     = (Map<String, Object>) doc.get("vars");
+            Map<String, Object>       paramsBlock   = (Map<String, Object>) doc.get("params");
 
             List<TestCase> testCases;
             if (doc.containsKey("tests")) {
                 var tests = (List<Map<String, Object>>) doc.get("tests");
                 testCases = new ArrayList<>(tests.size());
                 for (var testEntry : tests) {
-                    String testName = (String) testEntry.get("name");
-                    var perTestSetup = (List<Map<String, Object>>) testEntry.get("setup");
-                    var steps = (List<Map<String, Object>>) testEntry.get("steps");
-                    var perTestTeardown = (List<Map<String, Object>>) testEntry.get("teardown");
+                    String testName        = (String) testEntry.get("name");
+                    var    perTestSetup    = (List<Map<String, Object>>) testEntry.get("setup");
+                    var    steps           = (List<Map<String, Object>>) testEntry.get("steps");
+                    var    perTestTeardown = (List<Map<String, Object>>) testEntry.get("teardown");
                     testCases.add(new TestCase(testName, perTestSetup, steps, perTestTeardown));
                 }
             } else {
@@ -70,7 +72,8 @@ public final class YamlTestDiscovery {
                 testCases = List.of(new TestCase(name, null, steps, null));
             }
 
-            return new TestFileDescriptor(name, file, simulateBlock, fileSetup, fileTeardown, testCases);
+            return new TestFileDescriptor(name, file, simulateBlock, fileSetup, fileTeardown,
+                                          testCases, varsBlock, paramsBlock);
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse test file: " + file, e);
         }

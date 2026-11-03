@@ -10,12 +10,20 @@ public record TestFileDescriptor(
         Map<String, Object> simulateBlock,
         List<Map<String, Object>> fileSetup,
         List<Map<String, Object>> fileTeardown,
-        List<TestCase> testCases) {
+        List<TestCase> testCases,
+        Map<String, Object> varsBlock,
+        Map<String, Object> paramsBlock) {
+
+    public TestFileDescriptor(String name, Path file, Map<String, Object> simulateBlock,
+                              List<Map<String, Object>> fileSetup, List<Map<String, Object>> fileTeardown,
+                              List<TestCase> testCases) {
+        this(name, file, simulateBlock, fileSetup, fileTeardown, testCases, null, null);
+    }
 
     public TestFileDescriptor {
-        fileSetup = fileSetup != null ? List.copyOf(fileSetup) : List.of();
+        fileSetup    = fileSetup != null ? List.copyOf(fileSetup) : List.of();
         fileTeardown = fileTeardown != null ? List.copyOf(fileTeardown) : List.of();
-        testCases = List.copyOf(testCases);
+        testCases    = List.copyOf(testCases);
     }
 
     public boolean isMultiTest() {

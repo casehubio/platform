@@ -153,6 +153,7 @@ public final class StepSchemaComposer {
             case BOOLEAN -> "boolean";
             case ARRAY -> "array";
             case OBJECT -> "object";
+            case EXPRESSION -> "string";
         };
     }
 }

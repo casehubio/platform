@@ -8,4 +8,8 @@ public interface StepResultStore {
     Map<String, Object> result(String stepName);
     io.casehub.yaml.core.error.YamlError error(String stepName);
     boolean hasCompleted(String stepName);
+
+    default Map<String, Object> liveResults() {
+        return Map.of();
+    }
 }

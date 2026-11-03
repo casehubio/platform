@@ -215,4 +215,37 @@ class StepPluginProcessorTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("must not return void");
     }
+
+    @Test
+    void expressionFieldGeneratesFormatInSchema() throws IOException {
+        Compilation compilation = javac()
+                .withProcessors(new StepPluginProcessor())
+                .compile(JavaFileObjects.forResource("test-plugins/ExpressionPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/expression-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"format\": \"expression\"");
+        assertThat(content).contains("\"subject\"");
+        assertThat(content).contains("\"message\"");
+    }
+
+    @Test
+    void expressionFieldGeneratesUncastExtraction() throws IOException {
+        Compilation compilation = javac()
+                .withProcessors(new StepPluginProcessor())
+                .compile(JavaFileObjects.forResource("test-plugins/ExpressionPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject source = compilation.generatedSourceFile(
+                "test.plugins.ExpressionPluginAction").orElseThrow();
+        String content = source.getCharContent(false).toString();
+
+        assertThat(content).contains("parameters.get(\"subject\")");
+        assertThat(content).doesNotContain("(String) parameters.get(\"subject\")");
+        assertThat(content).doesNotContain("(java.lang.Object) parameters.get(\"subject\")");
+    }
 }

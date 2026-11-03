@@ -727,5 +727,73 @@ class VariableResolverTest {
                                        .hasMessageContaining("str");
     }
 
+// --- Expression context (scope containers) ---
 
+    @Test
+    void withObjectScope_map_appearsInExpressionContext() {
+        Map<String, Object> data = Map.of("name", "Alice", "age", 30);
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withObjectScope("user", data);
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx).hasSize(1);
+        assertThat(ctx.get("user")).isSameAs(data);
+    }
+
+    @Test
+    void withObjectScope_functional_notInExpressionContext() {
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withObjectScope("user", name -> "value");
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx).isEmpty();
+    }
+
+    @Test
+    void buildExpressionContext_excludesDeferredPrefixes() {
+        Map<String, Object> data = Map.of("x", 1);
+        var resolver = new VariableResolver(Map.of(), Set.of("events"))
+                .withObjectScope("events", data);
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx).doesNotContainKey("events");
+    }
+
+    @Test
+    void scopeContainers_preservedAcross_withScope() {
+        Map<String, Object> data = Map.of("x", 1);
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withObjectScope("result", data)
+                .withScope("var", name -> "val");
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx.get("result")).isSameAs(data);
+    }
+
+    @Test
+    void scopeContainers_preservedAcross_withObjectScope_functional() {
+        Map<String, Object> data = Map.of("x", 1);
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withObjectScope("result", data)
+                .withObjectScope("other", name -> "val");
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx).hasSize(1);
+        assertThat(ctx.get("result")).isSameAs(data);
+    }
+
+    @Test
+    void withExpressionContext_addsToContainersOnly() {
+        Map<String, Object> data = Map.of("x", 1);
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withExpressionContext("result", data);
+        Map<String, Object> ctx = resolver.buildExpressionContext();
+        assertThat(ctx.get("result")).isSameAs(data);
+        assertThatThrownBy(() -> resolver.resolveString("${result.x}", "test"))
+                .isInstanceOf(UnresolvedVariableException.class);
+    }
+
+    @Test
+    void withObjectScope_map_alsoResolvesStrings() {
+        Map<String, Object> data = Map.of("name", "Alice");
+        var resolver = new VariableResolver(Map.of(), Set.of())
+                .withObjectScope("user", data);
+        Object result = resolver.resolve("${user.name}");
+        assertThat(result).isEqualTo("Alice");
+    }
 }

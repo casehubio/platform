@@ -1,5 +1,6 @@
 package io.casehub.yaml.plugin.processor;
 
+import io.casehub.yaml.plugin.api.Expression;
 import io.casehub.yaml.plugin.api.Required;
 
 import javax.annotation.processing.Filer;
@@ -26,8 +27,13 @@ class SchemaEmitter {
             for (int i = 0; i < fields.size(); i++) {
                 RecordComponentElement field = fields.get(i);
                 String yamlKey = BinderEmitter.toKebabCase(field.getSimpleName().toString());
-                String jsonType = toJsonType(field.asType().toString());
-                w.print("    \"" + yamlKey + "\": { \"type\": \"" + jsonType + "\" }");
+                boolean isExpression = field.getAnnotation(Expression.class) != null;
+                if (isExpression) {
+                    w.print("    \"" + yamlKey + "\": { \"type\": \"string\", \"format\": \"expression\" }");
+                } else {
+                    String jsonType = toJsonType(field.asType().toString());
+                    w.print("    \"" + yamlKey + "\": { \"type\": \"" + jsonType + "\" }");
+                }
                 if (i < fields.size() - 1) w.print(",");
                 w.println();
             }

@@ -1,9 +1,8 @@
 package io.casehub.yaml.step.plugin;
 
-import io.casehub.platform.api.expression.ExpressionContext;
-import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
 
@@ -19,6 +18,7 @@ public final class AssertThatPlugin implements Action {
     public static Definition definition() {
         return Definition.of("assertThat")
                 .description("Behavioural assertion with matchers")
+                .input("_subject", ParameterType.EXPRESSION, true)
                 .absorbSiblings(true)
                 .execute(new AssertThatPlugin())
                 .build();
@@ -27,7 +27,7 @@ public final class AssertThatPlugin implements Action {
     @Override
     public Result execute(Map<String, Object> params, ServiceRegistry services) {
         Object rawSubject = params.get("_subject");
-        Object subject = resolveSubject(rawSubject, services);
+        Object subject = rawSubject;
         String message = params.get("message") != null ? String.valueOf(params.get("message")) : null;
 
         List<MatchResult> failures = new ArrayList<>();
@@ -56,40 +56,6 @@ public final class AssertThatPlugin implements Action {
         }
 
         return Result.failed(sb.toString());
-    }
-
-    private Object resolveSubject(Object rawSubject, ServiceRegistry services) {
-        if (rawSubject == null) return null;
-        String subjectStr = String.valueOf(rawSubject);
-        if (!subjectStr.startsWith("${") || !subjectStr.endsWith("}")) {
-            return rawSubject;
-        }
-        ExpressionEngineRegistry engines;
-        try {
-            engines = services.lookup(ExpressionEngineRegistry.class);
-        } catch (IllegalArgumentException e) {
-            return rawSubject;
-        }
-
-        String engineType = engines.resolveDefault(ExpressionContext.CONDITION);
-        if (engineType == null) return rawSubject;
-
-        try {
-            String expression = subjectStr.substring(2, subjectStr.length() - 1);
-            Map<String, Object> context;
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> testContext = (Map<String, Object>) services.lookup(Map.class);
-                context = testContext;
-            } catch (IllegalArgumentException e) {
-                context = Map.of();
-            }
-            @SuppressWarnings("unchecked")
-            var compiled = engines.compile(engineType, expression, Map.class, Object.class);
-            return compiled.eval(context);
-        } catch (Exception e) {
-            return rawSubject;
-        }
     }
 
     private static String formatValue(Object value) {

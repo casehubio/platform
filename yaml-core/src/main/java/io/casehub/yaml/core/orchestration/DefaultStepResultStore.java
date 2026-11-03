@@ -35,4 +35,10 @@ public final class DefaultStepResultStore implements StepResultStore {
     public boolean hasCompleted(String stepName) {
         return completed.containsKey(stepName);
     }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Map<String, Object> liveResults() {
+        return (Map<String, Object>) (Map<?, ?>) results;
+    }
 }

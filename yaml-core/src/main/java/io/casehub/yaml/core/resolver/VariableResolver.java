@@ -16,6 +16,7 @@ public class VariableResolver {
     private final Map<String, ObjectVariableSource> objectPrefixSources;
     private final Set<String>                       deferredPrefixes;
     private final DeferredPrefixHandler             deferredPrefixHandler;
+    private final Map<String, Object>               scopeContainers;
 
     public VariableResolver(Map<String, VariableSource> prefixSources,
                             Set<String> deferredPrefixes) {
@@ -23,32 +24,61 @@ public class VariableResolver {
         this.objectPrefixSources   = Map.of();
         this.deferredPrefixes      = Set.copyOf(deferredPrefixes);
         this.deferredPrefixHandler = null;
+        this.scopeContainers       = Map.of();
     }
 
     private VariableResolver(Map<String, VariableSource> prefixSources,
                              Map<String, ObjectVariableSource> objectPrefixSources,
                              Set<String> deferredPrefixes,
-                             DeferredPrefixHandler deferredPrefixHandler) {
+                             DeferredPrefixHandler deferredPrefixHandler,
+                             Map<String, Object> scopeContainers) {
         this.prefixSources         = prefixSources;
         this.objectPrefixSources   = objectPrefixSources;
         this.deferredPrefixes      = deferredPrefixes;
         this.deferredPrefixHandler = deferredPrefixHandler;
+        this.scopeContainers       = scopeContainers;
     }
 
     public VariableResolver withScope(String prefix, VariableSource source) {
         var newSources = new LinkedHashMap<>(prefixSources);
         newSources.put(prefix, source);
-        return new VariableResolver(Map.copyOf(newSources), objectPrefixSources, deferredPrefixes, deferredPrefixHandler);
+        return new VariableResolver(Map.copyOf(newSources), objectPrefixSources, deferredPrefixes, deferredPrefixHandler, scopeContainers);
     }
 
     public VariableResolver withDeferredPrefixHandler(DeferredPrefixHandler handler) {
-        return new VariableResolver(prefixSources, objectPrefixSources, deferredPrefixes, handler);
+        return new VariableResolver(prefixSources, objectPrefixSources, deferredPrefixes, handler, scopeContainers);
     }
 
     public VariableResolver withObjectScope(String prefix, ObjectVariableSource source) {
         var newObjectSources = new LinkedHashMap<>(objectPrefixSources);
         newObjectSources.put(prefix, source);
-        return new VariableResolver(prefixSources, Map.copyOf(newObjectSources), deferredPrefixes, deferredPrefixHandler);
+        return new VariableResolver(prefixSources, Map.copyOf(newObjectSources), deferredPrefixes, deferredPrefixHandler, scopeContainers);
+    }
+
+    public VariableResolver withObjectScope(String prefix, Map<String, Object> map) {
+        var newObjectSources = new LinkedHashMap<>(objectPrefixSources);
+        newObjectSources.put(prefix, map::get);
+        var newContainers = new LinkedHashMap<>(scopeContainers);
+        newContainers.put(prefix, map);
+        return new VariableResolver(prefixSources, Map.copyOf(newObjectSources),
+                deferredPrefixes, deferredPrefixHandler, Map.copyOf(newContainers));
+    }
+
+    public VariableResolver withExpressionContext(String prefix, Map<String, Object> map) {
+        var newContainers = new LinkedHashMap<>(scopeContainers);
+        newContainers.put(prefix, map);
+        return new VariableResolver(prefixSources, objectPrefixSources,
+                deferredPrefixes, deferredPrefixHandler, Map.copyOf(newContainers));
+    }
+
+    public Map<String, Object> buildExpressionContext() {
+        Map<String, Object> context = new LinkedHashMap<>();
+        for (var entry : scopeContainers.entrySet()) {
+            if (!deferredPrefixes.contains(entry.getKey())) {
+                context.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return context;
     }
 
 

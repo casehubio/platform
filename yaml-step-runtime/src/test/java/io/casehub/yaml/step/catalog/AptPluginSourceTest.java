@@ -89,6 +89,32 @@ class AptPluginSourceTest {
         assertThat(registry.resolve("assert")).isPresent();
     }
 
+    @Test
+    void loadManifest_expressionFormat_mapsToExpressionType() throws IOException {
+        String manifest = """
+                {
+                  "actionClass": "io.casehub.yaml.step.catalog.AptPluginSourceTest$TestAction"
+                }
+                """;
+        String schema = """
+                {
+                  "type": "object",
+                  "properties": {
+                    "subject": { "type": "string", "format": "expression" },
+                    "message": { "type": "string" }
+                  }
+                }
+                """;
+        var source = new AptPluginSource(mapper);
+        Definition def = source.loadManifest("test",
+                new ByteArrayInputStream(manifest.getBytes(StandardCharsets.UTF_8)),
+                new ByteArrayInputStream(schema.getBytes(StandardCharsets.UTF_8)));
+        assertThat(def.inputs().get("subject").type())
+                .isEqualTo(io.casehub.yaml.plugin.api.ParameterType.EXPRESSION);
+        assertThat(def.inputs().get("message").type())
+                .isEqualTo(io.casehub.yaml.plugin.api.ParameterType.STRING);
+    }
+
     public static class TestAction implements Action {
         @Override
         public Result execute(

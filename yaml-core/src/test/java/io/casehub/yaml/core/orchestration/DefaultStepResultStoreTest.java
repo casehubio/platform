@@ -56,4 +56,27 @@ class DefaultStepResultStoreTest {
         var store = new DefaultStepResultStore();
         assertThat(store.hasCompleted("unknown")).isFalse();
     }
+
+    @Test
+    void liveResults_returnsLiveView() {
+        var store = new DefaultStepResultStore();
+        Map<String, Object> live = store.liveResults();
+        assertThat(live).isEmpty();
+
+        store.recordSuccess("step1", Map.of("output", "value1"));
+        assertThat(live).hasSize(1);
+        assertThat(live.get("step1")).isEqualTo(Map.of("output", "value1"));
+
+        store.recordSuccess("step2", Map.of("output", "value2"));
+        assertThat(live).hasSize(2);
+    }
+
+    @Test
+    void liveResults_excludesFailedSteps() {
+        var store = new DefaultStepResultStore();
+        store.recordFailure("badStep", new io.casehub.yaml.core.error.RuntimeStepError.StepActionError(
+                "badStep", null, "failed", io.casehub.yaml.core.error.SourceLocation.UNKNOWN, null));
+        Map<String, Object> live = store.liveResults();
+        assertThat(live).doesNotContainKey("badStep");
+    }
 }

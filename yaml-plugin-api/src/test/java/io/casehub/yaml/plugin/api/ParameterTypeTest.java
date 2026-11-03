@@ -99,4 +99,38 @@ class ParameterTypeTest {
     void fromStringRejectsUnknown() {
         assertThrows(IllegalArgumentException.class, () -> ParameterType.fromString("UNKNOWN"));
     }
+
+    @Test
+    void expression_isScalar() {
+        assertTrue(ParameterType.EXPRESSION.isScalar());
+    }
+
+    @Test
+    void expression_validate_acceptsAnyValue() {
+        assertTrue(ParameterType.EXPRESSION.validate("some expression"));
+        assertTrue(ParameterType.EXPRESSION.validate(42));
+        assertTrue(ParameterType.EXPRESSION.validate(java.util.Map.of()));
+        assertTrue(ParameterType.EXPRESSION.validate(null));
+    }
+
+    @Test
+    void expression_parseScalar_returnsRawString() {
+        assertEquals("results.output.risk", ParameterType.EXPRESSION.parseScalar("results.output.risk"));
+    }
+
+    @Test
+    void expression_canAccept_string() {
+        assertTrue(ParameterType.EXPRESSION.canAccept(ParameterType.STRING));
+    }
+
+    @Test
+    void string_cannotAccept_expression() {
+        assertFalse(ParameterType.STRING.canAccept(ParameterType.EXPRESSION));
+    }
+
+    @Test
+    void expression_fromString() {
+        assertEquals(ParameterType.EXPRESSION, ParameterType.fromString("EXPRESSION"));
+        assertEquals(ParameterType.EXPRESSION, ParameterType.fromString("expression"));
+    }
 }

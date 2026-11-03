@@ -123,8 +123,12 @@ public class AptPluginSource {
                 for (Map.Entry<String, Object> prop : properties.entrySet()) {
                     Map<String, Object> propSchema = (Map<String, Object>) prop.getValue();
                     String typeStr = (String) propSchema.getOrDefault("type", "string");
+                    String formatStr = (String) propSchema.get("format");
+                    ParameterType paramType = "expression".equals(formatStr)
+                            ? ParameterType.EXPRESSION
+                            : ParameterType.fromString(typeStr);
                     builder.input(prop.getKey(), new Parameter(
-                            ParameterType.fromString(typeStr), false, null, null, null,
+                            paramType, false, null, null, formatStr,
                             (String) propSchema.get("description")));
                 }
             }

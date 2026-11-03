@@ -668,7 +668,12 @@ public final class StructuralStepEvaluator {
 
 
     private VariableResolver withResultScope(VariableResolver resolver) {
-        return resultSource != null ? resolver.withObjectScope("result", resultSource) : resolver;
+        if (resultSource == null) return resolver;
+        resolver = resolver.withObjectScope("result", resultSource);
+        if (scope != null) {
+            resolver = resolver.withExpressionContext("result", scope.resultStore().liveResults());
+        }
+        return resolver;
     }
 
     private void recordResult(String stepName, Result result) {

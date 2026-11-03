@@ -3,7 +3,7 @@ package io.casehub.yaml.plugin.api;
 import java.util.Locale;
 
 public enum ParameterType {
-    STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT;
+    STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT, EXPRESSION;
 
     public boolean isScalar() {
         return this != ARRAY && this != OBJECT;
@@ -16,7 +16,8 @@ public enum ParameterType {
             case NUMBER  -> value instanceof Number;
             case BOOLEAN -> value instanceof Boolean;
             case ARRAY   -> value instanceof java.util.List;
-            case OBJECT  -> value instanceof java.util.Map;
+            case OBJECT     -> value instanceof java.util.Map;
+            case EXPRESSION -> true;
         };
     }
 
@@ -32,6 +33,7 @@ public enum ParameterType {
                         "'" + value + "' is not a boolean value. "
                         + "Expected: true/false/yes/no/on/off/y/n/1/0");
             };
+            case EXPRESSION -> value;
             case ARRAY, OBJECT -> throw new IllegalArgumentException(
                     "Cannot parse '" + this + "' from string");
         };
@@ -39,8 +41,9 @@ public enum ParameterType {
 
     public boolean canAccept(ParameterType outputType) {
         if (this == outputType) return true;
-        if (this == STRING && outputType.isScalar()) return true;
+        if (this == STRING && outputType.isScalar() && outputType != EXPRESSION) return true;
         if (this == NUMBER && outputType == INTEGER) return true;
+        if (this == EXPRESSION && outputType == STRING) return true;
         return false;
     }
 
@@ -52,6 +55,7 @@ public enum ParameterType {
             case "BOOLEAN" -> BOOLEAN;
             case "ARRAY", "LIST" -> ARRAY;
             case "OBJECT" -> OBJECT;
+            case "EXPRESSION" -> EXPRESSION;
             default -> throw new IllegalArgumentException(
                     "Unknown parameter type '" + name + "'");
         };

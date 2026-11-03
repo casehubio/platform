@@ -17,8 +17,8 @@ public final class ModuleParameterParser {
             case INTEGER -> new ParsedValue.IntegerValue(Integer.parseInt(value));
             case NUMBER  -> new ParsedValue.NumberValue(Double.parseDouble(value));
             case BOOLEAN -> new ParsedValue.BooleanValue(Truthiness.isTruthy(value));
-            case OBJECT  -> throw new IllegalArgumentException(
-                    "Module parameters do not support OBJECT type");
+            case OBJECT, EXPRESSION -> throw new IllegalArgumentException(
+                    "Module parameters do not support " + type + " type");
         };
     }
 }

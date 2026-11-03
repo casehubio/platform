@@ -1,5 +1,6 @@
 package io.casehub.yaml.plugin.processor;
 
+import io.casehub.yaml.plugin.api.Expression;
 import io.casehub.yaml.plugin.api.Required;
 
 import javax.annotation.processing.Filer;
@@ -64,8 +65,13 @@ class BinderEmitter {
             for (int i = 0; i < fields.size(); i++) {
                 RecordComponentElement field = fields.get(i);
                 String yamlKey = toKebabCase(field.getSimpleName().toString());
-                String type = field.asType().toString();
-                w.print(paramExtraction(type, yamlKey));
+                boolean isExpression = field.getAnnotation(Expression.class) != null;
+                if (isExpression) {
+                    w.print("parameters.get(\"" + yamlKey + "\")");
+                } else {
+                    String type = field.asType().toString();
+                    w.print(paramExtraction(type, yamlKey));
+                }
                 if (i < fields.size() - 1) w.print(", ");
             }
             w.println(");");

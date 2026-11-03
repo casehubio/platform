@@ -1,6 +1,8 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.resolver.VariableResolver;
+import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
@@ -25,10 +27,22 @@ public class CatalogStepRunner implements StepRunner {
             var definition = registry.resolve(ps.actionName())
                     .orElseThrow(() -> new IllegalArgumentException(
                             "No action registered for '" + ps.actionName() + "'"));
-            Map<String, Object> resolved = resolver.resolveMap(ps.params(), "step");
+
+            Map<String, Object> resolved;
+            if (hasExpressionParams(definition)) {
+                var paramResolver = new TypeAwareParamResolver(resolver, services);
+                resolved = paramResolver.resolve(ps.params(), definition.inputs());
+            } else {
+                resolved = resolver.resolveMap(ps.params(), "step");
+            }
             return definition.action().execute(resolved, services);
         }
         throw new IllegalArgumentException(
                 "Unsupported step type: " + step.getClass().getSimpleName());
+    }
+
+    private static boolean hasExpressionParams(Definition definition) {
+        return definition.inputs().values().stream()
+                .anyMatch(p -> p.type() == ParameterType.EXPRESSION);
     }
 }

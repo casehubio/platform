@@ -96,6 +96,10 @@ public final class PlaybookCompiler {
                 ? parsePools((Map<String, Object>) content.get("pools"), diagnostics)
                 : List.<io.casehub.platform.agent.config.PoolDeclaration>of();
 
+        PlaybookVariableContext variableContext =
+                PlaybookVariableContext.from(
+                        io.casehub.yaml.core.playbook.PlaybookVariableParser.parse(content));
+
         List<?> steps = content.containsKey("steps") ? (List<?>) content.get("steps") : List.of();
 
         var rootCtx = new CompilationContext("/do", 0, sourceMap, coordination, diagnostics, this);
@@ -119,7 +123,7 @@ public final class PlaybookCompiler {
         var workflow = new Workflow(doc, taskItems);
 
         return new CompilationOutcome.Success(
-                new CompilationResult(workflow, coordination.build(), sourceMap.build(), poolDeclarations));
+                new CompilationResult(workflow, coordination.build(), sourceMap.build(), poolDeclarations, variableContext));
     }
 
     TaskItem compileStep(Map<String, Object> step, CompilationContext ctx) {

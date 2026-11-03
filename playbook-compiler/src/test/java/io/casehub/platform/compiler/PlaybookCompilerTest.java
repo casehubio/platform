@@ -226,4 +226,33 @@ class PlaybookCompilerTest {
     }
 
 
+    @Test
+    void compile_extracts_variable_context() {
+        var content = new LinkedHashMap<String, Object>();
+        var params  = new LinkedHashMap<String, Object>();
+        params.put("portfolio:string", null);
+        var vars = new LinkedHashMap<String, Object>();
+        vars.put("retryCount:integer", 0);
+        content.put("params", params);
+        content.put("vars", vars);
+        content.put("steps", List.of());
+
+        var outcome = compiler.compile("test", content);
+
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+        var result = ((CompilationOutcome.Success) outcome).result();
+        assertThat(result.variableContext().params()).containsKey("portfolio");
+        assertThat(result.variableContext().vars().values()).containsKey("retryCount");
+    }
+
+    @Test
+    void compile_without_vars_has_empty_context() {
+        var content = Map.<String, Object>of("steps", List.of());
+
+        var outcome = compiler.compile("test", content);
+
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+        var result = ((CompilationOutcome.Success) outcome).result();
+        assertThat(result.variableContext()).isEqualTo(PlaybookVariableContext.EMPTY);
+    }
 }

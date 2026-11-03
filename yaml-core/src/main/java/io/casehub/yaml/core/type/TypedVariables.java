@@ -12,18 +12,24 @@ public final class TypedVariables {
         var domainTypes = new LinkedHashMap<String, String>();
         var values      = new LinkedHashMap<String, Object>();
         for (var entry : rawVariables.entrySet()) {
-            TypedName tn  = TypedName.parse(entry.getKey());
-            Object    raw = entry.getValue();
+            TypedName tn              = TypedName.parse(entry.getKey());
+            Object    raw             = entry.getValue();
+            boolean   hasExplicitType = entry.getKey().indexOf(':') >= 0;
+
             if (tn.isScalar()) {
-                schema.put(tn.name(), tn.scalarType());
-                if (raw == null || tn.scalarType().validate(raw)) {
+                ValueType effectiveType = tn.scalarType();
+                if (!hasExplicitType && raw != null) {
+                    effectiveType = inferType(raw);
+                }
+                schema.put(tn.name(), effectiveType);
+                if (raw == null || effectiveType.validate(raw)) {
                     values.put(tn.name(), raw);
                 } else {
                     try {
-                        values.put(tn.name(), tn.scalarType().parse(String.valueOf(raw)));
+                        values.put(tn.name(), effectiveType.parse(String.valueOf(raw)));
                     } catch (IllegalArgumentException e) {
                         throw new IllegalArgumentException(
-                                "Variable '" + tn.name() + "' (" + tn.scalarType()
+                                "Variable '" + tn.name() + "' (" + effectiveType
                                 + "): invalid value '" + raw + "'", e);
                     }
                 }
@@ -34,4 +40,12 @@ public final class TypedVariables {
         }
         return new TypedMap(schema, values, domainTypes);
     }
+
+    private static ValueType inferType(Object value) {
+        if (value instanceof Integer || value instanceof Long) {return ValueType.INTEGER;}
+        if (value instanceof Double || value instanceof Float) {return ValueType.NUMBER;}
+        if (value instanceof Boolean) {return ValueType.BOOLEAN;}
+        return ValueType.STRING;
+    }
+
 }

@@ -142,8 +142,7 @@ class WalkerTest {
         evalB.put("step", "eval-b");
         evalB.put("process", Map.of("command", "b.sh"));
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "await-all");
-        step.put("barrier", Map.of("await", List.of("eval-a", "eval-b"), "timeout", "30s"));
+        step.put("barrier await-all", Map.of("await", List.of("eval-a", "eval-b"), "timeout", "30s"));
 
         List<ResolvedStep> resolved = Walker.resolve(List.of(evalA, evalB, step), registry);
 
@@ -167,8 +166,7 @@ class WalkerTest {
         c.put("step", "strat-c");
         c.put("process", Map.of("command", "c.sh"));
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "consensus");
-        step.put("quorum", Map.of("required", 2, "of", List.of("strat-a", "strat-b", "strat-c"), "timeout", "15s"));
+        step.put("quorum consensus", Map.of("required", 2, "of", List.of("strat-a", "strat-b", "strat-c"), "timeout", "15s"));
 
         List<ResolvedStep> resolved = Walker.resolve(List.of(a, b, c, step), registry);
 
@@ -183,8 +181,7 @@ class WalkerTest {
     @Test
     void barrierWithoutAwait_throwsAtParseTime() {
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "wait");
-        step.put("barrier", Map.of());
+        step.put("barrier wait", Map.of());
 
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -197,8 +194,7 @@ class WalkerTest {
         evalA.put("step", "a");
         evalA.put("process", Map.of("command", "a.sh"));
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "q");
-        step.put("quorum", Map.of("required", 5, "of", List.of("a")));
+        step.put("quorum q", Map.of("required", 5, "of", List.of("a")));
 
         assertThatThrownBy(() -> Walker.resolve(List.of(evalA, step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -208,8 +204,7 @@ class WalkerTest {
     @Test
     void barrierAwaitsUnknownStep_throws() {
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "wait");
-        step.put("barrier", Map.of("await", List.of("nonexistent")));
+        step.put("barrier wait", Map.of("await", List.of("nonexistent")));
 
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -219,8 +214,7 @@ class WalkerTest {
     @Test
     void quorumReferencesUnknownStep_throws() {
         Map<String, Object> step = new LinkedHashMap<>();
-        step.put("step", "q");
-        step.put("quorum", Map.of("required", 1, "of", List.of("ghost")));
+        step.put("quorum q", Map.of("required", 1, "of", List.of("ghost")));
 
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -843,8 +837,7 @@ class WalkerTest {
                 Map.<String, Object>of("process", Map.of("command", "b.sh")),
                 Map.<String, Object>of("process", Map.of("command", "c.sh")));
         Map<String, Object> step = new java.util.LinkedHashMap<>();
-        step.put("step", "query");
-        step.put("parallel", Map.of("advance-after", 1, "steps", steps));
+        step.put("parallel query", Map.of("advance-after", 1, "steps", steps));
         var resolved = Walker.resolve(List.of(step), registry);
         assertThat(resolved).hasSize(1);
         var parallel = (ResolvedStep.ParallelStep) resolved.get(0);
@@ -1071,13 +1064,16 @@ class WalkerTest {
     }
 
     @Test
-    void preservesStepNameOnStructuralDecorator() {
-        var step = new LinkedHashMap<String, Object>();
-        step.put("step", "my-loop");
-        step.put("forEach", Map.of("item in items",
-                List.of(Map.of("process", Map.of("command", "a.sh")))));
-        var resolved = Walker.resolve(List.of(step), registry);
-        assertThat(resolved.get(0).name()).isEqualTo("my-loop");
+    void combinedKey_barrier_setsName() {
+        Map<String, Object> evalA = new LinkedHashMap<>();
+        evalA.put("step", "eval-a");
+        evalA.put("process", Map.of("command", "a.sh"));
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("barrier sync-point", Map.of("await", List.of("eval-a")));
+
+        var resolved = Walker.resolve(List.of(evalA, step), registry);
+        assertThat(resolved.get(1)).isInstanceOf(ResolvedStep.BarrierStep.class);
+        assertThat(resolved.get(1).name()).isEqualTo("sync-point");
     }
 
     @Test
@@ -1214,13 +1210,37 @@ class WalkerTest {
     }
 
     @Test
-    void combinedKey_explicitStepNameTakesPrecedence() {
+    void rejectsVerboseStepKeyWithStructuralKeyword() {
         var step = new LinkedHashMap<String, Object>();
+        step.put("block", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        step.put("step", "backend");
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'step' is not valid")
+                .hasMessageContaining("block backend:");
+    }
+
+    @Test
+    void rejectsVerboseStepKeyWithCombinedKeyStructural() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("block setup", List.of(Map.of("process", Map.of("command", "a.sh"))));
         step.put("step", "explicit");
-        step.put("block setup",
-                List.of(Map.of("process", Map.of("command", "a.sh"))));
-        var resolved = Walker.resolve(List.of(step), registry);
-        assertThat(resolved.get(0).name()).isEqualTo("explicit");
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'step' is not valid");
+    }
+
+    @Test
+    void rejectsVerboseStepKeyWithParallel() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("parallel", List.of(Map.of("process", Map.of("command", "a.sh"))));
+        step.put("step", "workers");
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("parallel workers:");
     }
 
 }

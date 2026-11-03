@@ -13,8 +13,7 @@ meta:
     - timeout
     - composition
 ---
-- step: monitor
-  block:
+- block monitor:
     - step: heartbeat
       log: { message: "Heartbeat: ${from.ts}" }
       from: heartbeats

@@ -12,8 +12,7 @@ meta:
     - block
     - composition
 ---
-- step: pattern
-  race:
+- race pattern:
     - block:
       - step: read-a1
         log: { message: "Path 1: read A" }

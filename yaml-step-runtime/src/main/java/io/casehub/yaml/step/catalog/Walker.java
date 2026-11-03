@@ -29,7 +29,8 @@ public final class Walker {
     static {
         COMBINED_KEY_PREFIXES.addAll(PROMOTABLE_DECORATORS);
         COMBINED_KEY_PREFIXES.addAll(java.util.List.of(
-                "block", "parallel", "try", "select", "race", "if", "match"));
+                "block", "parallel", "try", "select", "race", "if", "match",
+                "barrier", "quorum"));
     }
 
     private static String matchCombinedKey(String key) {
@@ -105,12 +106,14 @@ public final class Walker {
         Object  matchValue      = null;
         boolean hasMatch        = false;
         String  stepName        = null;
+        boolean stepFromKey     = false;
 
         for (Map.Entry<String, Object> e : step.entrySet()) {
             String key = e.getKey();
 
             if ("step".equals(key)) {
                 stepName = (String) e.getValue();
+                stepFromKey = true;
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
             } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key) || "barrier".equals(key) || "quorum".equals(key) || "race".equals(key) || "pause".equals(key) || "resume".equals(key)) {
@@ -138,7 +141,7 @@ public final class Walker {
                 structuralValue = e.getValue();
             } else if (RESERVED_KEYS.contains(key)) {
                 decorators.put(key, e.getValue());
-            } else if (matchCombinedKey(key) != null && e.getValue() instanceof List) {
+            } else if (matchCombinedKey(key) != null && (e.getValue() instanceof List || (e.getValue() instanceof Map && !PROMOTABLE_DECORATORS.contains(matchCombinedKey(key))))) {
                 if (structuralType != null) {
                     throw new IllegalArgumentException(
                             path + " → Step " + index + ": step has both structural type '"
@@ -195,6 +198,13 @@ public final class Walker {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": unknown key '" + first.getKey()
                     + "'. Available actions: " + registry.availableActions());
+        }
+
+        if (stepFromKey && structuralType != null) {
+            throw new IllegalArgumentException(
+                    path + " → Step " + index + ": 'step' is not valid inside '" + structuralType
+                    + "' — use combined-key syntax: '" + structuralType + " " + stepName
+                    + ":' instead of '" + structuralType + ":' + 'step: " + stepName + "'");
         }
 
         if (stepName != null && !seenNames.add(stepName)) {

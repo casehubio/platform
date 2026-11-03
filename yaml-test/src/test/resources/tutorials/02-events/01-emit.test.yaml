@@ -1,0 +1,11 @@
+name: Emit and capture events
+
+steps:
+  - emit-event: test.event
+    data:
+      key: value
+  - emit-event: test.event
+    data:
+      key: second
+  - assert:
+      expression: "true"

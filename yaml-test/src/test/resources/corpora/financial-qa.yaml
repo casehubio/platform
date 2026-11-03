@@ -1,0 +1,4 @@
+- key: "risk profile"
+  output: "Moderate risk: 60% equities."
+- key: "rebalancing"
+  output: "Shift 10% equities to bonds."

@@ -1,0 +1,10 @@
+name: Basic agent invocation
+
+steps:
+  - agent-invoke:
+      prompt: "What's my risk profile?"
+    capture: result
+  - assertThat: ${result.text}
+    not-empty: true
+  - assertThat: ${result.tokens}
+    greaterThan: 0

@@ -1,0 +1,11 @@
+name: Assertion matchers
+
+steps:
+  - agent-invoke:
+      prompt: "portfolio"
+    capture: result
+  - assertThat: ${result.text}
+    not-null: true
+    not-empty: true
+  - assertThat: ${result.duration}
+    greaterThanOrEqual: 0

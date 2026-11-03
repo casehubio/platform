@@ -1,0 +1,8 @@
+name: Basic assertion test
+
+steps:
+  - agent-invoke:
+      prompt: "hello"
+    capture: result
+  - assertThat: ${result.text}
+    contains: 'hello'

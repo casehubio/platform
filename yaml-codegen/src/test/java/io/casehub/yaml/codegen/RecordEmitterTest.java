@@ -138,6 +138,19 @@ class RecordEmitterTest {
     }
 
     @Test
+    void expressionFormatFieldGeneratesObjectType() {
+        List<RecordEmitter.GeneratedFile> files =
+                new RecordEmitter().emit(graph, emptyMapping, config);
+        RecordEmitter.GeneratedFile person =
+                files.stream()
+                     .filter(f -> f.fileName().equals("YamlPerson.java"))
+                     .findFirst()
+                     .orElseThrow();
+        assertThat(person.content()).contains("Object condition");
+    }
+
+
+    @Test
     void skippedFieldsOmitted() {
         MappingConfig mapping =
                 MappingConfig.load(new File("src/test/resources/schema/test-mappings.yaml"));
@@ -164,6 +177,7 @@ class RecordEmitterTest {
                                                 new TypeGraph.FieldDef(
                                                         "do",
                                                         "object",
+                                                        null,
                                                         null,
                                                         false,
                                                         false,
@@ -204,8 +218,8 @@ class RecordEmitterTest {
     void recordName_overridesSchemaTypeName() {
         TypeGraph caseGraph = new TypeGraph(List.of(
                 new TypeGraph.TypeDef("CaseDefinition", List.of(
-                        new TypeGraph.FieldDef("name", "string", null, false, false, null, false, null),
-                        new TypeGraph.FieldDef("duration", "object", null, false, false, null, false, null)
+                        new TypeGraph.FieldDef("name", "string", null, null, false, false, null, false, null),
+                        new TypeGraph.FieldDef("duration", "object", null, null, false, false, null, false, null)
                                                                ), false, null)
                                                    ));
         MappingConfig mapping = MappingConfig.load(
@@ -221,8 +235,8 @@ class RecordEmitterTest {
     void defaultValue_generatesCompactConstructorGuard() {
         TypeGraph caseGraph = new TypeGraph(List.of(
                 new TypeGraph.TypeDef("CaseDefinition", List.of(
-                        new TypeGraph.FieldDef("name", "string", null, false, false, null, false, null),
-                        new TypeGraph.FieldDef("duration", "object", null, false, false, null, false, null)
+                        new TypeGraph.FieldDef("name", "string", null, null, false, false, null, false, null),
+                        new TypeGraph.FieldDef("duration", "object", null, null, false, false, null, false, null)
                                                                ), false, null)
                                                    ));
         MappingConfig mapping = MappingConfig.load(
@@ -240,7 +254,7 @@ class RecordEmitterTest {
     void body_injectedIntoRecordBody() {
         TypeGraph caseGraph = new TypeGraph(List.of(
                 new TypeGraph.TypeDef("CaseDefinition", List.of(
-                        new TypeGraph.FieldDef("name", "string", null, false, false, null, false, null)
+                        new TypeGraph.FieldDef("name", "string", null, null, false, false, null, false, null)
                                                                ), false, null)
                                                    ));
         MappingConfig mapping = MappingConfig.load(
@@ -257,8 +271,8 @@ class RecordEmitterTest {
     void globalImports_resolveShortTypeNames() {
         TypeGraph caseGraph = new TypeGraph(List.of(
                 new TypeGraph.TypeDef("CaseDefinition", List.of(
-                        new TypeGraph.FieldDef("name", "string", null, false, false, null, false, null),
-                        new TypeGraph.FieldDef("duration", "object", null, false, false, null, false, null)
+                        new TypeGraph.FieldDef("name", "string", null, null, false, false, null, false, null),
+                        new TypeGraph.FieldDef("duration", "object", null, null, false, false, null, false, null)
                                                                ), false, null)
                                                    ));
         MappingConfig mapping = MappingConfig.load(
@@ -276,8 +290,8 @@ class RecordEmitterTest {
     void globalDeserializers_resolveImports() {
         TypeGraph caseGraph = new TypeGraph(List.of(
                 new TypeGraph.TypeDef("CaseDefinition", List.of(
-                        new TypeGraph.FieldDef("name", "string", null, false, false, null, false, null),
-                        new TypeGraph.FieldDef("duration", "object", null, false, false, null, false, null)
+                        new TypeGraph.FieldDef("name", "string", null, null, false, false, null, false, null),
+                        new TypeGraph.FieldDef("duration", "object", null, null, false, false, null, false, null)
                                                                ), false, null)
                                                    ));
         MappingConfig mapping = MappingConfig.load(

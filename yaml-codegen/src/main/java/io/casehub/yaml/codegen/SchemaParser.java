@@ -84,12 +84,16 @@ public class SchemaParser {
 
     private TypeGraph.FieldDef parseFieldDef(String name, JsonNode fieldNode, boolean required) {
         String schemaType = null;
+        String format = null;
         String refTarget = null;
         boolean isArray = false;
         boolean isMap = false;
         String mapValueType = null;
         String description =
                 fieldNode.has("description") ? fieldNode.get("description").asText() : null;
+        if (fieldNode.has("format")) {
+            format = fieldNode.get("format").asText();
+        }
 
         if (fieldNode.has("$ref")) {
             refTarget = extractRefName(fieldNode.get("$ref").asText());
@@ -125,7 +129,7 @@ public class SchemaParser {
         }
 
         return new TypeGraph.FieldDef(
-                name, schemaType, refTarget, isArray, isMap, mapValueType, required, description);
+                name, schemaType, format, refTarget, isArray, isMap, mapValueType, required, description);
     }
 
     private static String extractRefName(String ref) {

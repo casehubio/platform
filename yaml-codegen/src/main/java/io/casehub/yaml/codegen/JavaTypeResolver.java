@@ -57,6 +57,10 @@ public class JavaTypeResolver {
             return new ResolvedType(refType, refType, imports);
         }
 
+        if ("expression".equals(field.format())) {
+            return new ResolvedType("Object", "Object", imports);
+        }
+
         return resolveSchemaType(field.schemaType(), imports);
     }
 

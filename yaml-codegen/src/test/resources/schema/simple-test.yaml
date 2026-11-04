@@ -11,6 +11,9 @@ $defs:
         type: array
         items:
           type: string
+      condition:
+        type: string
+        format: expression
       address:
         $ref: "#/$defs/Address"
     unevaluatedProperties: false

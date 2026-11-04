@@ -15,10 +15,11 @@
  */
 package io.casehub.yaml.codegen;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class SchemaParserTest {
 
@@ -35,9 +36,9 @@ class SchemaParserTest {
     @Test
     void extractsFieldsFromProperties() {
         TypeGraph.TypeDef person = graph.findType("Person").orElseThrow();
-        assertThat(person.fields()).hasSize(4);
+        assertThat(person.fields()).hasSize(5);
         assertThat(person.fields().stream().map(TypeGraph.FieldDef::name))
-                .containsExactly("name", "age", "tags", "address");
+                .containsExactly("name", "age", "tags", "condition", "address");
     }
 
     @Test
@@ -69,4 +70,21 @@ class SchemaParserTest {
         assertThat(person.findField("name").orElseThrow().required()).isTrue();
         assertThat(person.findField("age").orElseThrow().required()).isFalse();
     }
+
+    @Test
+    void detectsExpressionFormat() {
+        TypeGraph.TypeDef  person    = graph.findType("Person").orElseThrow();
+        TypeGraph.FieldDef condition = person.findField("condition").orElseThrow();
+        assertThat(condition.schemaType()).isEqualTo("string");
+        assertThat(condition.format()).isEqualTo("expression");
+    }
+
+    @Test
+    void fieldsWithoutFormatHaveNullFormat() {
+        TypeGraph.TypeDef  person = graph.findType("Person").orElseThrow();
+        TypeGraph.FieldDef name   = person.findField("name").orElseThrow();
+        assertThat(name.format()).isNull();
+    }
+
+
 }

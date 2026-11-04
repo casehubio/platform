@@ -38,6 +38,7 @@ public record TypeGraph(List<TypeDef> types) {
     public record FieldDef(
             String name,
             String schemaType,
+            String format,
             String refTarget,
             boolean isArray,
             boolean isMap,

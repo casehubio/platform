@@ -63,7 +63,7 @@ public final class Walker {
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, AnnotationMap annotations) {
         Set<String>        seenNames = new java.util.HashSet<>();
-        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations);
+        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations, "", 0);
         validateBarrierQuorumReferences(result, seenNames);
         result = io.casehub.yaml.step.eval.FusionPass.fuse(result, registry);
         return result;
@@ -72,21 +72,23 @@ public final class Walker {
 
     private static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path, Set<String> seenNames) {
-        return resolve(steps, registry, depth, path, seenNames, AnnotationMap.empty());
+        return resolve(steps, registry, depth, path, seenNames, AnnotationMap.empty(), "", 0);
     }
 
     private static List<ResolvedStep> resolve(
-            List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path, Set<String> seenNames, AnnotationMap annotations) {
+            List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path,
+            Set<String> seenNames, AnnotationMap annotations, String annPrefix, int annOffset) {
         if (depth > MAX_DEPTH) {
             throw new IllegalArgumentException(
                     "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path);
         }
         List<ResolvedStep> result = new ArrayList<>(steps.size());
         for (int i = 0; i < steps.size(); i++) {
-            ResolvedStep                                     step     = resolveOne(steps.get(i), registry, i, depth, path, seenNames);
-            List<io.casehub.yaml.core.annotation.Annotation> stepAnns = (depth == 0) ? annotations.forStep(i) : List.of();
+            String                                           stepKey  = annPrefix + (annOffset + i);
+            ResolvedStep                                     step     = resolveOne(steps.get(i), registry, i, depth, path, seenNames, annotations, stepKey);
+            List<io.casehub.yaml.core.annotation.Annotation> stepAnns = annotations.forStep(stepKey);
             if (!stepAnns.isEmpty()) {
-                step = mergeAnnotationDecorators(step, stepAnns, i);
+                step = mergeAnnotationDecorators(step, stepAnns, annOffset + i);
                 step = withAnnotations(step, stepAnns);
             }
             result.add(step);
@@ -169,7 +171,7 @@ public final class Walker {
     @SuppressWarnings("unchecked")
     private static ResolvedStep resolveOne(
             Map<String, Object> step, PluginRegistry registry, int index, int depth, String path,
-            Set<String> seenNames) {
+            Set<String> seenNames, AnnotationMap annotations, String stepKey) {
         if (step.isEmpty()) {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": empty step map");
@@ -362,17 +364,18 @@ public final class Walker {
         if ("if".equals(structuralType)) {
             var thenSteps = (List<Map<String, Object>>) companions.get("then");
             var elseSteps = (List<Map<String, Object>>) companions.get("else");
+            String childPrefix = stepKey + ".";
             return new ResolvedStep.IfElseStep(
                     stepName,
                     String.valueOf(ifValue),
-                    resolve(thenSteps, registry, depth + 1, stepPath + " → then", seenNames),
-                    elseSteps != null ? resolve(elseSteps, registry, depth + 1, stepPath + " → else", seenNames) : null,
+                    resolve(thenSteps, registry, depth + 1, stepPath + " → then", seenNames, annotations, childPrefix, 0),
+                    elseSteps != null ? resolve(elseSteps, registry, depth + 1, stepPath + " → else", seenNames, annotations, childPrefix, thenSteps.size()) : null,
                     decorators);
         }
         if ("block".equals(structuralType)) {
             return new ResolvedStep.BlockStep(
                     stepName,
-                    resolve((List<Map<String, Object>>) structuralValue, registry, depth + 1, stepPath + " → block", seenNames),
+                    resolve((List<Map<String, Object>>) structuralValue, registry, depth + 1, stepPath + " → block", seenNames, annotations, stepKey + ".", 0),
                     decorators);
         }
         if ("match".equals(structuralType)) {
@@ -389,7 +392,7 @@ public final class Walker {
                 var stepList = (List<Map<String, Object>>) structuralValue;
                 return new ResolvedStep.ParallelStep(
                         stepName,
-                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames),
+                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0),
                         decorators);
             }
             @SuppressWarnings("unchecked")
@@ -400,7 +403,7 @@ public final class Walker {
                 throw new IllegalArgumentException(
                         "parallel map form requires a non-empty 'steps' list at " + stepPath);
             }
-            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames);
+            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0);
             Object advanceAfterRaw = policyMap.get("advance-after");
             int    advanceAfter;
             if (advanceAfterRaw == null || "all".equals(advanceAfterRaw)) {
@@ -424,12 +427,15 @@ public final class Walker {
             var trySteps     = (List<Map<String, Object>>) structuralValue;
             var catchSteps   = (List<Map<String, Object>>) companions.get("catch");
             var finallySteps = (List<Map<String, Object>>) companions.get("finally");
+            String childPrefix = stepKey + ".";
+            int offset = 0;
+            var resolvedTry = resolve(trySteps, registry, depth + 1, stepPath + " → try", seenNames, annotations, childPrefix, offset);
+            offset += trySteps.size();
+            var resolvedCatch = catchSteps != null ? resolve(catchSteps, registry, depth + 1, stepPath + " → catch", seenNames, annotations, childPrefix, offset) : null;
+            offset += catchSteps != null ? catchSteps.size() : 0;
+            var resolvedFinally = finallySteps != null ? resolve(finallySteps, registry, depth + 1, stepPath + " → finally", seenNames, annotations, childPrefix, offset) : null;
             return new ResolvedStep.TryCatchFinallyStep(
-                    stepName,
-                    resolve(trySteps, registry, depth + 1, stepPath + " → try", seenNames),
-                    catchSteps != null ? resolve(catchSteps, registry, depth + 1, stepPath + " → catch", seenNames) : null,
-                    finallySteps != null ? resolve(finallySteps, registry, depth + 1, stepPath + " → finally", seenNames) : null,
-                    decorators);
+                    stepName, resolvedTry, resolvedCatch, resolvedFinally, decorators);
         }
         if ("select".equals(structuralType)) {
             var branchMaps = (List<Map<String, Object>>) structuralValue;
@@ -468,7 +474,7 @@ public final class Walker {
         if ("race".equals(structuralType)) {
             @SuppressWarnings("unchecked")
             var branches = (List<Map<String, Object>>) structuralValue;
-            var resolvedBranches = resolve(branches, registry, depth + 1, stepPath + " → race", seenNames);
+            var resolvedBranches = resolve(branches, registry, depth + 1, stepPath + " → race", seenNames, annotations, stepKey + ".", 0);
             return new ResolvedStep.RaceStep(stepName, resolvedBranches, decorators);
         }
         if ("pause".equals(structuralType)) {
@@ -482,7 +488,7 @@ public final class Walker {
                 @SuppressWarnings("unchecked")
                 var stepList = (List<Map<String, Object>>) structuralValue;
                 var resolved = resolve(stepList, registry, depth + 1,
-                                       stepPath + " → " + structuralType, seenNames);
+                                       stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0);
                 decorators.put(structuralType, true);
                 return new ResolvedStep.BlockStep(stepName, resolved, decorators);
             }
@@ -503,7 +509,7 @@ public final class Walker {
             @SuppressWarnings("unchecked")
             var stepList = (List<Map<String, Object>>) entry.getValue();
             var resolved = resolve(stepList, registry, depth + 1,
-                                   stepPath + " → " + structuralType, seenNames);
+                                   stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0);
             decorators.put(structuralType, param);
             return new ResolvedStep.BlockStep(stepName, resolved, decorators);
         }
@@ -572,7 +578,7 @@ public final class Walker {
                 var rest = stripKeys(caseMap, Set.of("pattern", "when", "guard"));
                 List<ResolvedStep> caseSteps = rest.isEmpty()
                         ? List.of()
-                        : List.of(resolveOne(rest, registry, i, depth + 1, casePath, seenNames));
+                        : List.of(resolveOne(rest, registry, i, depth + 1, casePath, seenNames, AnnotationMap.empty(), ""));
                 result.add(new ResolvedMatchCase(pattern, guard, caseSteps));
             }
         }
@@ -615,7 +621,7 @@ public final class Walker {
             var rest = stripKeys(branchMap, Set.of("subscribe", "wait"));
             var branchSteps = rest.isEmpty()
                     ? List.<ResolvedStep>of()
-                    : List.of(resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames));
+                    : List.of(resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, AnnotationMap.empty(), ""));
             result.add(new ResolvedStep.SelectBranch(type, name, branchSteps));
         }
         return result;

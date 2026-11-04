@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WalkerAnnotationTest {
 
@@ -90,4 +91,52 @@ class WalkerAnnotationTest {
         assertTrue(resolved.get(0).annotations().isEmpty());
         assertEquals(1, resolved.get(1).annotations().size());
     }
+
+    @Test
+    void nestedBlockStepReceivesAnnotations() {
+        var blockChildren = List.of(
+                Map.<String, Object>of("rest-request", Map.of("url", "/api")),
+                Map.<String, Object>of("agent-invoke", Map.of("prompt", "hello"))
+                                   );
+        var steps = List.of(
+                Map.<String, Object>of("block", blockChildren)
+                           );
+        var timeout = new Annotation("timeout", List.of(new AnnotationArg.Positional("5s")));
+        var retry   = new Annotation("retry", List.of(new AnnotationArg.Positional("3")));
+        var annotations = new AnnotationMap(List.of(),
+                                            Map.of("0.0", List.of(timeout), "0.1", List.of(retry)));
+
+        var resolved = Walker.resolve(steps, registry, annotations);
+        var block    = (ResolvedStep.BlockStep) resolved.get(0);
+        assertEquals(1, block.steps().get(0).annotations().size());
+        assertEquals("timeout", block.steps().get(0).annotations().get(0).name());
+        assertEquals(1, block.steps().get(1).annotations().size());
+        assertEquals("retry", block.steps().get(1).annotations().get(0).name());
+    }
+
+    @Test
+    void nestedAnnotationsAcrossTryCatch() {
+        var tryChildren = List.of(
+                Map.<String, Object>of("rest-request", Map.of("url", "/api"))
+                                 );
+        var catchChildren = List.of(
+                Map.<String, Object>of("agent-invoke", Map.of("prompt", "handle"))
+                                   );
+        var steps = List.of(
+                Map.<String, Object>of("try", tryChildren, "catch", catchChildren)
+                           );
+        var timeout = new Annotation("timeout", List.of(new AnnotationArg.Positional("5s")));
+        var retry   = new Annotation("retry", List.of(new AnnotationArg.Positional("3")));
+        var annotations = new AnnotationMap(List.of(),
+                                            Map.of("0.0", List.of(timeout), "0.1", List.of(retry)));
+
+        var resolved = Walker.resolve(steps, registry, annotations);
+        var tryCatch = (ResolvedStep.TryCatchFinallyStep) resolved.get(0);
+        assertEquals(1, tryCatch.trySteps().get(0).annotations().size());
+        assertEquals("timeout", tryCatch.trySteps().get(0).annotations().get(0).name());
+        assertEquals(1, tryCatch.catchSteps().get(0).annotations().size());
+        assertEquals("retry", tryCatch.catchSteps().get(0).annotations().get(0).name());
+    }
+
+
 }

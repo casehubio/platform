@@ -20,8 +20,18 @@ public record AnnotationMap(
 
     public static AnnotationMap empty() { return EMPTY; }
 
+
+    public List<Annotation> forStep(String key) {
+        return stepAnnotations.getOrDefault(key, List.of());
+    }
+
     public List<Annotation> forStep(int index) {
-        return stepAnnotations.getOrDefault(String.valueOf(index), List.of());
+        return forStep(String.valueOf(index));
+    }
+
+
+    public boolean hasStepAnnotation(String key, String name) {
+        return forStep(key).stream().anyMatch(a -> a.name().equals(name));
     }
 
     public boolean hasStepAnnotation(int index, String name) {

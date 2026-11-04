@@ -6,20 +6,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public final class AnnotationExtractor {
 
     private AnnotationExtractor() {}
 
     public static AnnotationMap extract(String yamlText) {
-        if (yamlText == null || yamlText.isEmpty()) return AnnotationMap.empty();
+        if (yamlText == null || yamlText.isEmpty()) {return AnnotationMap.empty();}
 
-        String[] lines = yamlText.split("\n", -1);
-        List<Annotation> documentAnnotations = new ArrayList<>();
-        Map<String, List<Annotation>> stepAnnotations = new LinkedHashMap<>();
-        List<Annotation> pendingAnnotations = new ArrayList<>();
-        boolean inSteps = false;
-        int stepIndex = 0;
+        String[]                      lines               = yamlText.split("\n", -1);
+        List<Annotation>              documentAnnotations = new ArrayList<>();
+        Map<String, List<Annotation>> stepAnnotations     = new LinkedHashMap<>();
+        List<Annotation>              pendingAnnotations  = new ArrayList<>();
+        boolean                       inSteps             = false;
+        TreeMap<Integer, Integer>     indentCounters      = new TreeMap<>();
 
         for (String line : lines) {
             String trimmed = line.stripLeading();
@@ -30,7 +31,7 @@ public final class AnnotationExtractor {
                 continue;
             }
 
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {continue;}
 
             if (!inSteps && trimmed.startsWith("steps:")) {
                 flushToDocument(documentAnnotations, pendingAnnotations);
@@ -39,12 +40,20 @@ public final class AnnotationExtractor {
             }
 
             if (inSteps && trimmed.startsWith("- ")) {
+                int indent = line.length() - trimmed.length();
+
+                Integer previousAtThisLevel = indentCounters.get(indent);
+                indentCounters.tailMap(indent, true).clear();
+                int counter = (previousAtThisLevel != null) ? previousAtThisLevel + 1 : 0;
+                indentCounters.put(indent, counter);
+
+                String stepKey = buildStepKey(indentCounters);
+
                 if (!pendingAnnotations.isEmpty()) {
-                    validateNoDuplicates(pendingAnnotations, "step " + stepIndex);
-                    stepAnnotations.put(String.valueOf(stepIndex), List.copyOf(pendingAnnotations));
+                    validateNoDuplicates(pendingAnnotations, "step " + stepKey);
+                    stepAnnotations.put(stepKey, List.copyOf(pendingAnnotations));
                     pendingAnnotations.clear();
                 }
-                stepIndex++;
                 continue;
             }
 
@@ -58,6 +67,16 @@ public final class AnnotationExtractor {
         }
 
         return new AnnotationMap(documentAnnotations, stepAnnotations);
+    }
+
+
+    private static String buildStepKey(TreeMap<Integer, Integer> indentCounters) {
+        StringBuilder sb = new StringBuilder();
+        for (int counter : indentCounters.values()) {
+            if (!sb.isEmpty()) {sb.append('.');}
+            sb.append(counter);
+        }
+        return sb.toString();
     }
 
     private static void flushToDocument(List<Annotation> target, List<Annotation> pending) {

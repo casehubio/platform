@@ -2,7 +2,9 @@ package io.casehub.yaml.core.annotation;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnnotationExtractorTest {
 
@@ -164,4 +166,110 @@ class AnnotationExtractorTest {
         assertEquals("timeout", map.forStep(1).get(0).name());
         assertTrue(map.forStep(2).isEmpty());
     }
+
+    @Test
+    void extractAnnotationsInsideBlock() {
+        String yaml = """
+                      name: Test
+                      steps:
+                        - block:
+                            #@timeout(5s)
+                            - rest-request:
+                                url: /api
+                            #@retry(3)
+                            - agent-invoke:
+                                prompt: hello
+                      """;
+        var map = AnnotationExtractor.extract(yaml);
+        assertEquals(1, map.forStep("0.0").size());
+        assertEquals("timeout", map.forStep("0.0").get(0).name());
+        assertEquals(1, map.forStep("0.1").size());
+        assertEquals("retry", map.forStep("0.1").get(0).name());
+    }
+
+    @Test
+    void mixedTopLevelAndNestedAnnotations() {
+        String yaml = """
+                      name: Test
+                      steps:
+                        #@timeout(10s)
+                        - block:
+                            #@retry(3)
+                            - rest-request:
+                                url: /api
+                        #@audit
+                        - rest-request:
+                            url: /api2
+                      """;
+        var map = AnnotationExtractor.extract(yaml);
+        assertEquals(1, map.forStep("0").size());
+        assertEquals("timeout", map.forStep("0").get(0).name());
+        assertEquals(1, map.forStep("0.0").size());
+        assertEquals("retry", map.forStep("0.0").get(0).name());
+        assertEquals(1, map.forStep("1").size());
+        assertEquals("audit", map.forStep("1").get(0).name());
+    }
+
+    @Test
+    void deeplyNestedAnnotations() {
+        String yaml = """
+                      name: Test
+                      steps:
+                        - block:
+                            - block:
+                                #@timeout(5s)
+                                - rest-request:
+                                    url: /api
+                      """;
+        var map = AnnotationExtractor.extract(yaml);
+        assertEquals(1, map.forStep("0.0.0").size());
+        assertEquals("timeout", map.forStep("0.0.0").get(0).name());
+    }
+
+    @Test
+    void annotationsAcrossTryCatch() {
+        String yaml = """
+                      name: Test
+                      steps:
+                        - try:
+                            #@timeout(5s)
+                            - rest-request:
+                                url: /api
+                          catch:
+                            #@retry(3)
+                            - agent-invoke:
+                                prompt: handle error
+                      """;
+        var map = AnnotationExtractor.extract(yaml);
+        assertEquals(1, map.forStep("0.0").size());
+        assertEquals("timeout", map.forStep("0.0").get(0).name());
+        assertEquals(1, map.forStep("0.1").size());
+        assertEquals("retry", map.forStep("0.1").get(0).name());
+    }
+
+    @Test
+    void nestedStepCounterResetsForNewParent() {
+        String yaml = """
+                      name: Test
+                      steps:
+                        - block:
+                            #@timeout(5s)
+                            - rest-request:
+                                url: /api
+                            - agent-invoke:
+                                prompt: hello
+                        - block:
+                            #@retry(3)
+                            - rest-request:
+                                url: /api2
+                      """;
+        var map = AnnotationExtractor.extract(yaml);
+        assertEquals(1, map.forStep("0.0").size());
+        assertEquals("timeout", map.forStep("0.0").get(0).name());
+        assertTrue(map.forStep("0.1").isEmpty());
+        assertEquals(1, map.forStep("1.0").size());
+        assertEquals("retry", map.forStep("1.0").get(0).name());
+    }
+
+
 }

@@ -28,6 +28,7 @@ public final class StructuralStepEvaluator {
     private final io.casehub.yaml.core.resolver.ObjectVariableSource resultSource;
     private final java.util.concurrent.ConcurrentHashMap<String, java.util.List<io.casehub.yaml.core.orchestration.OrcLatch>> stepLatches = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Object>                                           injectedBindings;
 
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
@@ -40,10 +41,46 @@ public final class StructuralStepEvaluator {
         this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
         this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
+        this.injectedBindings   = Map.of();
     }
 
+    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings) {
+        this.conditionEvaluator = conditionEvaluator;
+        this.scope              = scope;
+        this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
+        this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
+        this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
+        this.injectedBindings   = Map.copyOf(injectedBindings);
+    }
+
+    @SuppressWarnings("unchecked")
+    public StructuralStepEvaluator withInjections(
+            java.util.List<io.casehub.yaml.core.annotation.InjectionBinding> bindings,
+            io.casehub.yaml.core.annotation.InjectionResolver resolver) {
+        Map<String, Object> injected = new java.util.LinkedHashMap<>();
+        for (var binding : bindings) {
+            Object resolved = resolver.resolve(binding.typeName(), binding.qualifiers());
+            if (resolved == null) {
+                throw new IllegalStateException(
+                        binding.typeName() + " not available — @Inject binding '"
+                        + binding.variableName() + "' could not be resolved");
+            }
+            injected.put(binding.variableName(), resolved);
+        }
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected);
+    }
+
+
     public Result evaluate(ResolvedStep step, VariableResolver resolver, StepRunner runner) {
-        StepContext ctx = new StepContext(withResultScope(resolver));
+        VariableResolver enriched = withResultScope(resolver);
+        for (var entry : injectedBindings.entrySet()) {
+            final Object val = entry.getValue();
+            enriched = enriched.withObjectScope(entry.getKey(), name -> {
+                if (val instanceof Map<?, ?> m) {return ((Map<String, Object>) m).get(name);}
+                return null;
+            });
+        }
+        StepContext ctx = new StepContext(enriched);
         return evaluateInternal(step, ctx, runner);
     }
 

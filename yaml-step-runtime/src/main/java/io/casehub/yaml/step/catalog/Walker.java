@@ -1,5 +1,6 @@
 package io.casehub.yaml.step.catalog;
 
+import io.casehub.yaml.core.annotation.AnnotationMap;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 
 import java.util.ArrayList;
@@ -21,6 +22,9 @@ public final class Walker {
 
     private static final Set<String> REMOVED_KEYS = Set.of("steps", "do");
     static final         int         MAX_DEPTH             = 32;
+    private static final Set<String> MIGRATED_DECORATORS   = Set.of(
+            "timeout", "retry", "delay", "priority", "resource", "background",
+            "on-error", "trigger", "semaphore", "at", "cancel", "mutex");
 
 
     private Walker() {}
@@ -53,24 +57,112 @@ public final class Walker {
 
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry) {
+        return resolve(steps, registry, AnnotationMap.empty());
+    }
+
+    public static List<ResolvedStep> resolve(
+            List<Map<String, Object>> steps, PluginRegistry registry, AnnotationMap annotations) {
         Set<String>        seenNames = new java.util.HashSet<>();
-        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames);
+        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations);
         validateBarrierQuorumReferences(result, seenNames);
         result = io.casehub.yaml.step.eval.FusionPass.fuse(result, registry);
         return result;
     }
 
+
     private static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path, Set<String> seenNames) {
+        return resolve(steps, registry, depth, path, seenNames, AnnotationMap.empty());
+    }
+
+    private static List<ResolvedStep> resolve(
+            List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path, Set<String> seenNames, AnnotationMap annotations) {
         if (depth > MAX_DEPTH) {
             throw new IllegalArgumentException(
                     "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path);
         }
         List<ResolvedStep> result = new ArrayList<>(steps.size());
         for (int i = 0; i < steps.size(); i++) {
-            result.add(resolveOne(steps.get(i), registry, i, depth, path, seenNames));
+            ResolvedStep                                     step     = resolveOne(steps.get(i), registry, i, depth, path, seenNames);
+            List<io.casehub.yaml.core.annotation.Annotation> stepAnns = (depth == 0) ? annotations.forStep(i) : List.of();
+            if (!stepAnns.isEmpty()) {
+                step = mergeAnnotationDecorators(step, stepAnns, i);
+                step = withAnnotations(step, stepAnns);
+            }
+            result.add(step);
         }
         return result;
+    }
+
+    private static ResolvedStep withAnnotations(ResolvedStep step, List<io.casehub.yaml.core.annotation.Annotation> anns) {
+        return switch (step) {
+            case ResolvedStep.PluginStep s -> new ResolvedStep.PluginStep(s.name(), s.actionName(), s.params(), s.decorators(), anns);
+            case ResolvedStep.InvokeStep s -> new ResolvedStep.InvokeStep(s.name(), s.invokeSpec(), s.decorators(), anns);
+            case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), s.decorators(), anns);
+            case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), s.decorators(), anns);
+            case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), s.decorators(), anns);
+            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.decorators(), anns);
+            case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), s.decorators(), anns);
+            case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), s.decorators(), anns);
+            case ResolvedStep.BarrierStep s -> new ResolvedStep.BarrierStep(s.name(), s.awaitSteps(), s.timeout(), s.decorators(), anns);
+            case ResolvedStep.QuorumStep s -> new ResolvedStep.QuorumStep(s.name(), s.required(), s.ofSteps(), s.timeout(), s.decorators(), anns);
+            case ResolvedStep.ControlStep s -> new ResolvedStep.ControlStep(s.name(), s.target(), s.activate(), s.decorators(), anns);
+            case ResolvedStep.RaceStep s -> new ResolvedStep.RaceStep(s.name(), s.branches(), s.decorators(), anns);
+            case ResolvedStep.FusedPipelineStep s -> s;
+        };
+    }
+
+    private static ResolvedStep mergeAnnotationDecorators(ResolvedStep step, List<io.casehub.yaml.core.annotation.Annotation> anns, int index) {
+        Map<String, Object> mergedDecorators = null;
+        for (var ann : anns) {
+            if (MIGRATED_DECORATORS.contains(ann.name())) {
+                if (mergedDecorators == null) {
+                    mergedDecorators = new LinkedHashMap<>(step.decorators());
+                }
+                if (mergedDecorators.containsKey(ann.name())) {
+                    LOG.warning("Step " + index + ": decorator key '" + ann.name()
+                                + "' is deprecated — use #@" + ann.name() + "() annotation instead");
+                }
+                Object value;
+                if (ann.args().isEmpty()) {
+                    value = true;
+                } else {
+                    String raw = ann.stringArg(0);
+                    value = parseDecoratorValue(raw);
+                }
+                mergedDecorators.put(ann.name(), value);
+            }
+        }
+        if (mergedDecorators == null) {return step;}
+        return withDecorators(step, mergedDecorators);
+    }
+
+    private static Object parseDecoratorValue(String raw) {
+        if (raw == null) {return true;}
+        try {return Integer.parseInt(raw);} catch (NumberFormatException ignored) {}
+        try {return Double.parseDouble(raw);} catch (NumberFormatException ignored) {}
+        if ("true".equalsIgnoreCase(raw)) {return true;}
+        if ("false".equalsIgnoreCase(raw)) {return false;}
+        return raw;
+    }
+
+
+    private static ResolvedStep withDecorators(ResolvedStep step, Map<String, Object> decorators) {
+        return switch (step) {
+            case ResolvedStep.PluginStep s -> new ResolvedStep.PluginStep(s.name(), s.actionName(), s.params(), decorators);
+            case ResolvedStep.InvokeStep s -> new ResolvedStep.InvokeStep(s.name(), s.invokeSpec(), decorators);
+            case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), decorators);
+            case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), decorators);
+            case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), decorators);
+            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), decorators);
+            case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), decorators);
+            case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), decorators);
+            case ResolvedStep.BarrierStep s -> new ResolvedStep.BarrierStep(s.name(), s.awaitSteps(), s.timeout(), decorators);
+            case ResolvedStep.QuorumStep s -> new ResolvedStep.QuorumStep(s.name(), s.required(), s.ofSteps(), s.timeout(), decorators);
+            case ResolvedStep.ControlStep s -> new ResolvedStep.ControlStep(s.name(), s.target(), s.activate(), decorators);
+            case ResolvedStep.RaceStep s -> new ResolvedStep.RaceStep(s.name(), s.branches(), decorators);
+            case ResolvedStep.FusedPipelineStep s -> s;
+        };
     }
 
 

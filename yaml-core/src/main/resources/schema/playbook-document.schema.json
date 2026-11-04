@@ -1,0 +1,631 @@
+{
+  "$id": "https://casehub.io/yaml-core/playbook-document.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Playbook Content Document",
+  "description": "Schema for CaseHub playbook content documents and .test.yaml files. Covers step types, decorators, invoke bindings, simulation, orchestration, and pools.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for the playbook or test."
+    },
+    "meta": {
+      "type": "object",
+      "description": "Playbook metadata.",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "steps": {
+      "$ref": "#/$defs/stepList",
+      "description": "The step sequence. Required unless 'tests' is present."
+    },
+    "params": {
+      "type": "object",
+      "description": "Typed parameter declarations with optional constraints.",
+      "additionalProperties": { "$ref": "#/$defs/parameterDeclaration" }
+    },
+    "vars": {
+      "type": "object",
+      "description": "Variable declarations with types and defaults.",
+      "additionalProperties": { "$ref": "#/$defs/parameterDeclaration" }
+    },
+    "orchestration": {
+      "type": "object",
+      "description": "Pre-declared barriers and signals for coordination.",
+      "properties": {
+        "barriers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": { "count": { "type": "integer" } }
+          }
+        },
+        "signals": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "pools": {
+      "type": "object",
+      "description": "Agent pool declarations.",
+      "additionalProperties": { "$ref": "#/$defs/poolDeclaration" }
+    },
+    "simulate": {
+      "$ref": "#/$defs/simulateBlock",
+      "description": "Simulation configuration for test files."
+    },
+    "setup": {
+      "$ref": "#/$defs/stepList",
+      "description": "File-level setup steps (test files)."
+    },
+    "teardown": {
+      "$ref": "#/$defs/stepList",
+      "description": "File-level teardown steps (test files)."
+    },
+    "tests": {
+      "type": "array",
+      "description": "Multiple test cases in one file.",
+      "items": { "$ref": "#/$defs/testCase" }
+    },
+    "playbook": { "type": "string", "description": "Playbook name (alternative location to front matter)." },
+    "scenario": { "description": "Reserved key for scenario content." },
+    "states": { "description": "Reserved key for state machine definitions." },
+    "data": {
+      "type": "object",
+      "description": "Typed CSV data sources.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "csv": { "type": "string" }
+        }
+      }
+    },
+    "iterations": {
+      "type": "object",
+      "description": "Named iteration groups shared across forEach elements.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "as": { "type": "string" },
+          "in": {
+            "oneOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "string" }
+            ]
+          }
+        },
+        "required": ["as", "in"]
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "stepList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "step": {
+      "type": "object",
+      "properties": {
+        "step": { "type": "string", "description": "Names a step for barrier/quorum references." },
+        "invoke": { "$ref": "#/$defs/invokeBinding" },
+        "block": { "$ref": "#/$defs/stepList" },
+        "parallel": {
+          "oneOf": [
+            { "$ref": "#/$defs/stepList" },
+            {
+              "type": "object",
+              "properties": {
+                "steps": { "$ref": "#/$defs/stepList" },
+                "advance-after": { "oneOf": [{ "type": "integer" }, { "type": "string" }] },
+                "cancel-remaining": { "type": "boolean" },
+                "collection-timeout": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "try": { "$ref": "#/$defs/stepList" },
+        "catch": { "$ref": "#/$defs/stepList" },
+        "finally": { "$ref": "#/$defs/stepList" },
+        "if": { "type": "string", "description": "Condition expression (structural or decorator)." },
+        "then": { "$ref": "#/$defs/stepList" },
+        "else": { "$ref": "#/$defs/stepList" },
+        "match": { "type": "string", "description": "Value to match against." },
+        "cases": { "type": "array", "items": { "$ref": "#/$defs/matchCase" } },
+        "select": { "type": "array", "items": { "$ref": "#/$defs/selectBranch" } },
+        "race": { "$ref": "#/$defs/stepList" },
+        "barrier": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "await": { "type": "array", "items": { "type": "string" } },
+                "timeout": { "type": "string" }
+              },
+              "required": ["await"]
+            },
+            { "description": "Barrier decorator." }
+          ]
+        },
+        "quorum": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "required": { "type": "integer" },
+                "of": { "type": "array", "items": { "type": "string" } },
+                "timeout": { "type": "string" }
+              },
+              "required": ["required", "of"]
+            },
+            { "description": "Quorum decorator." }
+          ]
+        },
+        "pause": { "type": "string" },
+        "resume": { "type": "string" },
+        "log": {
+          "type": "object",
+          "properties": { "message": { "type": "string" } }
+        },
+        "delay": { "type": "string", "description": "Duration (e.g. 1000ms, 5s)." },
+        "signal": { "type": "string", "description": "Send a signal (structural or decorator)." },
+        "await": { "type": "string", "description": "Wait for signal." },
+        "rest-request": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string" },
+            "url": { "type": "string" },
+            "headers": { "type": "object" },
+            "body": {}
+          },
+          "required": ["url"]
+        },
+        "advisory": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        },
+        "agent-session-open": {
+          "type": "object",
+          "properties": {
+            "session": { "type": "string" },
+            "system": { "type": "string" },
+            "model": { "type": "string" },
+            "model-query": { "type": "object" },
+            "model-chain": { "type": "array" },
+            "pool": { "type": "string" },
+            "timeout": { "type": "string" },
+            "checkout-timeout": { "type": "string" }
+          },
+          "required": ["session"]
+        },
+        "agent-query": {
+          "type": "object",
+          "properties": {
+            "session": { "type": "string" },
+            "user": { "type": "string" },
+            "response-format": {},
+            "output": { "type": "string" },
+            "priority": { "type": "boolean" }
+          },
+          "required": ["session"]
+        },
+        "agent-session-clear": {
+          "type": "object",
+          "properties": { "session": { "type": "string" } },
+          "required": ["session"]
+        },
+        "agent-session-close": {
+          "type": "object",
+          "properties": { "session": { "type": "string" } },
+          "required": ["session"]
+        },
+        "assert": {
+          "type": "object",
+          "properties": {
+            "expression": { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "required": ["expression"]
+        },
+        "assertThat": { "type": "string", "description": "Expression to assert against." },
+        "contains": { "type": "string" },
+        "equals": {},
+        "matches": { "type": "string", "description": "Regex pattern." },
+        "hasSize": { "type": "integer" },
+        "startsWith": { "type": "string" },
+        "endsWith": { "type": "string" },
+        "greaterThan": { "type": "number" },
+        "greaterThanOrEqual": { "type": "number" },
+        "lessThan": { "type": "number" },
+        "not-null": { "type": "boolean" },
+        "not-empty": { "type": "boolean" },
+        "empty": { "type": "boolean" },
+        "rest-call": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "method": { "type": "string" },
+            "body": { "type": "object" },
+            "headers": { "type": "object" },
+            "timeout": { "type": "string" }
+          },
+          "required": ["url"]
+        },
+        "process": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string" },
+            "args": { "type": "array", "items": { "type": "string" } },
+            "working-dir": { "type": "string" },
+            "timeout": { "type": "string" },
+            "merge-stderr": { "type": "boolean" }
+          },
+          "required": ["command"]
+        },
+        "agent-invoke": {
+          "type": "object",
+          "properties": {
+            "prompt": { "type": "string" }
+          },
+          "required": ["prompt"]
+        },
+        "emit-event": {
+          "oneOf": [
+            { "type": "string", "description": "Event type string." },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "source": { "type": "string" },
+                "data": { "type": "object" }
+              },
+              "required": ["type"]
+            }
+          ]
+        },
+        "run-playbook": {
+          "oneOf": [
+            { "type": "string", "description": "Shorthand: file path." },
+            {
+              "type": "object",
+              "properties": {
+                "file": { "type": "string" },
+                "vars": { "type": "object" }
+              },
+              "required": ["file"]
+            }
+          ]
+        },
+        "verify-simulation": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string" },
+            "called": { "type": "integer" },
+            "calledAtLeast": { "type": "integer" },
+            "calledAtMost": { "type": "integer" },
+            "neverCalled": { "type": "boolean" },
+            "inOrder": { "type": "array", "items": { "type": "string" } },
+            "exhaustive": { "type": "boolean" }
+          }
+        },
+        "when": { "type": "string", "description": "Conditional guard expression." },
+        "timeout": { "type": "string", "description": "Max execution time (e.g. 5s, 200ms)." },
+        "retry": {
+          "oneOf": [
+            { "type": "integer" },
+            {
+              "type": "object",
+              "properties": {
+                "max": { "type": "integer" },
+                "backoff": { "type": "string" }
+              }
+            }
+          ],
+          "description": "Retry count or policy."
+        },
+        "loop": { "type": "integer", "description": "Repeat N times." },
+        "mutex": { "type": "string", "description": "Mutual exclusion group." },
+        "capture": { "type": "string", "description": "Capture step output to named variable." },
+        "forEach": {
+          "oneOf": [
+            { "type": "string", "description": "Named iteration group reference." },
+            {
+              "type": "object",
+              "properties": {
+                "as": { "type": "string" },
+                "in": {
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "string" } },
+                    { "type": "string" }
+                  ]
+                }
+              },
+              "required": ["as", "in"]
+            }
+          ],
+          "description": "Iteration directive."
+        },
+        "wait": { "type": "string", "description": "Wait for signal." },
+        "from": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "channel": { "type": "string" },
+                "until": { "type": "string" },
+                "name": { "type": "string" }
+              }
+            }
+          ],
+          "description": "Channel subscription."
+        },
+        "publish": {
+          "type": "object",
+          "properties": {
+            "channel": { "type": "string" },
+            "data": { "type": "object" }
+          },
+          "description": "Publish to channel."
+        },
+        "cancel": { "type": "string", "description": "Cancellation trigger name." },
+        "background": { "type": "boolean", "description": "Run step in background." },
+        "on-error": { "type": "string", "description": "Error handling strategy." },
+        "on-success": { "description": "Success handler." },
+        "on-failure": { "description": "Failure handler." },
+        "on-complete": { "description": "Completion handler." },
+        "trigger": { "description": "Event trigger." },
+        "transform": { "description": "Data transform." },
+        "transition": { "description": "State transition." },
+        "semaphore": { "description": "Semaphore constraint." },
+        "at": { "description": "Scheduled time." },
+        "resource": { "description": "Resource constraint." },
+        "priority": { "description": "Execution priority." },
+        "meta": { "type": "object", "description": "Metadata (stripped, not functional)." }
+      },
+      "patternProperties": {
+        "^timeout .+$": { "$ref": "#/$defs/stepList" },
+        "^retry \\d+$": { "$ref": "#/$defs/stepList" },
+        "^when .+$": { "$ref": "#/$defs/stepList" },
+        "^forEach .+$": { "$ref": "#/$defs/stepList" },
+        "^mutex .+$": { "$ref": "#/$defs/stepList" },
+        "^loop \\d+$": { "$ref": "#/$defs/stepList" },
+        "^block .+$": { "$ref": "#/$defs/stepList" },
+        "^parallel .+$": { "$ref": "#/$defs/stepList" },
+        "^try .+$": { "$ref": "#/$defs/stepList" },
+        "^select .+$": { "$ref": "#/$defs/stepList" },
+        "^race .+$": { "$ref": "#/$defs/stepList" },
+        "^if .+$": { "$ref": "#/$defs/stepList" },
+        "^match .+$": { "$ref": "#/$defs/stepList" },
+        "^barrier .+$": { "$ref": "#/$defs/stepList" },
+        "^quorum .+$": { "$ref": "#/$defs/stepList" }
+      },
+      "additionalProperties": true
+    },
+    "invokeBinding": {
+      "type": "object",
+      "description": "Invoke binding — discriminated by binding type key.",
+      "oneOf": [
+        { "required": ["mcp"], "properties": { "mcp": { "type": "string" } } },
+        {
+          "required": ["rest"],
+          "properties": {
+            "rest": {
+              "type": "object",
+              "properties": {
+                "method": { "type": "string" },
+                "url": { "type": "string" },
+                "headers": { "type": "object" },
+                "body": {}
+              }
+            }
+          }
+        },
+        { "required": ["graphql"], "properties": { "graphql": { "type": "string" } } },
+        { "required": ["python"], "properties": { "python": { "type": "string" } } },
+        { "required": ["node"], "properties": { "node": { "type": "string" } } },
+        {
+          "required": ["script"],
+          "properties": {
+            "script": {
+              "type": "object",
+              "properties": {
+                "runtime": { "type": "string" },
+                "script": { "type": "string" },
+                "timeout": { "type": "string" },
+                "workingDir": { "type": "string" },
+                "env": { "type": "object" }
+              }
+            }
+          }
+        },
+        {
+          "required": ["agent"],
+          "properties": {
+            "agent": {
+              "type": "object",
+              "properties": {
+                "descriptor": { "type": "string" },
+                "model": { "type": "string" },
+                "model-query": { "type": "object" },
+                "system": { "type": "string" },
+                "user": { "type": "string" },
+                "timeout": { "type": "string" },
+                "structured-output": { "type": "boolean" },
+                "pool": { "type": "string" },
+                "model-chain": { "type": "array" },
+                "response-format": {}
+              }
+            }
+          }
+        },
+        {
+          "required": ["process"],
+          "properties": {
+            "process": {
+              "type": "object",
+              "properties": {
+                "command": { "type": "string" },
+                "args": { "type": "array", "items": { "type": "string" } },
+                "output": { "type": "string" },
+                "timeout": { "type": "string" },
+                "env": { "type": "object" },
+                "working-dir": { "type": "string" },
+                "on-error": { "type": "string" }
+              }
+            }
+          }
+        },
+        { "required": ["aria"], "properties": { "aria": { "type": "string" } } },
+        {
+          "required": ["agent-session-open"],
+          "properties": {
+            "agent-session-open": {
+              "type": "object",
+              "properties": {
+                "session": { "type": "string" },
+                "system": { "type": "string" },
+                "model": { "type": "string" },
+                "model-query": { "type": "object" },
+                "model-chain": { "type": "array" },
+                "pool": { "type": "string" },
+                "timeout": { "type": "string" },
+                "checkout-timeout": { "type": "string" }
+              }
+            }
+          }
+        },
+        {
+          "required": ["agent-query"],
+          "properties": {
+            "agent-query": {
+              "type": "object",
+              "properties": {
+                "session": { "type": "string" },
+                "user": { "type": "string" },
+                "response-format": {},
+                "output": { "type": "string" },
+                "priority": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        {
+          "required": ["agent-session-clear"],
+          "properties": {
+            "agent-session-clear": {
+              "type": "object",
+              "properties": { "session": { "type": "string" } }
+            }
+          }
+        },
+        {
+          "required": ["agent-session-close"],
+          "properties": {
+            "agent-session-close": {
+              "type": "object",
+              "properties": { "session": { "type": "string" } }
+            }
+          }
+        }
+      ]
+    },
+    "simulateBlock": {
+      "type": "object",
+      "description": "Maps SPI method names to test response corpora. 'agent' is an alias for 'agent-provider.invoke'.",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "array", "items": { "type": "object" } },
+          {
+            "type": "object",
+            "properties": {
+              "strategy": { "type": "string", "enum": ["key", "sequential", "random", "nearest-match"] },
+              "corpus-file": { "type": "string" },
+              "corpus": { "type": "array", "items": { "type": "object" } }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "testCase": {
+      "type": "object",
+      "required": ["name", "steps"],
+      "properties": {
+        "name": { "type": "string" },
+        "setup": { "$ref": "#/$defs/stepList" },
+        "steps": { "$ref": "#/$defs/stepList" },
+        "teardown": { "$ref": "#/$defs/stepList" },
+        "simulate": { "$ref": "#/$defs/simulateBlock" }
+      },
+      "additionalProperties": true
+    },
+    "parameterDeclaration": {
+      "oneOf": [
+        { "type": "null", "description": "Required parameter, no default." },
+        { "type": "string", "description": "Shorthand: value is the default." },
+        {
+          "type": "object",
+          "properties": {
+            "default": {},
+            "minimum": { "type": "number" },
+            "maximum": { "type": "number" },
+            "minLength": { "type": "integer" },
+            "maxLength": { "type": "integer" },
+            "pattern": { "type": "string" },
+            "allowedValues": { "type": "array", "items": { "type": "string" } },
+            "constraintDescription": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "poolDeclaration": {
+      "type": "object",
+      "required": ["agent-id"],
+      "properties": {
+        "agent-id": { "type": "string" },
+        "backend": { "type": "string" },
+        "min-active": { "type": "integer", "default": 0 },
+        "max-active": { "type": "integer" },
+        "working-dir": { "type": "string" },
+        "salience": { "type": "integer" },
+        "max-prompt-tokens": { "type": "integer" },
+        "scaling": { "type": "object" },
+        "extensions": { "type": "object" },
+        "clearing": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "matchCase": {
+      "type": "object",
+      "description": "A case branch in a match step.",
+      "properties": {
+        "pattern": {},
+        "guard": { "type": "string" },
+        "default": {}
+      },
+      "additionalProperties": true
+    },
+    "selectBranch": {
+      "type": "object",
+      "description": "A branch in a select step — waits for a signal or subscribes to a channel.",
+      "properties": {
+        "wait": { "type": "string" },
+        "subscribe": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "properties": { "channel": { "type": "string" } } }
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

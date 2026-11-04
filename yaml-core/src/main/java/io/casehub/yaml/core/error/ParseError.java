@@ -1,5 +1,7 @@
 package io.casehub.yaml.core.error;
 
+import java.util.Map;
+
 public sealed interface ParseError extends YamlError {
 
     record UnknownStepError(String stepName, String referencedAction,
@@ -7,6 +9,9 @@ public sealed interface ParseError extends YamlError {
         @Override public ErrorCategory category() { return ErrorCategory.UNKNOWN_STEP; }
         @Override public String summary() {
             return "Step '" + stepName + "' references unknown action '" + referencedAction + "'";
+        }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("referencedAction", referencedAction);
         }
     }
 
@@ -16,6 +21,9 @@ public sealed interface ParseError extends YamlError {
         @Override public String summary() {
             return "Parameter '" + parameterName + "' on step '" + stepName
                     + "' violates constraint: " + constraint;
+        }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("parameterName", parameterName, "constraint", constraint);
         }
     }
 
@@ -27,6 +35,9 @@ public sealed interface ParseError extends YamlError {
             return engineType + " expression failed to parse on step '" + stepName
                     + "': " + engineMessage;
         }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("expressionText", expressionText, "engineType", engineType, "engineMessage", engineMessage);
+        }
     }
 
     record StructureError(String stepName, String detail,
@@ -36,6 +47,9 @@ public sealed interface ParseError extends YamlError {
             return "Invalid YAML structure"
                     + (stepName != null ? " at step '" + stepName + "'" : "")
                     + ": " + detail;
+        }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("detail", detail);
         }
     }
 

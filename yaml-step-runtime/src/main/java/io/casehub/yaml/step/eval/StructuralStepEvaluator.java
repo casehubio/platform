@@ -315,27 +315,48 @@ public final class StructuralStepEvaluator {
     private Result evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,
                                            StepContext ctx, StepRunner runner) {
         Result tryResult;
+        io.casehub.yaml.core.error.YamlError caughtError = null;
         try {
             tryResult = evaluateBlock(
                     new ResolvedStep.BlockStep(null, tcf.trySteps(), Map.of()), ctx, runner);
         } catch (Exception e) {
-            tryResult = Result.failed(e.getMessage());
+            caughtError = io.casehub.yaml.step.error.YamlErrorMapper.from(e, "try-block", null);
+            tryResult = Result.failed(caughtError.summary(), caughtError.category().yamlKey());
         }
 
         Result result = tryResult;
         if (!tryResult.isSuccess() && !tcf.catchSteps().isEmpty()) {
-            String errorMessage = tryResult instanceof Result.Failure f ? f.message() : "unknown error";
-            Map<String, Object> errorMap = Map.of("message", errorMessage, "step", "try-block");
-            VariableResolver errorResolver = ctx.resolver().withObjectScope("error",
-                                                                            name -> switch (name) {
-                                                                                case "message" -> errorMessage;
-                                                                                case "step" -> "try-block";
-                                                                                default -> null;
-                                                                            })
-                                                           .withExpressionContext("error", errorMap);
+            io.casehub.yaml.core.error.YamlError yamlError = caughtError != null
+                    ? caughtError
+                    : (tryResult instanceof Result.Failure f
+                        ? io.casehub.yaml.step.error.YamlErrorMapper.fromFailure(f, "try-block")
+                        : new io.casehub.yaml.core.error.RuntimeStepError.StepActionError(
+                                "try-block", null, "unknown error", null, null));
+
+            String              errorType    = yamlError.category().yamlKey();
+            String              errorMessage = yamlError.summary();
+            String              errorStep    = yamlError.stepName();
+            Map<String, Object> errorDetail  = yamlError.toDetailMap();
+
+            Map<String, Object> errorMap = new java.util.LinkedHashMap<>();
+            errorMap.put("type", errorType);
+            errorMap.put("message", errorMessage);
+            errorMap.put("step", errorStep);
+            errorMap.put("detail", errorDetail);
+
+            VariableResolver errorResolver = ctx.resolver()
+                    .withObjectScope("error", name -> switch (name) {
+                        case "type"    -> errorType;
+                        case "message" -> errorMessage;
+                        case "step"    -> errorStep;
+                        case "detail"  -> errorDetail;
+                        default        -> null;
+                    })
+                    .withExpressionContext("error", errorMap);
             try {
                 result = evaluateBlock(
-                        new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), ctx.withResolver(errorResolver), runner);
+                        new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()),
+                        ctx.withResolver(errorResolver), runner);
             } catch (Exception e) {
                 result = Result.failed("catch failed: " + e.getMessage());
             }
@@ -751,14 +772,14 @@ public final class StructuralStepEvaluator {
             if (output == null) {
                 return Map.of("error", Map.of(
                         "message", err.summary(),
-                        "category", err.category().name(),
+                        "category", err.category().yamlKey(),
                         "step", err.stepName() != null ? err.stepName() : ""));
             }
             if (err == null) {return output;}
             var composite = new java.util.HashMap<>(output);
             composite.put("error", Map.of(
                     "message", err.summary(),
-                    "category", err.category().name(),
+                    "category", err.category().yamlKey(),
                     "step", err.stepName() != null ? err.stepName() : ""));
             return composite;
         };

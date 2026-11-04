@@ -1,6 +1,7 @@
 package io.casehub.yaml.core.error;
 
 import java.time.Duration;
+import java.util.Map;
 
 public sealed interface CoordinationError extends YamlError {
 
@@ -11,6 +12,9 @@ public sealed interface CoordinationError extends YamlError {
             return "Channel '" + channelName + "' closed"
                     + (stepName != null ? " while step '" + stepName + "' was waiting" : "");
         }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("channelName", channelName);
+        }
     }
 
     record DeadlineError(String stepName, String scopeName, Duration deadline,
@@ -19,6 +23,9 @@ public sealed interface CoordinationError extends YamlError {
         @Override public String summary() {
             return "Deadline exceeded in scope '" + scopeName + "' after " + deadline
                     + (stepName != null ? " (step '" + stepName + "')" : "");
+        }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("scopeName", scopeName, "deadline", deadline.toString());
         }
     }
 
@@ -29,6 +36,9 @@ public sealed interface CoordinationError extends YamlError {
             return "Correlation timeout for key '" + correlationKey + "' after " + timeout
                     + (stepName != null ? " (step '" + stepName + "')" : "");
         }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("correlationKey", String.valueOf(correlationKey), "timeout", String.valueOf(timeout));
+        }
     }
 
     record SemaphoreError(String stepName, String semaphoreName,
@@ -38,6 +48,9 @@ public sealed interface CoordinationError extends YamlError {
             return "Reentrant acquire on semaphore '" + semaphoreName + "'"
                     + (stepName != null ? " by step '" + stepName + "'" : "");
         }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("semaphoreName", semaphoreName);
+        }
     }
 
     record TransitionError(String stepName, String machineName, Object fromState, Object toState,
@@ -45,6 +58,9 @@ public sealed interface CoordinationError extends YamlError {
         @Override public ErrorCategory category() { return ErrorCategory.ILLEGAL_TRANSITION; }
         @Override public String summary() {
             return "Invalid transition in '" + machineName + "': " + fromState + " -> " + toState;
+        }
+        @Override public Map<String, Object> toDetailMap() {
+            return Map.of("machineName", machineName, "fromState", String.valueOf(fromState), "toState", String.valueOf(toState));
         }
     }
 }

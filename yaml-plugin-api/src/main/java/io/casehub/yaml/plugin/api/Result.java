@@ -21,8 +21,12 @@ public sealed interface Result permits Result.Success, Result.Failure {
         public boolean isSuccess() {return true;}
     }
 
-    record Failure(String message, String category) implements Result {
-        public Failure(String message) { this(message, null); }
+    record Failure(String message, String category, Map<String, Object> detail) implements Result {
+        public Failure {
+            detail = detail != null ? Map.copyOf(detail) : Map.of();
+        }
+        public Failure(String message) { this(message, null, Map.of()); }
+        public Failure(String message, String category) { this(message, category, Map.of()); }
 
         @Override
         public boolean isSuccess()          {return false;}
@@ -40,4 +44,8 @@ public sealed interface Result permits Result.Success, Result.Failure {
     static Result failed(String message) {return new Failure(message, null);}
 
     static Result failed(String message, String category) {return new Failure(message, category);}
+
+    static Result failed(String message, String category, Map<String, Object> detail) {
+        return new Failure(message, category, detail);
+    }
 }

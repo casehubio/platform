@@ -114,11 +114,18 @@ public class AgentInvokeHandler implements InvokeHandler {
             return Result.of(Map.of("response", responseText), metadata);
 
         } catch (io.casehub.platform.agent.AgentTimeoutException e) {
-            return Result.failed("Agent timed out: " + e.getMessage());
+            return Result.failed("Agent timed out: " + e.getMessage(), "timeout",
+                    Map.of("timeout", e.timeout().toString()));
+        } catch (io.casehub.platform.agent.AgentRateLimitException e) {
+            return Result.failed("Agent rate limited: " + e.getMessage(), "rate-limit",
+                    Map.of("permitsPerSecond", e.permitsPerSecond(), "retryAfterMs", e.retryAfterMillis()));
+        } catch (io.casehub.platform.agent.AgentSessionLimitException e) {
+            return Result.failed("Agent session limit: " + e.getMessage(), "session-limit",
+                    Map.of("limit", e.limit()));
         } catch (io.casehub.platform.agent.AgentProcessException e) {
-            return Result.failed("Agent process error: " + e.getMessage());
+            return Result.failed("Agent process error: " + e.getMessage(), "infrastructure");
         } catch (Exception e) {
-            return Result.failed("Agent invocation failed: " + e.getMessage());
+            return Result.failed("Agent invocation failed: " + e.getMessage(), "action-failed");
         }
     }
 

@@ -544,7 +544,7 @@ class StructuralStepEvaluatorTest {
                 return Result.of(Map.of());
             });
             String errorMsg = capturedResolver[0].resolveString("${error.message}", "test");
-            assertThat(errorMsg).isEqualTo("original error");
+            assertThat(errorMsg).contains("original error");
         }
 
         @Test
@@ -572,6 +572,97 @@ class StructuralStepEvaluatorTest {
                 return Result.of(Map.of());
             });
             assertThat(order).containsExactly("t1", "t2", "c1");
+        }
+
+        @Test
+        void catchReceivesTypedErrorContext() {
+            var step = new ResolvedStep.TryCatchFinallyStep(null,
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var capturedResolver = new VariableResolver[1];
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    if ("try1".equals(inv.invokeSpec().get("id"))) {
+                        return Result.failed("timed out", "timeout", Map.of("timeout", "PT30S"));
+                    }
+                    capturedResolver[0] = r;
+                }
+                return Result.of(Map.of());
+            });
+            assertThat(capturedResolver[0].resolveString("${error.type}", "test")).isEqualTo("timeout");
+            assertThat(capturedResolver[0].resolveString("${error.message}", "test")).isNotNull();
+            assertThat(capturedResolver[0].resolveString("${error.step}", "test")).isEqualTo("try-block");
+        }
+
+        @Test
+        void catchReceivesErrorDetail() {
+            var step = new ResolvedStep.TryCatchFinallyStep(null,
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var capturedResolver = new VariableResolver[1];
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    if ("try1".equals(inv.invokeSpec().get("id"))) {
+                        return Result.failed("rate limited", "rate-limit",
+                                Map.of("permitsPerSecond", 10.0, "retryAfterMs", 5000L));
+                    }
+                    capturedResolver[0] = r;
+                }
+                return Result.of(Map.of());
+            });
+            Object detail = capturedResolver[0].resolve("${error.detail}");
+            assertThat(detail).isInstanceOf(Map.class);
+            @SuppressWarnings("unchecked")
+            var detailMap = (Map<String, Object>) detail;
+            assertThat(detailMap).containsEntry("permitsPerSecond", 10.0);
+            assertThat(detailMap).containsEntry("retryAfterMs", 5000L);
+        }
+
+        @Test
+        void catchReceivesTypeFromThrownException() {
+            var step = new ResolvedStep.TryCatchFinallyStep(null,
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var capturedResolver = new VariableResolver[1];
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    if ("try1".equals(inv.invokeSpec().get("id"))) {
+                        throw new io.casehub.yaml.core.orchestration.DeadlineExceededException(
+                                "my-scope", java.time.Duration.ofSeconds(5));
+                    }
+                    capturedResolver[0] = r;
+                }
+                return Result.of(Map.of());
+            });
+            assertThat(capturedResolver[0].resolveString("${error.type}", "test"))
+                    .isEqualTo("deadline-exceeded");
+        }
+
+        @Test
+        void catchReceivesActionFailedForUncategorizedFailure() {
+            var step = new ResolvedStep.TryCatchFinallyStep(null,
+                    List.of(leaf("try1")),
+                    List.of(leaf("catch1")),
+                    null,
+                    Map.of());
+            var capturedResolver = new VariableResolver[1];
+            evaluator.evaluate(step, resolver, (s, r) -> {
+                if (s instanceof ResolvedStep.InvokeStep inv) {
+                    if ("try1".equals(inv.invokeSpec().get("id"))) {
+                        return Result.failed("generic error");
+                    }
+                    capturedResolver[0] = r;
+                }
+                return Result.of(Map.of());
+            });
+            assertThat(capturedResolver[0].resolveString("${error.type}", "test"))
+                    .isEqualTo("action-failed");
         }
     }
 

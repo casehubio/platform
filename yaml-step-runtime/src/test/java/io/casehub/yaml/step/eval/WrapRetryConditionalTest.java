@@ -31,7 +31,7 @@ class WrapRetryConditionalTest {
         };
 
         var decorated = chain.apply(Map.of("retry",
-                Map.of("max", 5, "on", List.of("TIMEOUT"))), inner);
+                Map.of("max", 5, "on", List.of("timeout"))), inner);
         Result result = decorated.execute(new StepContext(resolver));
 
         assertThat(result.isSuccess()).isTrue();
@@ -49,7 +49,7 @@ class WrapRetryConditionalTest {
         };
 
         var decorated = chain.apply(Map.of("retry",
-                Map.of("max", 5, "on", List.of("TIMEOUT"))), inner);
+                Map.of("max", 5, "on", List.of("timeout"))), inner);
         Result result = decorated.execute(new StepContext(resolver));
 
         assertThat(result.isSuccess()).isFalse();
@@ -69,7 +69,7 @@ class WrapRetryConditionalTest {
         };
 
         var decorated = chain.apply(Map.of("retry",
-                Map.of("max", 5, "on", List.of("TIMEOUT"))), inner);
+                Map.of("max", 5, "on", List.of("timeout"))), inner);
         Result result = decorated.execute(new StepContext(resolver));
 
         assertThat(result.isSuccess()).isTrue();

@@ -2,6 +2,7 @@ package io.casehub.yaml.core.condition;
 
 import java.util.function.Function;
 
+// Deliberately separate from TypeAwareParamResolver — Truthiness fast-path and boolean-only semantics differ from general parameter resolution
 public final class ConditionEvaluator {
 
     private final Function<String, Boolean> expressionDelegate;

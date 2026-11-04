@@ -383,7 +383,7 @@ public final class Walker {
             return new ResolvedStep.MatchStep(
                     stepName,
                     (String) matchValue,
-                    resolveMatchCases(cases, registry, index, depth, stepPath, seenNames),
+                    resolveMatchCases(cases, registry, index, depth, stepPath, seenNames, annotations, stepKey),
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
@@ -441,7 +441,7 @@ public final class Walker {
             var branchMaps = (List<Map<String, Object>>) structuralValue;
             return new ResolvedStep.SelectStep(
                     stepName,
-                    resolveSelectBranches(branchMaps, registry, depth, stepPath, seenNames),
+                    resolveSelectBranches(branchMaps, registry, depth, stepPath, seenNames, annotations, stepKey),
                     decorators);
         }
         if ("barrier".equals(structuralType)) {
@@ -531,7 +531,8 @@ public final class Walker {
     @SuppressWarnings("unchecked")
     private static List<ResolvedMatchCase> resolveMatchCases(
             List<Map<String, Object>> cases, PluginRegistry registry, int stepIndex, int depth, String path,
-            Set<String> seenNames) {
+            Set<String> seenNames, AnnotationMap annotations, String stepKey) {
+        String childPrefix = stepKey + ".";
         List<ResolvedMatchCase> result = new ArrayList<>(cases.size());
         for (int i = 0; i < cases.size(); i++) {
             Map<String, Object> caseMap    = cases.get(i);
@@ -560,7 +561,7 @@ public final class Walker {
                 result.add(new ResolvedMatchCase(
                         new io.casehub.yaml.core.step.MatchPattern.DefaultPattern(),
                         null,
-                        resolve(steps, registry, depth + 1, casePath + " → default", seenNames)));
+                        resolve(steps, registry, depth + 1, casePath + " → default", seenNames, annotations, childPrefix, i)));
             } else {
                 var                                    patternObj = caseMap.get("pattern");
                 io.casehub.yaml.core.step.MatchPattern pattern;
@@ -576,9 +577,19 @@ public final class Walker {
                 String guard = caseMap.containsKey("guard")
                                ? String.valueOf(caseMap.get("guard")) : null;
                 var rest = stripKeys(caseMap, Set.of("pattern", "when", "guard"));
-                List<ResolvedStep> caseSteps = rest.isEmpty()
-                        ? List.of()
-                        : List.of(resolveOne(rest, registry, i, depth + 1, casePath, seenNames, AnnotationMap.empty(), ""));
+                List<ResolvedStep> caseSteps;
+                if (rest.isEmpty()) {
+                    caseSteps = List.of();
+                } else {
+                    String caseKey = childPrefix + i;
+                    ResolvedStep caseStep = resolveOne(rest, registry, i, depth + 1, casePath, seenNames, annotations, caseKey);
+                    List<io.casehub.yaml.core.annotation.Annotation> caseAnns = annotations.forStep(caseKey);
+                    if (!caseAnns.isEmpty()) {
+                        caseStep = mergeAnnotationDecorators(caseStep, caseAnns, i);
+                        caseStep = withAnnotations(caseStep, caseAnns);
+                    }
+                    caseSteps = List.of(caseStep);
+                }
                 result.add(new ResolvedMatchCase(pattern, guard, caseSteps));
             }
         }
@@ -596,7 +607,8 @@ public final class Walker {
     @SuppressWarnings("unchecked")
     private static List<ResolvedStep.SelectBranch> resolveSelectBranches(
             List<Map<String, Object>> branches, PluginRegistry registry, int depth, String path,
-            Set<String> seenNames) {
+            Set<String> seenNames, AnnotationMap annotations, String stepKey) {
+        String childPrefix = stepKey + ".";
         List<ResolvedStep.SelectBranch> result = new ArrayList<>(branches.size());
         for (int i = 0; i < branches.size(); i++) {
             Map<String, Object>           branchMap  = branches.get(i);
@@ -619,9 +631,19 @@ public final class Walker {
                         branchPath + ": select branch must contain 'subscribe' or 'wait'");
             }
             var rest = stripKeys(branchMap, Set.of("subscribe", "wait"));
-            var branchSteps = rest.isEmpty()
-                    ? List.<ResolvedStep>of()
-                    : List.of(resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, AnnotationMap.empty(), ""));
+            List<ResolvedStep> branchSteps;
+            if (rest.isEmpty()) {
+                branchSteps = List.of();
+            } else {
+                String branchKey = childPrefix + i;
+                ResolvedStep branchStep = resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, annotations, branchKey);
+                List<io.casehub.yaml.core.annotation.Annotation> branchAnns = annotations.forStep(branchKey);
+                if (!branchAnns.isEmpty()) {
+                    branchStep = mergeAnnotationDecorators(branchStep, branchAnns, i);
+                    branchStep = withAnnotations(branchStep, branchAnns);
+                }
+                branchSteps = List.of(branchStep);
+            }
             result.add(new ResolvedStep.SelectBranch(type, name, branchSteps));
         }
         return result;

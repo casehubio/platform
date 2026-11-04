@@ -9,6 +9,7 @@ import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ class WalkerAnnotationTest {
     private final PluginRegistry registry = new CompositePluginRegistry() {{
         register(defn("rest-request"));
         register(defn("agent-invoke"));
+        register(defn("process"));
     }};
 
     @Test
@@ -136,6 +138,78 @@ class WalkerAnnotationTest {
         assertEquals("timeout", tryCatch.trySteps().get(0).annotations().get(0).name());
         assertEquals(1, tryCatch.catchSteps().get(0).annotations().size());
         assertEquals("retry", tryCatch.catchSteps().get(0).annotations().get(0).name());
+    }
+
+    @Test
+    void nestedAnnotationsInsideMatchCases() {
+        Map<String, Object> caseEntry = new LinkedHashMap<>();
+        caseEntry.put("pattern", "ACTIVE");
+        caseEntry.put("process", Map.of("command", "handle.sh"));
+
+        Map<String, Object> defaultEntry = new LinkedHashMap<>();
+        defaultEntry.put("default", List.of(Map.of("rest-request", Map.of("url", "/fallback"))));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", "${status}");
+        step.put("cases", List.of(caseEntry, defaultEntry));
+
+        var timeout = new Annotation("timeout", List.of(new AnnotationArg.Positional("5s")));
+        var retry   = new Annotation("retry", List.of(new AnnotationArg.Positional("3")));
+        var annotations = new AnnotationMap(List.of(),
+                                            Map.of("0.0", List.of(timeout), "0.1", List.of(retry)));
+
+        var resolved = Walker.resolve(List.of(step), registry, annotations);
+        var match    = (ResolvedStep.MatchStep) resolved.get(0);
+        assertEquals(1, match.cases().get(0).steps().get(0).annotations().size());
+        assertEquals("timeout", match.cases().get(0).steps().get(0).annotations().get(0).name());
+        assertEquals(1, match.cases().get(1).steps().get(0).annotations().size());
+        assertEquals("retry", match.cases().get(1).steps().get(0).annotations().get(0).name());
+    }
+
+    @Test
+    void nestedAnnotationsInsideSelectBranches() {
+        var step = new LinkedHashMap<String, Object>();
+        step.put("select", List.of(
+                Map.of("subscribe", Map.of("channel", "quotes"),
+                       "process", Map.of("cmd", "handle")),
+                Map.of("wait", "timeout",
+                       "process", Map.of("cmd", "fallback"))));
+
+        var audit   = new Annotation("audit", List.of(new AnnotationArg.Positional("PII")));
+        var timeout = new Annotation("timeout", List.of(new AnnotationArg.Positional("10s")));
+        var annotations = new AnnotationMap(List.of(),
+                                            Map.of("0.0", List.of(audit), "0.1", List.of(timeout)));
+
+        var resolved = Walker.resolve(List.of(step), registry, annotations);
+        var sel      = (ResolvedStep.SelectStep) resolved.get(0);
+        assertEquals(1, sel.branches().get(0).steps().get(0).annotations().size());
+        assertEquals("audit", sel.branches().get(0).steps().get(0).annotations().get(0).name());
+        assertEquals(1, sel.branches().get(1).steps().get(0).annotations().size());
+        assertEquals("timeout", sel.branches().get(1).steps().get(0).annotations().get(0).name());
+    }
+
+    @Test
+    void matchDefaultCaseWithMultipleAnnotatedSteps() {
+        Map<String, Object> defaultEntry = new LinkedHashMap<>();
+        defaultEntry.put("default", List.of(
+                Map.of("rest-request", Map.of("url", "/first")),
+                Map.of("agent-invoke", Map.of("prompt", "second"))));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", "${status}");
+        step.put("cases", List.of(defaultEntry));
+
+        var ann0 = new Annotation("timeout", List.of(new AnnotationArg.Positional("5s")));
+        var ann1 = new Annotation("retry", List.of(new AnnotationArg.Positional("3")));
+        var annotations = new AnnotationMap(List.of(),
+                                            Map.of("0.0", List.of(ann0), "0.1", List.of(ann1)));
+
+        var resolved     = Walker.resolve(List.of(step), registry, annotations);
+        var match        = (ResolvedStep.MatchStep) resolved.get(0);
+        var defaultSteps = match.cases().get(0).steps();
+        assertEquals(2, defaultSteps.size());
+        assertEquals("timeout", defaultSteps.get(0).annotations().get(0).name());
+        assertEquals("retry", defaultSteps.get(1).annotations().get(0).name());
     }
 
 

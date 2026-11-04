@@ -9,8 +9,13 @@ final class ScopeUtils {
 
     private ScopeUtils() {}
 
+    @SuppressWarnings("unchecked")
     static VariableResolver pushScope(VariableResolver resolver, String prefix, Object value) {
-        return resolver.withObjectScope(prefix, drillSource(value));
+        VariableResolver result = resolver.withObjectScope(prefix, drillSource(value));
+        if (value instanceof Map<?, ?> map) {
+            result = result.withExpressionContext(prefix, (Map<String, Object>) map);
+        }
+        return result;
     }
 
     static ObjectVariableSource drillSource(Object value) {

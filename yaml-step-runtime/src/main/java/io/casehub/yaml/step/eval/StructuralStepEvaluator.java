@@ -325,12 +325,14 @@ public final class StructuralStepEvaluator {
         Result result = tryResult;
         if (!tryResult.isSuccess() && !tcf.catchSteps().isEmpty()) {
             String errorMessage = tryResult instanceof Result.Failure f ? f.message() : "unknown error";
+            Map<String, Object> errorMap = Map.of("message", errorMessage, "step", "try-block");
             VariableResolver errorResolver = ctx.resolver().withObjectScope("error",
                                                                             name -> switch (name) {
                                                                                 case "message" -> errorMessage;
                                                                                 case "step" -> "try-block";
                                                                                 default -> null;
-                                                                            });
+                                                                            })
+                                                           .withExpressionContext("error", errorMap);
             try {
                 result = evaluateBlock(
                         new ResolvedStep.BlockStep(null, tcf.catchSteps(), Map.of()), ctx.withResolver(errorResolver), runner);

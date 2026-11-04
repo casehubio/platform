@@ -406,7 +406,11 @@ public final class DecoratorChain {
             }
             return null;
         };
-        return resolver.withObjectScope("each", eachSource);
+        VariableResolver result = resolver.withObjectScope("each", eachSource);
+        Map<String, Object> exprCtx = new java.util.LinkedHashMap<>();
+        exprCtx.put("index", index);
+        exprCtx.put(as, item);
+        return result.withExpressionContext("each", exprCtx);
     }
 
     @SuppressWarnings("unchecked")

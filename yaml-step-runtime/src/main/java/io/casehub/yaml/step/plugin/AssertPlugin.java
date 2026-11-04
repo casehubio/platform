@@ -11,6 +11,7 @@ import io.casehub.yaml.plugin.api.Result;
 
 import java.util.Map;
 
+// expression stays String, not @Expression — evaluated against empty context deliberately (static assertion, not scope-dependent)
 @Plugin(value = "assert", description = "Asserts an expression evaluates to true")
 public record AssertPlugin(
         @Required String expression,

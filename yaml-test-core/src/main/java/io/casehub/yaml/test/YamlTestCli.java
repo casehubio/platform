@@ -141,7 +141,7 @@ public final class YamlTestCli {
         var config = new PlaybookRunConfig(parsed.dryRun(), parsed.vars(),
                 parsed.corpusPath(), parsed.profile());
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                playbookPath.getParent(), simulationRuntime);
+                playbookPath.getParent(), simulationRuntime, new FileSystemModuleLoader());
 
         PlaybookRunResult result = runner.run(playbookPath, config);
         printPlaybookResult(result);

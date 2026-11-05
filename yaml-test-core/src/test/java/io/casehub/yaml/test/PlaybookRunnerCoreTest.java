@@ -101,4 +101,79 @@ class PlaybookRunnerCoreTest {
         assertThat(result.success()).isFalse();
         assertThat(result.error()).isNotNull();
     }
+
+    @Test
+    void runPlaybookWithImportsExpandsModuleSteps() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-imports.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace()).isNotNull();
+        assertThat(result.trace().children()).hasSize(3);
+    }
+
+    @Test
+    void runPlaybookWithoutImportsStillWorks() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void runWithNullModuleLoaderAndNoImportsWorks() {
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void moduleOutputResolvesInVariableReference() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-module-outputs.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(2);
+    }
+
+    @Test
+    void multipleImportsWithDifferentAliases() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-multiple-imports.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(3);
+    }
+
+    @Test
+    void validatePlaybookWithImportsSucceeds() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.validate(PLAYBOOK_ROOT.resolve("with-imports.yaml"));
+
+        assertThat(result.valid()).isTrue();
+    }
+
+
 }

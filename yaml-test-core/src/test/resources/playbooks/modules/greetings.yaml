@@ -1,0 +1,19 @@
+module:
+  name: greetings
+  parameters:
+    greeting:
+      type: STRING
+      default: hello
+  outputs:
+    full-greeting:
+      type: STRING
+      value: "${var.greeting} world"
+
+steps:
+  say-hello:
+    - agent-invoke:
+        prompt: "hello from module"
+      capture: result
+  say-goodbye:
+    - agent-invoke:
+        prompt: "goodbye from module"

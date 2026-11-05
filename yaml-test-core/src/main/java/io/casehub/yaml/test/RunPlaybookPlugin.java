@@ -49,7 +49,7 @@ public final class RunPlaybookPlugin implements Action {
 
         var config = new PlaybookRunConfig(false, callerVars, null, null);
         var runner = new PlaybookRunnerCore(ctx.pluginRegistry(), ctx.serviceRegistry(),
-                ctx.resourceRoot(), null);
+                ctx.resourceRoot(), null, new FileSystemModuleLoader());
 
         PlaybookRunResult runResult = runner.run(playbookPath, config);
 

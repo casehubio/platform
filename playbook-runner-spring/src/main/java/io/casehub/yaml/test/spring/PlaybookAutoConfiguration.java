@@ -7,6 +7,7 @@ import io.casehub.yaml.test.PlaybookApi;
 import io.casehub.yaml.test.PlaybookRunConfig;
 import io.casehub.yaml.test.PlaybookRunRequest;
 import io.casehub.yaml.test.PlaybookRunResult;
+import io.casehub.yaml.test.FileSystemModuleLoader;
 import io.casehub.yaml.test.PlaybookRunnerCore;
 import io.casehub.yaml.test.PlaybookValidationResult;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,14 +34,14 @@ public class PlaybookAutoConfiguration {
                 var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
                         request.corpusPath(), request.simulationProfile());
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                        Path.of("."), runtime);
+                        Path.of("."), runtime, new FileSystemModuleLoader());
                 return runner.run(Path.of(request.playbookPath()), config);
             }
 
             @Override
             public PlaybookValidationResult validate(String playbookPath) {
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                        Path.of("."), null);
+                        Path.of("."), null, new FileSystemModuleLoader());
                 return runner.validate(Path.of(playbookPath));
             }
         };

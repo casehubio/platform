@@ -1,0 +1,13 @@
+name: Playbook with imports
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "howdy"
+
+steps:
+  - use: g.say-hello
+  - agent-invoke:
+      prompt: "inline step"
+  - use: g.say-goodbye

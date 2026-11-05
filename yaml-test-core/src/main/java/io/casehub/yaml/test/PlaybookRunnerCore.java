@@ -5,10 +5,15 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.simulation.MapSimulationConfig;
 import io.casehub.platform.simulation.SimulationOverlay;
 import io.casehub.platform.simulation.SimulationRuntime;
+import io.casehub.yaml.core.module.ModuleExpander;
+import io.casehub.yaml.core.module.TypedExpandedModule;
+import io.casehub.yaml.core.module.YamlImport;
+import io.casehub.yaml.core.module.YamlModule;
 import io.casehub.yaml.core.playbook.PlaybookDocument;
 import io.casehub.yaml.core.playbook.PlaybookFrontMatter;
 import io.casehub.yaml.core.playbook.PlaybookVariableParser;
 import io.casehub.yaml.core.resolver.VariableResolver;
+import io.casehub.yaml.core.resolver.VariableSource;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
@@ -21,7 +26,6 @@ import io.casehub.yaml.step.statemachine.PlaybookParser;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,15 +37,25 @@ public final class PlaybookRunnerCore {
     private final ServiceRegistry serviceRegistry;
     private final Path resourceRoot;
     private final SimulationRuntime simulationRuntime;
+    private final ModuleLoader moduleLoader;
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
                               SimulationRuntime simulationRuntime) {
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationRuntime, null);
+    }
+
+    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
+                              ServiceRegistry serviceRegistry,
+                              Path resourceRoot,
+                              SimulationRuntime simulationRuntime,
+                              ModuleLoader moduleLoader) {
         this.pluginRegistry = pluginRegistry;
         this.serviceRegistry = serviceRegistry;
         this.resourceRoot = resourceRoot;
         this.simulationRuntime = simulationRuntime;
+        this.moduleLoader = moduleLoader;
     }
 
     @SuppressWarnings("unchecked")
@@ -53,7 +67,9 @@ public final class PlaybookRunnerCore {
         try {
             String yaml = Files.readString(playbookPath);
             PlaybookDocument doc = PlaybookParser.parse(yaml);
-            Map<String, Object> content = doc.content();
+            Map<String, Object> content = new LinkedHashMap<>(doc.content());
+
+            VariableSource moduleOutputSource = expandImports(content, playbookPath);
 
             String playbookName = extractName(doc, content, playbookPath);
 
@@ -96,7 +112,7 @@ public final class PlaybookRunnerCore {
                     new io.casehub.yaml.core.condition.ConditionEvaluator(null))
                     .withListener(traceCollector);
 
-            VariableResolver resolver = buildResolver(parsed, callerParams);
+            VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource);
 
             Map<String, Object> outputVars = new LinkedHashMap<>();
             boolean allPassed = true;
@@ -157,7 +173,8 @@ public final class PlaybookRunnerCore {
         try {
             String yaml = Files.readString(playbookPath);
             PlaybookDocument doc = PlaybookParser.parse(yaml);
-            Map<String, Object> content = doc.content();
+            Map<String, Object> content = new LinkedHashMap<>(doc.content());
+            expandImports(content, playbookPath);
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
             var steps = (List<Map<String, Object>>) content.get("steps");
@@ -188,8 +205,51 @@ public final class PlaybookRunnerCore {
         return (String) content.getOrDefault("name", path.getFileName().toString());
     }
 
+
+    @SuppressWarnings("unchecked")
+    private VariableSource expandImports(Map<String, Object> content, Path playbookPath) {
+        var rawImports = (List<Map<String, Object>>) content.remove("imports");
+        if (rawImports == null || rawImports.isEmpty()) {
+            return null;
+        }
+        if (moduleLoader == null) {
+            throw new IllegalStateException(
+                    "Playbook uses imports but no ModuleLoader is configured");
+        }
+
+        ObjectMapper convertMapper = new ObjectMapper();
+        List<YamlImport> imports = rawImports.stream()
+                                             .map(raw -> convertMapper.convertValue(raw, YamlImport.class))
+                                             .toList();
+
+        Map<String, YamlModule> modules = moduleLoader.loadModules(imports, playbookPath);
+
+        var bridge = new PlaybookModuleBridge();
+        TypedExpandedModule<Map<String, Object>> expanded =
+                ModuleExpander.expand(imports, modules, content, bridge);
+
+        Map<String, Object> expandedContent = new LinkedHashMap<>(expanded.content());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> expandedStepSections =
+                (Map<String, Object>) expandedContent.remove(PlaybookModuleBridge.EXPANDED_STEP_SECTIONS_KEY);
+
+        if (expandedStepSections != null) {
+            Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
+                    expandedContent, expandedStepSections);
+            content.clear();
+            content.putAll(withInlinedSteps);
+        } else {
+            content.clear();
+            content.putAll(expandedContent);
+        }
+
+        return expanded.outputSource();
+    }
+
     private static VariableResolver buildResolver(
-            PlaybookVariableParser.ParsedVariables parsed, Map<String, String> callerParams) {
+            PlaybookVariableParser.ParsedVariables parsed, Map<String, String> callerParams,
+            VariableSource moduleOutputSource) {
         VariableResolver resolver = parsed.params().isEmpty() && parsed.vars().values().isEmpty()
                 ? new VariableResolver(Map.of(), Set.of("events"))
                 : VariableResolver.forParams(parsed.params(), callerParams, Set.of("events"));
@@ -197,6 +257,9 @@ public final class PlaybookRunnerCore {
         if (!parsed.vars().values().isEmpty()) {
             resolver = resolver.withObjectScope("var",
                     name -> parsed.vars().values().get(name));
+        }
+        if (moduleOutputSource != null) {
+            resolver = resolver.withScope("module", moduleOutputSource);
         }
         return resolver;
     }

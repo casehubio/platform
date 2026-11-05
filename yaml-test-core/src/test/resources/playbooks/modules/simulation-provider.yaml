@@ -1,0 +1,16 @@
+module:
+  name: simulation-provider
+  parameters:
+    model:
+      type: STRING
+      default: "gpt-4"
+  outputs:
+    configured-model:
+      type: STRING
+      value: "${var.model}"
+
+steps:
+  configure:
+    - agent-invoke:
+        prompt: "configure model"
+      capture: config-result

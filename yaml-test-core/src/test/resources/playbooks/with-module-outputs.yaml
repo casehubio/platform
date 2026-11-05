@@ -1,0 +1,13 @@
+name: Playbook with module outputs
+
+imports:
+  - module: simulation-provider
+    as: sim
+    parameters:
+      model: "claude-3"
+
+steps:
+  - use: sim.configure
+  - agent-invoke:
+      prompt: "using model ${module.sim.configured-model}"
+    capture: final-result

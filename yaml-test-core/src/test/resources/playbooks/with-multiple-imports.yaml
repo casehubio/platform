@@ -1,0 +1,13 @@
+name: Multiple imports
+
+imports:
+  - module: greetings
+    as: g
+  - module: simulation-provider
+    as: sim
+
+steps:
+  - use: g.say-hello
+  - use: sim.configure
+  - agent-invoke:
+      prompt: "done"

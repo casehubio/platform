@@ -1,11 +1,13 @@
 package io.casehub.yaml.test;
 
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import io.casehub.yaml.step.eval.StepExecutionListener;
 
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,15 @@ public final class StepTraceCollector implements StepExecutionListener {
 
     private final Deque<Frame> stack = new LinkedList<>();
     private final List<StepTraceNode> rootChildren = new ArrayList<>();
+    private final SimulationRuntime simulationRuntime;
+
+    public StepTraceCollector() {
+        this(null);
+    }
+
+    public StepTraceCollector(SimulationRuntime simulationRuntime) {
+        this.simulationRuntime = simulationRuntime;
+    }
 
     private record Frame(int index, String name, String type, long startNanos,
                          List<StepTraceNode> children) {}
@@ -27,7 +38,20 @@ public final class StepTraceCollector implements StepExecutionListener {
     public void afterStep(ResolvedStep step, int index, Result result, Map<String, Object> detail) {
         String action = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
         StepOutcome outcome = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
-        exitStep(action, outcome, detail);
+        Map<String, Object> enrichedDetail = detail;
+
+        if (result.isSuccess() && step instanceof ResolvedStep.PluginStep ps
+                && simulationRuntime != null) {
+            var strategy = simulationRuntime.strategyFor(ps.actionName());
+            if (strategy.isPresent()) {
+                outcome = StepOutcome.SIMULATED;
+                enrichedDetail = new LinkedHashMap<>(detail);
+                enrichedDetail.put("strategy", strategy.get().getClass().getSimpleName()
+                        .replace("Strategy", "").toLowerCase());
+            }
+        }
+
+        exitStep(action, outcome, enrichedDetail);
     }
 
     public void enterStep(int index, String name, String type) {

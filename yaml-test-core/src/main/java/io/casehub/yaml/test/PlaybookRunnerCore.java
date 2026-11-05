@@ -90,7 +90,8 @@ public final class PlaybookRunnerCore {
 
             List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);
             var runner = new CatalogStepRunner(pluginRegistry, runServices);
-            var traceCollector = new StepTraceCollector();
+            var traceCollector = new StepTraceCollector(
+                    config.dryRun() ? simulationRuntime : null);
             var evaluator = new StructuralStepEvaluator(
                     new io.casehub.yaml.core.condition.ConditionEvaluator(null))
                     .withListener(traceCollector);

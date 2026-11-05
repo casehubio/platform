@@ -203,9 +203,9 @@ public final class PlaybookRunnerCore {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> loadYamlMap(Path path) {
-        try {
+        try (var is = Files.newInputStream(path)) {
             var mapper = new ObjectMapper(new YAMLFactory());
-            return mapper.readValue(Files.newInputStream(path), Map.class);
+            return mapper.readValue(is, Map.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to load: " + path, e);
         }

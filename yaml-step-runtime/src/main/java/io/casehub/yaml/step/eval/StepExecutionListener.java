@@ -7,7 +7,7 @@ import java.util.Map;
 
 public interface StepExecutionListener {
 
-    void beforeStep(ResolvedStep step, int index);
+    void beforeStep(ResolvedStep step);
 
-    void afterStep(ResolvedStep step, int index, Result result, Map<String, Object> detail);
+    void afterStep(ResolvedStep step, Result result, Map<String, Object> detail);
 }

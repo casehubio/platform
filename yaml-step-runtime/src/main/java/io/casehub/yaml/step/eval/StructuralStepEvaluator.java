@@ -92,9 +92,8 @@ public final class StructuralStepEvaluator {
     }
 
     private Result evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
-        int stepIndex = 0;
         if (listener != null) {
-            listener.beforeStep(step, stepIndex);
+            listener.beforeStep(step);
         }
         Map<String, Object> decorators = step.decorators();
         Result              result;
@@ -105,7 +104,7 @@ public final class StructuralStepEvaluator {
                                    .execute(ctx);
         }
         if (listener != null) {
-            listener.afterStep(step, stepIndex, result, Map.of());
+            listener.afterStep(step, result, Map.of());
         }
         boolean isPolicyParallel = step instanceof ResolvedStep.ParallelStep p
                                    && p.advanceAfter() < p.steps().size();

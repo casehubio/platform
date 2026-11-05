@@ -30,12 +30,12 @@ public final class StepTraceCollector implements StepExecutionListener {
                          List<StepTraceNode> children) {}
 
     @Override
-    public void beforeStep(ResolvedStep step, int index) {
-        enterStep(index, step.name(), PlaybookRunnerCore.resolveStepType(step));
+    public void beforeStep(ResolvedStep step) {
+        enterStep(0, step.name(), PlaybookRunnerCore.resolveStepType(step));
     }
 
     @Override
-    public void afterStep(ResolvedStep step, int index, Result result, Map<String, Object> detail) {
+    public void afterStep(ResolvedStep step, Result result, Map<String, Object> detail) {
         String action = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
         StepOutcome outcome = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
         Map<String, Object> enrichedDetail = detail;
@@ -54,11 +54,11 @@ public final class StepTraceCollector implements StepExecutionListener {
         exitStep(action, outcome, enrichedDetail);
     }
 
-    public void enterStep(int index, String name, String type) {
+    public synchronized void enterStep(int index, String name, String type) {
         stack.push(new Frame(index, name, type, System.nanoTime(), new ArrayList<>()));
     }
 
-    public void exitStep(String action, StepOutcome outcome, Map<String, Object> detail) {
+    public synchronized void exitStep(String action, StepOutcome outcome, Map<String, Object> detail) {
         Frame frame = stack.pop();
         long durationMs = (System.nanoTime() - frame.startNanos()) / 1_000_000;
         var node = new StepTraceNode(frame.index(), frame.name(), frame.type(),

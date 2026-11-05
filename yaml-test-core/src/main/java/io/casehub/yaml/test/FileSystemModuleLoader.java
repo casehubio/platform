@@ -50,7 +50,17 @@ public final class FileSystemModuleLoader implements ModuleLoader {
     }
 
     private YamlModuleFile loadModuleFile(String moduleName, Path moduleDir) {
-        Path relativePath = moduleDir.resolve(moduleName + ".yaml");
+        if (moduleName.contains("..") || moduleName.startsWith("/") || moduleName.startsWith("\\")) {
+            throw new IllegalArgumentException(
+                    "Module name '" + moduleName + "' contains path traversal characters");
+        }
+
+        Path relativePath = moduleDir.resolve(moduleName + ".yaml").normalize();
+        if (!relativePath.startsWith(moduleDir.normalize())) {
+            throw new IllegalArgumentException(
+                    "Module name '" + moduleName + "' resolves outside module directory");
+        }
+
         if (Files.exists(relativePath)) {
             return parseModuleFile(relativePath);
         }

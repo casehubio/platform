@@ -26,6 +26,7 @@ public class PlaybookBeans implements PlaybookApi {
     private final PluginRegistry pluginRegistry;
     private final ServiceRegistry serviceRegistry;
     private final SimulationRuntime simulationRuntime;
+    private final FileSystemModuleLoader moduleLoader = new FileSystemModuleLoader();
 
     @Inject
     public PlaybookBeans(PluginRegistry pluginRegistry,
@@ -43,7 +44,7 @@ public class PlaybookBeans implements PlaybookApi {
         var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
                 request.corpusPath(), request.simulationProfile());
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                Path.of("."), simulationRuntime, new FileSystemModuleLoader());
+                Path.of("."), simulationRuntime, moduleLoader);
         return runner.run(Path.of(request.playbookPath()), config);
     }
 
@@ -51,7 +52,7 @@ public class PlaybookBeans implements PlaybookApi {
     @PlatformQuery("Validate a playbook structure without executing")
     public PlaybookValidationResult validate(String playbookPath) {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                Path.of("."), null, new FileSystemModuleLoader());
+                Path.of("."), null, moduleLoader);
         return runner.validate(Path.of(playbookPath));
     }
 }

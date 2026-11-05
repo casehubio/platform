@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Object>> {
 
-    static final String EXPANDED_STEP_SECTIONS_KEY = "_expandedStepSections";
+    static final String EXPANDED_STEP_SECTIONS_KEY = "\0__expanded_step_sections__";
 
     private Map<String, Object> originalContent;
 

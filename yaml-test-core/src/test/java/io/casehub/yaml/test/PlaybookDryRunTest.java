@@ -49,7 +49,7 @@ class PlaybookDryRunTest {
     @Test
     void dryRunDetectsSimulatedSteps() {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                PLAYBOOK_ROOT, simulationRuntime);
+                PLAYBOOK_ROOT, simulationRuntime, new FileSystemModuleLoader());
         var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
                 PlaybookRunConfig.forDryRun());
 
@@ -65,7 +65,7 @@ class PlaybookDryRunTest {
     @Test
     void nonDryRunDoesNotMarkSimulated() {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                PLAYBOOK_ROOT, simulationRuntime);
+                PLAYBOOK_ROOT, simulationRuntime, new FileSystemModuleLoader());
         var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
                 PlaybookRunConfig.defaults());
 

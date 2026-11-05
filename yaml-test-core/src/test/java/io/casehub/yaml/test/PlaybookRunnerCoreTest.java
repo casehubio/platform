@@ -175,5 +175,44 @@ class PlaybookRunnerCoreTest {
         assertThat(result.valid()).isTrue();
     }
 
+    @Test
+    void moduleOutputResolvesToCorrectValue() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-module-outputs.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.output()).containsKey("text");
+        assertThat(String.valueOf(result.output().get("text")))
+                .contains("claude-3");
+    }
+
+    @Test
+    void nullModuleLoaderWithImportsThrowsDescriptiveError() {
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-imports.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).contains("no ModuleLoader is configured");
+    }
+
+    @Test
+    void importsAndParamsComposeTogether() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var config = new PlaybookRunConfig(false, Map.of("custom-prompt", "hello world"), null, null);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-imports-and-params.yaml"), config);
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(2);
+    }
+
 
 }

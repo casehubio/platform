@@ -33,6 +33,8 @@ import java.util.Set;
 
 public final class PlaybookRunnerCore {
 
+    private static final ObjectMapper CONVERT_MAPPER = new ObjectMapper();
+
     private final PluginRegistry pluginRegistry;
     private final ServiceRegistry serviceRegistry;
     private final Path resourceRoot;
@@ -217,9 +219,8 @@ public final class PlaybookRunnerCore {
                     "Playbook uses imports but no ModuleLoader is configured");
         }
 
-        ObjectMapper convertMapper = new ObjectMapper();
         List<YamlImport> imports = rawImports.stream()
-                                             .map(raw -> convertMapper.convertValue(raw, YamlImport.class))
+                                             .map(raw -> CONVERT_MAPPER.convertValue(raw, YamlImport.class))
                                              .toList();
 
         Map<String, YamlModule> modules = moduleLoader.loadModules(imports, playbookPath);

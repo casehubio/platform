@@ -28,20 +28,21 @@ public class PlaybookAutoConfiguration {
                                    ServiceRegistry serviceRegistry,
                                    ObjectProvider<SimulationRuntime> simulationRuntimeProvider) {
         SimulationRuntime runtime = simulationRuntimeProvider.getIfAvailable();
+        var moduleLoader = new FileSystemModuleLoader();
         return new PlaybookApi() {
             @Override
             public PlaybookRunResult run(PlaybookRunRequest request) {
                 var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
                         request.corpusPath(), request.simulationProfile());
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                        Path.of("."), runtime, new FileSystemModuleLoader());
+                        Path.of("."), runtime, moduleLoader);
                 return runner.run(Path.of(request.playbookPath()), config);
             }
 
             @Override
             public PlaybookValidationResult validate(String playbookPath) {
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                        Path.of("."), null, new FileSystemModuleLoader());
+                        Path.of("."), null, moduleLoader);
                 return runner.validate(Path.of(playbookPath));
             }
         };

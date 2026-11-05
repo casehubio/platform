@@ -1,0 +1,14 @@
+name: Playbook with imports and params
+
+params:
+  custom-prompt: "default prompt"
+
+imports:
+  - module: greetings
+    as: g
+
+steps:
+  - use: g.say-hello
+  - agent-invoke:
+      prompt: ${params.custom-prompt}
+    capture: result

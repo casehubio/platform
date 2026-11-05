@@ -49,4 +49,25 @@ class FileSystemModuleLoaderTest {
         Map<String, YamlModule> modules = loader.loadModules(List.of(), PLAYBOOK_FILE);
         assertThat(modules).isEmpty();
     }
+
+    @Test
+    void pathTraversalModuleNameThrows() {
+        var loader = new FileSystemModuleLoader();
+        var imp    = new YamlImport("../../etc/passwd", "evil", null, Map.of());
+
+        assertThatThrownBy(() -> loader.loadModules(List.of(imp), PLAYBOOK_FILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("path traversal");
+    }
+
+    @Test
+    void absolutePathModuleNameThrows() {
+        var loader = new FileSystemModuleLoader();
+        var imp    = new YamlImport("/etc/passwd", "evil", null, Map.of());
+
+        assertThatThrownBy(() -> loader.loadModules(List.of(imp), PLAYBOOK_FILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("path traversal");
+    }
+
 }

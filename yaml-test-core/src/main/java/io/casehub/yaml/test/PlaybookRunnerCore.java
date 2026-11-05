@@ -3,10 +3,10 @@ package io.casehub.yaml.test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.simulation.MapSimulationConfig;
-import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.SimulationOverlay;
-import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
+import io.casehub.platform.simulation.config.YamlSimulationConfig;
+import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.yaml.core.module.ModuleExpander;
 import io.casehub.yaml.core.module.TypedExpandedModule;
 import io.casehub.yaml.core.module.YamlImport;
@@ -228,6 +228,18 @@ public final class PlaybookRunnerCore {
                 return candidate;
             }
             dir = dir.getParent();
+        }
+        return null;
+    }
+
+    public static Path resolveClasspathRoot(String classpathDir) {
+        java.net.URL url = Thread.currentThread().getContextClassLoader().getResource(classpathDir);
+        if (url != null && "file".equals(url.getProtocol())) {
+            try {
+                return Path.of(url.toURI());
+            } catch (java.net.URISyntaxException e) {
+                return null;
+            }
         }
         return null;
     }

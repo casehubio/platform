@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PlaybookRunnerCoreTest {
 
-    private static final Path PLAYBOOK_ROOT = Path.of("src/test/resources/playbooks");
+    private static final Path PLAYBOOK_ROOT = Path.of("src/test/playbooks");
 
     private CompositePluginRegistry pluginRegistry;
     private MapServiceRegistry serviceRegistry;
@@ -283,6 +283,20 @@ class PlaybookRunnerCoreTest {
         assertThat(runtime.lastPushedConfig.strategyFor("agent-provider.invoke"))
                 .as("no simulation.yaml means empty config")
                 .isEmpty();
+    }
+
+    @Test
+    void resolveClasspathRootFindsPlaybooksDirectory() {
+        Path resolved = PlaybookRunnerCore.resolveClasspathRoot("playbooks");
+        assertThat(resolved).isNotNull();
+        assertThat(Files.isDirectory(resolved)).isTrue();
+        assertThat(resolved.resolve("simple.yaml")).exists();
+    }
+
+    @Test
+    void resolveClasspathRootReturnsNullForMissingDirectory() {
+        Path resolved = PlaybookRunnerCore.resolveClasspathRoot("nonexistent-dir-xyz");
+        assertThat(resolved).isNull();
     }
 
 

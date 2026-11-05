@@ -419,6 +419,24 @@
 
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/main/playbooks</directory>
+                <targetPath>playbooks</targetPath>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <testResource>
+                <directory>src/test/playbooks</directory>
+                <targetPath>playbooks</targetPath>
+            </testResource>
+        </testResources>
         <pluginManagement>
             <plugins>
                 <plugin>

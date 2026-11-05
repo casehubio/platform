@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FileSystemModuleLoaderTest {
 
-    private static final Path PLAYBOOK_ROOT = Path.of("src/test/resources/playbooks");
+    private static final Path PLAYBOOK_ROOT = Path.of("src/test/playbooks");
     private static final Path PLAYBOOK_FILE = PLAYBOOK_ROOT.resolve("simple.yaml");
 
     @Test

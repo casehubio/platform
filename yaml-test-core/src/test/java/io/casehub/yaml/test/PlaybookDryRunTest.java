@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PlaybookDryRunTest {
 
-    private static final Path PLAYBOOK_ROOT = Path.of("src/test/resources/playbooks");
+    private static final Path PLAYBOOK_ROOT = Path.of("src/test/playbooks");
 
     private CompositePluginRegistry pluginRegistry;
     private MapServiceRegistry serviceRegistry;

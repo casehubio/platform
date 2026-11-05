@@ -17,6 +17,8 @@ public final class YamlTestDiscovery {
     private static final String TEST_SUFFIX = ".test.yaml";
     private static final String LIFECYCLE_PREFIX = "_";
     private static final ObjectMapper MAPPER = new ObjectMapper(new YAMLFactory());
+    public static final  Path         DEFAULT_TEST_ROOT = Path.of("src/test/playbooks");
+
 
     private YamlTestDiscovery() {}
 

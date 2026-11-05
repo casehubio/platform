@@ -1,18 +1,18 @@
 package io.casehub.yaml.test.quarkus;
 
+import io.casehub.platform.api.mcp.McpDomain;
+import io.casehub.platform.api.mcp.PlatformMutation;
+import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
+import io.casehub.yaml.test.FileSystemModuleLoader;
 import io.casehub.yaml.test.PlaybookApi;
 import io.casehub.yaml.test.PlaybookRunConfig;
 import io.casehub.yaml.test.PlaybookRunRequest;
 import io.casehub.yaml.test.PlaybookRunResult;
-import io.casehub.yaml.test.FileSystemModuleLoader;
 import io.casehub.yaml.test.PlaybookRunnerCore;
 import io.casehub.yaml.test.PlaybookValidationResult;
-import io.casehub.platform.api.mcp.McpDomain;
-import io.casehub.platform.api.mcp.PlatformMutation;
-import io.casehub.platform.api.mcp.PlatformQuery;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -42,17 +42,25 @@ public class PlaybookBeans implements PlaybookApi {
     @PlatformMutation("Run a playbook with optional dry-run simulation")
     public PlaybookRunResult run(PlaybookRunRequest request) {
         var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
-                request.corpusPath(), request.simulationProfile());
+                                           request.corpusPath(), request.simulationProfile());
+        Path resourceRoot = PlaybookRunnerCore.resolveClasspathRoot("playbooks");
+        if (resourceRoot == null) {
+            resourceRoot = Path.of(".");
+        }
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                Path.of("."), simulationRuntime, moduleLoader);
+                                            resourceRoot, simulationRuntime, moduleLoader);
         return runner.run(Path.of(request.playbookPath()), config);
     }
 
     @Override
     @PlatformQuery("Validate a playbook structure without executing")
     public PlaybookValidationResult validate(String playbookPath) {
+        Path resourceRoot = PlaybookRunnerCore.resolveClasspathRoot("playbooks");
+        if (resourceRoot == null) {
+            resourceRoot = Path.of(".");
+        }
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                Path.of("."), null, moduleLoader);
+                                            resourceRoot, null, moduleLoader);
         return runner.validate(Path.of(playbookPath));
     }
 }

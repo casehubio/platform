@@ -104,7 +104,17 @@ public final class YamlTestCli {
         boolean anyFailed = false;
 
         for (String pathStr : parsed.paths()) {
-            Path root = Path.of(pathStr);
+            Path root;
+            if (pathStr.startsWith("classpath:")) {
+                root = PlaybookRunnerCore.resolveClasspathRoot(pathStr.substring("classpath:".length()));
+                if (root == null) {
+                    System.err.println("Classpath resource not found: " + pathStr);
+                    anyFailed = true;
+                    continue;
+                }
+            } else {
+                root = Path.of(pathStr);
+            }
 
             if (Files.isRegularFile(root) && isPlaybookFile(root.getFileName().toString())) {
                 anyFailed |= runPlaybook(root, parsed, pluginRegistry,

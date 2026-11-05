@@ -17,14 +17,8 @@
     <build>
         <resources>
             <resource>
-                <directory>${project.basedir}/../playbooks</directory>
+                <directory>src/main/playbooks</directory>
                 <targetPath>playbooks</targetPath>
-                <filtering>false</filtering>
-                <includes>
-                    <include>**/*.json</include>
-                    <include>**/*.yaml</include>
-                    <include>**/*.yml</include>
-                </includes>
             </resource>
         </resources>
     </build>

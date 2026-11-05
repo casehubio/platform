@@ -247,12 +247,8 @@ class PlaybookSchemaValidationTest {
     }
 
     private static Path findPlaybooksDir() {
-        Path candidate = Path.of("playbooks");
+        Path candidate = Path.of("../playbook-catalog/src/main/playbooks");
         if (Files.isDirectory(candidate)) return candidate;
-        candidate = Path.of("..").resolve("playbooks");
-        if (Files.isDirectory(candidate)) return candidate;
-        throw new AssertionError("Cannot find playbooks directory");
+        throw new AssertionError("Cannot find playbooks directory at " + candidate.toAbsolutePath());
     }
-
-
 }

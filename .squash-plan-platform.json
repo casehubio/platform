@@ -1,0 +1,19 @@
+{
+  "groups": [
+    {
+      "label": "blog-sync",
+      "commits": ["c51b0216"],
+      "message": "docs: sync 72 blog entries from personal blog\n\nno-issue: reverse sync"
+    },
+    {
+      "label": "feature-392",
+      "commits": ["d43a9d80", "fd49bda1", "4ded1505", "33d8a689", "2136180e", "d044c901", "9e4d8efb", "f25c2918"],
+      "message": "feat(#392): parallel completion policies — discriminator, race, quorum-continue\n\nExtend parallel: with advance-after and cancel-remaining options to\nsupport four completion policies on the same execution substrate:\n- parallel (wait-all, default, unchanged)\n- discriminator (advance-after: N, cancel-remaining: false)\n- race (advance-after: 1, cancel-remaining: true)\n- quorum-continue (advance-after: N, cancel-remaining: false)\n\nImplementation:\n- ParallelStep record gains advanceAfter, cancelRemaining, collectionTimeout\n- ParallelCompletionTracker (two-latch pattern, analogous to QuorumTracker)\n- Walker polymorphic parsing (list and map forms)\n- Dual-path evaluator (executor for default, SpawnedTask for policy)\n- StepSchemaComposer oneOf for polymorphic parallel schema\n- Barrier integration via completion latch\n- Race uses child scope for interrupt-on-close\n\nCloses #392\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+    },
+    {
+      "label": "docs-promote",
+      "commits": ["6c417c97"],
+      "message": "docs(work-end): project-promote artifacts from workspace"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.step.catalog.CompositePluginRegistry;
 import io.casehub.yaml.step.plugin.AssertThatPlugin;
 import io.casehub.yaml.step.plugin.EmitEventPlugin;
-import io.casehub.yaml.step.plugin.RunPlaybookPlugin;
+import io.casehub.yaml.test.RunPlaybookPlugin;
 import io.casehub.yaml.step.plugin.VerifySimulationPlugin;
 import io.casehub.yaml.test.TestFileDescriptor;
 import io.casehub.yaml.test.TestResult;

@@ -3,6 +3,7 @@ package io.casehub.yaml.test;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.yaml.step.catalog.CompositePluginRegistry;
 import io.casehub.yaml.step.plugin.AssertThatPlugin;
 import io.casehub.yaml.step.plugin.EmitEventPlugin;
@@ -40,6 +41,7 @@ class YamlTestExecutorTest {
                 .build());
 
         serviceRegistry = new MapServiceRegistry();
+        serviceRegistry.register(ExpressionEngineRegistry.class, new DotPathExpressionEngine());
     }
 
     @Test

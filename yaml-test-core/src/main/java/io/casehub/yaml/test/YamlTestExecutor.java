@@ -2,6 +2,7 @@ package io.casehub.yaml.test;
 
 import io.casehub.platform.simulation.SimulationOverlay;
 import io.casehub.platform.simulation.SimulationRuntime;
+import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.PluginRegistry;
@@ -80,6 +81,10 @@ public final class YamlTestExecutor {
 
         var testServices = new MapServiceRegistry();
         testServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
+        try {
+            testServices.register(ExpressionEngineRegistry.class,
+                    baseServiceRegistry.lookup(ExpressionEngineRegistry.class));
+        } catch (IllegalArgumentException ignored) {}
 
         var testContext = new TestExecutionContext(pluginRegistry, testServices, resourceRoot, null);
         testServices.register(TestExecutionContext.class, testContext);
@@ -115,7 +120,7 @@ public final class YamlTestExecutor {
                                                          "'" + captureName + "' is a reserved capture name"));
                         } else {
                             Map<String, Object> capturedOutput = result.output();
-                            resolver = resolver.withObjectScope(captureName, capturedOutput::get);
+                            resolver = resolver.withObjectScope(captureName, capturedOutput);
                         }
                     }
                 }

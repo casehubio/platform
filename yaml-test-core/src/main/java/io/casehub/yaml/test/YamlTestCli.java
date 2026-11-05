@@ -95,6 +95,8 @@ public final class YamlTestCli {
         pluginRegistry.register(VerifySimulationPlugin.definition());
 
         var serviceRegistry = new MapServiceRegistry();
+        serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
+                new DotPathExpressionEngine());
         var simulationRuntime = new SimulationRuntime(
                 MapSimulationConfig.builder().build(), new InMemorySimulationCorpus<>());
 

@@ -90,29 +90,20 @@ public final class PlaybookRunnerCore {
 
             List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);
             var runner = new CatalogStepRunner(pluginRegistry, runServices);
+            var traceCollector = new StepTraceCollector();
             var evaluator = new StructuralStepEvaluator(
-                    new io.casehub.yaml.core.condition.ConditionEvaluator(null));
+                    new io.casehub.yaml.core.condition.ConditionEvaluator(null))
+                    .withListener(traceCollector);
 
             VariableResolver resolver = buildResolver(parsed, callerParams);
 
-            List<StepTraceNode> childTraces = new ArrayList<>();
             Map<String, Object> outputVars = new LinkedHashMap<>();
             boolean allPassed = true;
             String errorMsg = null;
 
             for (int i = 0; i < resolved.size(); i++) {
                 var step = resolved.get(i);
-                long stepStart = System.nanoTime();
                 Result result = evaluator.evaluate(step, resolver, runner);
-                long stepDurationMs = (System.nanoTime() - stepStart) / 1_000_000;
-
-                String stepName = step.name();
-                String stepType = resolveStepType(step);
-                String actionName = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
-                StepOutcome outcome = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
-
-                childTraces.add(StepTraceNode.leaf(i, stepName, stepType,
-                        actionName, outcome, stepDurationMs, Map.of()));
 
                 if (!result.isSuccess()) {
                     allPassed = false;
@@ -137,7 +128,7 @@ public final class PlaybookRunnerCore {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
                     allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
-                    durationMs, Map.of(), childTraces);
+                    durationMs, Map.of(), traceCollector.rootChildren());
 
             return new PlaybookRunResult(allPassed, playbookName,
                     playbookPath.toString(), durationMs, rootTrace,

@@ -29,6 +29,7 @@ public final class StructuralStepEvaluator {
     private final java.util.concurrent.ConcurrentHashMap<String, java.util.List<io.casehub.yaml.core.orchestration.OrcLatch>> stepLatches = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String, Object>                                           injectedBindings;
+    private final StepExecutionListener                                        listener;
 
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
@@ -42,15 +43,21 @@ public final class StructuralStepEvaluator {
         this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
         this.injectedBindings   = Map.of();
+        this.listener           = null;
     }
 
-    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings) {
+    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
         this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
         this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
         this.injectedBindings   = Map.copyOf(injectedBindings);
+        this.listener           = listener;
+    }
+
+    public StructuralStepEvaluator withListener(StepExecutionListener listener) {
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, listener);
     }
 
     @SuppressWarnings("unchecked")
@@ -67,7 +74,7 @@ public final class StructuralStepEvaluator {
             }
             injected.put(binding.variableName(), resolved);
         }
-        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected);
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected, this.listener);
     }
 
 
@@ -85,6 +92,10 @@ public final class StructuralStepEvaluator {
     }
 
     private Result evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
+        int stepIndex = 0;
+        if (listener != null) {
+            listener.beforeStep(step, stepIndex);
+        }
         Map<String, Object> decorators = step.decorators();
         Result              result;
         if (decorators.isEmpty()) {
@@ -92,6 +103,9 @@ public final class StructuralStepEvaluator {
         } else {
             result = decoratorChain.apply(decorators, c -> dispatchStep(step, c, runner))
                                    .execute(ctx);
+        }
+        if (listener != null) {
+            listener.afterStep(step, stepIndex, result, Map.of());
         }
         boolean isPolicyParallel = step instanceof ResolvedStep.ParallelStep p
                                    && p.advanceAfter() < p.steps().size();

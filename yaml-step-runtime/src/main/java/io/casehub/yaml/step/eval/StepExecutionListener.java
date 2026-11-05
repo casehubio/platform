@@ -5,9 +5,9 @@ import io.casehub.yaml.step.catalog.ResolvedStep;
 
 import java.util.Map;
 
-@FunctionalInterface
 public interface StepExecutionListener {
 
-    void onStepComplete(ResolvedStep step, int index, Result result,
-                        long durationMs, Map<String, Object> detail);
+    void beforeStep(ResolvedStep step, int index);
+
+    void afterStep(ResolvedStep step, int index, Result result, Map<String, Object> detail);
 }

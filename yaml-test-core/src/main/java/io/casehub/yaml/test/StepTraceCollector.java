@@ -1,0 +1,57 @@
+package io.casehub.yaml.test;
+
+import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.step.catalog.ResolvedStep;
+import io.casehub.yaml.step.eval.StepExecutionListener;
+
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+public final class StepTraceCollector implements StepExecutionListener {
+
+    private final Deque<Frame> stack = new LinkedList<>();
+    private final List<StepTraceNode> rootChildren = new ArrayList<>();
+
+    private record Frame(int index, String name, String type, long startNanos,
+                         List<StepTraceNode> children) {}
+
+    @Override
+    public void beforeStep(ResolvedStep step, int index) {
+        enterStep(index, step.name(), PlaybookRunnerCore.resolveStepType(step));
+    }
+
+    @Override
+    public void afterStep(ResolvedStep step, int index, Result result, Map<String, Object> detail) {
+        String action = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
+        StepOutcome outcome = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
+        exitStep(action, outcome, detail);
+    }
+
+    public void enterStep(int index, String name, String type) {
+        stack.push(new Frame(index, name, type, System.nanoTime(), new ArrayList<>()));
+    }
+
+    public void exitStep(String action, StepOutcome outcome, Map<String, Object> detail) {
+        Frame frame = stack.pop();
+        long durationMs = (System.nanoTime() - frame.startNanos()) / 1_000_000;
+        var node = new StepTraceNode(frame.index(), frame.name(), frame.type(),
+                action, outcome, durationMs, detail, frame.children());
+
+        if (stack.isEmpty()) {
+            rootChildren.add(node);
+        } else {
+            stack.peek().children().add(node);
+        }
+    }
+
+    public List<StepTraceNode> rootChildren() {
+        return List.copyOf(rootChildren);
+    }
+
+    public int depth() {
+        return stack.size();
+    }
+}

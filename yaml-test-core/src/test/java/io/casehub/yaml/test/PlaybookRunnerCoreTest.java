@@ -1,13 +1,21 @@
 package io.casehub.yaml.test;
 
+import io.casehub.platform.simulation.MapSimulationConfig;
+import io.casehub.platform.simulation.SimulationConfig;
+import io.casehub.platform.simulation.SimulationCorpus;
+import io.casehub.platform.simulation.SimulationOverlay;
+import io.casehub.platform.simulation.SimulationRuntime;
+import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.CompositePluginRegistry;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -214,5 +222,81 @@ class PlaybookRunnerCoreTest {
         assertThat(result.trace().children()).hasSize(2);
     }
 
+    @Test
+    void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("playbook.yaml"),
+                          "name: Sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+        Files.writeString(tempDir.resolve("simulation.yaml"),
+                          "methods:\n  agent-provider.invoke:\n    strategy: sequential\n");
 
+        var runtime = new RecordingSimulationRuntime();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            tempDir, runtime);
+        var result = runner.run(tempDir.resolve("playbook.yaml"),
+                                PlaybookRunConfig.forDryRun());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(runtime.lastPushedConfig).isNotNull();
+        assertThat(runtime.lastPushedConfig.strategyFor("agent-provider.invoke"))
+                .as("discovered simulation.yaml should configure strategy")
+                .hasValue("sequential");
+    }
+
+    @Test
+    void dryRunWalksUpDirectoryHierarchyForSimulationYaml(@TempDir Path tempDir) throws IOException {
+        Path subdir = tempDir.resolve("nested/playbooks");
+        Files.createDirectories(subdir);
+        Files.writeString(subdir.resolve("playbook.yaml"),
+                          "name: Nested sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+        Files.writeString(tempDir.resolve("simulation.yaml"),
+                          "methods:\n  agent-provider.invoke:\n    strategy: key\n");
+
+        var runtime = new RecordingSimulationRuntime();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            subdir, runtime);
+        var result = runner.run(subdir.resolve("playbook.yaml"),
+                                PlaybookRunConfig.forDryRun());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(runtime.lastPushedConfig).isNotNull();
+        assertThat(runtime.lastPushedConfig.strategyFor("agent-provider.invoke"))
+                .as("should walk up to find simulation.yaml in ancestor")
+                .hasValue("key");
+    }
+
+    @Test
+    void dryRunFallsThroughToEmptyOverlayWhenNoSimulationYaml(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("playbook.yaml"),
+                          "name: No sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+
+        var runtime = new RecordingSimulationRuntime();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            tempDir, runtime);
+        var result = runner.run(tempDir.resolve("playbook.yaml"),
+                                PlaybookRunConfig.forDryRun());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(runtime.lastPushedConfig).isNotNull();
+        assertThat(runtime.lastPushedConfig.strategyFor("agent-provider.invoke"))
+                .as("no simulation.yaml means empty config")
+                .isEmpty();
+    }
+
+
+    static class RecordingSimulationRuntime extends SimulationRuntime {
+        SimulationConfig lastPushedConfig;
+
+        RecordingSimulationRuntime() {
+            super(MapSimulationConfig.builder().build(), new InMemorySimulationCorpus<>());
+        }
+
+        @Override
+        public SimulationOverlay pushOverlay(SimulationConfig config, SimulationCorpus corpus) {
+            this.lastPushedConfig = config;
+            return super.pushOverlay(config, corpus);
+        }
+    }
 }

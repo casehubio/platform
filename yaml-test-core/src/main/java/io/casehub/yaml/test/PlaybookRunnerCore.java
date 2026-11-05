@@ -3,7 +3,9 @@ package io.casehub.yaml.test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.platform.simulation.MapSimulationConfig;
+import io.casehub.platform.simulation.config.YamlSimulationConfig;
 import io.casehub.platform.simulation.SimulationOverlay;
+import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.core.module.ModuleExpander;
 import io.casehub.yaml.core.module.TypedExpandedModule;
@@ -24,6 +26,8 @@ import io.casehub.yaml.step.eval.StructuralStepEvaluator;
 import io.casehub.yaml.step.plugin.EventSink;
 import io.casehub.yaml.step.statemachine.PlaybookParser;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -76,7 +80,7 @@ public final class PlaybookRunnerCore {
             String playbookName = extractName(doc, content, playbookPath);
 
             if (config.dryRun() && simulationRuntime != null) {
-                overlay = activateSimulation(config);
+                overlay = activateSimulation(config, playbookPath);
             }
 
             var parsed = PlaybookVariableParser.parse(content);
@@ -191,14 +195,43 @@ public final class PlaybookRunnerCore {
         }
     }
 
-    private SimulationOverlay activateSimulation(PlaybookRunConfig config) {
+    private SimulationOverlay activateSimulation(PlaybookRunConfig config, Path playbookPath) {
         if (config.corpusPath() != null) {
             Path corpusFile = resourceRoot.resolve(config.corpusPath());
-            var parsed = SimulateBlockParser.parse(loadYamlMap(corpusFile), resourceRoot);
+            var  parsed     = SimulateBlockParser.parse(loadYamlMap(corpusFile), resourceRoot);
             return simulationRuntime.pushOverlay(parsed.config(), parsed.corpus());
+        }
+        Path discovered = discoverSimulationYaml(playbookPath);
+        if (discovered != null) {
+            try (var is = Files.newInputStream(discovered)) {
+                var yamlConfig = new YamlSimulationConfig(is);
+                var corpus     = new InMemorySimulationCorpus<>();
+                var allCorpus  = yamlConfig.loadAllCorpus();
+                allCorpus.forEach(corpus::seed);
+                return simulationRuntime.pushOverlay(yamlConfig, corpus);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to load discovered simulation.yaml: " + discovered, e);
+            }
         }
         return simulationRuntime.pushOverlay(MapSimulationConfig.builder().build());
     }
+
+    static Path discoverSimulationYaml(Path playbookPath) {
+        Path dir = playbookPath.getParent();
+        while (dir != null) {
+            Path candidate = dir.resolve("simulation.yaml");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            candidate = dir.resolve("simulation.yml");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            dir = dir.getParent();
+        }
+        return null;
+    }
+
 
     private static String extractName(PlaybookDocument doc, Map<String, Object> content, Path path) {
         if (doc.hasPlaybookHeader() && doc.frontMatter().name() != null) {

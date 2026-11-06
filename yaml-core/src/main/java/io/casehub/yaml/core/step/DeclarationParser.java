@@ -123,10 +123,29 @@ public final class DeclarationParser {
         if (invokeMap.containsKey("agent-session-close")) {
             return parseSessionCloseBinding(invokeMap.get("agent-session-close"));
         }
+        if (invokeMap.containsKey("graphql-exec")) {
+            Object val = invokeMap.get("graphql-exec");
+            if (val instanceof String s) return new InvokeBinding.Graphql(s);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) val;
+            return new InvokeBinding.Graphql((String) map.get("query"));
+        }
+        if (invokeMap.containsKey("mcp-call")) {
+            Object val = invokeMap.get("mcp-call");
+            if (val instanceof String s) return new InvokeBinding.Mcp(s);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) val;
+            return new InvokeBinding.Mcp((String) map.get("tool"));
+        }
+        if (invokeMap.containsKey("rest-request")) {
+            Object val = invokeMap.get("rest-request");
+            if (val instanceof String s) return new InvokeBinding.Rest("GET", s, Map.of(), Map.of());
+            return parseRestBinding(val);
+        }
 
         throw new IllegalArgumentException(
-                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, python, agent, process, aria, "
-                + "agent-session-open, agent-query, agent-session-clear, agent-session-close. "
+                "Unknown invoke binding type. Expected one of: mcp, rest, graphql, graphql-exec, python, agent, process, aria, "
+                + "agent-session-open, agent-query, agent-session-clear, agent-session-close, mcp-call, rest-request. "
                 + "Got keys: " + invokeMap.keySet());
     }
 
@@ -217,12 +236,14 @@ public final class DeclarationParser {
 
     @SuppressWarnings("unchecked")
     private static InvokeBinding.SessionClear parseSessionClearBinding(Object raw) {
+        if (raw instanceof String s) {return new InvokeBinding.SessionClear(s);}
         Map<String, Object> map = (Map<String, Object>) raw;
         return new InvokeBinding.SessionClear((String) map.get("session"));
     }
 
     @SuppressWarnings("unchecked")
     private static InvokeBinding.SessionClose parseSessionCloseBinding(Object raw) {
+        if (raw instanceof String s) {return new InvokeBinding.SessionClose(s);}
         Map<String, Object> map = (Map<String, Object>) raw;
         return new InvokeBinding.SessionClose((String) map.get("session"));
     }

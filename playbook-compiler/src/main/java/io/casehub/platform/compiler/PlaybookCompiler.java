@@ -54,6 +54,8 @@ public final class PlaybookCompiler {
         register("agent-query", new AgentSessionStepCompiler("agent-query"));
         register("agent-session-clear", new AgentSessionStepCompiler("agent-session-clear"));
         register("agent-session-close", new AgentSessionStepCompiler("agent-session-close"));
+        register("graphql-exec", new GraphqlExecStepCompiler());
+        register("mcp-call", new McpCallStepCompiler());
     }
 
     public void register(String stepType, StepCompiler compiler) {

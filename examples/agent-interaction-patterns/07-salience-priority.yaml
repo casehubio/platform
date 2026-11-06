@@ -41,8 +41,7 @@ steps:
       user: "I need to cancel my subscription effective immediately."
       output: voice_response
 
-  - agent-session-close:
-      session: call-7721
+  - agent-session-close: call-7721
 
   # While voice is idle, chat and email can run
   - agent-session-open:
@@ -55,8 +54,7 @@ steps:
       user: "How do I export my data?"
       output: chat_response
 
-  - agent-session-close:
-      session: chat-user-88
+  - agent-session-close: chat-user-88
 
   # Email uses remaining capacity
   - agent-session-open:
@@ -69,5 +67,4 @@ steps:
       user: "Ticket #99: Request for enterprise pricing for 500-seat deployment."
       output: email_response
 
-  - agent-session-close:
-      session: email-ticket-99
+  - agent-session-close: email-ticket-99

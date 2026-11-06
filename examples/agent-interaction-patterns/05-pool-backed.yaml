@@ -28,5 +28,4 @@ steps:
       user: "Which specific stocks would you watch based on those indicators?"
       output: stock_picks
 
-  - agent-session-close:
-      session: analyst-1
+  - agent-session-close: analyst-1

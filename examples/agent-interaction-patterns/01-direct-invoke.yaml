@@ -14,5 +14,4 @@ steps:
       user: "Classify this document: 'Payment of $5,000 due by March 15'"
       output: classification
 
-  - agent-session-close:
-      session: classifier
+  - agent-session-close: classifier

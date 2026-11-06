@@ -22,8 +22,7 @@ steps:
       output: expedite_response
 
   # Clear context — next customer, different issue
-  - agent-session-clear:
-      session: support
+  - agent-session-clear: support
 
   # Second customer issue (agent has no memory of the first)
   - agent-query:
@@ -31,5 +30,4 @@ steps:
       user: "I was charged twice for subscription renewal."
       output: billing_response
 
-  - agent-session-close:
-      session: support
+  - agent-session-close: support

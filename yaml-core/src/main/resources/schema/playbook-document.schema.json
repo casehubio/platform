@@ -175,14 +175,19 @@
         "signal": { "type": "string", "description": "Send a signal (structural or decorator)." },
         "await": { "type": "string", "description": "Wait for signal." },
         "rest-request": {
-          "type": "object",
-          "properties": {
-            "method": { "type": "string" },
-            "url": { "type": "string" },
-            "headers": { "type": "object" },
-            "body": {}
-          },
-          "required": ["url"]
+          "oneOf": [
+            { "type": "string", "description": "Shorthand: URL with GET method." },
+            {
+              "type": "object",
+              "properties": {
+                "method": { "type": "string" },
+                "url": { "type": "string" },
+                "headers": { "type": "object" },
+                "body": {}
+              },
+              "required": ["url"]
+            }
+          ]
         },
         "advisory": {
           "oneOf": [
@@ -216,14 +221,35 @@
           "required": ["session"]
         },
         "agent-session-clear": {
-          "type": "object",
-          "properties": { "session": { "type": "string" } },
-          "required": ["session"]
+          "oneOf": [
+            { "type": "string", "description": "Session name to clear." },
+            { "type": "object", "properties": { "session": { "type": "string" } }, "required": ["session"] }
+          ]
         },
         "agent-session-close": {
-          "type": "object",
-          "properties": { "session": { "type": "string" } },
-          "required": ["session"]
+          "oneOf": [
+            { "type": "string", "description": "Session name to close." },
+            { "type": "object", "properties": { "session": { "type": "string" } }, "required": ["session"] }
+          ]
+        },
+        "graphql-exec": {
+          "oneOf": [
+            { "type": "string", "description": "Shorthand: GraphQL query string." },
+            { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] }
+          ]
+        },
+        "mcp-call": {
+          "oneOf": [
+            { "type": "string", "description": "Shorthand: MCP tool name." },
+            {
+              "type": "object",
+              "properties": {
+                "tool": { "type": "string" },
+                "params": { "type": "object" }
+              },
+              "required": ["tool"]
+            }
+          ]
         },
         "assert": {
           "type": "object",

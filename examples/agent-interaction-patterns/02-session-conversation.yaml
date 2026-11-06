@@ -25,5 +25,4 @@ steps:
       user: "Summarize your recommendations in three bullet points."
       output: summary
 
-  - agent-session-close:
-      session: analyst
+  - agent-session-close: analyst

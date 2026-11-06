@@ -242,6 +242,59 @@ class DeclarationParserTest {
         assertThat(binding.session()).isEqualTo("analyst");
     }
 
+    @Test
+    void parsesSessionCloseBinding_scalarForm() {
+        Map<String, Object> invoke  = Map.of("agent-session-close", "classifier");
+        var                 binding = (InvokeBinding.SessionClose) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("classifier");
+    }
+
+    @Test
+    void parsesSessionClearBinding_scalarForm() {
+        Map<String, Object> invoke  = Map.of("agent-session-clear", "support");
+        var                 binding = (InvokeBinding.SessionClear) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.session()).isEqualTo("support");
+    }
+
+    @Test
+    void parsesGraphqlExecBinding() {
+        Map<String, Object> invoke  = Map.of("graphql-exec", "{ users { id } }");
+        var                 binding = (InvokeBinding.Graphql) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.query()).isEqualTo("{ users { id } }");
+    }
+
+    @Test
+    void parsesGraphqlExecBinding_mapForm() {
+        Map<String, Object> invoke  = Map.of("graphql-exec", Map.of("query", "{ users { id } }"));
+        var                 binding = (InvokeBinding.Graphql) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.query()).isEqualTo("{ users { id } }");
+    }
+
+    @Test
+    void parsesMcpCallBinding() {
+        Map<String, Object> invoke  = Map.of("mcp-call", "file_search");
+        var                 binding = (InvokeBinding.Mcp) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.tool()).isEqualTo("file_search");
+    }
+
+    @Test
+    void parsesMcpCallBinding_mapForm() {
+        Map<String, Object> invoke  = Map.of("mcp-call", Map.of("tool", "file_search"));
+        var                 binding = (InvokeBinding.Mcp) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.tool()).isEqualTo("file_search");
+    }
+
+    @Test
+    void parsesRestRequestBinding_scalarForm() {
+        Map<String, Object> invoke  = Map.of("rest-request", "/api/users");
+        var                 binding = (InvokeBinding.Rest) DeclarationParser.parseInvoke(invoke);
+        assertThat(binding.url()).isEqualTo("/api/users");
+        assertThat(binding.method()).isEqualTo("GET");
+        assertThat(binding.headers()).isEmpty();
+        assertThat(binding.body()).isEmpty();
+    }
+
+
     @SuppressWarnings("unchecked")
     private static <K, V> Map<K, V> mapOf(Object... kvs) {
         var map = new LinkedHashMap<K, V>();

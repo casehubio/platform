@@ -173,6 +173,82 @@ class PlaybookCompilerTest {
     }
 
     @Test
+    void compile_agentSessionClose_scalarForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("agent-session-close", "classifier")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+        var result = ((CompilationOutcome.Success) outcome).result();
+        assertThat(result.workflow().getDo()).hasSize(1);
+        assertThat(result.workflow().getDo().getFirst().getTask().getSetTask()).isNotNull();
+    }
+
+    @Test
+    void compile_agentSessionClear_scalarForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("agent-session-clear", "support")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+    @Test
+    void compile_agentSessionOpen_scalarForm_rejected() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("agent-session-open", "analyst")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Failure.class);
+    }
+
+    @Test
+    void compile_agentQuery_scalarForm_rejected() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("agent-query", "analyst")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Failure.class);
+    }
+
+    @Test
+    void compile_restRequest_scalarForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("rest-request", "http://localhost:8080/api/users")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+    @Test
+    void compile_graphqlExec_scalarForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("graphql-exec", "{ users { id } }")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+    @Test
+    void compile_graphqlExec_mapForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("graphql-exec", Map.of("query", "{ users { id } }"))));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+    @Test
+    void compile_mcpCall_scalarForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("mcp-call", "file_search")));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+    @Test
+    void compile_mcpCall_mapForm() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("mcp-call", Map.of("tool", "file_search", "params", Map.of("q", "auth")))));
+        CompilationOutcome outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+    }
+
+
+    @Test
     void compile_inlinePools_parsedIntoResult() {
         var content = Map.<String, Object>of(
                 "pools", Map.of(

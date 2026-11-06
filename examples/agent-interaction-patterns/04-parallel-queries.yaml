@@ -32,9 +32,6 @@ steps:
           user: "Review: 'Data stored in EU region only, GDPR article 28 processor agreement.'"
           output: compliance_review
 
-  - agent-session-close:
-      session: legal-reviewer
-  - agent-session-close:
-      session: financial-reviewer
-  - agent-session-close:
-      session: compliance-reviewer
+  - agent-session-close: legal-reviewer
+  - agent-session-close: financial-reviewer
+  - agent-session-close: compliance-reviewer

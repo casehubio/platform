@@ -1,17 +1,19 @@
 package io.casehub.yaml.step.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.yaml.jackson.YamlMappers;
 import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.core.step.DeclarationFile;
 import io.casehub.yaml.core.step.DeclarationParser;
 import io.casehub.yaml.core.step.InvokeBinding;
+import io.casehub.yaml.jackson.YamlMappers;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Portability;
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.step.ActionExecutionEvent;
 import io.casehub.yaml.step.InvokeHandler;
+import io.casehub.yaml.step.SimulatingAction;
 import io.casehub.yaml.step.ValidatingAction;
 
 import java.io.IOException;
@@ -25,14 +27,23 @@ public class YamlDefinitionSource {
     private final List<String> definitionFiles;
     private final List<InvokeHandler> handlers;
     private final Consumer<ActionExecutionEvent> eventSink;
+    private final SimulationRuntime              simulationRuntime;
+
 
     public YamlDefinitionSource(List<String> definitionFiles,
                                 List<InvokeHandler> handlers,
-                                Consumer<ActionExecutionEvent> eventSink) {
-        this.definitionFiles = definitionFiles;
-        this.handlers = handlers;
-        this.eventSink = eventSink;
+                                Consumer<ActionExecutionEvent> eventSink) {this(definitionFiles, handlers, eventSink, null);}
+
+    public YamlDefinitionSource(List<String> definitionFiles,
+                                List<InvokeHandler> handlers,
+                                Consumer<ActionExecutionEvent> eventSink,
+                                SimulationRuntime simulationRuntime) {
+        this.definitionFiles   = definitionFiles;
+        this.handlers          = handlers;
+        this.eventSink         = eventSink;
+        this.simulationRuntime = simulationRuntime;
     }
+
 
     public void populate(PluginRegistry registry) {
         for (String file : definitionFiles) {
@@ -80,6 +91,9 @@ public class YamlDefinitionSource {
             InvokeBinding binding = decl.invoke();
 
             Action action    = resolveHandler(binding).create(decl, binding);
+            if (simulationRuntime != null) {
+                action = new SimulatingAction(action, binding, simulationRuntime);
+            }
             Action validated = new ValidatingAction(decl, action, eventSink);
 
             Portability portability = decl.portability() != null

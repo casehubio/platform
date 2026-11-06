@@ -16,11 +16,18 @@ class RestRequestCompiler implements StepCompiler {
     @Override
     @SuppressWarnings("unchecked")
     public TaskItem compile(String stepKey, Object stepValue, Map<String, Object> fullStep, CompilationContext ctx) {
-        String name = ctx.generateName("call");
-        Map<String, Object> config = (Map<String, Object>) stepValue;
+        String              name = ctx.generateName("call");
+        Map<String, Object> config;
+        if (stepValue instanceof String s) {
+            config = Map.of("url", s, "method", "GET");
+        } else if (stepValue instanceof Map) {
+            config = (Map<String, Object>) stepValue;
+        } else {
+            return null;
+        }
 
         String method = String.valueOf(config.getOrDefault("method", "GET"));
-        String url = String.valueOf(config.get("url"));
+        String url    = String.valueOf(config.get("url"));
 
         Endpoint endpoint;
         if (url.matches("^\\s*\\$\\{.+}\\s*$")) {

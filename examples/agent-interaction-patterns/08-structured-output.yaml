@@ -45,5 +45,4 @@ steps:
           {"type":"object","properties":{"total":{"type":"number"},"tax":{"type":"number"},"taxRate":{"type":"string"}}}
       output: corrected_totals
 
-  - agent-session-close:
-      session: extractor
+  - agent-session-close: extractor

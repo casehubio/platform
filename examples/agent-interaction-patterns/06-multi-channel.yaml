@@ -32,8 +32,7 @@ steps:
       user: "Hi, I need to change my delivery address."
       output: voice_greeting
 
-  - agent-session-close:
-      session: voice-customer-1
+  - agent-session-close: voice-customer-1
 
   # Email channel — longer, more detailed responses
   - agent-session-open:
@@ -51,5 +50,4 @@ steps:
         14:00-16:00 UTC. No error codes returned, just timeout after 30s.
       output: email_response
 
-  - agent-session-close:
-      session: email-ticket-42
+  - agent-session-close: email-ticket-42

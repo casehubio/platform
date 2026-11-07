@@ -3,7 +3,9 @@ package io.casehub.platform.mcp.spring;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.platform.api.mcp.McpResourceRegistry;
+import io.casehub.platform.api.mcp.ReadTracker;
 import io.casehub.platform.mcp.DomainModelRegistry;
+import io.casehub.platform.mcp.InMemoryReadTracker;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -33,12 +35,18 @@ public class McpSpringAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    ReadTracker readTracker() {
+        return new InMemoryReadTracker();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     SpringOperationDispatcher springOperationDispatcher(DomainModelRegistry registry,
                                                          ApplicationContext context,
-                                                         ApplicationEventPublisher eventPublisher) {
+                                                         ReadTracker readTracker) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        return new SpringOperationDispatcher(registry, context, mapper, eventPublisher);
+        return new SpringOperationDispatcher(registry, context, mapper, readTracker);
     }
 
     @Bean

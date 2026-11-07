@@ -2,12 +2,11 @@ package io.casehub.platform.mcp.spring;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.mcp.ContextParam;
-import io.casehub.platform.api.mcp.McpAccessEvent;
 import io.casehub.platform.api.mcp.McpEnrich;
 import io.casehub.platform.api.mcp.McpParam;
 import io.casehub.platform.api.mcp.McpParamFormat;
-import io.casehub.platform.api.mcp.McpTrack;
-import io.casehub.platform.api.mcp.McpTrackType;
+import io.casehub.platform.api.mcp.PlatformQuery;
+import io.casehub.platform.api.mcp.ReadTracker;
 import io.casehub.platform.api.mcp.McpCursorMap;
 import io.casehub.platform.api.mcp.McpCursorType;
 import io.casehub.platform.api.mcp.McpDelegate;
@@ -34,16 +33,16 @@ public class SpringOperationDispatcher {
     private final DomainModelRegistry registry;
     private final ApplicationContext context;
     private final ObjectMapper mapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ReadTracker readTracker;
 
     public SpringOperationDispatcher(DomainModelRegistry registry,
                                       ApplicationContext context,
                                       ObjectMapper mapper,
-                                      ApplicationEventPublisher eventPublisher) {
+                                      ReadTracker readTracker) {
         this.registry = registry;
         this.context = context;
         this.mapper = mapper;
-        this.eventPublisher = eventPublisher;
+        this.readTracker = readTracker;
     }
 
     public Object dispatch(String domain, String operation, Map<String, Object> params)
@@ -86,8 +85,8 @@ public class SpringOperationDispatcher {
             result = method.invoke(bean, args);
         }
 
-        if (method.isAnnotationPresent(McpTrack.class)) {
-            fireTrackEvent(method.getAnnotation(McpTrack.class), domain, operation, effectiveParams);
+        if (method.isAnnotationPresent(PlatformQuery.class) && method.getAnnotation(PlatformQuery.class).track()) {
+            recordAccess(domain, effectiveParams);
         }
 
         if (method.isAnnotationPresent(McpEnrich.class) || method.getAnnotationsByType(McpEnrich.class).length > 0) {
@@ -266,11 +265,24 @@ public class SpringOperationDispatcher {
         return enriched;
     }
 
-    private void fireTrackEvent(McpTrack track, String domain, String operation,
-                                 Map<String, Object> params) {
-        if (track.value() == McpTrackType.ACCESS) {
-            eventPublisher.publishEvent(new McpAccessEvent(domain, operation, params, Instant.now()));
+    private void recordAccess(String domain, Map<String, Object> params) {
+        try {
+            var principal = context.getBean(io.casehub.platform.api.identity.CurrentPrincipal.class);
+            String agentId = principal.actorId();
+            String resourceKey = extractResourceKey(params);
+            if (resourceKey != null) {
+                readTracker.recordRead(agentId, domain, resourceKey);
+            }
+        } catch (Exception ignored) {
         }
+    }
+
+    private String extractResourceKey(Map<String, Object> params) {
+        for (String candidate : List.of("entryId", "id", "path", "caseId", "resourceId")) {
+            Object value = params.get(candidate);
+            if (value != null) return value.toString();
+        }
+        return null;
     }
 
     private Method findMethod(Class<?> type, String name) {

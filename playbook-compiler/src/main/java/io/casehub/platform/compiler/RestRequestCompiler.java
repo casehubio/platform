@@ -26,6 +26,20 @@ class RestRequestCompiler implements StepCompiler {
             return null;
         }
 
+        if (config.containsKey("_subject")) {
+            String subject = String.valueOf(config.get("_subject"));
+            var    mutable = new java.util.LinkedHashMap<>(config);
+            mutable.remove("_subject");
+            int spaceIdx = subject.indexOf(' ');
+            if (spaceIdx > 0) {
+                mutable.putIfAbsent("method", subject.substring(0, spaceIdx));
+                mutable.putIfAbsent("url", subject.substring(spaceIdx + 1));
+            } else {
+                mutable.putIfAbsent("url", subject);
+            }
+            config = mutable;
+        }
+
         String method = String.valueOf(config.getOrDefault("method", "GET"));
         String url    = String.valueOf(config.get("url"));
 

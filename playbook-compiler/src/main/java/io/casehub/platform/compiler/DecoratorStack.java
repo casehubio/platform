@@ -11,7 +11,7 @@ record DecoratorStack(String when, Duration timeout, RetrySpec retry, Integer lo
 
     static final DecoratorStack EMPTY = new DecoratorStack(null, null, null, null, null);
 
-    private static final Set<String> DECORATOR_KEYS = Set.of("when", "timeout", "retry", "loop", "mutex", "step", "meta");
+    private static final Set<String> DECORATOR_KEYS = Set.of("when", "timeout", "retry", "loop", "mutex", "step", "name", "capture", "meta");
 
     static DecoratorStack extract(Map<String, Object> step) {
         String when = step.containsKey("when") ? String.valueOf(step.get("when")) : null;

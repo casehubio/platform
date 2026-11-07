@@ -15,7 +15,7 @@ public final class StepKeywords {
             "wait", "mutex", "when", "capture");
 
     public static final Set<String> STRUCTURAL_KEYS = Set.of(
-            "step", "invoke",
+            "step", "name", "invoke",
             "then", "else", "match", "cases", "block",
             "try", "catch", "finally", "select",
             "parallel", "race",

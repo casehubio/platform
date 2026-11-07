@@ -2,6 +2,7 @@ package io.casehub.platform.registration.quarkus;
 
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.identity.PlatformRoles;
+import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
@@ -50,17 +51,17 @@ public class RegistrationEndpoint {
     }
 
     @PlatformQuery("Get registration policy for a tenant")
-    public RegistrationMode getPolicy(String tenancyId) {
+    public RegistrationMode getPolicy(@ContextParam("tenancyId") String tenancyId) {
         return registrationPolicy.getMode(tenancyId);
     }
 
     @PlatformMutation("Request a password reset email")
-    public void requestPasswordReset(String email, String tenancyId) {
+    public void requestPasswordReset(String email, @ContextParam("tenancyId") String tenancyId) {
         registrationService.requestPasswordReset(email, tenancyId);
     }
 
     @PlatformMutation("Reset password with a reset token")
-    public RegistrationResult resetPassword(String token, String newPassword, String tenancyId) {
+    public RegistrationResult resetPassword(String token, String newPassword, @ContextParam("tenancyId") String tenancyId) {
         return registrationService.resetPassword(token, newPassword, tenancyId);
     }
 

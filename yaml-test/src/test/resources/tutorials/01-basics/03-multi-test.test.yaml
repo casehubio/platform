@@ -3,16 +3,14 @@ name: Multi-test basics
 tests:
   - name: First invocation
     steps:
-      - agent-invoke:
-          prompt: "hello"
+      - agent-invoke "hello":
         capture: result
       - assertThat: ${result.text}
         not-empty: true
 
   - name: Second invocation
     steps:
-      - agent-invoke:
-          prompt: "world"
+      - agent-invoke "world":
         capture: result
       - assertThat: ${result.text}
         contains: 'world'

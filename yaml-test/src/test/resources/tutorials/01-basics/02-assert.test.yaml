@@ -1,8 +1,7 @@
 name: Assertion matchers
 
 steps:
-  - agent-invoke:
-      prompt: "portfolio"
+  - agent-invoke "portfolio":
     capture: result
   - assertThat: ${result.text}
     not-null: true

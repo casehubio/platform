@@ -23,6 +23,7 @@ public class SimulationRuntime {
     private final ConcurrentHashMap<String, SimilarityScorer<?>> scorers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<SimulationOverlay> overlayStack = new CopyOnWriteArrayList<>();
+    private final ConcurrentHashMap<String, CorpusSelector> corpusSelectors = new ConcurrentHashMap<>();
     private       ProfileSource                           profileSource;
     private volatile double                               globalSpeed;
 
@@ -57,12 +58,12 @@ public class SimulationRuntime {
             if (overlayStrategy.isPresent()) {
                 return Optional.of((SimulationStrategy<I, O>) overlay.strategyCache()
                                                                      .computeIfAbsent(qualifiedName, qn ->
-                                                                                                             createStrategy(qn, overlayStrategy.get(), overlay.corpus())));
+                                                                                                             createStrategy(qn, overlayStrategy.get(), overlay.corpus(), overlay.config())));
             }
         }
         return config.strategyFor(qualifiedName)
                      .map(strategyName -> (SimulationStrategy<I, O>) strategyCache.computeIfAbsent(
-                             qualifiedName, qn -> createStrategy(qn, strategyName, corpus)));
+                             qualifiedName, qn -> createStrategy(qn, strategyName, corpus, config)));
     }
 
     public boolean captureEnabled(final String qualifiedName) {
@@ -169,30 +170,80 @@ public class SimulationRuntime {
     }
 
     private SimulationStrategy<?, ?> createStrategy(final String qualifiedName, final String strategyName,
-                                                      final SimulationCorpus corpus) {
-        return switch (resolveAlias(strategyName)) {
-            case "sequential" -> new SequentialStrategy<>(corpus, qualifiedName,
-                    config.exhaustionPolicy(qualifiedName).orElse(ExhaustionPolicy.WRAP));
+                                                      final SimulationCorpus corpus, final SimulationConfig effectiveConfig) {
+        SimulationCorpus effectiveCorpus = corpus;
+        CorpusSelector selector = null;
+        Optional<CorpusSelectorConfig> selection = effectiveConfig.corpusSelection(qualifiedName);
+        if (selection.isPresent()) {
+            selector = buildSelector(qualifiedName, selection.get());
+            effectiveCorpus = new PhasedCorpus<>(selector, selection.get().phases());
+        }
+
+        SimulationStrategy<?, ?> strategy = switch (resolveAlias(strategyName)) {
+            case "sequential" -> new SequentialStrategy<>(effectiveCorpus, qualifiedName,
+                    effectiveConfig.exhaustionPolicy(qualifiedName).orElse(ExhaustionPolicy.WRAP));
             case "key-lookup" -> {
                 final KeyExtractor extractor = requireExtractor(qualifiedName);
-                final MatchPolicy mp = config.matchPolicy(qualifiedName).orElse(MatchPolicy.FIRST);
-                final ExhaustionPolicy ep = config.exhaustionPolicy(qualifiedName)
+                final MatchPolicy mp = effectiveConfig.matchPolicy(qualifiedName).orElse(MatchPolicy.FIRST);
+                final ExhaustionPolicy ep = effectiveConfig.exhaustionPolicy(qualifiedName)
                         .orElse(ExhaustionPolicy.CLAMP);
-                yield new KeyLookupStrategy<>(corpus, qualifiedName, extractor, mp, ep);
+                yield new KeyLookupStrategy<>(effectiveCorpus, qualifiedName, extractor, mp, ep);
             }
-            case "random" -> new RandomStrategy<>(corpus, qualifiedName, new Random(), null);
+            case "random" -> new RandomStrategy<>(effectiveCorpus, qualifiedName, new Random(), null);
             case "recorded-replay" -> {
                 final KeyExtractor extractor = requireExtractor(qualifiedName);
-                yield new RecordedReplayStrategy<>(corpus, qualifiedName, extractor);
+                yield new RecordedReplayStrategy<>(effectiveCorpus, qualifiedName, extractor);
             }
             case "nearest-match" -> {
                 final SimilarityScorer scorer = requireScorer(qualifiedName);
-                final double threshold = config.threshold(qualifiedName).orElse(0.0);
-                yield new NearestMatchStrategy<>(corpus, qualifiedName, scorer, threshold);
+                final double threshold = effectiveConfig.threshold(qualifiedName).orElse(0.0);
+                yield new NearestMatchStrategy<>(effectiveCorpus, qualifiedName, scorer, threshold);
             }
             default -> throw new SimulationConfigException(
                     "Unknown strategy '" + strategyName + "' for " + qualifiedName);
         };
+
+        if (selector != null) {
+            strategy = wrapWithSelector(strategy, selector);
+        }
+        return strategy;
+    }
+
+    private CorpusSelector buildSelector(final String qualifiedName, final CorpusSelectorConfig selectorConfig) {
+        return corpusSelectors.computeIfAbsent(qualifiedName, qn -> switch (selectorConfig) {
+            case CorpusSelectorConfig.StateMachine sm ->
+                    new io.casehub.platform.simulation.selector.StateMachineSelector(sm.initial(), sm.transitions());
+            case CorpusSelectorConfig.DurationBased d ->
+                    new io.casehub.platform.simulation.selector.DurationSelector(d.orderedPhases(), this::globalSpeed);
+            case CorpusSelectorConfig.LookupCount lc ->
+                    new io.casehub.platform.simulation.selector.LookupCountSelector(lc.orderedPhases());
+            case CorpusSelectorConfig.Weighted w ->
+                    new io.casehub.platform.simulation.selector.RandomSelector(w.weightedPhases(), new Random());
+        });
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static SimulationStrategy<?, ?> wrapWithSelector(final SimulationStrategy strategy,
+                                                              final CorpusSelector selector) {
+        return new SimulationStrategy<>() {
+            @Override public Object resolve(Object input) {
+                Object result = strategy.resolve(input);
+                selector.onResolved();
+                return result;
+            }
+            @Override public boolean canResolve(Object input) {
+                return strategy.canResolve(input);
+            }
+            @Override public DataRealism dataRealism() {
+                return strategy.dataRealism();
+            }
+        };
+    }
+
+    public Optional<io.casehub.platform.simulation.selector.StateMachineSelector> stateMachineSelector(final String qualifiedName) {
+        CorpusSelector selector = corpusSelectors.get(qualifiedName);
+        return selector instanceof io.casehub.platform.simulation.selector.StateMachineSelector sms
+                ? Optional.of(sms) : Optional.empty();
     }
 
     private SimilarityScorer<?> requireScorer(final String qualifiedName) {

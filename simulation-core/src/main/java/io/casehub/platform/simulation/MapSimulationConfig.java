@@ -12,6 +12,7 @@ public final class MapSimulationConfig implements SimulationConfig {
     private final Map<String, Double> thresholds;
     private final double              speed;
     private final Map<String, DataRealism> fallthroughRealisms;
+    private final Map<String, CorpusSelectorConfig> corpusSelections;
 
 
     private MapSimulationConfig(final Map<String, String> strategies,
@@ -19,22 +20,24 @@ public final class MapSimulationConfig implements SimulationConfig {
                                 final Map<String, ExhaustionPolicy> exhaustionPolicies,
                                 final Map<String, Double> thresholds,
                                 final double speed,
-                                final Map<String, DataRealism> fallthroughRealisms) {
+                                final Map<String, DataRealism> fallthroughRealisms,
+                                final Map<String, CorpusSelectorConfig> corpusSelections) {
         this.strategies          = Map.copyOf(strategies);
         this.captures            = Map.copyOf(captures);
         this.exhaustionPolicies  = Map.copyOf(exhaustionPolicies);
         this.thresholds          = Map.copyOf(thresholds);
         this.speed               = speed;
         this.fallthroughRealisms = Map.copyOf(fallthroughRealisms);
+        this.corpusSelections    = Map.copyOf(corpusSelections);
     }
 
     public static MapSimulationConfig of(final Map<String, String> strategies) {
-        return new MapSimulationConfig(strategies, Map.of(), Map.of(), Map.of(), 1.0, Map.of());
+        return new MapSimulationConfig(strategies, Map.of(), Map.of(), Map.of(), 1.0, Map.of(), Map.of());
     }
 
     public static MapSimulationConfig of(final Map<String, String> strategies,
                                          final Map<String, Boolean> captures) {
-        return new MapSimulationConfig(strategies, captures, Map.of(), Map.of(), 1.0, Map.of());
+        return new MapSimulationConfig(strategies, captures, Map.of(), Map.of(), 1.0, Map.of(), Map.of());
     }
 
     public static Builder builder() {
@@ -71,6 +74,11 @@ public final class MapSimulationConfig implements SimulationConfig {
         return fallthroughRealisms.get(qualifiedName);
     }
 
+    @Override
+    public Optional<CorpusSelectorConfig> corpusSelection(final String qualifiedName) {
+        return Optional.ofNullable(corpusSelections.get(qualifiedName));
+    }
+
 
     public Map<String, String> strategies() {
         return strategies;
@@ -84,6 +92,7 @@ public final class MapSimulationConfig implements SimulationConfig {
         private final Map<String, Double> thresholds = new LinkedHashMap<>();
         private       double              speed      = 1.0;
         private final Map<String, DataRealism> fallthroughRealisms = new LinkedHashMap<>();
+        private final Map<String, CorpusSelectorConfig> corpusSelections = new LinkedHashMap<>();
 
 
         Builder() {}
@@ -120,6 +129,12 @@ public final class MapSimulationConfig implements SimulationConfig {
             return this;
         }
 
-        public MapSimulationConfig build() {return new MapSimulationConfig(strategies, captures, exhaustionPolicies, thresholds, speed, fallthroughRealisms);}
+        public Builder corpusSelection(final String qualifiedName, final CorpusSelectorConfig config) {
+            corpusSelections.put(qualifiedName, config);
+            return this;
+        }
+
+
+        public MapSimulationConfig build() {return new MapSimulationConfig(strategies, captures, exhaustionPolicies, thresholds, speed, fallthroughRealisms, corpusSelections);}
     }
 }

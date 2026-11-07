@@ -26,5 +26,9 @@ public interface SimulationConfig {
         return null;
     }
 
+    default Optional<CorpusSelectorConfig> corpusSelection(String qualifiedName) {
+        return Optional.empty();
+    }
+
 
 }

@@ -111,7 +111,8 @@
     "step": {
       "type": "object",
       "properties": {
-        "step": { "type": "string", "description": "Names a step for barrier/quorum references." },
+        "step": { "type": "string", "description": "Names a step for barrier/quorum references. Alias: 'name'." },
+        "name": { "type": "string", "description": "Human-readable step name for tracing, state machine transitions, and step-lifecycle events. Alias for 'step' but allowed inside structural blocks." },
         "invoke": { "$ref": "#/$defs/invokeBinding" },
         "block": { "$ref": "#/$defs/stepList" },
         "parallel": {
@@ -430,7 +431,13 @@
         "^if .+$": { "$ref": "#/$defs/stepList" },
         "^match .+$": { "$ref": "#/$defs/stepList" },
         "^barrier .+$": { "$ref": "#/$defs/stepList" },
-        "^quorum .+$": { "$ref": "#/$defs/stepList" }
+        "^quorum .+$": { "$ref": "#/$defs/stepList" },
+        "^rest-request .+$": { "description": "Combined-key shorthand: rest-request METHOD URL:" },
+        "^agent-invoke .+$": { "description": "Combined-key shorthand: agent-invoke PROMPT:" },
+        "^mcp-call .+$": { "description": "Combined-key shorthand: mcp-call TOOL:" },
+        "^graphql-exec .+$": { "description": "Combined-key shorthand: graphql-exec OPERATION:" },
+        "^process .+$": { "description": "Combined-key shorthand: process COMMAND:" },
+        "^rest-call .+$": { "description": "Combined-key shorthand: rest-call URL:" }
       },
       "additionalProperties": true
     },

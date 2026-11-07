@@ -143,11 +143,22 @@ public final class PlaybookCompiler {
 
         String stepKey = null;
         StepCompiler compiler = null;
+        String combinedKeySuffix = null;
         for (String key : effectiveStep.keySet()) {
             if (registry.containsKey(key)) {
                 stepKey = key;
                 compiler = registry.get(key);
                 break;
+            }
+            int spaceIdx = key.indexOf(' ');
+            if (spaceIdx > 0) {
+                String prefix = key.substring(0, spaceIdx);
+                if (registry.containsKey(prefix)) {
+                    stepKey = key;
+                    combinedKeySuffix = key.substring(spaceIdx + 1);
+                    compiler = registry.get(prefix);
+                    break;
+                }
             }
         }
 
@@ -157,7 +168,18 @@ public final class PlaybookCompiler {
             return null;
         }
 
-        TaskItem core = compiler.compile(stepKey, effectiveStep.get(stepKey), effectiveStep, ctx);
+        Object stepValue = effectiveStep.get(stepKey);
+        if (combinedKeySuffix != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> merged = stepValue instanceof Map
+                    ? new LinkedHashMap<>((Map<String, Object>) stepValue)
+                    : new LinkedHashMap<>();
+            merged.put("_subject", combinedKeySuffix);
+            stepValue = merged;
+            stepKey = stepKey.substring(0, stepKey.indexOf(' '));
+        }
+
+        TaskItem core = compiler.compile(stepKey, stepValue, effectiveStep, ctx);
         if (core == null) return null;
 
         return applyDecorators(core, decorators, ctx);

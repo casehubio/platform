@@ -1243,4 +1243,84 @@ class WalkerTest {
                 .hasMessageContaining("parallel workers:");
     }
 
+    @Test
+    void nameKey_setsStepName() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("name", "fetch-order");
+        step.put("process", Map.of("command", "fetch.sh"));
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0).name()).isEqualTo("fetch-order");
+    }
+
+    @Test
+    void nameKey_worksInsideStructuralBlock() {
+        Map<String, Object> inner = new LinkedHashMap<>();
+        inner.put("name", "inner-step");
+        inner.put("process", Map.of("command", "a.sh"));
+
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("block", List.of(inner));
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(block), registry);
+
+        var blockStep = (ResolvedStep.BlockStep) resolved.get(0);
+        assertThat(blockStep.steps().get(0).name()).isEqualTo("inner-step");
+    }
+
+    @Test
+    void nameAndStepBothPresent_throws() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("step", "a");
+        step.put("name", "b");
+        step.put("process", Map.of("command", "x.sh"));
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("both 'step' and 'name'");
+    }
+
+    @Test
+    void combinedKeyAction_suffixBecomesSubject() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process ls -la", Map.of("timeout", "5s"));
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        assertThat(resolved).hasSize(1);
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "ls -la");
+        assertThat(plugin.params()).containsEntry("timeout", "5s");
+    }
+
+    @Test
+    void combinedKeyAction_nullValue_suffixBecomesSubject() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process ls -la", null);
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "ls -la");
+    }
+
+    @Test
+    void combinedKeyAction_withNameDecorator() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("name", "fetch-users");
+        step.put("process GET /api/users", null);
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.name()).isEqualTo("fetch-users");
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "GET /api/users");
+    }
+
+
 }

@@ -205,9 +205,13 @@ public final class Walker {
         for (Map.Entry<String, Object> e : step.entrySet()) {
             String key = e.getKey();
 
-            if ("step".equals(key)) {
+            if ("step".equals(key) || "name".equals(key)) {
+                if (stepFromKey || ("name".equals(key) && step.containsKey("step"))) {
+                    throw new IllegalArgumentException(
+                            path + " → Step " + index + ": both 'step' and 'name' present — use one or the other");
+                }
                 stepName = (String) e.getValue();
-                stepFromKey = true;
+                if ("step".equals(key)) stepFromKey = true;
             } else if ("invoke".equals(key)) {
                 invokeSpec = (Map<String, Object>) e.getValue();
             } else if ("block".equals(key) || "parallel".equals(key) || "try".equals(key) || "select".equals(key) || "barrier".equals(key) || "quorum".equals(key) || "race".equals(key) || "pause".equals(key) || "resume".equals(key)) {
@@ -272,7 +276,33 @@ public final class Walker {
                         actionParams = new LinkedHashMap<>();
                     }
                 } else {
-                    unknownKeys.add(e);
+                    int spaceIdx = key.indexOf(' ');
+                    if (spaceIdx > 0) {
+                        String prefix = key.substring(0, spaceIdx);
+                        var prefixEntry = registry.resolve(prefix);
+                        if (prefixEntry.isPresent()) {
+                            if (matchedAction != null) {
+                                throw new IllegalArgumentException(
+                                        path + " → Step " + index + ": ambiguous — multiple action keys matched: '"
+                                        + matchedAction + "' and '" + key + "'");
+                            }
+                            matchedAction = prefix;
+                            matchedDef    = prefixEntry.get();
+                            String suffix = key.substring(spaceIdx + 1);
+                            Object value  = e.getValue();
+                            if (value instanceof Map) {
+                                actionParams = new LinkedHashMap<>((Map<String, Object>) value);
+                                actionParams.put("_subject", suffix);
+                            } else {
+                                actionParams = new LinkedHashMap<>();
+                                actionParams.put("_subject", suffix);
+                            }
+                        } else {
+                            unknownKeys.add(e);
+                        }
+                    } else {
+                        unknownKeys.add(e);
+                    }
                 }
             }
         }
@@ -297,7 +327,7 @@ public final class Walker {
         if (stepFromKey && structuralType != null) {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": 'step' is not valid inside '" + structuralType
-                    + "' — use combined-key syntax: '" + structuralType + " " + stepName
+                    + "' — use 'name:' or combined-key syntax: '" + structuralType + " " + stepName
                     + ":' instead of '" + structuralType + ":' + 'step: " + stepName + "'");
         }
 

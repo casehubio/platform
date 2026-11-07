@@ -11,6 +11,7 @@ import io.casehub.platform.api.mcp.McpCursorMap;
 import io.casehub.platform.api.mcp.McpCursorType;
 import io.casehub.platform.api.mcp.McpDelegate;
 import io.casehub.platform.api.mcp.McpAutoRoute;
+import io.casehub.platform.api.mcp.McpTransform;
 import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
@@ -89,6 +90,10 @@ public class SpringOperationDispatcher {
             recordAccess(domain, effectiveParams);
         }
 
+        if (method.isAnnotationPresent(McpTransform.class)) {
+            result = applyTransform(method, result, effectiveParams);
+        }
+
         if (method.isAnnotationPresent(McpEnrich.class) || method.getAnnotationsByType(McpEnrich.class).length > 0) {
             result = applyEnrichments(method, result, effectiveParams, op);
         } else if (op.type() == OperationDescriptor.OperationType.MUTATION && shouldWrapResult(method, result)) {
@@ -153,6 +158,43 @@ public class SpringOperationDispatcher {
             }
         }
         return args;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object applyTransform(Method method, Object result, Map<String, Object> params) throws Exception {
+        McpTransform transform = method.getAnnotation(McpTransform.class);
+        Object spiBean = context.getBean(transform.spi());
+        Method transformMethod = findMethod(transform.spi(), transform.method());
+
+        if (transform.perElement() && result instanceof List<?> list) {
+            List<Object> transformed = new ArrayList<>(list.size());
+            for (Object element : list) {
+                transformed.add(invokeTransform(transformMethod, spiBean, element, params));
+            }
+            return transformed;
+        }
+
+        return invokeTransform(transformMethod, spiBean, result, params);
+    }
+
+    private Object invokeTransform(Method transformMethod, Object spiBean,
+                                    Object result, Map<String, Object> params) throws Exception {
+        Parameter[] tParams = transformMethod.getParameters();
+        Object[] args = new Object[tParams.length];
+        boolean resultPlaced = false;
+        for (int i = 0; i < tParams.length; i++) {
+            Object rawValue = params.get(tParams[i].getName());
+            if (rawValue != null) {
+                args[i] = mapper.convertValue(rawValue, tParams[i].getType());
+            } else if (!resultPlaced && tParams[i].getType().isAssignableFrom(result.getClass())) {
+                args[i] = result;
+                resultPlaced = true;
+            }
+        }
+        if (!resultPlaced) {
+            args[0] = result;
+        }
+        return transformMethod.invoke(spiBean, args);
     }
 
     private void validateParams(OperationDescriptor op, Map<String, Object> params) {

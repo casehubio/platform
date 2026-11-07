@@ -1,0 +1,17 @@
+name: State machine corpus selection
+simulate:
+  agent:
+    - prompt: "fallback"
+      response: "static fallback"
+
+tests:
+  - name: "step completion advances state machine and changes agent responses"
+    steps:
+      - run-playbook: ../../../main/playbooks/simulation/order-lifecycle.playbook.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+      - assertThat: result.stateMachines.agent-provider_invoke
+        equals: shipped
+      - assertThat: result.output.response
+        contains: "Payment confirmed"

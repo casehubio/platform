@@ -217,16 +217,23 @@ public final class PlaybookRunnerCore {
     }
 
     static Path discoverSimulationYaml(Path playbookPath) {
+        String fileName = playbookPath.getFileName().toString();
+        String base = fileName.endsWith(".playbook.yaml") ? fileName.substring(0, fileName.length() - ".playbook.yaml".length())
+                                                          : fileName.endsWith(".playbook.yml") ? fileName.substring(0, fileName.length() - ".playbook.yml".length())
+                                                                                               : fileName.endsWith(".yaml") ? fileName.substring(0, fileName.length() - ".yaml".length())
+                                                                                                                            : fileName.endsWith(".yml") ? fileName.substring(0, fileName.length() - ".yml".length())
+                                                                                                                                                        : fileName;
+
         Path dir = playbookPath.getParent();
         while (dir != null) {
-            Path candidate = dir.resolve("simulation.yaml");
-            if (Files.exists(candidate)) {
-                return candidate;
-            }
+            Path candidate = dir.resolve(base + ".simulation.yaml");
+            if (Files.exists(candidate)) {return candidate;}
+            candidate = dir.resolve(base + ".simulation.yml");
+            if (Files.exists(candidate)) {return candidate;}
+            candidate = dir.resolve("simulation.yaml");
+            if (Files.exists(candidate)) {return candidate;}
             candidate = dir.resolve("simulation.yml");
-            if (Files.exists(candidate)) {
-                return candidate;
-            }
+            if (Files.exists(candidate)) {return candidate;}
             dir = dir.getParent();
         }
         return null;

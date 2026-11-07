@@ -79,7 +79,7 @@ public class YamlTestEngine implements TestEngine {
 
     @Override
     public void execute(ExecutionRequest request) {
-        var root = request.getRootTestDescriptor();
+        var root     = request.getRootTestDescriptor();
         var listener = request.getEngineExecutionListener();
         listener.executionStarted(root);
 
@@ -91,13 +91,17 @@ public class YamlTestEngine implements TestEngine {
         pluginRegistry.register(ValidatePlaybookPlugin.definition());
         var serviceRegistry = new MapServiceRegistry();
         serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
-                new io.casehub.yaml.test.DotPathExpressionEngine());
+                                 new io.casehub.yaml.test.DotPathExpressionEngine());
+
+        var simulationRuntime = new io.casehub.platform.simulation.SimulationRuntime(
+                io.casehub.platform.simulation.MapSimulationConfig.builder().build(),
+                new io.casehub.platform.simulation.inmem.InMemorySimulationCorpus<>());
 
         for (var child : root.getChildren()) {
             if (child instanceof YamlFileDescriptor fileDesc) {
-                executeMultiTestFile(fileDesc, listener, pluginRegistry, serviceRegistry);
+                executeMultiTestFile(fileDesc, listener, pluginRegistry, serviceRegistry, simulationRuntime);
             } else if (child instanceof YamlCaseDescriptor caseDesc && caseDesc.fileDescriptor() != null) {
-                executeSingleTestFile(caseDesc, listener, pluginRegistry, serviceRegistry);
+                executeSingleTestFile(caseDesc, listener, pluginRegistry, serviceRegistry, simulationRuntime);
             }
         }
 
@@ -107,22 +111,23 @@ public class YamlTestEngine implements TestEngine {
     private void executeMultiTestFile(YamlFileDescriptor fileDesc,
                                       org.junit.platform.engine.EngineExecutionListener listener,
                                       CompositePluginRegistry pluginRegistry,
-                                      MapServiceRegistry serviceRegistry) {
+                                      MapServiceRegistry serviceRegistry,
+                                      io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
         listener.executionStarted(fileDesc);
         Path resourceRoot = fileDesc.file().getParent();
 
-        var fileRegistry = createFilePluginRegistry(pluginRegistry);
+        var                     fileRegistry = createFilePluginRegistry(pluginRegistry);
         AgentSessionTestSupport agentSupport = null;
-        var testFileDesc = fileDesc.testFileDescriptor();
+        var                     testFileDesc = fileDesc.testFileDescriptor();
         if (testFileDesc.simulateBlock() != null
-                && testFileDesc.simulateBlock().containsKey("agent")) {
+            && testFileDesc.simulateBlock().containsKey("agent")) {
             agentSupport = AgentSessionTestSupport.setup(
-                    testFileDesc.simulateBlock(), fileRegistry, null);
+                    testFileDesc.simulateBlock(), fileRegistry, null, simulationRuntime);
         }
 
         try {
-            var executor = new YamlTestExecutor(fileRegistry, serviceRegistry, resourceRoot);
-            List<TestResult> results = executor.execute(testFileDesc);
+            var              executor = new YamlTestExecutor(fileRegistry, serviceRegistry, resourceRoot, simulationRuntime);
+            List<TestResult> results  = executor.execute(testFileDesc);
 
             int childIdx = 0;
             for (var child : fileDesc.getChildren()) {
@@ -136,32 +141,33 @@ public class YamlTestEngine implements TestEngine {
 
             boolean allPassed = results.stream().allMatch(r -> r.status() == TestStatus.PASS);
             listener.executionFinished(fileDesc,
-                    allPassed ? TestExecutionResult.successful() : TestExecutionResult.failed(
-                            new AssertionError("One or more tests failed")));
+                                       allPassed ? TestExecutionResult.successful() : TestExecutionResult.failed(
+                                               new AssertionError("One or more tests failed")));
         } finally {
-            if (agentSupport != null) agentSupport.close();
+            if (agentSupport != null) {agentSupport.close();}
         }
     }
 
     private void executeSingleTestFile(YamlCaseDescriptor caseDesc,
                                        org.junit.platform.engine.EngineExecutionListener listener,
                                        CompositePluginRegistry pluginRegistry,
-                                       MapServiceRegistry serviceRegistry) {
+                                       MapServiceRegistry serviceRegistry,
+                                       io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
         listener.executionStarted(caseDesc);
         Path resourceRoot = caseDesc.file().getParent();
 
-        var fileRegistry = createFilePluginRegistry(pluginRegistry);
+        var                     fileRegistry = createFilePluginRegistry(pluginRegistry);
         AgentSessionTestSupport agentSupport = null;
-        var testFileDesc = caseDesc.fileDescriptor();
+        var                     testFileDesc = caseDesc.fileDescriptor();
         if (testFileDesc.simulateBlock() != null
-                && testFileDesc.simulateBlock().containsKey("agent")) {
+            && testFileDesc.simulateBlock().containsKey("agent")) {
             agentSupport = AgentSessionTestSupport.setup(
-                    testFileDesc.simulateBlock(), fileRegistry, null);
+                    testFileDesc.simulateBlock(), fileRegistry, null, simulationRuntime);
         }
 
         try {
-            var executor = new YamlTestExecutor(fileRegistry, serviceRegistry, resourceRoot);
-            List<TestResult> results = executor.execute(testFileDesc);
+            var              executor = new YamlTestExecutor(fileRegistry, serviceRegistry, resourceRoot, simulationRuntime);
+            List<TestResult> results  = executor.execute(testFileDesc);
 
             if (results.isEmpty()) {
                 listener.executionFinished(caseDesc, TestExecutionResult.successful());
@@ -169,7 +175,7 @@ public class YamlTestEngine implements TestEngine {
                 listener.executionFinished(caseDesc, toExecutionResult(results.get(0)));
             }
         } finally {
-            if (agentSupport != null) agentSupport.close();
+            if (agentSupport != null) {agentSupport.close();}
         }
     }
 

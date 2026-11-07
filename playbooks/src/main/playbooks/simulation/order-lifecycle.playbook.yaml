@@ -1,0 +1,24 @@
+# Order lifecycle — three named steps drive a state machine
+# through: pending → checked → paid → shipped
+
+steps:
+  - agent-session-open:
+      session: order-agent
+      system: You are an order processing assistant.
+
+  - name: check-order
+    agent-query:
+      session: order-agent
+      user: "Check order status for ORD-5501"
+
+  - name: process-payment
+    agent-query:
+      session: order-agent
+      user: "Process payment for ORD-5501"
+
+  - name: ship-order
+    agent-query:
+      session: order-agent
+      user: "Ship order ORD-5501"
+
+  - agent-session-close: order-agent

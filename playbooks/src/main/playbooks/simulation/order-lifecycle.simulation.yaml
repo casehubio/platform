@@ -1,0 +1,22 @@
+methods:
+  agent-provider.invoke:
+    strategy: sequential
+    corpus-selection:
+      type: state-machine
+      initial: pending
+      transitions:
+        pending:
+          check-order: checked
+        checked:
+          process-payment: paid
+        paid:
+          ship-order: shipped
+      phases:
+        pending:
+          - output: "Order ORD-5501 is PENDING"
+        checked:
+          - output: "Order ORD-5501 is CHECKED"
+        paid:
+          - output: "Payment confirmed for ORD-5501"
+        shipped:
+          - output: "Order ORD-5501 has SHIPPED"

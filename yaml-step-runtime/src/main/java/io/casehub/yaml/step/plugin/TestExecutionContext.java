@@ -10,4 +10,5 @@ public record TestExecutionContext(
         PluginRegistry pluginRegistry,
         ServiceRegistry serviceRegistry,
         Path resourceRoot,
-        VariableResolver variableResolver) {}
+        VariableResolver variableResolver,
+        Object simulationRuntime) {}

@@ -85,6 +85,9 @@ public class SimulationRuntime {
         final var overlay = new SimulationOverlay(config, corpus);
         overlayStack.add(overlay);
         strategyCache.clear();
+        for (String qn : config.corpusSelectionKeys()) {
+            config.corpusSelection(qn).ifPresent(sel -> buildSelector(qn, sel));
+        }
         return overlay;
     }
 
@@ -245,6 +248,25 @@ public class SimulationRuntime {
         return selector instanceof io.casehub.platform.simulation.selector.StateMachineSelector sms
                 ? Optional.of(sms) : Optional.empty();
     }
+
+    public void advanceStateMachines(String trigger) {
+        for (var entry : corpusSelectors.entrySet()) {
+            if (entry.getValue() instanceof io.casehub.platform.simulation.selector.StateMachineSelector sms) {
+                sms.advance(trigger);
+            }
+        }
+    }
+
+    public java.util.Map<String, String> stateMachineStates() {
+        var states = new java.util.LinkedHashMap<String, String>();
+        for (var entry : corpusSelectors.entrySet()) {
+            if (entry.getValue() instanceof io.casehub.platform.simulation.selector.StateMachineSelector sms) {
+                states.put(entry.getKey(), sms.activePhase());
+            }
+        }
+        return states;
+    }
+
 
     private SimilarityScorer<?> requireScorer(final String qualifiedName) {
         final SimilarityScorer<?> scorer = scorers.get(qualifiedName);

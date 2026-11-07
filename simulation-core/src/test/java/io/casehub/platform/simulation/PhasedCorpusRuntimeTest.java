@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -120,4 +119,72 @@ class PhasedCorpusRuntimeTest {
         assertThat(strategy.get().resolve("anything")).isEqualTo("out-a");
         assertThat(strategy.get().resolve("anything")).isEqualTo("out-b");
     }
+
+    @Test
+    void advanceStateMachinesAdvancesAllRegisteredSelectors() {
+        var phases1 = Map.<String, List<InvocationRecord<Object, Object>>>of(
+                "a", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-a1", Instant.now())),
+                "b", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-b1", Instant.now())));
+        var sm1 = new CorpusSelectorConfig.StateMachine("a",
+                                                        Map.of("a", Map.of("step-one", "b")), phases1);
+
+        var phases2 = Map.<String, List<InvocationRecord<Object, Object>>>of(
+                "x", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-x", Instant.now())),
+                "y", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-y", Instant.now())));
+        var sm2 = new CorpusSelectorConfig.StateMachine("x",
+                                                        Map.of("x", Map.of("step-one", "y")), phases2);
+
+        var config = MapSimulationConfig.builder()
+                                        .strategy("spi.one", "sequential")
+                                        .corpusSelection("spi.one", sm1)
+                                        .strategy("spi.two", "sequential")
+                                        .corpusSelection("spi.two", sm2)
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+
+        runtime.strategyFor("spi.one");
+        runtime.strategyFor("spi.two");
+
+        assertThat(runtime.stateMachineSelector("spi.one").get().activePhase()).isEqualTo("a");
+        assertThat(runtime.stateMachineSelector("spi.two").get().activePhase()).isEqualTo("x");
+
+        runtime.advanceStateMachines("step-one");
+
+        assertThat(runtime.stateMachineSelector("spi.one").get().activePhase()).isEqualTo("b");
+        assertThat(runtime.stateMachineSelector("spi.two").get().activePhase()).isEqualTo("y");
+    }
+
+    @Test
+    void advanceStateMachinesSkipsNonStateMachineSelectors() {
+        var smPhases = Map.<String, List<InvocationRecord<Object, Object>>>of(
+                "a", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-a", Instant.now())),
+                "b", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-b", Instant.now())));
+        var smConfig = new CorpusSelectorConfig.StateMachine("a",
+                                                             Map.of("a", Map.of("go", "b")), smPhases);
+
+        var lcPhases = Map.<String, List<InvocationRecord<Object, Object>>>of(
+                "p", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-p", Instant.now())),
+                "q", List.of(new InvocationRecord<>("t1", null, (Object) "in", (Object) "out-q", Instant.now())));
+        var lcConfig = new CorpusSelectorConfig.LookupCount(
+                List.of(new CorpusSelectorConfig.CountPhase("p", 2),
+                        new CorpusSelectorConfig.CountPhase("q", 0)), lcPhases);
+
+        var config = MapSimulationConfig.builder()
+                                        .strategy("sm.spi", "sequential")
+                                        .corpusSelection("sm.spi", smConfig)
+                                        .strategy("lc.spi", "sequential")
+                                        .corpusSelection("lc.spi", lcConfig)
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+
+        runtime.strategyFor("sm.spi");
+        runtime.strategyFor("lc.spi");
+
+        runtime.advanceStateMachines("go");
+
+        assertThat(runtime.stateMachineSelector("sm.spi").get().activePhase()).isEqualTo("b");
+        assertThat(runtime.stateMachineSelector("lc.spi")).isEmpty();
+    }
+
+
 }

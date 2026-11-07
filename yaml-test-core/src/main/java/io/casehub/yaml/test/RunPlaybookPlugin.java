@@ -4,6 +4,7 @@ import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
 
 import java.nio.file.Files;
@@ -47,9 +48,12 @@ public final class RunPlaybookPlugin implements Action {
                                          ? (Map<String, Object>) params.get("vars")
                                          : Map.of();
 
-        var config = new PlaybookRunConfig(false, callerVars, null, null);
+        SimulationRuntime simRuntime = ctx.simulationRuntime() instanceof SimulationRuntime sr ? sr : null;
+        boolean           dryRun     = simRuntime != null;
+
+        var config = new PlaybookRunConfig(dryRun, callerVars, null, null);
         var runner = new PlaybookRunnerCore(ctx.pluginRegistry(), ctx.serviceRegistry(),
-                ctx.resourceRoot(), null, new FileSystemModuleLoader());
+                                            ctx.resourceRoot(), simRuntime, new FileSystemModuleLoader());
 
         PlaybookRunResult runResult = runner.run(playbookPath, config);
 
@@ -62,17 +66,26 @@ public final class RunPlaybookPlugin implements Action {
                             "step", node.index() + 1,
                             "action", node.action() != null ? node.action() : node.type(),
                             "success", node.outcome() == StepOutcome.EXECUTED
-                                    || node.outcome() == StepOutcome.SIMULATED));
+                                       || node.outcome() == StepOutcome.SIMULATED));
                 }
             }
         }
 
-        return Result.of(Map.of(
-                "succeeded", runResult.success(),
-                "output", runResult.output(),
-                "stepCount", stepEvents.size(),
-                "duration", runResult.durationMs(),
-                "stepEvents", (Object) stepEvents,
-                "error", runResult.error() != null ? runResult.error() : ""));
+        var resultMap = new java.util.LinkedHashMap<String, Object>();
+        resultMap.put("succeeded", runResult.success());
+        resultMap.put("output", runResult.output());
+        resultMap.put("stepCount", stepEvents.size());
+        resultMap.put("duration", runResult.durationMs());
+        resultMap.put("stepEvents", stepEvents);
+        resultMap.put("error", runResult.error() != null ? runResult.error() : "");
+        if (simRuntime != null) {
+            var smStates = simRuntime.stateMachineStates();
+            var sanitized = new java.util.LinkedHashMap<String, Object>();
+            for (var smEntry : smStates.entrySet()) {
+                sanitized.put(smEntry.getKey().replace('.', '_'), smEntry.getValue());
+            }
+            resultMap.put("stateMachines", sanitized);
+        }
+        return Result.of(resultMap);
     }
 }

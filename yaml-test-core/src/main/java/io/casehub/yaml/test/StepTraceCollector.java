@@ -36,19 +36,23 @@ public final class StepTraceCollector implements StepExecutionListener {
 
     @Override
     public void afterStep(ResolvedStep step, Result result, Map<String, Object> detail) {
-        String action = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
-        StepOutcome outcome = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
+        String              action         = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
+        StepOutcome         outcome        = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
         Map<String, Object> enrichedDetail = detail;
 
         if (result.isSuccess() && step instanceof ResolvedStep.PluginStep ps
-                && simulationRuntime != null) {
+            && simulationRuntime != null) {
             var strategy = simulationRuntime.strategyFor(ps.actionName());
             if (strategy.isPresent()) {
-                outcome = StepOutcome.SIMULATED;
+                outcome        = StepOutcome.SIMULATED;
                 enrichedDetail = new LinkedHashMap<>(detail);
                 enrichedDetail.put("strategy", strategy.get().getClass().getSimpleName()
-                        .replace("Strategy", "").toLowerCase());
+                                                       .replace("Strategy", "").toLowerCase());
             }
+        }
+
+        if (result.isSuccess() && step.name() != null && simulationRuntime != null) {
+            simulationRuntime.advanceStateMachines(step.name());
         }
 
         exitStep(action, outcome, enrichedDetail);

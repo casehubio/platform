@@ -30,5 +30,9 @@ public interface SimulationConfig {
         return Optional.empty();
     }
 
+    default java.util.Set<String> corpusSelectionKeys() {
+        return java.util.Set.of();
+    }
+
 
 }

@@ -30,7 +30,7 @@ class ValidatePlaybookPluginTest {
         var pluginRegistry = new CompositePluginRegistry();
         registerStubActions(pluginRegistry);
 
-        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null);
+        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null, null);
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();
@@ -46,7 +46,7 @@ class ValidatePlaybookPluginTest {
     void missingFile_returnsError() {
         var services = new MapServiceRegistry();
         var pluginRegistry = new CompositePluginRegistry();
-        var ctx = new TestExecutionContext(pluginRegistry, services, tempDir, null);
+        var ctx = new TestExecutionContext(pluginRegistry, services, tempDir, null, null);
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();
@@ -67,7 +67,7 @@ class ValidatePlaybookPluginTest {
         var pluginRegistry = new CompositePluginRegistry();
         registerStubActions(pluginRegistry);
 
-        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null);
+        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null, null);
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();
@@ -98,7 +98,7 @@ class ValidatePlaybookPluginTest {
         var pluginRegistry = new CompositePluginRegistry();
         registerStubActions(pluginRegistry);
 
-        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null);
+        var ctx = new TestExecutionContext(pluginRegistry, services, examplesDir, null, null);
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();
@@ -132,7 +132,7 @@ class ValidatePlaybookPluginTest {
                 .build());
 
         var services = new MapServiceRegistry();
-        var ctx = new TestExecutionContext(pluginRegistry, services, tempDir, null);
+        var ctx = new TestExecutionContext(pluginRegistry, services, tempDir, null, null);
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();

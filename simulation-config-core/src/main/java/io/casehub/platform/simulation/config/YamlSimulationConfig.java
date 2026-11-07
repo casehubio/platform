@@ -579,6 +579,18 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                        .map(MethodConfig::corpusSelection);
     }
 
+    @Override
+    public java.util.Set<String> corpusSelectionKeys() {
+        var keys = new java.util.LinkedHashSet<String>();
+        for (var entry : methods.entrySet()) {
+            if (entry.getValue().corpusSelection() != null) {
+                keys.add(entry.getKey());
+            }
+        }
+        return keys;
+    }
+
+
     @SuppressWarnings("unchecked")
     private CorpusSelectorConfig parseCorpusSelectionConfig(Map<String, Object> raw) {
         String type = (String) raw.get("type");

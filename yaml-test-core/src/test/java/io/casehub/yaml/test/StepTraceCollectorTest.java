@@ -65,4 +65,83 @@ class StepTraceCollectorTest {
 
         assertThat(collector.rootChildren().get(0).durationMs()).isGreaterThanOrEqualTo(0);
     }
+
+    @Test
+    void afterStepAdvancesStateMachineSelectorsOnSuccess() {
+        var phases = Map.<String, java.util.List<io.casehub.platform.simulation.InvocationRecord<Object, Object>>>of(
+                "pending", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "pending-out", java.time.Instant.now())),
+                "completed", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "completed-out", java.time.Instant.now())));
+        var smConfig = new io.casehub.platform.simulation.CorpusSelectorConfig.StateMachine("pending",
+                                                                                            Map.of("pending", Map.of("submit-payment", "completed")), phases);
+
+        var config = io.casehub.platform.simulation.MapSimulationConfig.builder()
+                                                                       .strategy("payment.process", "sequential")
+                                                                       .corpusSelection("payment.process", smConfig)
+                                                                       .build();
+        var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
+        runtime.strategyFor("payment.process");
+
+        var collector = new StepTraceCollector(runtime);
+        var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
+                "submit-payment", "payment.process", Map.of(), Map.of());
+
+        collector.beforeStep(step);
+        collector.afterStep(step, io.casehub.yaml.plugin.api.Result.of(Map.of()), Map.of());
+
+        assertThat(runtime.stateMachineSelector("payment.process").get().activePhase())
+                .isEqualTo("completed");
+    }
+
+    @Test
+    void afterStepDoesNotAdvanceOnFailure() {
+        var phases = Map.<String, java.util.List<io.casehub.platform.simulation.InvocationRecord<Object, Object>>>of(
+                "pending", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "pending-out", java.time.Instant.now())),
+                "completed", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "completed-out", java.time.Instant.now())));
+        var smConfig = new io.casehub.platform.simulation.CorpusSelectorConfig.StateMachine("pending",
+                                                                                            Map.of("pending", Map.of("submit-payment", "completed")), phases);
+
+        var config = io.casehub.platform.simulation.MapSimulationConfig.builder()
+                                                                       .strategy("payment.process", "sequential")
+                                                                       .corpusSelection("payment.process", smConfig)
+                                                                       .build();
+        var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
+        runtime.strategyFor("payment.process");
+
+        var collector = new StepTraceCollector(runtime);
+        var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
+                "submit-payment", "payment.process", Map.of(), Map.of());
+
+        collector.beforeStep(step);
+        collector.afterStep(step, io.casehub.yaml.plugin.api.Result.failed("error"), Map.of());
+
+        assertThat(runtime.stateMachineSelector("payment.process").get().activePhase())
+                .isEqualTo("pending");
+    }
+
+    @Test
+    void afterStepIgnoresNullStepName() {
+        var phases = Map.<String, java.util.List<io.casehub.platform.simulation.InvocationRecord<Object, Object>>>of(
+                "a", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "out-a", java.time.Instant.now())),
+                "b", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "out-b", java.time.Instant.now())));
+        var smConfig = new io.casehub.platform.simulation.CorpusSelectorConfig.StateMachine("a",
+                                                                                            Map.of("a", Map.of("go", "b")), phases);
+
+        var config = io.casehub.platform.simulation.MapSimulationConfig.builder()
+                                                                       .strategy("spi.method", "sequential")
+                                                                       .corpusSelection("spi.method", smConfig)
+                                                                       .build();
+        var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
+        runtime.strategyFor("spi.method");
+
+        var collector = new StepTraceCollector(runtime);
+        var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
+                null, "spi.method", Map.of(), Map.of());
+
+        collector.beforeStep(step);
+        collector.afterStep(step, io.casehub.yaml.plugin.api.Result.of(Map.of()), Map.of());
+
+        assertThat(runtime.stateMachineSelector("spi.method").get().activePhase())
+                .isEqualTo("a");
+    }
+
 }

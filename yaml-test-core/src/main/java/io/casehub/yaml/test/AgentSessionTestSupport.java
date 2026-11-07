@@ -35,28 +35,29 @@ public final class AgentSessionTestSupport implements AutoCloseable {
     public static AgentSessionTestSupport setup(
             Map<String, Object> simulateBlock,
             CompositePluginRegistry pluginRegistry,
-            List<PoolDeclaration> compiledPools) {
+            List<PoolDeclaration> compiledPools,
+            io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
 
-        Map<String, String> corpus = extractCorpus(simulateBlock);
-        int clearingThreshold = extractConfigInt(simulateBlock, "clearing-threshold", 8000);
-        int maxActive = extractConfigInt(simulateBlock, "max-active", 20);
+        Map<String, String> corpus            = extractCorpus(simulateBlock);
+        int                 clearingThreshold = extractConfigInt(simulateBlock, "clearing-threshold", 8000);
+        int                 maxActive         = extractConfigInt(simulateBlock, "max-active", 20);
 
-        AgentBackend backend = new CorpusBackend(corpus);
+        AgentBackend            backend  = new CorpusBackend(corpus, simulationRuntime);
         BackendInstanceRegistry backends = new SingleBackendRegistry(backend);
 
         List<PoolDeclaration> pools = compiledPools != null && !compiledPools.isEmpty()
-                ? compiledPools.stream()
-                    .map(p -> new PoolDeclaration(p.name(), p.agentId(), "stub",
-                            p.minActive(), p.maxActive(), p.workingDir(),
-                            p.scaling(), p.extensions(), p.salience(), p.clearing(),
-                            p.maxPromptTokens()))
-                    .toList()
-                : List.of(new PoolDeclaration("default", "agent", "stub",
-                    0, maxActive, null, Map.of(), Map.of()));
+                                      ? compiledPools.stream()
+                                                     .map(p -> new PoolDeclaration(p.name(), p.agentId(), "stub",
+                                                                                   p.minActive(), p.maxActive(), p.workingDir(),
+                                                                                   p.scaling(), p.extensions(), p.salience(), p.clearing(),
+                                                                                   p.maxPromptTokens()))
+                                                     .toList()
+                                      : List.of(new PoolDeclaration("default", "agent", "stub",
+                                                                    0, maxActive, null, Map.of(), Map.of()));
 
         var poolRegistry = new SessionPoolRegistry(pools, backends);
-        var manager = new SessionLifecycleManager(poolRegistry);
-        var pipeline = new SessionPipeline(manager, "stub", maxActive, clearingThreshold);
+        var manager      = new SessionLifecycleManager(poolRegistry);
+        var pipeline     = new SessionPipeline(manager, "stub", maxActive, clearingThreshold);
 
         for (var def : AgentSessionPlugins.definitions(pipeline)) {
             pluginRegistry.register(def);
@@ -112,49 +113,90 @@ public final class AgentSessionTestSupport implements AutoCloseable {
     }
 
     static class CorpusBackend implements AgentBackend {
-        private final Map<String, String> corpus;
-        CorpusBackend(Map<String, String> corpus) { this.corpus = corpus; }
-        @Override public String key() { return "stub"; }
+        private static final String                                           AGENT_QN = "agent-provider.invoke";
+        private final        Map<String, String>                              corpus;
+        private final        io.casehub.platform.simulation.SimulationRuntime simulationRuntime;
 
-        @Override public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+        CorpusBackend(Map<String, String> corpus, io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
+            this.corpus            = corpus;
+            this.simulationRuntime = simulationRuntime;
+        }
+
+        @Override
+        public String key() {return "stub";}
+
+        @Override
+        public Multi<AgentEvent> invoke(AgentSessionConfig config) {
             String response = lookupResponse(config.userPrompt());
             return Multi.createFrom().items(
                     new AgentEvent.TextDelta(response),
                     new AgentEvent.InvocationComplete(10, 20, 0, 0, 0, 0.001, 50L, 0L, null, 0, false, null, null));
         }
 
-        @Override public AgentSession openSession(AgentSessionInit init) {
-            return new CorpusSession(corpus);
+        @Override
+        public AgentSession openSession(AgentSessionInit init) {
+            return new CorpusSession(corpus, simulationRuntime);
         }
 
         String lookupResponse(String prompt) {
-            if (prompt == null) return "No prompt";
+            if (simulationRuntime != null) {
+                var strategy = simulationRuntime.<Object, Object>strategyFor(AGENT_QN);
+                if (strategy.isPresent() && strategy.get().canResolve(prompt)) {
+                    return String.valueOf(strategy.get().resolve(prompt));
+                }
+            }
+            if (prompt == null) {return "No prompt";}
             return corpus.entrySet().stream()
-                    .filter(e -> prompt.contains(e.getKey()))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse("Response: " + prompt.substring(0, Math.min(40, prompt.length())));
+                         .filter(e -> prompt.contains(e.getKey()))
+                         .map(Map.Entry::getValue)
+                         .findFirst()
+                         .orElse("Response: " + prompt.substring(0, Math.min(40, prompt.length())));
         }
     }
 
     private static class CorpusSession implements AgentSession {
-        private final Map<String, String> corpus;
-        CorpusSession(Map<String, String> corpus) { this.corpus = corpus; }
+        private static final String                                           AGENT_QN = "agent-provider.invoke";
+        private final        Map<String, String>                              corpus;
+        private final        io.casehub.platform.simulation.SimulationRuntime simulationRuntime;
 
-        @Override public Multi<AgentEvent> query(String prompt) {
-            String response = corpus.entrySet().stream()
-                    .filter(e -> prompt != null && prompt.contains(e.getKey()))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse("Response: " + (prompt != null ? prompt.substring(0, Math.min(40, prompt.length())) : "null"));
+        CorpusSession(Map<String, String> corpus, io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
+            this.corpus            = corpus;
+            this.simulationRuntime = simulationRuntime;
+        }
+
+        @Override
+        public Multi<AgentEvent> query(String prompt) {
+            String response = lookupResponse(prompt);
             return Multi.createFrom().items(
                     new AgentEvent.TextDelta(response),
                     new AgentEvent.InvocationComplete(10, 20, 0, 0, 0, 0.001, 50L, 0L, null, 0, false, null, null));
         }
-        @Override public Uni<Void> interrupt() { return Uni.createFrom().voidItem(); }
-        @Override public void clear() {}
-        @Override public void close(Duration maxWait) {}
-        @Override public void close() { close(Duration.ofSeconds(30)); }
+
+        private String lookupResponse(String prompt) {
+            if (simulationRuntime != null) {
+                var strategy = simulationRuntime.<Object, Object>strategyFor(AGENT_QN);
+                if (strategy.isPresent() && strategy.get().canResolve(prompt)) {
+                    return String.valueOf(strategy.get().resolve(prompt));
+                }
+            }
+            return corpus.entrySet().stream()
+                         .filter(e -> prompt != null && prompt.contains(e.getKey()))
+                         .map(Map.Entry::getValue)
+                         .findFirst()
+                         .orElse("Response: " + (prompt != null ? prompt.substring(0, Math.min(40, prompt.length())) : "null"));
+        }
+
+        @Override
+        public Uni<Void> interrupt()        {return Uni.createFrom().voidItem();}
+
+        @Override
+        public void clear()                 {}
+
+        @Override
+        public void close(Duration maxWait) {}
+
+        @Override
+        public void close()                 {close(Duration.ofSeconds(30));}
     }
 
     private record SingleBackendRegistry(AgentBackend backend) implements BackendInstanceRegistry {

@@ -1,8 +1,8 @@
 package io.casehub.yaml.test;
 
+import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.platform.simulation.SimulationOverlay;
 import io.casehub.platform.simulation.SimulationRuntime;
-import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.PluginRegistry;
@@ -83,10 +83,10 @@ public final class YamlTestExecutor {
         testServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
         try {
             testServices.register(ExpressionEngineRegistry.class,
-                    baseServiceRegistry.lookup(ExpressionEngineRegistry.class));
+                                  baseServiceRegistry.lookup(ExpressionEngineRegistry.class));
         } catch (IllegalArgumentException ignored) {}
 
-        var testContext = new TestExecutionContext(pluginRegistry, testServices, resourceRoot, null);
+        var testContext = new TestExecutionContext(pluginRegistry, testServices, resourceRoot, null, simulationRuntime);
         testServices.register(TestExecutionContext.class, testContext);
 
         VariableResolver resolver = buildResolver(varsBlock, paramsBlock);

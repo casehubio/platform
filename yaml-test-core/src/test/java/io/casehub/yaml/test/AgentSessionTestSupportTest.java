@@ -19,7 +19,7 @@ class AgentSessionTestSupportTest {
                 "agent", List.of(
                         Map.of("prompt", "hello", "response", "world")));
 
-        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null)) {
+        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null, null)) {
             assertThat(pluginRegistry.resolve("agent-session-open")).isPresent();
             assertThat(pluginRegistry.resolve("agent-session-query")).isPresent();
             assertThat(pluginRegistry.resolve("agent-session-clear")).isPresent();
@@ -35,7 +35,7 @@ class AgentSessionTestSupportTest {
                         Map.of("prompt", "hello", "response", "world"),
                         Map.of("prompt", "classify", "response", "INVOICE")));
 
-        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null)) {
+        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null, null)) {
             var services = new MapServiceRegistry();
 
             var openDef = pluginRegistry.resolve("agent-session-open").orElseThrow();
@@ -63,7 +63,7 @@ class AgentSessionTestSupportTest {
                 "agent", List.of(
                         Map.of("prompt", "test", "response", "response")));
 
-        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null)) {
+        try (var support = AgentSessionTestSupport.setup(simulateBlock, pluginRegistry, null, null)) {
             var services = new MapServiceRegistry();
 
             pluginRegistry.resolve("agent-session-open").orElseThrow()

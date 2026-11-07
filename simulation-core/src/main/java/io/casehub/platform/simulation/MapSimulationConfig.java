@@ -79,6 +79,11 @@ public final class MapSimulationConfig implements SimulationConfig {
         return Optional.ofNullable(corpusSelections.get(qualifiedName));
     }
 
+    @Override
+    public java.util.Set<String> corpusSelectionKeys() {
+        return corpusSelections.keySet();
+    }
+
 
     public Map<String, String> strategies() {
         return strategies;

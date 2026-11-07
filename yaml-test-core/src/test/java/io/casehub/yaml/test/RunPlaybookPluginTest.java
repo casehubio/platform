@@ -1,10 +1,10 @@
 package io.casehub.yaml.test;
 
 import io.casehub.yaml.core.resolver.VariableResolver;
-import io.casehub.yaml.step.catalog.CompositePluginRegistry;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.step.catalog.CompositePluginRegistry;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -101,7 +101,7 @@ class RunPlaybookPluginTest {
     private MapServiceRegistry buildServices(CompositePluginRegistry registry, Path root) {
         var services = new MapServiceRegistry();
         var ctx = new TestExecutionContext(registry, services, root,
-                                           new VariableResolver(Map.of(), java.util.Set.of()));
+                                           new VariableResolver(Map.of(), java.util.Set.of()), null);
         services.register(TestExecutionContext.class, ctx);
         return services;
     }

@@ -10,12 +10,12 @@ meta:
     - channel
     - flow-control
 ---
-- step: producer
+- name:producer
   log: { message: "Sending 3 items" }
   publish: { channel: events, data: { value: 1 } }
   loop: 3
 
-- step: consumer
+- name:consumer
   log: { message: "Processing ${from.value}" }
   from: { channel: events, until: "${flag.done}" }
   loop: continuous

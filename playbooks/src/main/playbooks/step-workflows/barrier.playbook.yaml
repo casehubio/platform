@@ -10,9 +10,9 @@ meta:
     - dependency
     - step-workflows
 ---
-- step: fetch-data
+- name:fetch-data
   log: { message: "Fetching data" }
-- step: load-config
+- name:load-config
   log: { message: "Loading config" }
 - barrier:
     await: [fetch-data, load-config]

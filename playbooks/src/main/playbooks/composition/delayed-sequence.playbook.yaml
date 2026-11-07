@@ -11,13 +11,13 @@ meta:
     - from
     - composition
 ---
-- step: read-a
+- name:read-a
   log: { message: "Read trigger: ${from.type}" }
   from: triggers
 
 - delay: 2s
 
-- step: read-b
+- name:read-b
   log: { message: "Read consequence: ${from.type}" }
   from: consequences
   timeout: 10s

@@ -14,7 +14,7 @@ meta:
 - log: { message: "Event A detected — watching for B within 5s" }
 
 - block:
-  - step: watch-for-b
+  - name: watch-for-b
     log: { message: "Event B arrived: ${from.type}" }
     from: events
     timeout: 5s

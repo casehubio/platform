@@ -19,7 +19,7 @@ meta:
         loop: 10
 
     enricher:
-      - step: enrich
+      - name: enrich
         log: { message: "Enriching ${from.type}" }
         from: { channel: raw-events, name: enricher }
         loop: continuous

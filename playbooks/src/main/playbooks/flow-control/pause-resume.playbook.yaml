@@ -23,7 +23,7 @@ meta:
         loop: 3
 
     consumer:
-      - step: reader
+      - name: reader
         log: { message: "Reading ${from.batch}" }
         from: { channel: events, name: primary-reader }
         loop: continuous

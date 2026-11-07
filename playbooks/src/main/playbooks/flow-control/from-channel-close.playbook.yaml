@@ -19,7 +19,7 @@ meta:
       - log: { message: "Closing channel" }
 
     consumer:
-      - step: read
+      - name: read
         log: { message: "Received ${from.id}" }
         from: data
         loop: continuous

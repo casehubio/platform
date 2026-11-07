@@ -14,18 +14,18 @@ meta:
 ---
 - race pattern:
     - block:
-      - step: read-a1
+      - name:read-a1
         log: { message: "Path 1: read A" }
         from: events
-      - step: read-b
+      - name:read-b
         log: { message: "Path 1: read B after A" }
         from: events
         timeout: 5s
     - block:
-      - step: read-a2
+      - name:read-a2
         log: { message: "Path 2: read A" }
         from: events
-      - step: read-c
+      - name:read-c
         log: { message: "Path 2: read C after A" }
         from: events
         timeout: 5s

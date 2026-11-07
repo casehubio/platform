@@ -6,8 +6,7 @@ setup:
 tests:
   - name: First test
     steps:
-      - agent-invoke:
-          prompt: "risk"
+      - agent-invoke "risk":
         capture: result
       - assertThat: ${result.text}
         contains: 'risk'
@@ -16,8 +15,7 @@ tests:
     setup:
       - emit-event: test.per-test-setup
     steps:
-      - agent-invoke:
-          prompt: "rebalance"
+      - agent-invoke "rebalance":
         capture: result
       - assertThat: ${result.text}
         contains: 'rebalance'

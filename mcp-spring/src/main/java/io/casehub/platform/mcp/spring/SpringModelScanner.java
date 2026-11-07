@@ -3,6 +3,7 @@ package io.casehub.platform.mcp.spring;
 import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.McpExclude;
+import io.casehub.platform.api.mcp.McpOnly;
 import io.casehub.platform.api.mcp.McpParam;
 import io.casehub.platform.api.mcp.McpParamFormat;
 import io.casehub.platform.api.mcp.ModelEnricher;
@@ -82,6 +83,11 @@ public class SpringModelScanner {
                     domainOps.get(domain).add(
                             buildOperation(method, beanType,
                                            OperationDescriptor.OperationType.MUTATION, desc));
+                } else if (method.isAnnotationPresent(McpOnly.class)) {
+                    String desc = method.getAnnotation(McpOnly.class).value();
+                    domainOps.get(domain).add(
+                            buildOperation(method, beanType,
+                                           OperationDescriptor.OperationType.QUERY, desc));
                 }
             }
         }
@@ -121,6 +127,11 @@ public class SpringModelScanner {
                         domainOps.get(domain).add(
                                 buildOperation(method, beanType,
                                                OperationDescriptor.OperationType.MUTATION, desc));
+                    } else if (method.isAnnotationPresent(McpOnly.class)) {
+                        String desc = method.getAnnotation(McpOnly.class).value();
+                        domainOps.get(domain).add(
+                                buildOperation(method, beanType,
+                                               OperationDescriptor.OperationType.QUERY, desc));
                     }
                 }
             }

@@ -8,6 +8,9 @@ import io.casehub.platform.api.mcp.McpParam;
 import io.casehub.platform.api.mcp.McpParamFormat;
 import io.casehub.platform.api.mcp.McpTrack;
 import io.casehub.platform.api.mcp.McpTrackType;
+import io.casehub.platform.api.mcp.McpCursorMap;
+import io.casehub.platform.api.mcp.McpCursorType;
+import io.casehub.platform.api.mcp.McpDelegate;
 import io.casehub.platform.api.mcp.McpUpsert;
 import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.OperationDescriptor;
@@ -75,7 +78,9 @@ public class SpringOperationDispatcher {
         }
 
         Object result;
-        if (method.isAnnotationPresent(McpUpsert.class)) {
+        if (method.isAnnotationPresent(McpDelegate.class)) {
+            result = dispatchDelegate(method, effectiveParams);
+        } else if (method.isAnnotationPresent(McpUpsert.class)) {
             result = dispatchUpsert(method, bean, args, effectiveParams, op);
         } else {
             result = method.invoke(bean, args);
@@ -108,6 +113,47 @@ public class SpringOperationDispatcher {
             }
             default -> throw new IllegalArgumentException("Unknown @ContextParam key: " + key);
         };
+    }
+
+    private Object dispatchDelegate(Method declaringMethod, Map<String, Object> params) throws Exception {
+        McpDelegate delegate = declaringMethod.getAnnotation(McpDelegate.class);
+        Object spiBean = context.getBean(delegate.spi());
+        Method targetMethod = findMethod(delegate.spi(), delegate.method());
+        Object[] delegateArgs = matchArgsWithCursorMap(targetMethod, params, declaringMethod);
+        return targetMethod.invoke(spiBean, delegateArgs);
+    }
+
+    private Object[] matchArgsWithCursorMap(Method target, Map<String, Object> params,
+                                             Method declaringMethod) {
+        Parameter[] declaringParams = declaringMethod.getParameters();
+        Map<String, McpCursorType> cursorMaps = new LinkedHashMap<>();
+        for (Parameter p : declaringParams) {
+            if (p.isAnnotationPresent(McpCursorMap.class)) {
+                cursorMaps.put(p.getName(), p.getAnnotation(McpCursorMap.class).value());
+            }
+        }
+
+        Parameter[] targetParams = target.getParameters();
+        Object[] args = new Object[targetParams.length];
+        for (int i = 0; i < targetParams.length; i++) {
+            Parameter param = targetParams[i];
+            if (param.isAnnotationPresent(ContextParam.class)) {
+                args[i] = resolveContextParam(param.getAnnotation(ContextParam.class).value());
+            } else {
+                Object rawValue = params.get(param.getName());
+                if (rawValue != null) {
+                    McpCursorType cursorType = cursorMaps.get(param.getName());
+                    if (cursorType == McpCursorType.INSTANT && rawValue instanceof String s) {
+                        args[i] = Instant.parse(s);
+                    } else if (param.isAnnotationPresent(McpParam.class)) {
+                        args[i] = serialiseMcpParam(rawValue, param.getAnnotation(McpParam.class).format());
+                    } else {
+                        args[i] = mapper.convertValue(rawValue, param.getType());
+                    }
+                }
+            }
+        }
+        return args;
     }
 
     private void validateParams(OperationDescriptor op, Map<String, Object> params) {

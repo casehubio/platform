@@ -2,6 +2,9 @@ package io.casehub.platform.mcp.spring;
 
 import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
+import io.casehub.platform.api.mcp.McpExclude;
+import io.casehub.platform.api.mcp.McpParam;
+import io.casehub.platform.api.mcp.McpParamFormat;
 import io.casehub.platform.api.mcp.ModelEnricher;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
@@ -68,6 +71,7 @@ public class SpringModelScanner {
             domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
             for (Method method : beanType.getDeclaredMethods()) {
                 if (Modifier.isStatic(method.getModifiers())) {continue;}
+                if (method.isAnnotationPresent(McpExclude.class)) {continue;}
                 if (method.isAnnotationPresent(PlatformQuery.class)) {
                     String desc = method.getAnnotation(PlatformQuery.class).value();
                     domainOps.get(domain).add(
@@ -106,6 +110,7 @@ public class SpringModelScanner {
                 domainOps.computeIfAbsent(domain, k -> new ArrayList<>());
                 for (Method method : iface.getDeclaredMethods()) {
                     if (Modifier.isStatic(method.getModifiers())) {continue;}
+                    if (method.isAnnotationPresent(McpExclude.class)) {continue;}
                     if (method.isAnnotationPresent(PlatformQuery.class)) {
                         String desc = method.getAnnotation(PlatformQuery.class).value();
                         domainOps.get(domain).add(
@@ -180,11 +185,22 @@ public class SpringModelScanner {
 
             String name = param.getName();
             boolean required = !Optional.class.isAssignableFrom(param.getType());
-            Map<String, String> fields = expandFields(param.getType());
-            params.add(new ParameterDescriptor(name, mapTypeName(param.getType()),
-                    required, "", fields));
+            McpParamFormat mcpFormat = null;
+            if (param.isAnnotationPresent(McpParam.class)) {
+                mcpFormat = param.getAnnotation(McpParam.class).format();
+            }
+            String typeName = mcpFormat != null ? mcpFormatTypeName(mcpFormat) : mapTypeName(param.getType());
+            Map<String, String> fields = mcpFormat != null ? Map.of() : expandFields(param.getType());
+            params.add(new ParameterDescriptor(name, typeName, required, "", fields, mcpFormat));
         }
         return params;
+    }
+
+    private String mcpFormatTypeName(McpParamFormat format) {
+        return switch (format) {
+            case MAP -> "JSON";
+            case LIST -> "List";
+        };
     }
 
     private Map<String, String> expandFields(Class<?> type) {

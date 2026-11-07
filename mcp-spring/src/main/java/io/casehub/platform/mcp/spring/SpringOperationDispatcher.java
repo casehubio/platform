@@ -2,6 +2,8 @@ package io.casehub.platform.mcp.spring;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.mcp.ContextParam;
+import io.casehub.platform.api.mcp.McpParam;
+import io.casehub.platform.api.mcp.McpParamFormat;
 import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
@@ -9,7 +11,9 @@ import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,11 +56,19 @@ public class SpringOperationDispatcher {
             }
             Object rawValue = effectiveParams.get(param.getName());
             if (rawValue != null) {
-                args[i] = mapper.convertValue(rawValue, param.getType());
+                if (param.isAnnotationPresent(McpParam.class)) {
+                    args[i] = serialiseMcpParam(rawValue, param.getAnnotation(McpParam.class).format());
+                } else {
+                    args[i] = mapper.convertValue(rawValue, param.getType());
+                }
             }
         }
 
-        return method.invoke(bean, args);
+        Object result = method.invoke(bean, args);
+        if (op.type() == OperationDescriptor.OperationType.MUTATION && shouldWrapResult(method, result)) {
+            return wrapMutationResult(result);
+        }
+        return result;
     }
 
     private Object resolveContextParam(String key) {
@@ -107,5 +119,37 @@ public class SpringOperationDispatcher {
                     .collect(Collectors.joining(", ")));
             throw new IllegalArgumentException(sb.toString());
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String serialiseMcpParam(Object value, McpParamFormat format) {
+        return switch (format) {
+            case MAP -> {
+                Map<String, Object> map = (Map<String, Object>) value;
+                yield map.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining("|"));
+            }
+            case LIST -> {
+                List<String> list = (List<String>) value;
+                yield String.join("|", list);
+            }
+        };
+    }
+
+    private boolean shouldWrapResult(Method method, Object result) {
+        Class<?> returnType = method.getReturnType();
+        return returnType == void.class || returnType == Void.class
+                || returnType == String.class;
+    }
+
+    private Map<String, Object> wrapMutationResult(Object result) {
+        Map<String, Object> wrapped = new LinkedHashMap<>();
+        wrapped.put("success", true);
+        wrapped.put("timestamp", Instant.now().toString());
+        if (result instanceof String s && !s.isBlank()) {
+            wrapped.put("id", s);
+        }
+        return wrapped;
     }
 }

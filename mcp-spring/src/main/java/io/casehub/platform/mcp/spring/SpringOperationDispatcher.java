@@ -10,7 +10,7 @@ import io.casehub.platform.api.mcp.ReadTracker;
 import io.casehub.platform.api.mcp.McpCursorMap;
 import io.casehub.platform.api.mcp.McpCursorType;
 import io.casehub.platform.api.mcp.McpDelegate;
-import io.casehub.platform.api.mcp.McpUpsert;
+import io.casehub.platform.api.mcp.McpAutoRoute;
 import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
@@ -79,8 +79,8 @@ public class SpringOperationDispatcher {
         Object result;
         if (method.isAnnotationPresent(McpDelegate.class)) {
             result = dispatchDelegate(method, effectiveParams);
-        } else if (method.isAnnotationPresent(McpUpsert.class)) {
-            result = dispatchUpsert(method, bean, args, effectiveParams, op);
+        } else if (method.isAnnotationPresent(McpAutoRoute.class)) {
+            result = dispatchAutoRoute(method, bean, args, effectiveParams, op);
         } else {
             result = method.invoke(bean, args);
         }
@@ -221,10 +221,10 @@ public class SpringOperationDispatcher {
         return wrapped;
     }
 
-    private Object dispatchUpsert(Method addMethod, Object bean, Object[] args,
+    private Object dispatchAutoRoute(Method addMethod, Object bean, Object[] args,
                                    Map<String, Object> params, OperationDescriptor op) throws Exception {
-        McpUpsert upsert = addMethod.getAnnotation(McpUpsert.class);
-        Method checkMethod = findMethod(bean.getClass(), upsert.existsCheck());
+        McpAutoRoute route = addMethod.getAnnotation(McpAutoRoute.class);
+        Method checkMethod = findMethod(bean.getClass(), route.check());
         Object[] checkArgs = matchArgs(checkMethod, params, bean);
         Object existing = checkMethod.invoke(bean, checkArgs);
         boolean created = existing == null;
@@ -233,7 +233,7 @@ public class SpringOperationDispatcher {
         if (created) {
             result = addMethod.invoke(bean, args);
         } else {
-            Method updateMethod = findMethod(bean.getClass(), upsert.update());
+            Method updateMethod = findMethod(bean.getClass(), route.alternate());
             Object[] updateArgs = matchArgs(updateMethod, params, bean);
             result = updateMethod.invoke(bean, updateArgs);
         }

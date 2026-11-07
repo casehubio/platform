@@ -2,17 +2,24 @@ package io.casehub.platform.mcp.spring;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.mcp.ContextParam;
+import io.casehub.platform.api.mcp.McpAccessEvent;
+import io.casehub.platform.api.mcp.McpEnrich;
 import io.casehub.platform.api.mcp.McpParam;
 import io.casehub.platform.api.mcp.McpParamFormat;
+import io.casehub.platform.api.mcp.McpTrack;
+import io.casehub.platform.api.mcp.McpTrackType;
+import io.casehub.platform.api.mcp.McpUpsert;
 import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.ParameterDescriptor;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,13 +31,16 @@ public class SpringOperationDispatcher {
     private final DomainModelRegistry registry;
     private final ApplicationContext context;
     private final ObjectMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SpringOperationDispatcher(DomainModelRegistry registry,
                                       ApplicationContext context,
-                                      ObjectMapper mapper) {
+                                      ObjectMapper mapper,
+                                      ApplicationEventPublisher eventPublisher) {
         this.registry = registry;
         this.context = context;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     public Object dispatch(String domain, String operation, Map<String, Object> params)
@@ -64,10 +74,23 @@ public class SpringOperationDispatcher {
             }
         }
 
-        Object result = method.invoke(bean, args);
-        if (op.type() == OperationDescriptor.OperationType.MUTATION && shouldWrapResult(method, result)) {
-            return wrapMutationResult(result);
+        Object result;
+        if (method.isAnnotationPresent(McpUpsert.class)) {
+            result = dispatchUpsert(method, bean, args, effectiveParams, op);
+        } else {
+            result = method.invoke(bean, args);
         }
+
+        if (method.isAnnotationPresent(McpTrack.class)) {
+            fireTrackEvent(method.getAnnotation(McpTrack.class), domain, operation, effectiveParams);
+        }
+
+        if (method.isAnnotationPresent(McpEnrich.class) || method.getAnnotationsByType(McpEnrich.class).length > 0) {
+            result = applyEnrichments(method, result, effectiveParams, op);
+        } else if (op.type() == OperationDescriptor.OperationType.MUTATION && shouldWrapResult(method, result)) {
+            result = wrapMutationResult(result);
+        }
+
         return result;
     }
 
@@ -151,5 +174,85 @@ public class SpringOperationDispatcher {
             wrapped.put("id", s);
         }
         return wrapped;
+    }
+
+    private Object dispatchUpsert(Method addMethod, Object bean, Object[] args,
+                                   Map<String, Object> params, OperationDescriptor op) throws Exception {
+        McpUpsert upsert = addMethod.getAnnotation(McpUpsert.class);
+        Method checkMethod = findMethod(bean.getClass(), upsert.existsCheck());
+        Object[] checkArgs = matchArgs(checkMethod, params, bean);
+        Object existing = checkMethod.invoke(bean, checkArgs);
+        boolean created = existing == null;
+
+        Object result;
+        if (created) {
+            result = addMethod.invoke(bean, args);
+        } else {
+            Method updateMethod = findMethod(bean.getClass(), upsert.update());
+            Object[] updateArgs = matchArgs(updateMethod, params, bean);
+            result = updateMethod.invoke(bean, updateArgs);
+        }
+
+        Map<String, Object> wrapped = wrapMutationResult(result);
+        wrapped.put("created", created);
+        return wrapped;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object applyEnrichments(Method method, Object primaryResult,
+                                     Map<String, Object> params, OperationDescriptor op) throws Exception {
+        Map<String, Object> enriched;
+        if (primaryResult instanceof Map) {
+            enriched = new LinkedHashMap<>((Map<String, Object>) primaryResult);
+        } else {
+            enriched = mapper.convertValue(primaryResult, Map.class);
+            if (enriched == null) enriched = new LinkedHashMap<>();
+        }
+
+        for (McpEnrich enrich : method.getAnnotationsByType(McpEnrich.class)) {
+            Object spiBean = context.getBean(enrich.spi());
+            Method enrichMethod = findMethod(enrich.spi(), enrich.method());
+            Object[] enrichArgs = matchArgs(enrichMethod, params, spiBean);
+            Object enrichResult = enrichMethod.invoke(spiBean, enrichArgs);
+            enriched.put(enrich.as(), enrichResult);
+        }
+
+        return enriched;
+    }
+
+    private void fireTrackEvent(McpTrack track, String domain, String operation,
+                                 Map<String, Object> params) {
+        if (track.value() == McpTrackType.ACCESS) {
+            eventPublisher.publishEvent(new McpAccessEvent(domain, operation, params, Instant.now()));
+        }
+    }
+
+    private Method findMethod(Class<?> type, String name) {
+        return Arrays.stream(type.getMethods())
+                .filter(m -> m.getName().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Method '" + name + "' not found on " + type.getName()));
+    }
+
+    private Object[] matchArgs(Method target, Map<String, Object> params, Object bean) {
+        Parameter[] targetParams = target.getParameters();
+        Object[] args = new Object[targetParams.length];
+        for (int i = 0; i < targetParams.length; i++) {
+            Parameter param = targetParams[i];
+            if (param.isAnnotationPresent(ContextParam.class)) {
+                args[i] = resolveContextParam(param.getAnnotation(ContextParam.class).value());
+            } else {
+                Object rawValue = params.get(param.getName());
+                if (rawValue != null) {
+                    if (param.isAnnotationPresent(McpParam.class)) {
+                        args[i] = serialiseMcpParam(rawValue, param.getAnnotation(McpParam.class).format());
+                    } else {
+                        args[i] = mapper.convertValue(rawValue, param.getType());
+                    }
+                }
+            }
+        }
+        return args;
     }
 }

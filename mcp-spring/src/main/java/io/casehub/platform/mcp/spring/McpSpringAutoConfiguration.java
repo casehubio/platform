@@ -34,10 +34,11 @@ public class McpSpringAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     SpringOperationDispatcher springOperationDispatcher(DomainModelRegistry registry,
-                                                         ApplicationContext context) {
+                                                         ApplicationContext context,
+                                                         ApplicationEventPublisher eventPublisher) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        return new SpringOperationDispatcher(registry, context, mapper);
+        return new SpringOperationDispatcher(registry, context, mapper, eventPublisher);
     }
 
     @Bean

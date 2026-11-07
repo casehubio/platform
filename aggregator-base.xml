@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Base slice — platform-api, platform-core, playbook-catalog.
+  Base slice — platform-api, platform-core, playbooks.
   Zero @QuarkusTest. Everything else depends on this.
   Built first, then slices A/B/C run in parallel.
 -->
@@ -17,7 +17,7 @@
   <name>CaseHub :: Platform :: Base</name>
 
   <modules>
-    <module>playbook-catalog</module>
+    <module>playbooks</module>
     <module>platform-api</module>
     <module>platform-core</module>
   </modules>

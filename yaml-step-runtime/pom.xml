@@ -110,12 +110,7 @@
             <version>1.5.6</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>io.casehub</groupId>
-            <artifactId>casehub-platform-playbook-catalog</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
+
     </dependencies>
 
     <build>

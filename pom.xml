@@ -15,7 +15,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>playbook-catalog</module>
         <module>mcp-api</module>
         <module>platform-api</module>
         <module>registration-api</module>
@@ -221,6 +220,7 @@
         <module>yaml-step-testing</module>
         <module>yaml-test-core</module>
         <module>yaml-test</module>
+        <module>playbooks</module>
         <module>playbook-runner</module>
         <module>playbook-runner-spring</module>
         <module>drift-detection</module>

@@ -1,0 +1,10 @@
+name: Playbook catalog parsing gate
+steps:
+  - validate-playbook:
+      directory: ../../main/playbooks
+    capture: result
+  - assertThat: result.validatedCount
+    greaterThan: 60
+  - assertThat: result.errors
+    hasSize: 1
+    message: "Only composition/modules.playbook.yaml expected to fail (import deserialization)"

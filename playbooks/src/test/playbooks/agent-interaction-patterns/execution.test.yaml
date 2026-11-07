@@ -1,0 +1,87 @@
+name: Agent example playbook execution
+simulate:
+  agent:
+    - prompt: "Classify"
+      response: "INVOICE"
+    - prompt: "risk profile"
+      response: "Moderate risk: 60% equities creates growth exposure."
+    - prompt: "rebalancing"
+      response: "Shift 10% equities to bonds for downturn protection."
+    - prompt: "bullet points"
+      response: "1. Reduce equity. 2. Increase bonds. 3. Hold cash."
+    - prompt: "order #4521"
+      response: "I see your order. Checking shipping status now."
+    - prompt: "expedite"
+      response: "I've requested expedited shipping for your replacement."
+    - prompt: "charged twice"
+      response: "Found the duplicate charge. Refund of $12.99 initiated."
+    - prompt: "delivery address"
+      response: "Sure, what's the new address?"
+    - prompt: "API timeouts"
+      response: "Pattern suggests connection pool exhaustion between 14-16 UTC."
+    - prompt: "cancel my subscription"
+      response: "Cancellation processed effective today."
+    - prompt: "export my data"
+      response: "Go to Settings > Privacy > Export Data."
+    - prompt: "enterprise pricing"
+      response: "Enterprise 500-seat plan: $45/seat/month, annual billing."
+    - prompt: "ACME Corp"
+      response: '{"vendor":"ACME Corp","invoiceNumber":"INV-2024-0891","total":496.80}'
+    - prompt: "tax rate"
+      response: '{"total":501.40,"tax":41.40,"taxRate":"9%"}'
+    - prompt: "key indicators"
+      response: "Watch earnings growth, P/E ratios, and Fed rate policy."
+    - prompt: "stocks"
+      response: "Monitor AAPL, MSFT, NVDA for Q4 positioning."
+
+tests:
+  - name: "ex01 direct invoke classifies document"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+      - assertThat: result.stepCount
+        greaterThan: 0
+
+  - name: "ex02 conversation multi-turn responses"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+
+  - name: "ex03 clear gives second customer clean context"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+
+  - name: "ex05 pool-backed infrastructure"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+
+  - name: "ex06 multi-channel separate pools"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+
+  - name: "ex07 salience pools priority levels"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+
+  - name: "ex08 structured output returns corpus JSON"
+    steps:
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true

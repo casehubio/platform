@@ -48,15 +48,15 @@ class PlaybookSchemaValidationTest {
     void allStructuralKeysPresent() {
         JsonNode stepProps = schemaNode.at("/$defs/step/properties");
         assertThat(stepProps.isMissingNode())
-                .as("$defs/step/properties must exist")
-                .isFalse();
+                  .as("$defs/step/properties must exist")
+                  .isFalse();
         Set<String> schemaKeys = new HashSet<>();
         stepProps.fieldNames().forEachRemaining(schemaKeys::add);
 
         for (String key : StepKeywords.STRUCTURAL_KEYS) {
             assertThat(schemaKeys)
-                    .as("Structural key '%s' must appear in $defs/step/properties", key)
-                    .contains(key);
+                      .as("Structural key '%s' must appear in $defs/step/properties", key)
+                      .contains(key);
         }
     }
 
@@ -64,12 +64,12 @@ class PlaybookSchemaValidationTest {
     void allDecoratorKeysPresent() {
         JsonNode stepProps = schemaNode.at("/$defs/step/properties");
         assertThat(stepProps.isMissingNode())
-                .as("$defs/step/properties must exist")
-                .isFalse();
+                  .as("$defs/step/properties must exist")
+                  .isFalse();
         for (String key : StepKeywords.DECORATOR_KEYS) {
             assertThat(stepProps.has(key))
-                    .as("Decorator key '%s' must appear in $defs/step/properties", key)
-                    .isTrue();
+                      .as("Decorator key '%s' must appear in $defs/step/properties", key)
+                      .isTrue();
         }
     }
 
@@ -104,8 +104,8 @@ class PlaybookSchemaValidationTest {
         JsonNode stepProps = schemaNode.at("/$defs/step/properties");
         for (String plugin : pluginNames) {
             assertThat(stepProps.has(plugin))
-                    .as("Plugin '%s' must have a property in $defs/step", plugin)
-                    .isTrue();
+                      .as("Plugin '%s' must have a property in $defs/step", plugin)
+                      .isTrue();
         }
     }
 
@@ -113,8 +113,8 @@ class PlaybookSchemaValidationTest {
     void allCombinedKeyPrefixesPresent() {
         JsonNode patternProps = schemaNode.at("/$defs/step/patternProperties");
         assertThat(patternProps.isMissingNode())
-                .as("$defs/step/patternProperties must exist")
-                .isFalse();
+                  .as("$defs/step/patternProperties must exist")
+                  .isFalse();
 
         Set<String> patterns = new HashSet<>();
         patternProps.fieldNames().forEachRemaining(patterns::add);
@@ -127,40 +127,30 @@ class PlaybookSchemaValidationTest {
             boolean found = patterns.stream()
                     .anyMatch(p -> p.startsWith("^" + prefix + " "));
             assertThat(found)
-                    .as("Combined-key prefix '%s' must have a patternProperties entry", prefix)
-                    .isTrue();
+                      .as("Combined-key prefix '%s' must have a patternProperties entry", prefix)
+                      .isTrue();
         }
     }
 
     @TestFactory
-    @SuppressWarnings("unchecked")
     Collection<DynamicTest> playbookFixturesValidateAgainstSchema() throws IOException {
         Path playbooksDir = findPlaybooksDir();
-        Path manifestPath = playbooksDir.resolve("manifest.json");
-        assertThat(manifestPath).exists();
-
-        Map<String, Object> manifest = MAPPER.readValue(manifestPath.toFile(), Map.class);
-        List<Map<String, Object>> categories =
-                (List<Map<String, Object>>) manifest.get("categories");
-
-        List<DynamicTest> tests = new ArrayList<>();
         Yaml snakeYaml = new Yaml();
 
-        for (Map<String, Object> category : categories) {
-            String categoryKey = (String) category.get("key");
-            List<Map<String, Object>> scenarios =
-                    (List<Map<String, Object>>) category.get("scenarios");
-
-            for (Map<String, Object> scenario : scenarios) {
-                String file = (String) scenario.get("file");
-                String title = (String) scenario.get("title");
-                Path yamlPath = playbooksDir.resolve(file);
-
-                tests.add(DynamicTest.dynamicTest(
-                        "playbook: " + categoryKey + " / " + title,
-                        () -> validatePlaybookFixture(yamlPath, snakeYaml)));
-            }
+        List<Path> yamlFiles;
+        try (Stream<Path> stream = Files.walk(playbooksDir)) {
+            yamlFiles = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".yaml") || p.toString().endsWith(".yml"))
+                    .sorted()
+                    .toList();
         }
+
+        List<DynamicTest> tests = yamlFiles.stream()
+                .map(path -> DynamicTest.dynamicTest(
+                        "playbook: " + playbooksDir.relativize(path),
+                        () -> validatePlaybookFixture(path, snakeYaml)))
+                .toList();
 
         assertThat(tests).isNotEmpty();
         return tests;
@@ -220,11 +210,11 @@ class PlaybookSchemaValidationTest {
         Set<ValidationMessage> errors = schema.validate(jsonContent);
 
         assertThat(errors)
-                .as("Fixture %s should validate against schema: %s",
+                  .as("Fixture %s should validate against schema: %s",
                         yamlPath.getFileName(),
                         errors.stream().map(ValidationMessage::getMessage)
                                 .collect(Collectors.joining("; ")))
-                .isEmpty();
+                  .isEmpty();
     }
 
     private void validateTestFixture(Path yamlPath) throws IOException {
@@ -239,15 +229,15 @@ class PlaybookSchemaValidationTest {
         Set<ValidationMessage> errors = schema.validate(jsonContent);
 
         assertThat(errors)
-                .as("Test file %s should validate: %s",
+                  .as("Test file %s should validate: %s",
                         yamlPath.getFileName(),
                         errors.stream().map(ValidationMessage::getMessage)
                                 .collect(Collectors.joining("; ")))
-                .isEmpty();
+                  .isEmpty();
     }
 
     private static Path findPlaybooksDir() {
-        Path candidate = Path.of("../playbook-catalog/src/main/playbooks");
+        Path candidate = Path.of("../playbooks/src/main/playbooks");
         if (Files.isDirectory(candidate)) return candidate;
         throw new AssertionError("Cannot find playbooks directory at " + candidate.toAbsolutePath());
     }

@@ -3,9 +3,9 @@ package io.casehub.yaml.step.catalog;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-final class StepKeywords {
+public final class StepKeywords {
 
-    static final Set<String> DECORATOR_KEYS = Set.of(
+    public static final Set<String> DECORATOR_KEYS = Set.of(
             "if", "on-success", "on-failure", "forEach", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
@@ -14,7 +14,7 @@ final class StepKeywords {
             "cancel", "background", "from",
             "wait", "mutex", "when", "capture");
 
-    static final Set<String> STRUCTURAL_KEYS = Set.of(
+    public static final Set<String> STRUCTURAL_KEYS = Set.of(
             "step", "invoke",
             "then", "else", "match", "cases", "block",
             "try", "catch", "finally", "select",

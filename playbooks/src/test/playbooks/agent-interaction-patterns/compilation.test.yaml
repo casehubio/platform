@@ -1,0 +1,81 @@
+name: Agent example playbook compilation
+tests:
+  - name: "01-direct-invoke compiles with 3 steps"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.stepCount
+        equals: 3
+
+  - name: "02-session-conversation compiles with 5 steps"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.stepCount
+        equals: 5
+
+  - name: "03-session-with-clear includes clear step"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.hasClearStep
+        equals: true
+
+  - name: "04-parallel-queries includes fork block"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/04-parallel-queries.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.hasFork
+        equals: true
+
+  - name: "05-pool-backed parses inline pool"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.poolDeclarations
+        hasSize: 1
+      - assertThat: result.pools.analysts.name
+        equals: "analysts"
+      - assertThat: result.pools.analysts.maxActive
+        equals: 5
+
+  - name: "06-multi-channel compiles successfully"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.stepCount
+        greaterThan: 0
+
+  - name: "07-salience-priority parses three pools"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.poolDeclarations
+        hasSize: 3
+      - assertThat: result.pools.voice.salience
+        equals: 2
+      - assertThat: result.pools.email.salience
+        equals: 0
+
+  - name: "08-structured-output compiles successfully"
+    steps:
+      - validate-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.yaml
+        capture: result
+      - assertThat: result.valid
+        equals: true
+      - assertThat: result.stepCount
+        greaterThan: 0

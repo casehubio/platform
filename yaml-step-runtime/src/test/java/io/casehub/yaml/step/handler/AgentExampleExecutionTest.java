@@ -42,11 +42,13 @@ class AgentExampleExecutionTest {
     private static final Path EXAMPLES_DIR = resolveExamplesDir();
 
     private static Path resolveExamplesDir() {
-        Path candidate = Path.of("examples/agent-interaction-patterns");
+        Path candidate = Path.of("../playbooks/src/main/playbooks/agent-interaction-patterns");
+        if (Files.isDirectory(candidate)) return candidate;
+        candidate = Path.of("examples/agent-interaction-patterns");
         if (Files.isDirectory(candidate)) return candidate;
         candidate = Path.of("../examples/agent-interaction-patterns");
         if (Files.isDirectory(candidate)) return candidate;
-        return Path.of("examples/agent-interaction-patterns");
+        return Path.of("../playbooks/src/main/playbooks/agent-interaction-patterns");
     }
 
     // --- Example execution: verify data flows through simulated LLM ---

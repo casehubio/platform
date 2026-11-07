@@ -97,7 +97,17 @@
             "DOMAIN_PLAUSIBLE", "RECORDED_REAL"
           ],
           "description": "DataRealism level for delegate fallthrough (null if absent — deterministic)"
+        },
+        "corpus-selection": {
+          "$ref": "#/$defs/corpus-selection-config",
+          "description": "Dynamic corpus selection — phases with strategy-driven triggers"
         }
+      },
+      "not": {
+        "anyOf": [
+          { "required": ["corpus-selection", "corpus"] },
+          { "required": ["corpus-selection", "corpus-files"] }
+        ]
       }
     },
     "corpus-entry": {
@@ -184,6 +194,57 @@
       "properties": {
         "ref": { "type": "string", "description": "Reference to a named temporal profile" },
         "delay": { "type": ["string", "number"], "description": "Gap delay absorbed into referenced profile's first entry" }
+      }
+    },
+    "corpus-selection-config": {
+      "type": "object",
+      "required": ["type", "phases"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["state-machine", "duration", "lookup-count", "random"],
+          "description": "Selection strategy type"
+        },
+        "initial": { "type": "string", "description": "Starting state (state-machine only)" },
+        "transitions": {
+          "type": "object",
+          "description": "fromState → trigger → toState (state-machine only)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "phases": {
+          "description": "Phase definitions — object (state-machine) or array (duration, lookup-count, random)",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/corpus-entry" }
+              }
+            },
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/corpus-selection-phase" }
+            }
+          ]
+        }
+      }
+    },
+    "corpus-selection-phase": {
+      "type": "object",
+      "required": ["name", "corpus"],
+      "properties": {
+        "name": { "type": "string", "description": "Phase name" },
+        "duration": { "type": ["string", "number"], "description": "Phase duration (duration type only). Omit on last phase." },
+        "count": { "type": "integer", "minimum": 1, "description": "Resolution count before advancing (lookup-count only). Omit on last phase." },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1, "description": "Selection probability (random only). All weights must sum to 1.0." },
+        "corpus": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/corpus-entry" },
+          "description": "Corpus entries for this phase"
+        }
       }
     }
   }

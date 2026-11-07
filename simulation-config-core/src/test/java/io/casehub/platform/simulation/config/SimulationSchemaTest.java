@@ -159,6 +159,39 @@ class SimulationSchemaTest {
         assertThat(props.at("/temporal/type").asText()).isEqualTo("array");
     }
 
+    @Test
+    void methodConfigDefinesCorpusSelection() throws IOException {
+        JsonNode props = loadSchema().at("/$defs/method-config/properties");
+        assertThat(props.has("corpus-selection")).isTrue();
+    }
+
+    @Test
+    void corpusSelectionConfigDefined() throws IOException {
+        JsonNode config = loadSchema().at("/$defs/corpus-selection-config");
+        assertThat(config.has("required")).isTrue();
+        assertThat(config.get("required").toString()).contains("type");
+        JsonNode typeEnum = config.at("/properties/type/enum");
+        assertThat(typeEnum.toString()).contains("state-machine", "duration", "lookup-count", "random");
+    }
+
+    @Test
+    void corpusAndCorpusSelectionMutuallyExclusiveInSchema() throws IOException {
+        JsonNode methodConfig = loadSchema().at("/$defs/method-config");
+        assertThat(methodConfig.has("not")).isTrue();
+    }
+
+    @Test
+    void corpusSelectionPhaseDefined() throws IOException {
+        JsonNode phase = loadSchema().at("/$defs/corpus-selection-phase");
+        assertThat(phase.get("required").toString()).contains("name", "corpus");
+        JsonNode props = phase.get("properties");
+        assertThat(props.has("name")).isTrue();
+        assertThat(props.has("duration")).isTrue();
+        assertThat(props.has("count")).isTrue();
+        assertThat(props.has("weight")).isTrue();
+        assertThat(props.has("corpus")).isTrue();
+    }
+
 
     private JsonNode loadSchema() throws IOException {
         InputStream is = getClass().getClassLoader()

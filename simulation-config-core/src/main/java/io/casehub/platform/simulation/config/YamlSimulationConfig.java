@@ -1,6 +1,7 @@
 package io.casehub.platform.simulation.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.simulation.CorpusSelectorConfig;
 import io.casehub.platform.simulation.DataRealism;
 import io.casehub.platform.simulation.ExhaustionPolicy;
 import io.casehub.platform.simulation.InvocationRecord;
@@ -323,8 +324,22 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                         .toUpperCase().replace("-", "_"))
                 : null;
 
+        CorpusSelectorConfig corpusSelection = null;
+        Map<String, Object> rawSelection = (Map<String, Object>) props.get("corpus-selection");
+        if (rawSelection != null) {
+            if (rawCorpus != null && !rawCorpus.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "'corpus' and 'corpus-selection' are mutually exclusive on a method");
+            }
+            if (corpusFiles != null && !corpusFiles.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "'corpus-files' and 'corpus-selection' are mutually exclusive on a method");
+            }
+            corpusSelection = parseCorpusSelectionConfig(rawSelection);
+        }
+
         return new MethodConfig(strategy, capture, ep, mp, keyExtractor, scorer,
-                threshold, corpus, corpusFiles, fallthroughRealism);
+                threshold, corpus, corpusFiles, fallthroughRealism, corpusSelection);
     }
 
     @SuppressWarnings("unchecked")
@@ -557,6 +572,109 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
             Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles", "speed");
 
+
+    @Override
+    public Optional<CorpusSelectorConfig> corpusSelection(String qualifiedName) {
+        return Optional.ofNullable(methods.get(qualifiedName))
+                       .map(MethodConfig::corpusSelection);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CorpusSelectorConfig parseCorpusSelectionConfig(Map<String, Object> raw) {
+        String type = (String) raw.get("type");
+        if (type == null) {
+            throw new IllegalArgumentException("corpus-selection requires a 'type' field");
+        }
+        return switch (type) {
+            case "state-machine" -> parseStateMachineSelection(raw);
+            case "duration" -> parseDurationSelection(raw);
+            case "lookup-count" -> parseLookupCountSelection(raw);
+            case "random" -> parseRandomSelection(raw);
+            default -> throw new IllegalArgumentException(
+                    "Unknown corpus-selection type: '" + type + "'. Valid types: state-machine, duration, lookup-count, random");
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private CorpusSelectorConfig.StateMachine parseStateMachineSelection(Map<String, Object> raw) {
+        String                                 initial     = (String) raw.get("initial");
+        Map<String, Map<String, String>>       transitions = (Map<String, Map<String, String>>) raw.getOrDefault("transitions", Map.of());
+        Map<String, List<Map<String, Object>>> rawPhases   = (Map<String, List<Map<String, Object>>>) raw.get("phases");
+
+        Map<String, java.util.List<InvocationRecord<Object, Object>>> phases = new LinkedHashMap<>();
+        if (rawPhases != null) {
+            rawPhases.forEach((phaseName, entries) ->
+                                      phases.put(phaseName, parseCorpusEntriesToRecords(entries)));
+        }
+        return new CorpusSelectorConfig.StateMachine(initial, transitions, phases);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CorpusSelectorConfig.DurationBased parseDurationSelection(Map<String, Object> raw) {
+        List<Map<String, Object>> rawPhases     = (List<Map<String, Object>>) raw.get("phases");
+        var                       orderedPhases = new ArrayList<CorpusSelectorConfig.DurationPhase>();
+        var                       phases        = new LinkedHashMap<String, java.util.List<InvocationRecord<Object, Object>>>();
+
+        for (var phaseMap : rawPhases) {
+            String name = (String) phaseMap.get("name");
+            java.time.Duration duration = phaseMap.containsKey("duration")
+                                          ? DurationParser.parse(String.valueOf(phaseMap.get("duration")))
+                                          : null;
+            orderedPhases.add(new CorpusSelectorConfig.DurationPhase(name, duration));
+            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
+            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+        }
+        return new CorpusSelectorConfig.DurationBased(orderedPhases, phases);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CorpusSelectorConfig.LookupCount parseLookupCountSelection(Map<String, Object> raw) {
+        List<Map<String, Object>> rawPhases     = (List<Map<String, Object>>) raw.get("phases");
+        var                       orderedPhases = new ArrayList<CorpusSelectorConfig.CountPhase>();
+        var                       phases        = new LinkedHashMap<String, java.util.List<InvocationRecord<Object, Object>>>();
+
+        for (var phaseMap : rawPhases) {
+            String name = (String) phaseMap.get("name");
+            int count = phaseMap.containsKey("count")
+                        ? ((Number) phaseMap.get("count")).intValue()
+                        : 0;
+            orderedPhases.add(new CorpusSelectorConfig.CountPhase(name, count));
+            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
+            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+        }
+        return new CorpusSelectorConfig.LookupCount(orderedPhases, phases);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CorpusSelectorConfig.Weighted parseRandomSelection(Map<String, Object> raw) {
+        List<Map<String, Object>> rawPhases      = (List<Map<String, Object>>) raw.get("phases");
+        var                       weightedPhases = new ArrayList<CorpusSelectorConfig.WeightedPhase>();
+        var                       phases         = new LinkedHashMap<String, java.util.List<InvocationRecord<Object, Object>>>();
+
+        for (var phaseMap : rawPhases) {
+            String name   = (String) phaseMap.get("name");
+            double weight = ((Number) phaseMap.get("weight")).doubleValue();
+            weightedPhases.add(new CorpusSelectorConfig.WeightedPhase(name, weight));
+            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
+            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+        }
+        return new CorpusSelectorConfig.Weighted(weightedPhases, phases);
+    }
+
+    private java.util.List<InvocationRecord<Object, Object>> parseCorpusEntriesToRecords(
+            List<Map<String, Object>> entries) {
+        return entries.stream().map(entry -> {
+            String tenancyId = entry.containsKey("tenancy-id")
+                               ? (String) entry.get("tenancy-id") : defaultTenancyId;
+            return new InvocationRecord<Object, Object>(
+                    tenancyId,
+                    (String) entry.get("key"),
+                    entry.get("input"),
+                    entry.get("output"),
+                    java.time.Instant.now());
+        }).toList();
+    }
+
     private static void warnUnknownKeys(Map<String, Object> root) {
         for (String key : root.keySet()) {
             if (!KNOWN_TOP_LEVEL_KEYS.contains(key)) {
@@ -577,7 +695,8 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             Double threshold,
             List<CorpusEntry> corpus,
             List<String> corpusFiles,
-            DataRealism fallthroughRealism) {}
+            DataRealism fallthroughRealism,
+            CorpusSelectorConfig corpusSelection) {}
 
     record CorpusEntry(
             String key,

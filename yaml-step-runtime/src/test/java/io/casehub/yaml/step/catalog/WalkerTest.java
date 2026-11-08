@@ -1376,5 +1376,46 @@ class WalkerTest {
         assertThat(plugin.params()).containsEntry("_value", "run this prompt");
     }
 
+    @Test
+    void scalarValue_usePrimaryInput_whenDefined() {
+        var logDefn = Definition.of("log")
+                                .input("message", new io.casehub.yaml.plugin.api.Parameter(
+                                        io.casehub.yaml.plugin.api.ParameterType.STRING, true, null, null, null, null))
+                                .execute((params, services) -> Result.of(Map.of()))
+                                .build();
+        var reg = new CompositePluginRegistry();
+        reg.register(logDefn);
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("log", "Step complete");
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), reg);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.params()).containsEntry("message", "Step complete");
+        assertThat(plugin.params()).doesNotContainKey("_subject");
+    }
+
+    @Test
+    void combinedKey_usePrimaryInput_forSuffix() {
+        var restDefn = Definition.of("rest-request")
+                                 .input("method", new io.casehub.yaml.plugin.api.Parameter(
+                                         io.casehub.yaml.plugin.api.ParameterType.STRING, true, null, null, null, null))
+                                 .execute((params, services) -> Result.of(Map.of()))
+                                 .build();
+        var reg = new CompositePluginRegistry();
+        reg.register(restDefn);
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("rest-request:GET", "/api/users");
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), reg);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.params()).containsEntry("method", "GET");
+        assertThat(plugin.params()).containsEntry("_value", "/api/users");
+        assertThat(plugin.params()).doesNotContainKey("_subject");
+    }
+
 
 }

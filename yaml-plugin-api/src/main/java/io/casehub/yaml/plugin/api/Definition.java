@@ -39,6 +39,15 @@ public record Definition(
         this(name, description, inputs, outputs, portability, action, capability, streamingType, false);
     }
 
+    public String primaryInput() {
+        for (var entry : inputs.entrySet()) {
+            if (entry.getValue().required()) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     public static Builder of(String name) {return new Builder(name);}
 
     public static final class Builder {

@@ -10,14 +10,10 @@ meta:
     - command
     - invoke-bindings
 ---
-- process-exec:
-    command: ls
-    args: [-la, src/]
-    output: stdout
-    timeout: 10s
+- process-exec ls: [-la, src/]
+  output: stdout
+  timeout: 10s
 - log: { message: "Directory listed" }
-- process-exec:
-    command: git
-    args: [status, --short]
-    output: stdout
+- process-exec git: [status, --short]
+  output: stdout
 - log: { message: "Git status captured" }

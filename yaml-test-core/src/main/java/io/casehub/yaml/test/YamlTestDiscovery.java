@@ -67,7 +67,8 @@ public final class YamlTestDiscovery {
                     var    perTestSetup    = (List<Map<String, Object>>) testEntry.get("setup");
                     var    steps           = (List<Map<String, Object>>) testEntry.get("steps");
                     var    perTestTeardown = (List<Map<String, Object>>) testEntry.get("teardown");
-                    testCases.add(new TestCase(testName, perTestSetup, steps, perTestTeardown));
+                    var perTestSimulate = (Map<String, Object>) testEntry.get("simulate");
+                    testCases.add(new TestCase(testName, perTestSetup, steps, perTestTeardown, perTestSimulate));
                 }
             } else {
                 var steps = (List<Map<String, Object>>) doc.get("steps");

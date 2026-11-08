@@ -91,7 +91,12 @@ public final class YamlTestExecutor {
 
         VariableResolver resolver = buildResolver(varsBlock, paramsBlock);
 
+        SimulationOverlay perTestOverlay = null;
         try {
+            if (testCase.simulateBlock() != null && simulationRuntime != null) {
+                var parsed = SimulateBlockParser.parse(testCase.simulateBlock(), resourceRoot);
+                perTestOverlay = simulationRuntime.pushOverlay(parsed.config(), parsed.corpus());
+            }
             runLifecycleSteps(testCase.setupSteps(), "per-test-setup");
 
             List<ResolvedStep> resolvedSteps = Walker.resolve(testCase.steps(), pluginRegistry);
@@ -138,6 +143,9 @@ public final class YamlTestExecutor {
             try {
                 runLifecycleSteps(testCase.teardownSteps(), "per-test-teardown");
             } catch (Exception ignored) {}
+            if (perTestOverlay != null) {
+                simulationRuntime.popOverlay(perTestOverlay);
+            }
         }
     }
 

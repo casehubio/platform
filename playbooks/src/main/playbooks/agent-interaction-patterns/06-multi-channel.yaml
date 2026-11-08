@@ -20,34 +20,28 @@ pools:
 
 steps:
   # Voice channel — short, conversational exchanges
-  - agent-session-open:
-      session: voice-customer-1
+  - agent-session-open voice-customer-1:
       pool: voice
       system: >
         You are a voice support agent. Keep responses under 2 sentences.
         Be warm and direct.
 
-  - agent-query:
-      session: voice-customer-1
-      user: "Hi, I need to change my delivery address."
-      output: voice_greeting
+  - agent-query voice-customer-1: "Hi, I need to change my delivery address."
+    output: voice_greeting
 
   - agent-session-close: voice-customer-1
 
   # Email channel — longer, more detailed responses
-  - agent-session-open:
-      session: email-ticket-42
+  - agent-session-open email-ticket-42:
       pool: email
       system: >
         You are an email support agent. Write complete, professional responses
         with greeting and sign-off. Reference the ticket number.
 
-  - agent-query:
-      session: email-ticket-42
-      user: >
-        Ticket #42: Customer reports intermittent API timeouts when calling
-        /v2/payments endpoint. Happens ~3 times per day, always between
-        14:00-16:00 UTC. No error codes returned, just timeout after 30s.
-      output: email_response
+  - agent-query email-ticket-42: >
+      Ticket #42: Customer reports intermittent API timeouts when calling
+      /v2/payments endpoint. Happens ~3 times per day, always between
+      14:00-16:00 UTC. No error codes returned, just timeout after 30s.
+    output: email_response
 
   - agent-session-close: email-ticket-42

@@ -276,29 +276,48 @@ public final class Walker {
                         actionParams = new LinkedHashMap<>();
                     }
                 } else {
-                    int spaceIdx = key.indexOf(' ');
-                    if (spaceIdx > 0) {
-                        String prefix = key.substring(0, spaceIdx);
+                    String resolvedPrefix = null;
+                    String keySuffix      = null;
+                    io.casehub.yaml.plugin.api.Definition resolvedDef = null;
+
+                    int colonIdx = key.indexOf(':');
+                    if (colonIdx > 0) {
+                        String prefix = key.substring(0, colonIdx);
                         var prefixEntry = registry.resolve(prefix);
                         if (prefixEntry.isPresent()) {
-                            if (matchedAction != null) {
-                                throw new IllegalArgumentException(
-                                        path + " → Step " + index + ": ambiguous — multiple action keys matched: '"
-                                        + matchedAction + "' and '" + key + "'");
+                            resolvedPrefix = prefix;
+                            keySuffix      = key.substring(colonIdx + 1);
+                            resolvedDef    = prefixEntry.get();
+                        }
+                    }
+                    if (resolvedPrefix == null) {
+                        int spaceIdx = key.indexOf(' ');
+                        if (spaceIdx > 0) {
+                            String prefix = key.substring(0, spaceIdx);
+                            var prefixEntry = registry.resolve(prefix);
+                            if (prefixEntry.isPresent()) {
+                                resolvedPrefix = prefix;
+                                keySuffix      = key.substring(spaceIdx + 1);
+                                resolvedDef    = prefixEntry.get();
                             }
-                            matchedAction = prefix;
-                            matchedDef    = prefixEntry.get();
-                            String suffix = key.substring(spaceIdx + 1);
-                            Object value  = e.getValue();
-                            if (value instanceof Map) {
-                                actionParams = new LinkedHashMap<>((Map<String, Object>) value);
-                                actionParams.put("_subject", suffix);
-                            } else {
-                                actionParams = new LinkedHashMap<>();
-                                actionParams.put("_subject", suffix);
-                            }
-                        } else {
-                            unknownKeys.add(e);
+                        }
+                    }
+
+                    if (resolvedPrefix != null) {
+                        if (matchedAction != null) {
+                            throw new IllegalArgumentException(
+                                    path + " → Step " + index + ": ambiguous — multiple action keys matched: '"
+                                    + matchedAction + "' and '" + key + "'");
+                        }
+                        matchedAction = resolvedPrefix;
+                        matchedDef    = resolvedDef;
+                        Object value  = e.getValue();
+                        actionParams  = new LinkedHashMap<>();
+                        actionParams.put("_subject", keySuffix);
+                        if (value instanceof Map) {
+                            actionParams.putAll((Map<String, Object>) value);
+                        } else if (value != null) {
+                            actionParams.put("_value", value);
                         }
                     } else {
                         unknownKeys.add(e);

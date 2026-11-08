@@ -175,52 +175,15 @@
         "delay": { "type": "string", "description": "Duration (e.g. 1000ms, 5s)." },
         "signal": { "type": "string", "description": "Send a signal (structural or decorator)." },
         "await": { "type": "string", "description": "Wait for signal." },
-        "rest-request": {
-          "oneOf": [
-            { "type": "string", "description": "Shorthand: URL with GET method." },
-            {
-              "type": "object",
-              "properties": {
-                "method": { "type": "string" },
-                "url": { "type": "string" },
-                "headers": { "type": "object" },
-                "body": {}
-              },
-              "required": ["url"]
-            }
-          ]
-        },
+        "rest-request": { "description": "Deprecated verbose form — use rest-request:METHOD: URL instead." },
         "advisory": {
           "oneOf": [
             { "type": "string" },
             { "type": "object" }
           ]
         },
-        "agent-session-open": {
-          "type": "object",
-          "properties": {
-            "session": { "type": "string" },
-            "system": { "type": "string" },
-            "model": { "type": "string" },
-            "model-query": { "type": "object" },
-            "model-chain": { "type": "array" },
-            "pool": { "type": "string" },
-            "timeout": { "type": "string" },
-            "checkout-timeout": { "type": "string" }
-          },
-          "required": ["session"]
-        },
-        "agent-query": {
-          "type": "object",
-          "properties": {
-            "session": { "type": "string" },
-            "user": { "type": "string" },
-            "response-format": {},
-            "output": { "type": "string" },
-            "priority": { "type": "boolean" }
-          },
-          "required": ["session"]
-        },
+        "agent-session-open": { "description": "Deprecated verbose form — use agent-session-open SESSION: instead." },
+        "agent-query": { "description": "Deprecated verbose form — use agent-query SESSION: prompt instead." },
         "agent-session-clear": {
           "oneOf": [
             { "type": "string", "description": "Session name to clear." },
@@ -239,19 +202,7 @@
             { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] }
           ]
         },
-        "mcp-call": {
-          "oneOf": [
-            { "type": "string", "description": "Shorthand: MCP tool name." },
-            {
-              "type": "object",
-              "properties": {
-                "tool": { "type": "string" },
-                "params": { "type": "object" }
-              },
-              "required": ["tool"]
-            }
-          ]
-        },
+        "mcp-call": { "description": "Deprecated verbose form — use mcp-call TOOL: params instead." },
         "assert": {
           "type": "object",
           "properties": {
@@ -432,12 +383,16 @@
         "^match .+$": { "$ref": "#/$defs/stepList" },
         "^barrier .+$": { "$ref": "#/$defs/stepList" },
         "^quorum .+$": { "$ref": "#/$defs/stepList" },
-        "^rest-request .+$": { "description": "Combined-key shorthand: rest-request METHOD URL:" },
-        "^agent-invoke .+$": { "description": "Combined-key shorthand: agent-invoke PROMPT:" },
-        "^mcp-call .+$": { "description": "Combined-key shorthand: mcp-call TOOL:" },
-        "^graphql-exec .+$": { "description": "Combined-key shorthand: graphql-exec OPERATION:" },
-        "^process .+$": { "description": "Combined-key shorthand: process COMMAND:" },
-        "^rest-call .+$": { "description": "Combined-key shorthand: rest-call URL:" }
+        "^rest-request:.+$": { "description": "Compact: rest-request:METHOD: URL" },
+        "^rest-call:.+$": { "description": "Compact: rest-call:METHOD: URL" },
+        "^agent-query .+$": { "description": "Compact: agent-query SESSION: prompt" },
+        "^agent-session-open .+$": { "description": "Compact: agent-session-open SESSION:" },
+        "^mcp-call .+$": { "description": "Compact: mcp-call TOOL: params" },
+        "^process .+$": { "description": "Compact: process COMMAND: args" },
+        "^rest-request .+$": { "description": "Legacy space form: rest-request METHOD URL:" },
+        "^agent-invoke .+$": { "description": "Compact: agent-invoke PROMPT:" },
+        "^graphql-exec .+$": { "description": "Compact: graphql-exec OPERATION:" },
+        "^rest-call .+$": { "description": "Legacy space form: rest-call URL:" }
       },
       "additionalProperties": true
     },
@@ -595,7 +550,7 @@
         "setup": { "$ref": "#/$defs/stepList" },
         "steps": { "$ref": "#/$defs/stepList" },
         "teardown": { "$ref": "#/$defs/stepList" },
-        "simulate": { "$ref": "#/$defs/simulateBlock" }
+        "simulate": { "$ref": "#/$defs/simulateBlock", "description": "Per-test simulation config — overlays file-level simulate block for this test case." }
       },
       "additionalProperties": true
     },

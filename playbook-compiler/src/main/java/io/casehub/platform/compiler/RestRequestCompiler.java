@@ -21,23 +21,25 @@ class RestRequestCompiler implements StepCompiler {
         if (stepValue instanceof String s) {
             config = Map.of("url", s, "method", "GET");
         } else if (stepValue instanceof Map) {
-            config = (Map<String, Object>) stepValue;
+            config = new java.util.LinkedHashMap<>((Map<String, Object>) stepValue);
         } else {
             return null;
         }
 
         if (config.containsKey("_subject")) {
             String subject = String.valueOf(config.get("_subject"));
-            var    mutable = new java.util.LinkedHashMap<>(config);
-            mutable.remove("_subject");
+            config.remove("_subject");
             int spaceIdx = subject.indexOf(' ');
             if (spaceIdx > 0) {
-                mutable.putIfAbsent("method", subject.substring(0, spaceIdx));
-                mutable.putIfAbsent("url", subject.substring(spaceIdx + 1));
+                config.putIfAbsent("method", subject.substring(0, spaceIdx));
+                config.putIfAbsent("url", subject.substring(spaceIdx + 1));
             } else {
-                mutable.putIfAbsent("url", subject);
+                config.putIfAbsent("method", subject);
             }
-            config = mutable;
+        }
+        if (config.containsKey("_value")) {
+            config.putIfAbsent("url", String.valueOf(config.get("_value")));
+            config.remove("_value");
         }
 
         String method = String.valueOf(config.getOrDefault("method", "GET"));

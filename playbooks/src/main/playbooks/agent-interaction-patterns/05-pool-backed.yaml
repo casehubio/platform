@@ -13,19 +13,14 @@ pools:
       threshold: 8000
 
 steps:
-  - agent-session-open:
-      session: analyst-1
+  - agent-session-open analyst-1:
       pool: analysts
       system: "You are a senior financial analyst specializing in equity markets."
 
-  - agent-query:
-      session: analyst-1
-      user: "What are the key indicators for tech sector performance in Q4?"
-      output: q4_outlook
+  - agent-query analyst-1: "What are the key indicators for tech sector performance in Q4?"
+    output: q4_outlook
 
-  - agent-query:
-      session: analyst-1
-      user: "Which specific stocks would you watch based on those indicators?"
-      output: stock_picks
+  - agent-query analyst-1: "Which specific stocks would you watch based on those indicators?"
+    output: stock_picks
 
   - agent-session-close: analyst-1

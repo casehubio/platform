@@ -144,11 +144,23 @@ public final class PlaybookCompiler {
         String stepKey = null;
         StepCompiler compiler = null;
         String combinedKeySuffix = null;
+        char combinedKeySeparator = 0;
         for (String key : effectiveStep.keySet()) {
             if (registry.containsKey(key)) {
                 stepKey = key;
                 compiler = registry.get(key);
                 break;
+            }
+            int colonIdx = key.indexOf(':');
+            if (colonIdx > 0) {
+                String prefix = key.substring(0, colonIdx);
+                if (registry.containsKey(prefix)) {
+                    stepKey = key;
+                    combinedKeySuffix = key.substring(colonIdx + 1);
+                    combinedKeySeparator = ':';
+                    compiler = registry.get(prefix);
+                    break;
+                }
             }
             int spaceIdx = key.indexOf(' ');
             if (spaceIdx > 0) {
@@ -156,6 +168,7 @@ public final class PlaybookCompiler {
                 if (registry.containsKey(prefix)) {
                     stepKey = key;
                     combinedKeySuffix = key.substring(spaceIdx + 1);
+                    combinedKeySeparator = ' ';
                     compiler = registry.get(prefix);
                     break;
                 }
@@ -170,13 +183,23 @@ public final class PlaybookCompiler {
 
         Object stepValue = effectiveStep.get(stepKey);
         if (combinedKeySuffix != null) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> merged = stepValue instanceof Map
-                    ? new LinkedHashMap<>((Map<String, Object>) stepValue)
-                    : new LinkedHashMap<>();
+            var merged = new LinkedHashMap<String, Object>();
             merged.put("_subject", combinedKeySuffix);
+            if (stepValue instanceof Map) {
+                @SuppressWarnings("unchecked")
+                var mapValue = (Map<String, Object>) stepValue;
+                merged.putAll(mapValue);
+            } else if (stepValue != null) {
+                merged.put("_value", stepValue);
+            }
+            for (var sibling : effectiveStep.entrySet()) {
+                if (!sibling.getKey().equals(stepKey)) {
+                    merged.put(sibling.getKey(), sibling.getValue());
+                }
+            }
             stepValue = merged;
-            stepKey = stepKey.substring(0, stepKey.indexOf(' '));
+            int sepIdx = stepKey.indexOf(combinedKeySeparator);
+            stepKey = stepKey.substring(0, sepIdx);
         }
 
         TaskItem core = compiler.compile(stepKey, stepValue, effectiveStep, ctx);

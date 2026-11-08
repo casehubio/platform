@@ -10,10 +10,10 @@ meta:
     - request
     - invoke-bindings
 ---
-- rest-request GET /api/users:
-    headers: { Accept: application/json }
+- rest-request:GET: /api/users
+  headers: { Accept: application/json }
 - log: { message: "Fetched user list" }
-- rest-request POST /api/orders:
-    headers: { Content-Type: application/json }
-    body: { item: "widget", qty: 5 }
+- rest-request:POST: /api/orders
+  headers: { Content-Type: application/json }
+  body: { item: "widget", qty: 5 }
 - log: { message: "Order created" }

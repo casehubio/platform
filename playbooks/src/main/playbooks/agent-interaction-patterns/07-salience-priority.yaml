@@ -31,40 +31,31 @@ pools:
 
 steps:
   # Voice call arrives — gets immediate capacity
-  - agent-session-open:
-      session: call-7721
+  - agent-session-open call-7721:
       pool: voice
       system: "You are a voice agent. Be concise. One sentence max."
 
-  - agent-query:
-      session: call-7721
-      user: "I need to cancel my subscription effective immediately."
-      output: voice_response
+  - agent-query call-7721: "I need to cancel my subscription effective immediately."
+    output: voice_response
 
   - agent-session-close: call-7721
 
   # While voice is idle, chat and email can run
-  - agent-session-open:
-      session: chat-user-88
+  - agent-session-open chat-user-88:
       pool: chat
       system: "You are a chat agent. Friendly, helpful, use emoji sparingly."
 
-  - agent-query:
-      session: chat-user-88
-      user: "How do I export my data?"
-      output: chat_response
+  - agent-query chat-user-88: "How do I export my data?"
+    output: chat_response
 
   - agent-session-close: chat-user-88
 
   # Email uses remaining capacity
-  - agent-session-open:
-      session: email-ticket-99
+  - agent-session-open email-ticket-99:
       pool: email
       system: "You are an email agent. Professional tone, include ticket reference."
 
-  - agent-query:
-      session: email-ticket-99
-      user: "Ticket #99: Request for enterprise pricing for 500-seat deployment."
-      output: email_response
+  - agent-query email-ticket-99: "Ticket #99: Request for enterprise pricing for 500-seat deployment."
+    output: email_response
 
   - agent-session-close: email-ticket-99

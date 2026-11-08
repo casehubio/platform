@@ -1322,5 +1322,59 @@ class WalkerTest {
         assertThat(plugin.params()).containsEntry("_subject", "GET /api/users");
     }
 
+    @Test
+    void colonCombinedKey_resolvesAction() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process:fast", "/tmp/script.sh");
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        assertThat(resolved).hasSize(1);
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "fast");
+        assertThat(plugin.params()).containsEntry("_value", "/tmp/script.sh");
+    }
+
+    @Test
+    void colonCombinedKey_withMapValue_mergesParams() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process:GET", Map.of("timeout", "5s"));
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "GET");
+        assertThat(plugin.params()).containsEntry("timeout", "5s");
+        assertThat(plugin.params()).doesNotContainKey("_value");
+    }
+
+    @Test
+    void colonCombinedKey_nullValue() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process:POST", null);
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "POST");
+        assertThat(plugin.params()).doesNotContainKey("_value");
+    }
+
+    @Test
+    void spaceCombinedKey_stringValue_preservedAsValue() {
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("process my-session", "run this prompt");
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+
+        var plugin = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.actionName()).isEqualTo("process");
+        assertThat(plugin.params()).containsEntry("_subject", "my-session");
+        assertThat(plugin.params()).containsEntry("_value", "run this prompt");
+    }
+
 
 }

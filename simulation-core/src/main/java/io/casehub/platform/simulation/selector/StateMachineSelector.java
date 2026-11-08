@@ -7,12 +7,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class StateMachineSelector implements CorpusSelector {
 
+    private final String                           initial;
     private final Map<String, Map<String, String>> transitions;
-    private final AtomicReference<String> currentState;
+    private final AtomicReference<String>          currentState;
 
     public StateMachineSelector(String initial, Map<String, Map<String, String>> transitions) {
+        this.initial      = initial;
         this.currentState = new AtomicReference<>(initial);
-        this.transitions = Map.copyOf(transitions);
+        this.transitions  = Map.copyOf(transitions);
     }
 
     @Override
@@ -20,10 +22,18 @@ public final class StateMachineSelector implements CorpusSelector {
         return currentState.get();
     }
 
+    @Override
+    public String type() {return "state-machine";}
+
+    @Override
+    public void reset() {
+        currentState.set(initial);
+    }
+
     public void advance(String trigger) {
         currentState.getAndUpdate(state -> {
             Map<String, String> stateTransitions = transitions.get(state);
-            if (stateTransitions == null) return state;
+            if (stateTransitions == null) {return state;}
             String next = stateTransitions.get(trigger);
             return next != null ? next : state;
         });

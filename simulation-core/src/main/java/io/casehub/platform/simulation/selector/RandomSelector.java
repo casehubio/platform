@@ -28,4 +28,8 @@ public final class RandomSelector implements CorpusSelector {
         }
         return phases.getLast().name();
     }
+
+    @Override
+    public String type() {return "weighted";}
+
 }

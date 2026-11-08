@@ -1,0 +1,18 @@
+methods:
+  test-spi.invoke:
+    strategy: sequential
+    corpus-selection:
+      type: state-machine
+      initial: idle
+      transitions:
+        idle:
+          activate: active
+        active:
+          complete: done
+      phases:
+        idle:
+          - output: "idle response"
+        active:
+          - output: "active response"
+        done:
+          - output: "done response"

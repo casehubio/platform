@@ -106,7 +106,7 @@
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>-AgenerateGraphQL=false</arg>
-                        <arg>-AdomainFilter=temporal-drivers</arg>
+                        <arg>-AdomainFilter=temporal-drivers,corpus-selectors</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>

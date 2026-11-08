@@ -528,6 +528,86 @@ class SimulationRuntimeTest {
     }
 
 
+    @Test
+    void allSelectorInfoReturnsAllSelectors() {
+        var config = MapSimulationConfig.builder()
+                                        .strategy(QN, "sequential")
+                                        .corpusSelection(QN, new CorpusSelectorConfig.StateMachine(
+                                                "idle", Map.of("idle", Map.of("go", "active")),
+                                                Map.of("idle", List.of(), "active", List.of())))
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.strategyFor(QN);
+
+        var info = runtime.allSelectorInfo();
+        assertThat(info).containsKey(QN);
+        assertThat(info.get(QN).type()).isEqualTo("state-machine");
+        assertThat(info.get(QN).activePhase()).isEqualTo("idle");
+    }
+
+    @Test
+    void resetSelectorResetsToInitial() {
+        var config = MapSimulationConfig.builder()
+                                        .strategy(QN, "sequential")
+                                        .corpusSelection(QN, new CorpusSelectorConfig.StateMachine(
+                                                "idle", Map.of("idle", Map.of("go", "active")),
+                                                Map.of("idle", List.of(), "active", List.of())))
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.strategyFor(QN);
+        runtime.advanceStateMachine(QN, "go");
+        assertThat(runtime.allSelectorInfo().get(QN).activePhase()).isEqualTo("active");
+
+        runtime.resetSelector(QN);
+        assertThat(runtime.allSelectorInfo().get(QN).activePhase()).isEqualTo("idle");
+    }
+
+    @Test
+    void advanceStateMachineTargetsSpecificSelector() {
+        String qn2 = "other-spi.query";
+        var config = MapSimulationConfig.builder()
+                                        .strategy(QN, "sequential")
+                                        .corpusSelection(QN, new CorpusSelectorConfig.StateMachine(
+                                                "a", Map.of("a", Map.of("go", "b")),
+                                                Map.of("a", List.of(), "b", List.of())))
+                                        .strategy(qn2, "sequential")
+                                        .corpusSelection(qn2, new CorpusSelectorConfig.StateMachine(
+                                                "x", Map.of("x", Map.of("go", "y")),
+                                                Map.of("x", List.of(), "y", List.of())))
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.strategyFor(QN);
+        runtime.strategyFor(qn2);
+
+        runtime.advanceStateMachine(QN, "go");
+        assertThat(runtime.allSelectorInfo().get(QN).activePhase()).isEqualTo("b");
+        assertThat(runtime.allSelectorInfo().get(qn2).activePhase()).isEqualTo("x");
+    }
+
+    @Test
+    void advanceStateMachineThrowsForNonStateMachine() {
+        var config = MapSimulationConfig.builder()
+                                        .strategy(QN, "sequential")
+                                        .corpusSelection(QN, new CorpusSelectorConfig.LookupCount(
+                                                List.of(new CorpusSelectorConfig.CountPhase("a", 5)),
+                                                Map.of("a", List.of())))
+                                        .build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+        runtime.strategyFor(QN);
+
+        assertThatThrownBy(() -> runtime.advanceStateMachine(QN, "go"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void resetSelectorThrowsForUnknown() {
+        var config  = MapSimulationConfig.builder().build();
+        var runtime = new SimulationRuntime(config, new NoOpSimulationCorpus<>());
+
+        assertThatThrownBy(() -> runtime.resetSelector("nonexistent"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static SimulationConfig stubConfig(final Optional<String> strategy,
                                                final boolean capture,
                                                final Optional<ExhaustionPolicy> exhaustion) {

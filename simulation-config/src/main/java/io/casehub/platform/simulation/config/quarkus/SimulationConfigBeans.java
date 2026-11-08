@@ -124,6 +124,7 @@ public class SimulationConfigBeans {
         }
 
         runtime.setProfileSource(config);
+        runtime.initializeSelectors();
 
         var registry = ParameterRegistry.loadFromClasspath();
         var factory = new DeclarativeExtractorFactory(registry);

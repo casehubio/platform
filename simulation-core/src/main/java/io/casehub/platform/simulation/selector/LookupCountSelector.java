@@ -32,4 +32,13 @@ public final class LookupCountSelector implements CorpusSelector {
     public void onResolved() {
         resolveCount.incrementAndGet();
     }
+
+    @Override
+    public String type() {return "lookup-count";}
+
+    @Override
+    public void reset() {
+        resolveCount.set(0);
+    }
+
 }

@@ -74,4 +74,25 @@ class LookupCountSelectorTest {
         selector.activePhase();
         assertThat(selector.activePhase()).isEqualTo("a");
     }
+
+    @Test
+    void typeReturnsLookupCount() {
+        var selector = new LookupCountSelector(
+                List.of(new CorpusSelectorConfig.CountPhase("a", 5)));
+        assertThat(selector.type()).isEqualTo("lookup-count");
+    }
+
+    @Test
+    void resetZeroesCounter() {
+        var selector = new LookupCountSelector(
+                List.of(
+                        new CorpusSelectorConfig.CountPhase("a", 2),
+                        new CorpusSelectorConfig.CountPhase("b", 0)));
+        selector.onResolved();
+        selector.onResolved();
+        assertThat(selector.activePhase()).isEqualTo("b");
+
+        selector.reset();
+        assertThat(selector.activePhase()).isEqualTo("a");
+    }
 }

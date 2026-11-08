@@ -98,4 +98,31 @@ class DurationSelectorTest {
         clock.set(Duration.ofSeconds(5).toNanos());
         assertThat(selector.activePhase()).isEqualTo("b");
     }
+
+    @Test
+    void typeReturnsDuration() {
+        var selector = new DurationSelector(
+                List.of(new CorpusSelectorConfig.DurationPhase("a", Duration.ofSeconds(10))),
+                SpeedMultiplier.identity(),
+                () -> 0L);
+        assertThat(selector.type()).isEqualTo("duration");
+    }
+
+    @Test
+    void resetRestartsTimer() {
+        var clock = new AtomicLong(0);
+        var selector = new DurationSelector(
+                List.of(
+                        new CorpusSelectorConfig.DurationPhase("a", Duration.ofSeconds(10)),
+                        new CorpusSelectorConfig.DurationPhase("b", null)),
+                SpeedMultiplier.identity(),
+                clock::get);
+        assertThat(selector.activePhase()).isEqualTo("a");
+
+        clock.set(Duration.ofSeconds(15).toNanos());
+        assertThat(selector.activePhase()).isEqualTo("b");
+
+        selector.reset();
+        assertThat(selector.activePhase()).isEqualTo("a");
+    }
 }

@@ -268,6 +268,42 @@ public class SimulationRuntime {
     }
 
 
+    public void initializeSelectors() {
+        for (String qn : config.corpusSelectionKeys()) {
+            config.corpusSelection(qn).ifPresent(sel -> buildSelector(qn, sel));
+        }
+    }
+
+    public java.util.Map<String, SelectorPhaseInfo> allSelectorInfo() {
+        var result = new java.util.LinkedHashMap<String, SelectorPhaseInfo>();
+        for (var entry : corpusSelectors.entrySet()) {
+            var selector = entry.getValue();
+            result.put(entry.getKey(), new SelectorPhaseInfo(selector.type(), selector.activePhase()));
+        }
+        return result;
+    }
+
+    public void resetSelector(String qualifiedName) {
+        CorpusSelector selector = corpusSelectors.get(qualifiedName);
+        if (selector == null) {
+            throw new IllegalArgumentException("No selector registered for: " + qualifiedName);
+        }
+        selector.reset();
+    }
+
+    public void advanceStateMachine(String qualifiedName, String trigger) {
+        CorpusSelector selector = corpusSelectors.get(qualifiedName);
+        if (selector == null) {
+            throw new IllegalArgumentException("No selector registered for: " + qualifiedName);
+        }
+        if (!(selector instanceof io.casehub.platform.simulation.selector.StateMachineSelector sms)) {
+            throw new IllegalArgumentException(
+                    "Selector '" + qualifiedName + "' is type '" + selector.type() + "', not a state machine");
+        }
+        sms.advance(trigger);
+    }
+
+
     private SimilarityScorer<?> requireScorer(final String qualifiedName) {
         final SimilarityScorer<?> scorer = scorers.get(qualifiedName);
         if (scorer == null) {

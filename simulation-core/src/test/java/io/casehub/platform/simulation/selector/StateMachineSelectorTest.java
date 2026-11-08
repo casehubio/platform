@@ -57,4 +57,22 @@ class StateMachineSelectorTest {
         selector.advance("cancel");
         assertThat(selector.activePhase()).isEqualTo("cancelled");
     }
+
+    @Test
+    void typeReturnsStateMachine() {
+        var selector = new StateMachineSelector("a", Map.of("a", Map.of("go", "b")));
+        assertThat(selector.type()).isEqualTo("state-machine");
+    }
+
+    @Test
+    void resetRestoresInitialState() {
+        var selector = new StateMachineSelector("a", Map.of(
+                "a", Map.of("go", "b"),
+                "b", Map.of("go", "c")));
+        selector.advance("go");
+        assertThat(selector.activePhase()).isEqualTo("b");
+
+        selector.reset();
+        assertThat(selector.activePhase()).isEqualTo("a");
+    }
 }

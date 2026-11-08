@@ -11,10 +11,10 @@ meta:
     - async
     - concurrency-patterns
 ---
-- corr-expect: { id: "order-42", timeout: 1000 }
-- corr-expect: { id: "order-99", timeout: 1000 }
-- log: { message: "Expectations registered" }
-- corr-send: { orderId: "order-99", status: "shipped" }
-- corr-send: { orderId: "order-42", status: "confirmed" }
-- corr-await: { id: "order-42" }
-- corr-await: { id: "order-99" }
+- corr-expect order-42: { timeout: 1000 }
+- corr-expect order-99: { timeout: 1000 }
+- log: "Expectations registered"
+- corr-send order-99: { status: "shipped" }
+- corr-send order-42: { status: "confirmed" }
+- corr-await: "order-42"
+- corr-await: "order-99"

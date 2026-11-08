@@ -11,8 +11,8 @@ meta:
     - decorator
     - flow-control
 ---
-- click: { role: button, name: "A" }
+- click: "A"
   retry: 3
-- click: { role: button, name: "B" }
+- click: "B"
   retry: { max: 2 }
-- click: { role: button, name: "C" }
+- click: "C"

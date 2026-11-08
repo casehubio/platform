@@ -10,9 +10,9 @@ meta:
     - compare-and-set
     - coordination-primitives
 ---
-- gauge-set: { name: "temp", value: 20 }
-- gauge-get: { name: "temp" }
-- gauge-set: { name: "temp", value: 35 }
-- gauge-get: { name: "temp" }
-- gauge-cas: { name: "temp", expect: 35, update: 42 }
-- gauge-get: { name: "temp" }
+- gauge-set temp: 20
+- gauge-get: "temp"
+- gauge-set temp: 35
+- gauge-get: "temp"
+- gauge-cas temp: { expect: 35, update: 42 }
+- gauge-get: "temp"

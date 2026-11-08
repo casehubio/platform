@@ -14,17 +14,17 @@ meta:
 ---
 - concurrent:
     producer:
-      - log: { message: "Sending batch 1" }
+      - log: "Sending batch 1"
         publish: { channel: events, data: { batch: 1 } }
         loop: 3
       - delay: 500ms
-      - log: { message: "Sending batch 2" }
+      - log: "Sending batch 2"
         publish: { channel: events, data: { batch: 2 } }
         loop: 3
 
     consumer:
       - name: reader
-        log: { message: "Reading ${from.batch}" }
+        log: "Reading ${from.batch}"
         from: { channel: events, name: primary-reader }
         loop: continuous
         cancel: shutdown
@@ -32,7 +32,7 @@ meta:
     controller:
       - delay: 200ms
       - pause: primary-reader
-      - log: { message: "Consumer paused — items buffer" }
+      - log: "Consumer paused — items buffer"
       - delay: 300ms
       - resume: primary-reader
-      - log: { message: "Consumer resumed — buffered items drain" }
+      - log: "Consumer resumed — buffered items drain"

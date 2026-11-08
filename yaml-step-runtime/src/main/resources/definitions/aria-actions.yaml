@@ -2,8 +2,8 @@ actions:
   click:
     description: Click a UI element
     inputs:
-      role: { type: string, required: true }
       name: { type: string, required: true }
+      role: { type: string, default: button }
       index: { type: string }
       within: { type: object }
     invoke: { aria: click }

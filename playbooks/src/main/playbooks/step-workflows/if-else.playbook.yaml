@@ -12,11 +12,11 @@ meta:
 ---
 - if: true
   then:
-    - log: { message: "Condition was true" }
+    - log: "Condition was true"
   else:
-    - log: { message: "Condition was false" }
+    - log: "Condition was false"
 - if: false
   then:
-    - log: { message: "This is skipped" }
+    - log: "This is skipped"
   else:
-    - log: { message: "False branch taken" }
+    - log: "False branch taken"

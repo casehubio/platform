@@ -13,8 +13,8 @@ meta:
 - match: "warning"
   cases:
     - pattern: "error"
-      log: { message: "Matched: error" }
+      log: "Matched: error"
     - pattern: "warning"
-      log: { message: "Matched: warning" }
+      log: "Matched: warning"
     - default:
-        - log: { message: "No match — default" }
+        - log: "No match — default"

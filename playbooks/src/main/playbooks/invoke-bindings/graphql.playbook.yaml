@@ -11,6 +11,6 @@ meta:
     - invoke-bindings
 ---
 - graphql-exec: "{ users { id name email } }"
-- log: { message: "Query executed" }
+- log: "Query executed"
 - graphql-exec: "mutation { createUser(name: \"Alice\") { id } }"
-- log: { message: "Mutation executed" }
+- log: "Mutation executed"

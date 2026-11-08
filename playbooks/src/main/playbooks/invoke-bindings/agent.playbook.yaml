@@ -10,15 +10,13 @@ meta:
     - llm
     - invoke-bindings
 ---
-- agent-delegate:
-    descriptor: summarizer
+- agent-delegate summarizer:
     model: claude-sonnet-5
     structuredOutput: true
     params: { text: "Long document content...", maxLength: 100 }
-- log: { message: "Summary generated" }
-- agent-delegate:
-    descriptor: code-gen
+- log: "Summary generated"
+- agent-delegate code-gen:
     model: claude-opus-5
     structuredOutput: true
     params: { spec: "REST endpoint for user CRUD" }
-- log: { message: "Code generated" }
+- log: "Code generated"

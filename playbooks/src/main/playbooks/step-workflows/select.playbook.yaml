@@ -12,6 +12,6 @@ meta:
 ---
 - select:
   - wait: fast-signal
-    log: { message: "Fast branch won the race" }
+    log: "Fast branch won the race"
   - wait: slow-signal
-    log: { message: "Slow branch won the race" }
+    log: "Slow branch won the race"

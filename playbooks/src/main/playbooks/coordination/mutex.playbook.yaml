@@ -14,12 +14,12 @@ meta:
 ---
 - concurrent:
     branch-a:
-      - click: { role: button, name: "A" }
+      - click: "A"
         mutex: db-write
-      - click: { role: button, name: "B" }
+      - click: "B"
         mutex: db-write
     branch-b:
-      - click: { role: button, name: "C" }
+      - click: "C"
         mutex: db-write
-      - click: { role: button, name: "D" }
+      - click: "D"
         mutex: db-write

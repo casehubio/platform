@@ -10,9 +10,9 @@ meta:
     - barrier
     - coordination-primitives
 ---
-- latch-create: { name: "init-gate", count: 3 }
-- latch-countdown: { name: "init-gate" }
-- latch-status: { name: "init-gate" }
-- latch-countdown: { name: "init-gate" }
-- latch-countdown: { name: "init-gate" }
-- latch-status: { name: "init-gate" }
+- latch-create init-gate: { count: 3 }
+- latch-countdown: "init-gate"
+- latch-status: "init-gate"
+- latch-countdown: "init-gate"
+- latch-countdown: "init-gate"
+- latch-status: "init-gate"

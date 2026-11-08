@@ -10,6 +10,6 @@ meta:
     - step-workflows
 ---
 - block:
-  - log: { message: "Step 1: initialize" }
-  - log: { message: "Step 2: process" }
-  - log: { message: "Step 3: finalize" }
+  - log: "Step 1: initialize"
+  - log: "Step 2: process"
+  - log: "Step 3: finalize"

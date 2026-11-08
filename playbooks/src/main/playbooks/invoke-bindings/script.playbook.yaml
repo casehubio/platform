@@ -10,13 +10,9 @@ meta:
     - runtime
     - invoke-bindings
 ---
-- script-run:
-    runtime: python3
-    script: "import json; print(json.dumps({'status': 'ok'}))"
-    timeout: 30s
-- log: { message: "Python script done" }
-- script-run:
-    runtime: node
-    script: "console.log(JSON.stringify({ valid: true }))"
-    timeout: 10s
-- log: { message: "Node script done" }
+- script-run:python3: "import json; print(json.dumps({'status': 'ok'}))"
+  timeout: 30s
+- log: "Python script done"
+- script-run:node: "console.log(JSON.stringify({ valid: true }))"
+  timeout: 10s
+- log: "Node script done"

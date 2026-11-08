@@ -11,9 +11,9 @@ meta:
     - decorator
     - flow-control
 ---
-- click: { role: button, name: "A" }
-- click: { role: button, name: "B" }
+- click: "A"
+- click: "B"
   when: true
-- click: { role: button, name: "C" }
+- click: "C"
   when: false
-- click: { role: button, name: "D" }
+- click: "D"

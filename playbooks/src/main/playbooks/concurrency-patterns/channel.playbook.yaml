@@ -11,5 +11,5 @@ meta:
     - concurrency-patterns
 ---
 - parallel:
-  - chan-produce: { name: "work", capacity: 2, items: 4, interval: 200 }
-  - chan-consume: { name: "work", expect: 4, interval: 300 }
+  - chan-produce work: { capacity: 2, items: 4, interval: 200 }
+  - chan-consume work: { expect: 4, interval: 300 }

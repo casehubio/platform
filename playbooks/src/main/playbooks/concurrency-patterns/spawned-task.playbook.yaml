@@ -10,9 +10,9 @@ meta:
     - async
     - concurrency-patterns
 ---
-- spawn-task: { name: "indexer", duration: 800 }
-- task-poll: { name: "indexer" }
-- log: { message: "Foreground work while indexer runs" }
-- task-poll: { name: "indexer" }
-- task-join: { name: "indexer", timeout: 2000 }
-- task-poll: { name: "indexer" }
+- spawn-task indexer: { duration: 800 }
+- task-poll: "indexer"
+- log: "Foreground work while indexer runs"
+- task-poll: "indexer"
+- task-join indexer: { timeout: 2000 }
+- task-poll: "indexer"

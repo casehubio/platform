@@ -12,11 +12,11 @@ meta:
     - delay
     - composition
 ---
-- click: { role: button, name: "A" }
+- click: "A"
 - trigger:
     type: time
     delay: 2s
   block:
-    - click: { role: button, name: "C" }
-    - click: { role: button, name: "D" }
-- click: { role: button, name: "B" }
+    - click: "C"
+    - click: "D"
+- click: "B"

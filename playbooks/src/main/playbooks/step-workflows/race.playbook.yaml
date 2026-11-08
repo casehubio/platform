@@ -13,5 +13,5 @@ meta:
 - race:
   - block:
     - delay: 200ms
-    - log: { message: "Slow branch finished" }
-  - log: { message: "Fast branch finished" }
+    - log: "Slow branch finished"
+  - log: "Fast branch finished"

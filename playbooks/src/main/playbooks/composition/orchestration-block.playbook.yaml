@@ -21,13 +21,13 @@ orchestration:
 ---
 - concurrent:
     init:
-      - click: { role: button, name: "A" }
+      - click: "A"
       - delay: 1500ms
       - signal: ready
-      - await: { barrier: sync }
-      - click: { role: button, name: "C" }
+      - await:barrier: sync
+      - click: "C"
     worker:
-      - await: { signal: ready }
-      - click: { role: button, name: "B" }
-      - await: { barrier: sync }
-      - click: { role: button, name: "D" }
+      - await:signal: ready
+      - click: "B"
+      - await:barrier: sync
+      - click: "D"

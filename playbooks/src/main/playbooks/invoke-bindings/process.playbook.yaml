@@ -13,7 +13,7 @@ meta:
 - process-exec ls: [-la, src/]
   output: stdout
   timeout: 10s
-- log: { message: "Directory listed" }
+- log: "Directory listed"
 - process-exec git: [status, --short]
   output: stdout
-- log: { message: "Git status captured" }
+- log: "Git status captured"

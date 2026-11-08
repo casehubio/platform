@@ -12,15 +12,15 @@ meta:
 ---
 - concurrent:
     producer:
-      - log: { message: "Sending item 1" }
+      - log: "Sending item 1"
         publish: { channel: data, data: { id: 1 } }
-      - log: { message: "Sending item 2" }
+      - log: "Sending item 2"
         publish: { channel: data, data: { id: 2 } }
-      - log: { message: "Closing channel" }
+      - log: "Closing channel"
 
     consumer:
       - name: read
-        log: { message: "Received ${from.id}" }
+        log: "Received ${from.id}"
         from: data
         loop: continuous
         cancel: shutdown

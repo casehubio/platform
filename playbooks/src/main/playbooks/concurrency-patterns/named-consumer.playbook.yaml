@@ -13,14 +13,14 @@ meta:
 ---
 - concurrent:
     source:
-      - log: { message: "Emitting events" }
+      - log: "Emitting events"
         publish: { channel: raw-events, data: { type: "click", ts: 1000 } }
         delay: 100ms
         loop: 10
 
     enricher:
       - name: enrich
-        log: { message: "Enriching ${from.type}" }
+        log: "Enriching ${from.type}"
         from: { channel: raw-events, name: enricher }
         loop: continuous
         cancel: shutdown
@@ -28,4 +28,4 @@ meta:
     supervisor:
       - delay: 500ms
       - stop: enricher
-      - log: { message: "Enricher stopped after 500ms" }
+      - log: "Enricher stopped after 500ms"

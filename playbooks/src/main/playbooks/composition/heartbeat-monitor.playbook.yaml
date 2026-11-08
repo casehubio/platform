@@ -15,7 +15,7 @@ meta:
 ---
 - block monitor:
     - name: heartbeat
-      log: { message: "Heartbeat: ${from.ts}" }
+      log: "Heartbeat: ${from.ts}"
       from: heartbeats
       timeout: 5s
     - delay: 1s

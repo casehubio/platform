@@ -11,9 +11,9 @@ meta:
     - cancellation
     - concurrency-patterns
 ---
-- deadline-create: { name: "batch", deadlineMs: 600 }
-- deadline-check: { name: "batch" }
-- deadline-work: { name: "batch", duration: 300, label: "phase-1" }
-- deadline-check: { name: "batch" }
-- deadline-work: { name: "batch", duration: 400, label: "phase-2" }
-- deadline-check: { name: "batch" }
+- deadline-create batch: { deadlineMs: 600 }
+- deadline-check: "batch"
+- deadline-work batch: { duration: 300, label: "phase-1" }
+- deadline-check: "batch"
+- deadline-work batch: { duration: 400, label: "phase-2" }
+- deadline-check: "batch"

@@ -11,19 +11,18 @@ meta:
     - multi-primitive
     - concurrency-patterns
 ---
-- deadline-create: { name: "pipeline", deadlineMs: 3000 }
-- spawn-task: { name: "monitor", duration: 2500 }
-- deadline-check: { name: "pipeline" }
+- deadline-create pipeline: { deadlineMs: 3000 }
+- spawn-task monitor: { duration: 2500 }
+- deadline-check: "pipeline"
 - parallel:
-  - chan-produce: { name: "jobs", capacity: 2, items: 4, interval: 150 }
-  - pipeline-consume:
-      channel: jobs
+  - chan-produce jobs: { capacity: 2, items: 4, interval: 150 }
+  - pipeline-consume jobs:
       semaphore: gate
       permits: 2
       map: results
       expect: 4
       processingMs: 300
-- map-reader: { name: "results" }
-- deadline-check: { name: "pipeline" }
-- task-join: { name: "monitor", timeout: 2000 }
-- task-poll: { name: "monitor" }
+- map-reader: "results"
+- deadline-check: "pipeline"
+- task-join monitor: { timeout: 2000 }
+- task-poll: "monitor"

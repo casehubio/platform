@@ -12,7 +12,7 @@ meta:
 ---
 - mcp-call file_search:
     params: { query: "authentication handler", limit: 5 }
-- log: { message: "Search complete" }
+- log: "Search complete"
 - mcp-call code_review:
     params: { file: "src/auth.ts", focus: "security" }
-- log: { message: "Review complete" }
+- log: "Review complete"

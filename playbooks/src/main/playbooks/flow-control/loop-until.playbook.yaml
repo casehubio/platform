@@ -11,8 +11,8 @@ meta:
     - decorator
     - flow-control
 ---
-- click: { role: button, name: "A" }
+- click: "A"
   loop: { count: 3 }
-- click: { role: button, name: "B" }
+- click: "B"
   loop: { count: 5, until: true }
-- click: { role: button, name: "C" }
+- click: "C"

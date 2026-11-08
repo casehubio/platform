@@ -10,8 +10,8 @@ meta:
     - delay
     - flow-control
 ---
-- click: { role: button, name: "A" }
+- click: "A"
 - delay: 1000ms
-- click: { role: button, name: "B" }
+- click: "B"
 - delay: 500ms
-- click: { role: button, name: "C" }
+- click: "C"

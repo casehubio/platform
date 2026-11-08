@@ -12,11 +12,11 @@ meta:
     - concurrent
     - composition
 ---
-- click: { role: button, name: "A" }
-- click: { role: button, name: "B" }
+- click: "A"
+- click: "B"
 - trigger:
     type: data
     channel: trades
   block:
-    - click: { role: button, name: "C" }
-    - click: { role: button, name: "D" }
+    - click: "C"
+    - click: "D"

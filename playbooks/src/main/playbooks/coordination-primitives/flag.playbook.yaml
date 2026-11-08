@@ -10,8 +10,8 @@ meta:
     - toggle
     - coordination-primitives
 ---
-- flag-check: { name: "ready" }
-- flag-set: { name: "ready" }
-- flag-check: { name: "ready" }
-- flag-toggle: { name: "ready" }
-- flag-check: { name: "ready" }
+- flag-check: "ready"
+- flag-set: "ready"
+- flag-check: "ready"
+- flag-toggle: "ready"
+- flag-check: "ready"

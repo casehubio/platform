@@ -11,7 +11,7 @@ meta:
     - concurrency-patterns
 ---
 - parallel:
-  - sem-worker: { name: "pool", permits: 2, worker: "A", duration: 400 }
-  - sem-worker: { name: "pool", permits: 2, worker: "B", duration: 300 }
-  - sem-worker: { name: "pool", permits: 2, worker: "C", duration: 500 }
-  - sem-worker: { name: "pool", permits: 2, worker: "D", duration: 200 }
+  - sem-worker pool: { permits: 2, worker: "A", duration: 400 }
+  - sem-worker pool: { permits: 2, worker: "B", duration: 300 }
+  - sem-worker pool: { permits: 2, worker: "C", duration: 500 }
+  - sem-worker pool: { permits: 2, worker: "D", duration: 200 }

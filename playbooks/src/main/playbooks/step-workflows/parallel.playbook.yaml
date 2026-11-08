@@ -10,6 +10,6 @@ meta:
     - step-workflows
 ---
 - parallel:
-  - log: { message: "Branch A: fetching data" }
-  - log: { message: "Branch B: loading config" }
-  - log: { message: "Branch C: warming cache" }
+  - log: "Branch A: fetching data"
+  - log: "Branch B: loading config"
+  - log: "Branch C: warming cache"

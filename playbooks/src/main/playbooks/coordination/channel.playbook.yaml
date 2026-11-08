@@ -17,12 +17,12 @@ orchestration:
 ---
 - concurrent:
     producer:
-      - click: { role: button, name: "A" }
+      - click: "A"
       - signal: data-ready
-      - await: { signal: ack }
-      - click: { role: button, name: "C" }
+      - await:signal: ack
+      - click: "C"
     consumer:
-      - await: { signal: data-ready }
-      - click: { role: button, name: "B" }
+      - await:signal: data-ready
+      - click: "B"
       - signal: ack
-      - click: { role: button, name: "D" }
+      - click: "D"

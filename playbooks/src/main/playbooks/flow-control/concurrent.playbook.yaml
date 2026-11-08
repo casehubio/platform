@@ -12,8 +12,8 @@ meta:
 ---
 - concurrent:
     branch-a:
-      - click: { role: button, name: "A" }
-      - click: { role: button, name: "C" }
+      - click: "A"
+      - click: "C"
     branch-b:
-      - click: { role: button, name: "B" }
-      - click: { role: button, name: "D" }
+      - click: "B"
+      - click: "D"

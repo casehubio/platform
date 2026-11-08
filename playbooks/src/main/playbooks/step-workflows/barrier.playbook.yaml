@@ -10,10 +10,10 @@ meta:
     - dependency
     - step-workflows
 ---
-- name:fetch-data
-  log: { message: "Fetching data" }
-- name:load-config
-  log: { message: "Loading config" }
+- name: fetch-data
+  log: "Fetching data"
+- name: load-config
+  log: "Loading config"
 - barrier:
     await: [fetch-data, load-config]
-- log: { message: "Both done — proceeding" }
+- log: "Both done — proceeding"

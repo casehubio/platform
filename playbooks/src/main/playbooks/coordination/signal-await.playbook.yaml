@@ -14,8 +14,8 @@ meta:
 ---
 - concurrent:
     sender:
-      - click: { role: button, name: "A" }
+      - click: "A"
       - signal: go
     receiver:
-      - await: { signal: go }
-      - click: { role: button, name: "B" }
+      - await:signal: go
+      - click: "B"

@@ -28,6 +28,6 @@ meta:
             user: alice
             amount: 49.99
     ui-flow:
-      - click: { role: button, name: "Submit" }
+      - click: "Submit"
       - delay: 800ms
-      - click: { role: button, name: "Reset" }
+      - click: "Reset"

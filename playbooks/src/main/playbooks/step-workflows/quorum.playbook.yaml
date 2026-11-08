@@ -10,13 +10,13 @@ meta:
     - partial completion
     - step-workflows
 ---
-- name:primary
-  log: { message: "Primary completed" }
-- name:secondary
-  log: { message: "Secondary completed" }
-- name:tertiary
-  log: { message: "Tertiary completed" }
+- name: primary
+  log: "Primary completed"
+- name: secondary
+  log: "Secondary completed"
+- name: tertiary
+  log: "Tertiary completed"
 - quorum:
     required: 2
     of: [primary, secondary, tertiary]
-- log: { message: "Quorum met — 2 of 3 done" }
+- log: "Quorum met — 2 of 3 done"

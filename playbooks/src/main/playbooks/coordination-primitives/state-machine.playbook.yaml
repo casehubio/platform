@@ -10,9 +10,9 @@ meta:
     - guards
     - coordination-primitives
 ---
-- sm-create: { name: "order", states: [draft, submitted, approved, rejected], initial: draft }
-- sm-state: { name: "order" }
-- sm-transition: { name: "order", from: draft, to: submitted }
-- sm-state: { name: "order" }
-- sm-transition: { name: "order", from: submitted, to: approved }
-- sm-state: { name: "order" }
+- sm-create order: { states: [draft, submitted, approved, rejected], initial: draft }
+- sm-state: "order"
+- sm-transition order: { from: draft, to: submitted }
+- sm-state: "order"
+- sm-transition order: { from: submitted, to: approved }
+- sm-state: "order"

@@ -175,15 +175,18 @@
         "delay": { "type": "string", "description": "Duration (e.g. 1000ms, 5s)." },
         "signal": { "type": "string", "description": "Send a signal (structural or decorator)." },
         "await": { "type": "string", "description": "Wait for signal." },
-        "rest-request": { "description": "Deprecated verbose form — use rest-request:METHOD: URL instead." },
+        "rest-request:GET": { "type": "string", "description": "HTTP GET: rest-request:GET: URL" },
+        "rest-request:POST": { "type": "string", "description": "HTTP POST: rest-request:POST: URL" },
+        "rest-request:PUT": { "type": "string", "description": "HTTP PUT: rest-request:PUT: URL" },
+        "rest-request:DELETE": { "type": "string", "description": "HTTP DELETE: rest-request:DELETE: URL" },
+        "rest-request:PATCH": { "type": "string", "description": "HTTP PATCH: rest-request:PATCH: URL" },
         "advisory": {
           "oneOf": [
             { "type": "string" },
             { "type": "object" }
           ]
         },
-        "agent-session-open": { "description": "Deprecated verbose form — use agent-session-open SESSION: instead." },
-        "agent-query": { "description": "Deprecated verbose form — use agent-query SESSION: prompt instead." },
+        
         "agent-session-clear": {
           "oneOf": [
             { "type": "string", "description": "Session name to clear." },
@@ -202,7 +205,7 @@
             { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] }
           ]
         },
-        "mcp-call": { "description": "Deprecated verbose form — use mcp-call TOOL: params instead." },
+        
         "assert": {
           "type": "object",
           "properties": {
@@ -389,10 +392,10 @@
         "^agent-session-open .+$": { "description": "Compact: agent-session-open SESSION:" },
         "^mcp-call .+$": { "description": "Compact: mcp-call TOOL: params" },
         "^process .+$": { "description": "Compact: process COMMAND: args" },
-        "^rest-request .+$": { "description": "Legacy space form: rest-request METHOD URL:" },
+        
         "^agent-invoke .+$": { "description": "Compact: agent-invoke PROMPT:" },
         "^graphql-exec .+$": { "description": "Compact: graphql-exec OPERATION:" },
-        "^rest-call .+$": { "description": "Legacy space form: rest-call URL:" }
+        "^rest-call:.+$": { "description": "Compact: rest-call:METHOD: URL" }
       },
       "additionalProperties": true
     },

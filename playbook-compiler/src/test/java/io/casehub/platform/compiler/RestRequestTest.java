@@ -15,13 +15,13 @@ class RestRequestTest {
     @Test
     void restRequest_compilesToCallHttp() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/users"))));
+                Map.of("rest-request:GET", "https://api.example.com/users")));
 
         var outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
         var result = ((CompilationOutcome.Success) outcome).result();
-        var task = result.workflow().getDo().getFirst().getTask();
+        var task   = result.workflow().getDo().getFirst().getTask();
         assertThat(task.getCallTask()).isNotNull();
         assertThat(task.getCallTask().getCallHTTP()).isNotNull();
         assertThat(task.getCallTask().getCallHTTP().getWith().getMethod()).isEqualTo("GET");
@@ -29,35 +29,37 @@ class RestRequestTest {
 
     @Test
     void restRequest_post_includesBody() {
-        var content = Map.<String, Object>of("steps", List.of(
-                Map.of("rest-request", Map.of(
-                        "method", "POST",
-                        "url", "https://api.example.com/orders",
-                        "body", Map.of("item", "widget", "qty", 5)))));
+        var step = new LinkedHashMap<String, Object>();
+        step.put("rest-request:POST", "https://api.example.com/orders");
+        step.put("body", Map.of("item", "widget", "qty", 5));
+
+        var content = Map.<String, Object>of("steps", List.of(step));
 
         var outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
         var result = ((CompilationOutcome.Success) outcome).result();
         var httpArgs = result.workflow().getDo().getFirst().getTask()
-                .getCallTask().getCallHTTP().getWith();
+                             .getCallTask().getCallHTTP().getWith();
         assertThat(httpArgs.getMethod()).isEqualTo("POST");
         assertThat(httpArgs.getBody()).isNotNull();
     }
 
     @Test
     void integrationSmokeTest_fullPlaybook() {
+        var tryInner = new LinkedHashMap<String, Object>();
+        tryInner.put("rest-request:POST", "https://api.example.com/orders");
+        tryInner.put("body", Map.of("item", "widget"));
+
         var tryStep = new LinkedHashMap<String, Object>();
-        tryStep.put("try", List.of(
-                Map.of("rest-request", Map.of("method", "POST", "url", "https://api.example.com/orders",
-                        "body", Map.of("item", "widget")))));
+        tryStep.put("try", List.of(tryInner));
         tryStep.put("catch", List.of(Map.of("log", Map.of("message", "Order failed"))));
 
         var content = new LinkedHashMap<String, Object>();
         content.put("playbook", "order-flow");
         content.put("steps", List.of(
                 Map.of("log", Map.of("message", "Starting")),
-                Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/users")),
+                Map.of("rest-request:GET", "https://api.example.com/users"),
                 tryStep,
                 Map.of("delay", "500ms"),
                 Map.of("log", Map.of("message", "Done"))));
@@ -71,19 +73,16 @@ class RestRequestTest {
         assertThat(result.coordinationSpec().isEmpty()).isTrue();
     }
 
-
     @Test
     void restRequest_expressionVariableInUrl() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("rest-request", Map.of(
-                        "method", "GET",
-                        "url", "https://api.example.com/contractors/${input.contractorName}"))));
+                Map.of("rest-request:GET", "https://api.example.com/contractors/${input.contractorName}")));
 
         var outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
-        var result = ((CompilationOutcome.Success) outcome).result();
-        var task = result.workflow().getDo().getFirst().getTask();
+        var result   = ((CompilationOutcome.Success) outcome).result();
+        var task     = result.workflow().getDo().getFirst().getTask();
         var httpArgs = task.getCallTask().getCallHTTP().getWith();
         assertThat(httpArgs.getMethod()).isEqualTo("GET");
         assertThat(httpArgs.getEndpoint().getUriTemplate().getLiteralUriTemplate())
@@ -92,27 +91,26 @@ class RestRequestTest {
 
     @Test
     void restRequest_pureExpressionUrl() {
-        var content = Map.<String, Object>of("steps", List.of(
-                Map.of("rest-request", Map.of(
-                        "method", "POST",
-                        "url", "${config.apiBaseUrl}",
-                        "body", Map.of("key", "value")))));
+        var step = new LinkedHashMap<String, Object>();
+        step.put("rest-request:POST", "${config.apiBaseUrl}");
+        step.put("body", Map.of("key", "value"));
+
+        var content = Map.<String, Object>of("steps", List.of(step));
 
         var outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
-        var result = ((CompilationOutcome.Success) outcome).result();
-        var task = result.workflow().getDo().getFirst().getTask();
+        var result   = ((CompilationOutcome.Success) outcome).result();
+        var task     = result.workflow().getDo().getFirst().getTask();
         var httpArgs = task.getCallTask().getCallHTTP().getWith();
         assertThat(httpArgs.getEndpoint().getRuntimeExpression())
                 .isEqualTo("${config.apiBaseUrl}");
     }
 
-
     @Test
     void decoratedRestRequest_retryAndTimeout() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("rest-request", Map.of("method", "POST", "url", "https://api.example.com/orders"));
+        step.put("rest-request:POST", "https://api.example.com/orders");
         step.put("retry", 3);
         step.put("timeout", "5s");
 
@@ -122,5 +120,16 @@ class RestRequestTest {
 
         var result = ((CompilationOutcome.Success) outcome).result();
         assertThat(result.workflow().getDo()).hasSize(1);
+    }
+
+    @Test
+    void verboseRestRequest_rejected() {
+        var content = Map.<String, Object>of("steps", List.of(
+                Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/users"))));
+
+        var outcome = compiler.compile("test", content);
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Failure.class);
+        var failure = (CompilationOutcome.Failure) outcome;
+        assertThat(failure.diagnostics().get(0).message()).contains("Verbose");
     }
 }

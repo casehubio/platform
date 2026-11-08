@@ -32,6 +32,14 @@ public final class PlaybookCompiler {
 
     private final Map<String, StepCompiler> registry = new LinkedHashMap<>();
 
+    private static final Map<String, String> COMPACT_ONLY = Map.of(
+            "rest-request", "rest-request:METHOD: URL",
+            "agent-session-open", "agent-session-open SESSION:",
+            "agent-query", "agent-query SESSION: prompt",
+            "mcp-call", "mcp-call TOOL: params",
+            "process-exec", "process-exec COMMAND: args"
+    );
+
     public PlaybookCompiler() {
         register("log", (key, value, fullStep, ctx) -> {
             String name = ctx.generateName("set");
@@ -147,6 +155,11 @@ public final class PlaybookCompiler {
         char combinedKeySeparator = 0;
         for (String key : effectiveStep.keySet()) {
             if (registry.containsKey(key)) {
+                if (COMPACT_ONLY.containsKey(key)) {
+                    ctx.addDiagnostic(CompilationDiagnostic.Severity.ERROR,
+                            "Verbose '" + key + ":' form is removed — use compact: " + COMPACT_ONLY.get(key));
+                    return null;
+                }
                 stepKey = key;
                 compiler = registry.get(key);
                 break;

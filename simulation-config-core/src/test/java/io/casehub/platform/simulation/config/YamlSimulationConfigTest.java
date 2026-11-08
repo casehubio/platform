@@ -628,6 +628,45 @@ class YamlSimulationConfigTest {
                 .isEqualTo(resolved.corpusSelectionGroup("payment.refund").get());
     }
 
+    @Test
+    void profileLevelDurationCorpusSelection() {
+        var config = load("""
+                          profiles:
+                            degradation:
+                              corpus-selection:
+                                type: duration
+                                phases:
+                                  - name: normal
+                                    duration: 10s
+                                  - name: degraded
+                              methods:
+                                svc.health:
+                                  strategy: sequential
+                                  phases:
+                                    normal:
+                                      - output: OK
+                                    degraded:
+                                      - output: DOWN
+                          """);
+
+        var profile = config.resolve("degradation");
+        assertThat(profile).isPresent();
+
+        var resolved = profile.get().config();
+        var sel      = resolved.corpusSelection("svc.health");
+        assertThat(sel).isPresent();
+        assertThat(sel.get()).isInstanceOf(io.casehub.platform.simulation.CorpusSelectorConfig.DurationBased.class);
+
+        var d = (io.casehub.platform.simulation.CorpusSelectorConfig.DurationBased) sel.get();
+        assertThat(d.orderedPhases()).hasSize(2);
+        assertThat(d.orderedPhases().get(0).duration().getSeconds()).isEqualTo(10);
+        assertThat(d.phases().get("normal")).hasSize(1);
+        assertThat(d.phases().get("normal").get(0).output()).isEqualTo("OK");
+        assertThat(d.phases().get("degraded")).hasSize(1);
+        assertThat(d.phases().get("degraded").get(0).output()).isEqualTo("DOWN");
+    }
+
+
     private YamlSimulationConfig load(String yaml) {
         return new YamlSimulationConfig(
                 new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));

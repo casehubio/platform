@@ -76,4 +76,35 @@ class CorpusSelectionEventObserverTest {
         observer.onCloudEvent(complete);
         assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("done");
     }
+
+    @Test
+    void conditionMatchingEventFiresTrigger() throws Exception {
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+
+        CloudEvent event = CloudEventBuilder.v1()
+                                            .withType("test.conditional")
+                                            .withId("test-cond-1")
+                                            .withSource(URI.create("//test"))
+                                            .withData("application/json", "{\"level\": 10}".getBytes())
+                                            .build();
+        observer.onCloudEvent(event);
+
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("active");
+    }
+
+    @Test
+    void conditionNonMatchingEventDoesNotFireTrigger() throws Exception {
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+
+        CloudEvent event = CloudEventBuilder.v1()
+                                            .withType("test.conditional")
+                                            .withId("test-cond-2")
+                                            .withSource(URI.create("//test"))
+                                            .withData("application/json", "{\"level\": 3}".getBytes())
+                                            .build();
+        observer.onCloudEvent(event);
+
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+    }
+
 }

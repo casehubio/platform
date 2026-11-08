@@ -3,6 +3,9 @@ triggers:
     event-type: "test.activate"
   complete:
     event-type: "test.complete"
+  conditional-activate:
+    event-type: "test.conditional"
+    condition: "level > 5"
 
 methods:
   test-spi.invoke:
@@ -13,6 +16,7 @@ methods:
       transitions:
         idle:
           activate: active
+          conditional-activate: active
         active:
           complete: done
       phases:

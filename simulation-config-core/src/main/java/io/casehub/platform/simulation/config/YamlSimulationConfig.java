@@ -415,18 +415,25 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         Map<String, MethodConfig> result = new LinkedHashMap<>();
         rawMethods.forEach((qn, methodProps) -> {
             Map<String, Object> rawPhases = (Map<String, Object>) methodProps.get("phases");
-            if (rawPhases != null && profileSelection instanceof CorpusSelectorConfig.StateMachine sm) {
+            if (rawPhases != null) {
                 Map<String, java.util.List<InvocationRecord<Object, Object>>> phases = new LinkedHashMap<>();
                 rawPhases.forEach((phaseName, value) -> {
                     if (value instanceof List<?> entries) {
                         phases.put(phaseName, parseCorpusEntriesToRecords((List<Map<String, Object>>) entries));
                     }
                 });
-                CorpusSelectorConfig combined = new CorpusSelectorConfig.StateMachine(
-                        sm.initial(), sm.transitions(), phases);
+                CorpusSelectorConfig combined = switch (profileSelection) {
+                    case CorpusSelectorConfig.StateMachine sm ->
+                            new CorpusSelectorConfig.StateMachine(sm.initial(), sm.transitions(), phases);
+                    case CorpusSelectorConfig.DurationBased d ->
+                            new CorpusSelectorConfig.DurationBased(d.orderedPhases(), phases);
+                    case CorpusSelectorConfig.LookupCount lc ->
+                            new CorpusSelectorConfig.LookupCount(lc.orderedPhases(), phases);
+                    case CorpusSelectorConfig.Weighted w ->
+                            new CorpusSelectorConfig.Weighted(w.weightedPhases(), phases);
+                };
                 String strategy = (String) methodProps.get("strategy");
-                result.put(qn, new MethodConfig(strategy, null, null, null, null, null, null,
-                        null, null, null, combined));
+                result.put(qn, MethodConfig.forCorpusSelection(strategy, combined));
             } else {
                 result.put(qn, parseMethodConfig(methodProps));
             }
@@ -817,7 +824,13 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             List<CorpusEntry> corpus,
             List<String> corpusFiles,
             DataRealism fallthroughRealism,
-            CorpusSelectorConfig corpusSelection) {}
+            CorpusSelectorConfig corpusSelection) {
+
+        static MethodConfig forCorpusSelection(String strategy, CorpusSelectorConfig corpusSelection) {
+            return new MethodConfig(strategy, null, null, null, null, null, null,
+                    null, null, null, corpusSelection);
+        }
+    }
 
     record CorpusEntry(
             String key,

@@ -51,7 +51,7 @@ public class CorpusSelectionEventObserver {
         for (var entry : triggers.entrySet()) {
             String triggerName = entry.getKey();
             TriggerConfig config = entry.getValue();
-            CompiledExpression<Map, Boolean> compiled = null;
+            CompiledExpression<Map<String, Object>, Boolean> compiled = null;
 
             if (config.condition() != null) {
                 if (registry == null) {
@@ -63,7 +63,9 @@ public class CorpusSelectionEventObserver {
                         LOG.warning("Trigger '" + triggerName + "' has a condition but no default CONDITION"
                                 + " engine is registered — trigger will fire on event type match only");
                     } else {
-                        compiled = registry.compile(engineType, config.condition(), Map.class, Boolean.class);
+                        @SuppressWarnings("unchecked")
+                        Class<Map<String, Object>> mapClass = (Class<Map<String, Object>>) (Class<?>) Map.class;
+                        compiled = registry.compile(engineType, config.condition(), mapClass, Boolean.class);
                     }
                 }
             }
@@ -123,5 +125,5 @@ public class CorpusSelectionEventObserver {
 
     private record TriggerBinding(
             String triggerName,
-            CompiledExpression<Map, Boolean> condition) {}
+            CompiledExpression<Map<String, Object>, Boolean> condition) {}
 }

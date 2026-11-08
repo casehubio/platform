@@ -178,7 +178,8 @@ public class SimulationRuntime {
         CorpusSelector selector = null;
         Optional<CorpusSelectorConfig> selection = effectiveConfig.corpusSelection(qualifiedName);
         if (selection.isPresent()) {
-            selector = buildSelector(qualifiedName, selection.get());
+            String selectorKey = effectiveConfig.corpusSelectionGroup(qualifiedName).orElse(qualifiedName);
+            selector = buildSelector(selectorKey, selection.get());
             effectiveCorpus = new PhasedCorpus<>(selector, selection.get().phases());
         }
 

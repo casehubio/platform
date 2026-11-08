@@ -193,6 +193,21 @@ class SimulationSchemaTest {
     }
 
 
+    @Test
+    void triggerConfigDefined() throws IOException {
+        JsonNode trigger = loadSchema().at("/$defs/trigger-config");
+        assertThat(trigger.get("required").toString()).contains("event-type");
+        JsonNode props = trigger.get("properties");
+        assertThat(props.has("event-type")).isTrue();
+        assertThat(props.has("condition")).isTrue();
+    }
+
+    @Test
+    void topLevelTriggersProperty() throws IOException {
+        JsonNode props = loadSchema().at("/properties");
+        assertThat(props.has("triggers")).isTrue();
+    }
+
     private JsonNode loadSchema() throws IOException {
         InputStream is = getClass().getClassLoader()
                 .getResourceAsStream("schema/simulation.schema.json");

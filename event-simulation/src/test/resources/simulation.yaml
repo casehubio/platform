@@ -1,3 +1,9 @@
+triggers:
+  activate:
+    event-type: "test.activate"
+  complete:
+    event-type: "test.complete"
+
 methods:
   test-spi.invoke:
     strategy: sequential

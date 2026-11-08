@@ -31,6 +31,13 @@
         "$ref": "#/$defs/temporal-profile-config"
       }
     },
+    "triggers": {
+      "type": "object",
+      "description": "Named trigger bindings — map event types to state machine transition triggers",
+      "additionalProperties": {
+        "$ref": "#/$defs/trigger-config"
+      }
+    },
     "speed": {
       "type": "number",
       "exclusiveMinimum": 0,
@@ -135,6 +142,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "corpus-selection": {
+          "$ref": "#/$defs/corpus-selection-config",
+          "description": "Profile-level corpus selection — shared selector across all methods in this profile"
+        },
         "methods": {
           "type": "object",
           "additionalProperties": {
@@ -244,6 +255,21 @@
           "type": "array",
           "items": { "$ref": "#/$defs/corpus-entry" },
           "description": "Corpus entries for this phase"
+        }
+      }
+    },
+    "trigger-config": {
+      "type": "object",
+      "required": ["event-type"],
+      "additionalProperties": false,
+      "properties": {
+        "event-type": {
+          "type": "string",
+          "description": "CloudEvent type to match (e.g., capacity.pressure)"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Optional expression evaluated against event data (e.g., pressure > 0.8)"
         }
       }
     }

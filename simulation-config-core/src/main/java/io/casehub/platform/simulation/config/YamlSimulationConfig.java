@@ -13,6 +13,7 @@ import io.casehub.platform.simulation.SimulationProfile;
 import io.casehub.platform.simulation.TemporalProfile;
 import io.casehub.platform.simulation.TimedEntry;
 import io.casehub.platform.simulation.TimedSequence;
+import io.casehub.platform.simulation.TriggerConfig;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.yaml.jackson.YamlMappers;
 
@@ -39,6 +40,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     private final Map<String, MethodConfig> methods;
     private final Map<String, ProfileConfig> profiles;
     private final Map<String, TemporalProfileConfig> temporalProfiles;
+    private final Map<String, TriggerConfig>         triggers;
     private final double                             speed;
 
 
@@ -77,6 +79,9 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
             this.profiles = parseProfiles(
                     (Map<String, Map<String, Object>>) root.get("profiles"));
+
+            this.triggers = parseTriggers(
+                    (Map<String, Map<String, Object>>) root.get("triggers"));
 
             warnUnknownKeys(root);
 
@@ -244,6 +249,36 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                 }
                 return YamlSimulationConfig.this.fallthroughRealism(qualifiedName);
             }
+
+            @Override
+            public Optional<CorpusSelectorConfig> corpusSelection(String qualifiedName) {
+                MethodConfig pm = profile.methods().get(qualifiedName);
+                if (pm != null && pm.corpusSelection() != null) {
+                    return Optional.of(pm.corpusSelection());
+                }
+                return YamlSimulationConfig.this.corpusSelection(qualifiedName);
+            }
+
+            @Override
+            public Set<String> corpusSelectionKeys() {
+                var keys = new java.util.LinkedHashSet<>(YamlSimulationConfig.this.corpusSelectionKeys());
+                for (var entry : profile.methods().entrySet()) {
+                    if (entry.getValue().corpusSelection() != null) {
+                        keys.add(entry.getKey());
+                    }
+                }
+                return keys;
+            }
+
+            @Override
+            public Optional<String> corpusSelectionGroup(String qualifiedName) {
+                if (profile.corpusSelection() != null
+                        && profile.methods().containsKey(qualifiedName)
+                        && profile.methods().get(qualifiedName).corpusSelection() != null) {
+                    return Optional.of("__profile:" + name);
+                }
+                return Optional.empty();
+            }
         };
 
         InMemorySimulationCorpus corpus = new InMemorySimulationCorpus<>();
@@ -350,12 +385,51 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
         }
         Map<String, ProfileConfig> result = new LinkedHashMap<>();
         raw.forEach((name, props) -> {
-            Map<String, MethodConfig> profileMethods = parseMethods(
-                    (Map<String, Map<String, Object>>) props.get("methods"));
+            CorpusSelectorConfig profileSelection = null;
+            Map<String, Object> rawSelection = (Map<String, Object>) props.get("corpus-selection");
+            if (rawSelection != null) {
+                profileSelection = parseCorpusSelectionConfig(rawSelection);
+            }
+
+            Map<String, Map<String, Object>> rawMethods =
+                    (Map<String, Map<String, Object>>) props.get("methods");
+            Map<String, MethodConfig> profileMethods;
+            if (profileSelection != null && rawMethods != null) {
+                profileMethods = mergeProfileMethodPhases(profileSelection, rawMethods);
+            } else {
+                profileMethods = parseMethods(rawMethods);
+            }
+
             List<String> corpusFiles = (List<String>) props.get("corpus-files");
             List<TemporalProfileConfig> temporal = parseTemporalList(
                     (List<Object>) props.get("temporal"));
-            result.put(name, new ProfileConfig(profileMethods, corpusFiles, temporal));
+            result.put(name, new ProfileConfig(profileMethods, corpusFiles, temporal, profileSelection));
+        });
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, MethodConfig> mergeProfileMethodPhases(
+            CorpusSelectorConfig profileSelection,
+            Map<String, Map<String, Object>> rawMethods) {
+        Map<String, MethodConfig> result = new LinkedHashMap<>();
+        rawMethods.forEach((qn, methodProps) -> {
+            Map<String, Object> rawPhases = (Map<String, Object>) methodProps.get("phases");
+            if (rawPhases != null && profileSelection instanceof CorpusSelectorConfig.StateMachine sm) {
+                Map<String, java.util.List<InvocationRecord<Object, Object>>> phases = new LinkedHashMap<>();
+                rawPhases.forEach((phaseName, value) -> {
+                    if (value instanceof List<?> entries) {
+                        phases.put(phaseName, parseCorpusEntriesToRecords((List<Map<String, Object>>) entries));
+                    }
+                });
+                CorpusSelectorConfig combined = new CorpusSelectorConfig.StateMachine(
+                        sm.initial(), sm.transitions(), phases);
+                String strategy = (String) methodProps.get("strategy");
+                result.put(qn, new MethodConfig(strategy, null, null, null, null, null, null,
+                        null, null, null, combined));
+            } else {
+                result.put(qn, parseMethodConfig(methodProps));
+            }
         });
         return result;
     }
@@ -570,7 +644,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     }
 
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
-            Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles", "speed");
+            Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles", "triggers", "speed");
 
 
     @Override
@@ -588,6 +662,24 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             }
         }
         return keys;
+    }
+
+    @Override
+    public Map<String, TriggerConfig> triggers() {
+        return Collections.unmodifiableMap(triggers);
+    }
+
+    private Map<String, TriggerConfig> parseTriggers(Map<String, Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return Map.of();
+        }
+        var result = new LinkedHashMap<String, TriggerConfig>();
+        raw.forEach((name, props) -> {
+            String eventType = (String) props.get("event-type");
+            String condition = (String) props.get("condition");
+            result.put(name, new TriggerConfig(eventType, condition));
+        });
+        return result;
     }
 
 
@@ -719,5 +811,6 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     record ProfileConfig(
             Map<String, MethodConfig> methods,
             List<String> corpusFiles,
-            List<TemporalProfileConfig> temporal) {}
+            List<TemporalProfileConfig> temporal,
+            CorpusSelectorConfig corpusSelection) {}
 }

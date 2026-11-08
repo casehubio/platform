@@ -572,6 +572,62 @@ class YamlSimulationConfigTest {
         assertThat(config.matchPolicy("test.method")).isEmpty();
     }
 
+
+    @Test
+    void profileLevelCorpusSelectionSharedAcrossMethods() {
+        var config = load("""
+                          profiles:
+                            outage-scenario:
+                              corpus-selection:
+                                type: state-machine
+                                initial: normal
+                                transitions:
+                                  normal:
+                                    outage-starts: degraded
+                              methods:
+                                payment.charge:
+                                  strategy: key-lookup
+                                  phases:
+                                    normal:
+                                      - key: charge
+                                        output: APPROVED
+                                    degraded:
+                                      - key: charge
+                                        output: UNAVAILABLE
+                                payment.refund:
+                                  strategy: key-lookup
+                                  phases:
+                                    normal:
+                                      - key: refund
+                                        output: REFUNDED
+                                    degraded:
+                                      - key: refund
+                                        output: UNAVAILABLE
+                          """);
+
+        var profile = config.resolve("outage-scenario");
+        assertThat(profile).isPresent();
+
+        var resolved = profile.get().config();
+        assertThat(resolved.corpusSelectionKeys()).containsExactlyInAnyOrder("payment.charge", "payment.refund");
+
+        var chargeSel = resolved.corpusSelection("payment.charge");
+        assertThat(chargeSel).isPresent();
+        assertThat(chargeSel.get()).isInstanceOf(io.casehub.platform.simulation.CorpusSelectorConfig.StateMachine.class);
+        assertThat(chargeSel.get().phases().get("normal")).hasSize(1);
+        assertThat(chargeSel.get().phases().get("normal").get(0).output()).isEqualTo("APPROVED");
+
+        var refundSel = resolved.corpusSelection("payment.refund");
+        assertThat(refundSel).isPresent();
+        assertThat(refundSel.get().phases().get("normal")).hasSize(1);
+        assertThat(refundSel.get().phases().get("normal").get(0).output()).isEqualTo("REFUNDED");
+
+        assertThat(resolved.corpusSelectionGroup("payment.charge")).isPresent();
+        assertThat(resolved.corpusSelectionGroup("payment.refund")).isPresent();
+        assertThat(resolved.corpusSelectionGroup("payment.charge").get())
+                .isEqualTo(resolved.corpusSelectionGroup("payment.refund").get());
+    }
+
     private YamlSimulationConfig load(String yaml) {
         return new YamlSimulationConfig(
                 new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));

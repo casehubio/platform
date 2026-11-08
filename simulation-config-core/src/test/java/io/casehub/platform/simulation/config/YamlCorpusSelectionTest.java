@@ -230,6 +230,56 @@ class YamlCorpusSelectionTest {
         assertThat(sm.phases().get("a").get(0).tenancyId()).isEqualTo("custom-tenant");
     }
 
+
+    @Test
+    void parsesTopLevelTriggers() {
+        var yaml = """
+                   triggers:
+                     pressure-high:
+                       event-type: "capacity.pressure"
+                       condition: "pressure > 0.8"
+                     outage-start:
+                       event-type: "service.health"
+                   methods:
+                     test-spi.query:
+                       strategy: key-lookup
+                       corpus-selection:
+                         type: state-machine
+                         initial: normal
+                         transitions:
+                           normal:
+                             pressure-high: degraded
+                         phases:
+                           normal:
+                             - key: k1
+                               output: normal-result
+                           degraded:
+                             - key: k1
+                               output: degraded-result
+                   """;
+        var config = parse(yaml);
+
+        assertThat(config.triggers()).hasSize(2);
+        assertThat(config.triggers().get("pressure-high").eventType()).isEqualTo("capacity.pressure");
+        assertThat(config.triggers().get("pressure-high").condition()).isEqualTo("pressure > 0.8");
+        assertThat(config.triggers().get("outage-start").eventType()).isEqualTo("service.health");
+        assertThat(config.triggers().get("outage-start").condition()).isNull();
+    }
+
+    @Test
+    void noTriggersReturnsEmptyMap() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: sequential
+                       corpus:
+                         - output: static
+                   """;
+        var config = parse(yaml);
+        assertThat(config.triggers()).isEmpty();
+    }
+
+
     private YamlSimulationConfig parse(String yaml) {
         return new YamlSimulationConfig(
                 new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));

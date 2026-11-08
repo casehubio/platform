@@ -34,5 +34,14 @@ public interface SimulationConfig {
         return java.util.Set.of();
     }
 
+    default java.util.Optional<String> corpusSelectionGroup(String qualifiedName) {
+        return java.util.Optional.empty();
+    }
+
+
+    default java.util.Map<String, TriggerConfig> triggers() {
+        return java.util.Map.of();
+    }
+
 
 }

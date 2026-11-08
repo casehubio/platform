@@ -56,6 +56,7 @@ class ExpressionSpringAutoConfigurationTest {
             assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION)).isEqualTo("mvel");
             assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.TRANSFORM)).isEqualTo("jq");
             assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.FILTER)).isEqualTo("jq");
+            assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.PARAMETER)).isEqualTo("mvel");
         });
     }
 

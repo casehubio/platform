@@ -41,6 +41,13 @@ public class ExpressionBeans {
         registry.registerDefault(ExpressionContext.CONDITION, "mvel");
         registry.registerDefault(ExpressionContext.TRANSFORM, "jq");
         registry.registerDefault(ExpressionContext.FILTER, "jq");
+        registry.registerDefault(ExpressionContext.PARAMETER, "mvel");
+        for (ExpressionContext ctx : ExpressionContext.values()) {
+            if (registry.resolveDefault(ctx) == null) {
+                throw new IllegalStateException(
+                        "No default expression engine registered for " + ctx);
+            }
+        }
         return registry;
     }
 }

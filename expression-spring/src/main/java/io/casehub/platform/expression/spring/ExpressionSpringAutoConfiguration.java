@@ -1,6 +1,7 @@
 package io.casehub.platform.expression.spring;
 
 import io.casehub.platform.api.expression.ConfigManager;
+import io.casehub.platform.api.expression.ExpressionContext;
 import io.casehub.platform.api.expression.ExpressionEngine;
 import io.casehub.platform.api.expression.SecretManager;
 import io.casehub.platform.expression.ConfigManagerCore;
@@ -44,7 +45,11 @@ public class ExpressionSpringAutoConfiguration {
     @ConditionalOnMissingBean
     public DefaultExpressionEngineRegistry defaultExpressionEngineRegistry(
             List<ExpressionEngine> engines) {
-        return new DefaultExpressionEngineRegistry(engines);
+        var registry = new DefaultExpressionEngineRegistry(engines);
+        registry.registerDefault(ExpressionContext.CONDITION, "mvel");
+        registry.registerDefault(ExpressionContext.TRANSFORM, "jq");
+        registry.registerDefault(ExpressionContext.FILTER, "jq");
+        return registry;
     }
 
     @Bean

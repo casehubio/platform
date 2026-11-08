@@ -50,6 +50,16 @@ class ExpressionSpringAutoConfigurationTest {
     }
 
     @Test
+    void expressionEngineRegistry_has_platform_defaults() {
+        runner.run(ctx -> {
+            ExpressionEngineRegistry registry = ctx.getBean(ExpressionEngineRegistry.class);
+            assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION)).isEqualTo("mvel");
+            assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.TRANSFORM)).isEqualTo("jq");
+            assertThat(registry.resolveDefault(io.casehub.platform.api.expression.ExpressionContext.FILTER)).isEqualTo("jq");
+        });
+    }
+
+    @Test
     void custom_configManager_overrides_default() {
         runner.withBean("customConfigManager", ConfigManager.class,
                         () -> new ConfigManagerCore(new PropertySource() {

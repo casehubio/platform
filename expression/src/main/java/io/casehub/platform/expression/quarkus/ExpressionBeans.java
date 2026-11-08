@@ -1,5 +1,6 @@
 package io.casehub.platform.expression.quarkus;
 
+import io.casehub.platform.api.expression.ExpressionContext;
 import io.casehub.platform.api.expression.ExpressionEngine;
 import io.casehub.platform.expression.DefaultExpressionEngineRegistry;
 import io.casehub.platform.expression.JQExpressionEngine;
@@ -36,6 +37,10 @@ public class ExpressionBeans {
     @ApplicationScoped
     public DefaultExpressionEngineRegistry defaultExpressionEngineRegistry(
             Instance<ExpressionEngine> engines) {
-        return new DefaultExpressionEngineRegistry(engines.stream().toList());
+        var registry = new DefaultExpressionEngineRegistry(engines.stream().toList());
+        registry.registerDefault(ExpressionContext.CONDITION, "mvel");
+        registry.registerDefault(ExpressionContext.TRANSFORM, "jq");
+        registry.registerDefault(ExpressionContext.FILTER, "jq");
+        return registry;
     }
 }

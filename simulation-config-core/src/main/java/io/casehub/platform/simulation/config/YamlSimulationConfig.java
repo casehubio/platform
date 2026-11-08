@@ -701,14 +701,19 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
     @SuppressWarnings("unchecked")
     private CorpusSelectorConfig.StateMachine parseStateMachineSelection(Map<String, Object> raw) {
-        String                                 initial     = (String) raw.get("initial");
-        Map<String, Map<String, String>>       transitions = (Map<String, Map<String, String>>) raw.getOrDefault("transitions", Map.of());
-        Map<String, List<Map<String, Object>>> rawPhases   = (Map<String, List<Map<String, Object>>>) raw.get("phases");
+        String                           initial     = (String) raw.get("initial");
+        Map<String, Map<String, String>> transitions = (Map<String, Map<String, String>>) raw.getOrDefault("transitions", Map.of());
+        Map<String, Object>              rawPhases   = (Map<String, Object>) raw.get("phases");
 
         Map<String, java.util.List<InvocationRecord<Object, Object>>> phases = new LinkedHashMap<>();
         if (rawPhases != null) {
-            rawPhases.forEach((phaseName, entries) ->
-                                      phases.put(phaseName, parseCorpusEntriesToRecords(entries)));
+            rawPhases.forEach((phaseName, value) -> {
+                if (value instanceof List<?> entries) {
+                    phases.put(phaseName, parseCorpusEntriesToRecords((List<Map<String, Object>>) entries));
+                } else if (value instanceof Map<?, ?> phaseMap) {
+                    phases.put(phaseName, resolvePhaseRecords((Map<String, Object>) phaseMap));
+                }
+            });
         }
         return new CorpusSelectorConfig.StateMachine(initial, transitions, phases);
     }
@@ -725,8 +730,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                                           ? DurationParser.parse(String.valueOf(phaseMap.get("duration")))
                                           : null;
             orderedPhases.add(new CorpusSelectorConfig.DurationPhase(name, duration));
-            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
-            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+            phases.put(name, resolvePhaseRecords(phaseMap));
         }
         return new CorpusSelectorConfig.DurationBased(orderedPhases, phases);
     }
@@ -743,8 +747,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                         ? ((Number) phaseMap.get("count")).intValue()
                         : 0;
             orderedPhases.add(new CorpusSelectorConfig.CountPhase(name, count));
-            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
-            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+            phases.put(name, resolvePhaseRecords(phaseMap));
         }
         return new CorpusSelectorConfig.LookupCount(orderedPhases, phases);
     }
@@ -759,8 +762,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
             String name   = (String) phaseMap.get("name");
             double weight = ((Number) phaseMap.get("weight")).doubleValue();
             weightedPhases.add(new CorpusSelectorConfig.WeightedPhase(name, weight));
-            List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
-            phases.put(name, corpusEntries != null ? parseCorpusEntriesToRecords(corpusEntries) : List.of());
+            phases.put(name, resolvePhaseRecords(phaseMap));
         }
         return new CorpusSelectorConfig.Weighted(weightedPhases, phases);
     }
@@ -778,6 +780,21 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                     java.time.Instant.now());
         }).toList();
     }
+
+    @SuppressWarnings("unchecked")
+    private java.util.List<InvocationRecord<Object, Object>> resolvePhaseRecords(Map<String, Object> phaseMap) {
+        List<Map<String, Object>> corpusEntries = (List<Map<String, Object>>) phaseMap.get("corpus");
+        List<String>              corpusFiles   = (List<String>) phaseMap.get("corpus-files");
+        var                       records       = new ArrayList<InvocationRecord<Object, Object>>();
+        if (corpusEntries != null) {
+            records.addAll(parseCorpusEntriesToRecords(corpusEntries));
+        }
+        if (corpusFiles != null && !corpusFiles.isEmpty()) {
+            loadExternalCorpusFiles(corpusFiles).values().forEach(records::addAll);
+        }
+        return records.isEmpty() ? List.of() : records;
+    }
+
 
     private static void warnUnknownKeys(Map<String, Object> root) {
         for (String key : root.keySet()) {

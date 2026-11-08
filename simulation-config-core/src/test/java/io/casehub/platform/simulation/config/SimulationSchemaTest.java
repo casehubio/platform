@@ -183,13 +183,14 @@ class SimulationSchemaTest {
     @Test
     void corpusSelectionPhaseDefined() throws IOException {
         JsonNode phase = loadSchema().at("/$defs/corpus-selection-phase");
-        assertThat(phase.get("required").toString()).contains("name", "corpus");
+        assertThat(phase.get("required").toString()).contains("name");
         JsonNode props = phase.get("properties");
         assertThat(props.has("name")).isTrue();
         assertThat(props.has("duration")).isTrue();
         assertThat(props.has("count")).isTrue();
         assertThat(props.has("weight")).isTrue();
         assertThat(props.has("corpus")).isTrue();
+        assertThat(props.has("corpus-files")).isTrue();
     }
 
 

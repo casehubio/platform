@@ -231,8 +231,28 @@
             {
               "type": "object",
               "additionalProperties": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/corpus-entry" }
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/corpus-entry" }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "corpus": {
+                        "type": "array",
+                        "items": { "$ref": "#/$defs/corpus-entry" },
+                        "description": "Inline corpus entries for this phase"
+                      },
+                      "corpus-files": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "External corpus file paths for this phase"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
               }
             },
             {
@@ -245,7 +265,7 @@
     },
     "corpus-selection-phase": {
       "type": "object",
-      "required": ["name", "corpus"],
+      "required": ["name"],
       "properties": {
         "name": { "type": "string", "description": "Phase name" },
         "duration": { "type": ["string", "number"], "description": "Phase duration (duration type only). Omit on last phase." },
@@ -254,7 +274,12 @@
         "corpus": {
           "type": "array",
           "items": { "$ref": "#/$defs/corpus-entry" },
-          "description": "Corpus entries for this phase"
+          "description": "Inline corpus entries for this phase"
+        },
+        "corpus-files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "External corpus file paths for this phase"
         }
       }
     },

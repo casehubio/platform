@@ -1,0 +1,3 @@
+test-spi.query:
+  - key: k1
+    output: file-degraded-result

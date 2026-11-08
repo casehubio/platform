@@ -279,6 +279,160 @@ class YamlCorpusSelectionTest {
         assertThat(config.triggers()).isEmpty();
     }
 
+    @Test
+    void stateMachinePhaseWithCorpusFiles() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: key-lookup
+                       corpus-selection:
+                         type: state-machine
+                         initial: normal
+                         transitions:
+                           normal:
+                             degrade: degraded
+                         phases:
+                           normal:
+                             corpus-files:
+                               - classpath:simulation/phase-normal-corpus.yaml
+                           degraded:
+                             corpus-files:
+                               - classpath:simulation/phase-degraded-corpus.yaml
+                   """;
+        var config = parse(yaml);
+        var sm     = (CorpusSelectorConfig.StateMachine) config.corpusSelection("test-spi.query").get();
+
+        assertThat(sm.phases().get("normal")).hasSize(2);
+        assertThat(sm.phases().get("normal").get(0).output()).isEqualTo("file-normal-result");
+        assertThat(sm.phases().get("degraded")).hasSize(1);
+        assertThat(sm.phases().get("degraded").get(0).output()).isEqualTo("file-degraded-result");
+    }
+
+    @Test
+    void stateMachinePhaseWithBothInlineAndCorpusFiles() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: key-lookup
+                       corpus-selection:
+                         type: state-machine
+                         initial: normal
+                         transitions: {}
+                         phases:
+                           normal:
+                             corpus:
+                               - key: inline-key
+                                 output: inline-result
+                             corpus-files:
+                               - classpath:simulation/phase-normal-corpus.yaml
+                   """;
+        var config = parse(yaml);
+        var sm     = (CorpusSelectorConfig.StateMachine) config.corpusSelection("test-spi.query").get();
+
+        assertThat(sm.phases().get("normal")).hasSize(3);
+        assertThat(sm.phases().get("normal").get(0).output()).isEqualTo("inline-result");
+        assertThat(sm.phases().get("normal").get(1).output()).isEqualTo("file-normal-result");
+    }
+
+    @Test
+    void stateMachinePhaseBackwardCompatWithListFormat() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: key-lookup
+                       corpus-selection:
+                         type: state-machine
+                         initial: a
+                         transitions: {}
+                         phases:
+                           a:
+                             - key: k1
+                               output: result
+                   """;
+        var config = parse(yaml);
+        var sm     = (CorpusSelectorConfig.StateMachine) config.corpusSelection("test-spi.query").get();
+
+        assertThat(sm.phases().get("a")).hasSize(1);
+        assertThat(sm.phases().get("a").get(0).output()).isEqualTo("result");
+    }
+
+    @Test
+    void durationPhaseWithCorpusFiles() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: sequential
+                       corpus-selection:
+                         type: duration
+                         phases:
+                           - name: normal
+                             duration: 10s
+                             corpus-files:
+                               - classpath:simulation/phase-normal-corpus.yaml
+                           - name: degraded
+                             corpus:
+                               - output: inline-degraded
+                             corpus-files:
+                               - classpath:simulation/phase-degraded-corpus.yaml
+                   """;
+        var config = parse(yaml);
+        var d      = (CorpusSelectorConfig.DurationBased) config.corpusSelection("test-spi.query").get();
+
+        assertThat(d.phases().get("normal")).hasSize(2);
+        assertThat(d.phases().get("normal").get(0).output()).isEqualTo("file-normal-result");
+        assertThat(d.phases().get("degraded")).hasSize(2);
+        assertThat(d.phases().get("degraded").get(0).output()).isEqualTo("inline-degraded");
+    }
+
+    @Test
+    void lookupCountPhaseWithCorpusFiles() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: sequential
+                       corpus-selection:
+                         type: lookup-count
+                         phases:
+                           - name: pending
+                             count: 3
+                             corpus-files:
+                               - classpath:simulation/phase-normal-corpus.yaml
+                   """;
+        var config = parse(yaml);
+        var lc     = (CorpusSelectorConfig.LookupCount) config.corpusSelection("test-spi.query").get();
+
+        assertThat(lc.phases().get("pending")).hasSize(2);
+        assertThat(lc.phases().get("pending").get(0).output()).isEqualTo("file-normal-result");
+    }
+
+    @Test
+    void randomPhaseWithCorpusFiles() {
+        var yaml = """
+                   methods:
+                     test-spi.query:
+                       strategy: key-lookup
+                       corpus-selection:
+                         type: random
+                         phases:
+                           - name: normal
+                             weight: 0.8
+                             corpus-files:
+                               - classpath:simulation/phase-normal-corpus.yaml
+                           - name: error
+                             weight: 0.2
+                             corpus:
+                               - key: k1
+                                 output: fail
+                   """;
+        var config = parse(yaml);
+        var w      = (CorpusSelectorConfig.Weighted) config.corpusSelection("test-spi.query").get();
+
+        assertThat(w.phases().get("normal")).hasSize(2);
+        assertThat(w.phases().get("normal").get(0).output()).isEqualTo("file-normal-result");
+        assertThat(w.phases().get("error")).hasSize(1);
+        assertThat(w.phases().get("error").get(0).output()).isEqualTo("fail");
+    }
+
 
     private YamlSimulationConfig parse(String yaml) {
         return new YamlSimulationConfig(

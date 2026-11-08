@@ -1,0 +1,5 @@
+test-spi.query:
+  - key: k1
+    output: file-normal-result
+  - key: k2
+    output: file-normal-result-2

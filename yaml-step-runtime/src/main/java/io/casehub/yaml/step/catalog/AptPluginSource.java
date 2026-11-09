@@ -119,6 +119,7 @@ public class AptPluginSource {
         if (schemaStream != null) {
             Map<String, Object> schema = objectMapper.readValue(schemaStream, LinkedHashMap.class);
             Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+            java.util.List<String> requiredFields = schema.get("required") instanceof java.util.List<?> list ? list.stream().map(Object::toString).toList() : java.util.List.of();
             if (properties != null) {
                 for (Map.Entry<String, Object> prop : properties.entrySet()) {
                     Map<String, Object> propSchema = (Map<String, Object>) prop.getValue();
@@ -127,8 +128,9 @@ public class AptPluginSource {
                     ParameterType paramType = "expression".equals(formatStr)
                             ? ParameterType.EXPRESSION
                             : ParameterType.fromString(typeStr);
+                    boolean required = requiredFields.contains(prop.getKey());
                     builder.input(prop.getKey(), new Parameter(
-                            paramType, false, null, null, formatStr,
+                            paramType, required, null, null, formatStr,
                             (String) propSchema.get("description")));
                 }
             }

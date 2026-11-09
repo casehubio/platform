@@ -2,6 +2,8 @@ package io.casehub.platform.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.platform.api.mcp.ContextParam;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
@@ -19,6 +21,9 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
 
     @Inject
     DomainModelRegistry registry;
+    @Inject
+    CurrentPrincipal    currentPrincipal;
+
 
     private final ObjectMapper mapper;
 
@@ -43,10 +48,13 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
         Object[]    args         = new Object[methodParams.length];
 
         for (int i = 0; i < methodParams.length; i++) {
-            Parameter param     = methodParams[i];
-            String    paramName = resolveParamName(param);
-
-            Object rawValue = effectiveParams.get(paramName);
+            Parameter param = methodParams[i];
+            if (param.isAnnotationPresent(ContextParam.class)) {
+                args[i] = resolveContextParam(param.getAnnotation(ContextParam.class).value());
+                continue;
+            }
+            String paramName = resolveParamName(param);
+            Object rawValue  = effectiveParams.get(paramName);
             if (rawValue != null) {
                 args[i] = mapper.convertValue(rawValue, param.getType());
             }
@@ -138,4 +146,14 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
         }
         return param.getName();
     }
+
+    private Object resolveContextParam(String key) {
+        return switch (key) {
+            case "tenancyId" -> currentPrincipal.tenancyId();
+            case "actorId" -> currentPrincipal.actorId();
+            default -> throw new IllegalArgumentException(
+                    "Unknown @ContextParam key: " + key);
+        };
+    }
+
 }

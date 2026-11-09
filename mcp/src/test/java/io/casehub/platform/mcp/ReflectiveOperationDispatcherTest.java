@@ -105,6 +105,14 @@ class ReflectiveOperationDispatcherTest {
     }
 
     @Test
+    void resolvesContextParamFromCurrentPrincipal() throws Exception {
+        Object result = dispatcher.dispatch("direct", "lookupWithContext",
+                                            Map.of("id", "abc"));
+        assertThat(result).isEqualTo("found:abc@278776f9-e1b0-46fb-9032-8bddebdcf9ce");
+    }
+
+
+    @Test
     void catchesMcpCapabilityExceptionUnsupported() throws Exception {
         Object result = dispatcher.dispatch("cap-test", "search",
                                             Map.of("query", "test"));

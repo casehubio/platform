@@ -1,5 +1,6 @@
 package io.casehub.platform.mcp;
 
+import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.ModelEnricher;
 import io.casehub.platform.api.mcp.PlatformMutation;
@@ -311,13 +312,14 @@ public class GraphQLModelScanner {
     private List<ParameterDescriptor> buildParams(Method method) {
         List<ParameterDescriptor> params = new ArrayList<>();
         for (Parameter param : method.getParameters()) {
-            String name = readParamName(param);
-            String description = readParamDescription(param);
-            Map<String, String> fields = expandFields(param.getType());
-            boolean required = !Optional.class.isAssignableFrom(param.getType());
+            if (param.isAnnotationPresent(ContextParam.class)) {continue;}
+            String              name        = readParamName(param);
+            String              description = readParamDescription(param);
+            Map<String, String> fields      = expandFields(param.getType());
+            boolean             required    = !Optional.class.isAssignableFrom(param.getType());
 
             params.add(new ParameterDescriptor(name, mapTypeName(param.getType()),
-                    required, description, fields));
+                                               required, description, fields));
         }
         return params;
     }

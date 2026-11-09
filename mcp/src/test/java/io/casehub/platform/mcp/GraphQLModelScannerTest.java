@@ -109,7 +109,7 @@ class GraphQLModelScannerTest {
     @Test
     void directDomainHasQueryOperations() {
         var domain = registry.getDomain("direct").orElseThrow();
-        assertThat(domain.queryCount()).isEqualTo(1);
+        assertThat(domain.queryCount()).isEqualTo(2);
     }
 
     @Test
@@ -159,6 +159,14 @@ class GraphQLModelScannerTest {
         var helper = registry.getOperation("direct", "helper");
         assertThat(helper).isEmpty();
     }
+
+    @Test
+    void contextParamExcludedFromSchema() {
+        var op = registry.getOperation("direct", "lookupWithContext").orElseThrow();
+        assertThat(op.params()).hasSize(1);
+        assertThat(op.params().get(0).name()).isEqualTo("id");
+    }
+
 
     @Test
     void graphQLApiPathTakesPrecedenceOverDirectInterface() {

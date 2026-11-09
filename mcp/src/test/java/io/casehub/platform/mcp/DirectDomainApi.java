@@ -1,5 +1,6 @@
 package io.casehub.platform.mcp;
 
+import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
@@ -12,6 +13,10 @@ public interface DirectDomainApi {
 
     @PlatformMutation("Create a new item")
     String createItem(String name, int count);
+
+    @PlatformQuery("Look up with tenant context")
+    String lookupWithContext(String id, @ContextParam("tenancyId") String tenancyId);
+
 
     String helper();
 }

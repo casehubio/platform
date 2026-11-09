@@ -16,6 +16,12 @@ public class DirectDomainImpl implements DirectDomainApi {
     }
 
     @Override
+    public String lookupWithContext(String id, String tenancyId) {
+        return "found:" + id + "@" + tenancyId;
+    }
+
+
+    @Override
     public String helper() {
         return "not exposed";
     }

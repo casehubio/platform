@@ -75,6 +75,8 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 ## Digest System
 
+Before flushing a pending digest, the scheduler checks the current channel enablement: an explicit user preference takes precedence over the channel's `defaultEnabled` setting. Disabled channels retain their buffered notifications, subject to normal retention and buffer limits. Re-enabling a channel makes that buffer eligible for delivery under the current scheduling and suppression rules; disabling also clears any earlier quiet-hours deferral.
+
 Configurable digest schedules via `DigestSchedule` sealed interface:
 - `DigestSchedule.Interval(Duration period)` -- fixed period (minimum 1 minute)
 - `DigestSchedule.DailyAt(LocalTime time, ZoneId timezone)` -- once per day

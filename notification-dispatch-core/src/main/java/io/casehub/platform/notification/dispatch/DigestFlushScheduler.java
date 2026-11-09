@@ -1,6 +1,7 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
+import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.delivery.DigestGroupBy;
@@ -59,11 +60,16 @@ public class DigestFlushScheduler {
 
     void processKey(DigestBufferKey key, Instant now) {
         var prefs = preferenceStore.get(key.userId(), key.tenancyId());
-        DigestSchedule schedule = prefs
-                .map(NotificationPreferences::channelDefaults)
-                .map(cd -> cd.get(key.channelId()))
-                .map(ChannelPreference::digestSchedule)
-                .orElse(null);
+        var channelPreference = prefs.map(NotificationPreferences::channelDefaults)
+                .map(cd -> cd.get(key.channelId()));
+        boolean enabled = channelPreference.map(ChannelPreference::enabled)
+                .orElseGet(() -> channelRegistry.resolve(key.channelId())
+                        .map(DeliveryChannelDescriptor::defaultEnabled).orElse(false));
+        if (!enabled) {
+            quietHoursDeferredKeys.remove(key);
+            return;
+        }
+        DigestSchedule schedule = channelPreference.map(ChannelPreference::digestSchedule).orElse(null);
 
         if (schedule == null) {
             LOG.debugf("Orphan drain for key %s — schedule removed", key);
@@ -95,11 +101,7 @@ public class DigestFlushScheduler {
         }
 
         quietHoursDeferredKeys.remove(key);
-        DigestGroupBy groupBy = prefs
-                .map(NotificationPreferences::channelDefaults)
-                .map(cd -> cd.get(key.channelId()))
-                .map(ChannelPreference::groupBy)
-                .orElse(null);
+        DigestGroupBy groupBy = channelPreference.map(ChannelPreference::groupBy).orElse(null);
         flushKey(key, now, groupBy);
     }
 

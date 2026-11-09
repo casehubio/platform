@@ -130,5 +130,7 @@ yaml-test
 playbook-catalog
 # Build-time YAML→SWF compiler — no CDI beans, framework-neutral
 playbook-compiler
+# Declarative YAML playbooks and tests — no Java code or CDI beans
+playbooks
 # Durable coordination primitives — framework-neutral, no CDI beans
 coordination-core

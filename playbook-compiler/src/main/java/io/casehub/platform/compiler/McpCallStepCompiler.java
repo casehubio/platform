@@ -20,7 +20,11 @@ class McpCallStepCompiler implements StepCompiler {
         if (stepValue instanceof String s) {
             tool = s;
         } else if (stepValue instanceof Map) {
-            Map<String, Object> config = (Map<String, Object>) stepValue;
+            Map<String, Object> config = new java.util.LinkedHashMap<>((Map<String, Object>) stepValue);
+            if (config.containsKey("_subject")) {
+                config.putIfAbsent("tool", String.valueOf(config.remove("_subject")));
+            }
+            config.remove("_value");
             tool = (String) config.get("tool");
             if (tool == null) {
                 ctx.addDiagnostic(CompilationDiagnostic.Severity.ERROR,

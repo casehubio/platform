@@ -38,8 +38,13 @@ public class PlatformSchemaGenerator {
     }
 
     public JsonNode generate(Class<?> rootType) {
-        JsonNode schema = generator.generateSchema(rootType);
-        return SchemaPostProcessor.process(schema);
+        tools.jackson.databind.node.ObjectNode generated = generator.generateSchema(rootType);
+        try {
+            JsonNode schema = mapper.readTree(generated.toString());
+            return SchemaPostProcessor.process(schema);
+        } catch (IOException e) {
+            throw new SchemaGenerationException("Failed to convert schema: " + e.getMessage());
+        }
     }
 
     public void generateToJson(Class<?> rootType, Path output) throws IOException {

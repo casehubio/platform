@@ -39,6 +39,8 @@ class TutorialIntegrationTest {
     @Test
     void allTutorialTestsPass() {
         serviceRegistry = new MapServiceRegistry();
+        serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
+                                 new io.casehub.yaml.test.DotPathExpressionEngine());
         var executor = new YamlTestExecutor(pluginRegistry, serviceRegistry, TUTORIAL_ROOT);
         var descriptors = YamlTestDiscovery.discover(TUTORIAL_ROOT);
 
@@ -78,6 +80,8 @@ class TutorialIntegrationTest {
     @Test
     void multiTestFileProducesMultipleResults() {
         serviceRegistry = new MapServiceRegistry();
+        serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
+                                 new io.casehub.yaml.test.DotPathExpressionEngine());
         var executor = new YamlTestExecutor(pluginRegistry, serviceRegistry, TUTORIAL_ROOT);
         var descriptors = YamlTestDiscovery.discover(TUTORIAL_ROOT.resolve("01-basics"));
 

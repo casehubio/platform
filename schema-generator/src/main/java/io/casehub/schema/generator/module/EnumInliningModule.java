@@ -11,10 +11,10 @@ public class EnumInliningModule implements Module {
         builder.forTypesInGeneral()
                .withCustomDefinitionProvider((javaType, context) -> {
                    if (javaType.isInstanceOf(Enum.class)) {
-                       com.fasterxml.jackson.databind.node.ObjectNode enumNode =
+                       tools.jackson.databind.node.ObjectNode enumNode =
                                context.getGeneratorConfig().createObjectNode();
                        enumNode.put("type", "string");
-                       com.fasterxml.jackson.databind.node.ArrayNode values =
+                       tools.jackson.databind.node.ArrayNode values =
                                enumNode.putArray("enum");
                        for (Object constant : javaType.getErasedType().getEnumConstants()) {
                            values.add(constant.toString());

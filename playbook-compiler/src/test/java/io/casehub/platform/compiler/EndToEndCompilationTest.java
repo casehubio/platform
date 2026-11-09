@@ -22,11 +22,11 @@ class EndToEndCompilationTest {
 
         var branches = new LinkedHashMap<String, Object>();
         branches.put("init", List.of(
-                Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/init")),
+                Map.of("rest-request:GET", "https://api.example.com/init"),
                 Map.of("signal", "go")));
         branches.put("worker", List.of(
                 Map.of("await", Map.of("signal", "go")),
-                Map.of("rest-request", Map.of("method", "POST", "url", "https://api.example.com/process"))));
+                Map.of("rest-request:POST", "https://api.example.com/process")));
         content.put("steps", List.of(Map.of("concurrent", branches)));
 
         var outcome = compiler.compile("barrier-demo", content);
@@ -46,7 +46,7 @@ class EndToEndCompilationTest {
     @Test
     void decoratedRestRequest_nestingOrder_whenTimeoutRetryCoreF() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("rest-request", Map.of("method", "POST", "url", "https://api.example.com/orders"));
+        step.put("rest-request:POST", "https://api.example.com/orders");
         step.put("retry", 3);
         step.put("timeout", "10s");
         step.put("when", "${order.valid}");
@@ -116,7 +116,7 @@ class EndToEndCompilationTest {
     @Test
     void mutexDecorator_addsSemaphoreToCoordinationSpec() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("rest-request", Map.of("method", "POST", "url", "https://api.example.com/write"));
+        step.put("rest-request:POST", "https://api.example.com/write");
         step.put("mutex", "db-write");
 
         var content = Map.<String, Object>of("steps", List.of(step));
@@ -139,7 +139,7 @@ class EndToEndCompilationTest {
 
         var tryStep = new LinkedHashMap<String, Object>();
         tryStep.put("try", List.of(
-                Map.of("rest-request", Map.of("method", "POST", "url", "https://api.example.com/action"))));
+                Map.of("rest-request:POST", "https://api.example.com/action")));
         tryStep.put("catch", List.of(Map.of("log", Map.of("message", "failed"))));
 
         var content = new LinkedHashMap<String, Object>();
@@ -147,8 +147,8 @@ class EndToEndCompilationTest {
                 Map.of("log", Map.of("message", "start")),
                 ifStep,
                 Map.of("parallel", List.of(
-                        Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/a")),
-                        Map.of("rest-request", Map.of("method", "GET", "url", "https://api.example.com/b")))),
+                        Map.of("rest-request:GET", "https://api.example.com/a"),
+                        Map.of("rest-request:GET", "https://api.example.com/b"))),
                 tryStep,
                 Map.of("forEach", Map.of("in", "items", "as", "item")),
                 Map.of("delay", "1s"),

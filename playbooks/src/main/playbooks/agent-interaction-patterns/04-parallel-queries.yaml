@@ -15,13 +15,13 @@ steps:
 
   - parallel:
       - agent-query legal-reviewer: "Review this clause: 'Termination for convenience with 30-day notice.'"
-        output: legal_review
+        capture: legal_review
 
       - agent-query financial-reviewer: "Review: 'Net-90 payment terms with 2% early payment discount.'"
-        output: financial_review
+        capture: financial_review
 
       - agent-query compliance-reviewer: "Review: 'Data stored in EU region only, GDPR article 28 processor agreement.'"
-        output: compliance_review
+        capture: compliance_review
 
   - agent-session-close: legal-reviewer
   - agent-session-close: financial-reviewer

@@ -36,7 +36,7 @@ steps:
       system: "You are a voice agent. Be concise. One sentence max."
 
   - agent-query call-7721: "I need to cancel my subscription effective immediately."
-    output: voice_response
+    capture: voice_response
 
   - agent-session-close: call-7721
 
@@ -46,7 +46,7 @@ steps:
       system: "You are a chat agent. Friendly, helpful, use emoji sparingly."
 
   - agent-query chat-user-88: "How do I export my data?"
-    output: chat_response
+    capture: chat_response
 
   - agent-session-close: chat-user-88
 
@@ -56,6 +56,6 @@ steps:
       system: "You are an email agent. Professional tone, include ticket reference."
 
   - agent-query email-ticket-99: "Ticket #99: Request for enterprise pricing for 500-seat deployment."
-    output: email_response
+    capture: email_response
 
   - agent-session-close: email-ticket-99

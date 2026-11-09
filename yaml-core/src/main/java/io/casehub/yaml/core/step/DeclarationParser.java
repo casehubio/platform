@@ -143,6 +143,31 @@ public final class DeclarationParser {
             return parseRestBinding(val);
         }
 
+        for (String key : invokeMap.keySet()) {
+            int spaceIdx = key.indexOf(' ');
+            if (spaceIdx <= 0) continue;
+            String prefix = key.substring(0, spaceIdx);
+            String subject = key.substring(spaceIdx + 1);
+            Object stepValue = invokeMap.get(key);
+            var merged = new LinkedHashMap<String, Object>();
+            merged.put("_subject", subject);
+            if (stepValue instanceof Map) {
+                @SuppressWarnings("unchecked")
+                var mapValue = (Map<String, Object>) stepValue;
+                merged.putAll(mapValue);
+            } else if (stepValue != null) {
+                merged.put("_value", stepValue);
+            }
+            return switch (prefix) {
+                case "agent-session-open" -> parseSessionOpenCompact(merged);
+                case "agent-query" -> parseSessionQueryCompact(merged);
+                case "agent-session-clear" -> new InvokeBinding.SessionClear(subject);
+                case "agent-session-close" -> new InvokeBinding.SessionClose(subject);
+                default -> throw new IllegalArgumentException(
+                    "Unknown compact invoke binding: " + prefix + " (full key: " + key + ")");
+            };
+        }
+
         throw new IllegalArgumentException(
                 "Unknown invoke binding type. Expected one of: mcp, rest, graphql, graphql-exec, python, agent, process, aria, "
                 + "agent-session-open, agent-query, agent-session-clear, agent-session-close, mcp-call, rest-request. "
@@ -246,6 +271,33 @@ public final class DeclarationParser {
         if (raw instanceof String s) {return new InvokeBinding.SessionClose(s);}
         Map<String, Object> map = (Map<String, Object>) raw;
         return new InvokeBinding.SessionClose((String) map.get("session"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionOpen parseSessionOpenCompact(Map<String, Object> map) {
+        String session = (String) map.getOrDefault("session", map.get("_subject"));
+        return new InvokeBinding.SessionOpen(
+                session,
+                (String) map.get("system"),
+                (String) map.get("model"),
+                (Map<String, Object>) map.getOrDefault("model-query", map.get("modelQuery")),
+                (List<Object>) map.getOrDefault("model-chain", map.get("modelChain")),
+                (String) map.get("pool"),
+                (String) map.get("timeout"),
+                (String) map.getOrDefault("checkout-timeout", map.get("checkoutTimeout")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static InvokeBinding.SessionQuery parseSessionQueryCompact(Map<String, Object> map) {
+        String session = (String) map.getOrDefault("session", map.get("_subject"));
+        String user = map.containsKey("user") ? (String) map.get("user")
+                : map.containsKey("_value") ? String.valueOf(map.get("_value")) : null;
+        Boolean priority = (Boolean) map.get("priority");
+        return new InvokeBinding.SessionQuery(
+                session, user,
+                map.getOrDefault("response-format", map.get("responseFormat")),
+                (String) map.get("output"),
+                priority != null && priority);
     }
 
 }

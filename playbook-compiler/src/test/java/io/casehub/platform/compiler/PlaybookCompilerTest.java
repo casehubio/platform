@@ -138,10 +138,10 @@ class PlaybookCompilerTest {
     @Test
     void compile_agentSessionSteps_producesSetTasks() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("agent-session-open", Map.of("session", "analyst", "system", "You are an analyst")),
-                Map.of("agent-query", Map.of("session", "analyst", "user", "Summarize this")),
-                Map.of("agent-session-clear", Map.of("session", "analyst")),
-                Map.of("agent-session-close", Map.of("session", "analyst"))));
+                Map.of("agent-session-open analyst", Map.of("system", "You are an analyst")),
+                Map.of("agent-query analyst", "Summarize this"),
+                Map.of("agent-session-clear", "analyst"),
+                Map.of("agent-session-close", "analyst")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
@@ -159,13 +159,13 @@ class PlaybookCompilerTest {
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Failure.class);
         var diagnostics = ((CompilationOutcome.Failure) outcome).diagnostics();
-        assertThat(diagnostics.getFirst().message()).contains("session");
+        assertThat(diagnostics.getFirst().message()).containsIgnoringCase("verbose");
     }
 
     @Test
     void compile_agentQuery_missingUser_fails() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("agent-query", Map.of("session", "analyst"))));
+                Map.of("agent-query analyst", Map.of())));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Failure.class);
         var diagnostics = ((CompilationOutcome.Failure) outcome).diagnostics();
@@ -210,7 +210,7 @@ class PlaybookCompilerTest {
     @Test
     void compile_restRequest_scalarForm() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("rest-request", "http://localhost:8080/api/users")));
+                Map.of("rest-request:GET", "http://localhost:8080/api/users")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
     }
@@ -234,7 +234,7 @@ class PlaybookCompilerTest {
     @Test
     void compile_mcpCall_scalarForm() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("mcp-call", "file_search")));
+                Map.of("mcp-call file_search", "")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
     }
@@ -242,7 +242,7 @@ class PlaybookCompilerTest {
     @Test
     void compile_mcpCall_mapForm() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("mcp-call", Map.of("tool", "file_search", "params", Map.of("q", "auth")))));
+                Map.of("mcp-call file_search", Map.of("params", Map.of("q", "auth")))));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
     }
@@ -258,8 +258,8 @@ class PlaybookCompilerTest {
                         "email", Map.of("agent-id", "email-agent", "backend", "claude",
                                         "max-active", 5)),
                 "steps", List.of(
-                        Map.of("agent-session-open", Map.of("session", "s1", "pool", "voice")),
-                        Map.of("agent-session-close", Map.of("session", "s1"))));
+                        Map.of("agent-session-open s1", Map.of("pool", "voice")),
+                        Map.of("agent-session-close", "s1")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
@@ -275,8 +275,8 @@ class PlaybookCompilerTest {
     @Test
     void compile_noPools_emptyList() {
         var content = Map.<String, Object>of("steps", List.of(
-                Map.of("agent-session-open", Map.of("session", "s1")),
-                Map.of("agent-session-close", Map.of("session", "s1"))));
+                Map.of("agent-session-open s1", Map.of()),
+                Map.of("agent-session-close", "s1")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 
@@ -291,8 +291,8 @@ class PlaybookCompilerTest {
                         "agent-id", "extractor", "backend", "claude",
                         "max-active", 5, "max-prompt-tokens", 50000)),
                 "steps", List.of(
-                        Map.of("agent-session-open", Map.of("session", "e1", "pool", "extractors")),
-                        Map.of("agent-session-close", Map.of("session", "e1"))));
+                        Map.of("agent-session-open e1", Map.of("pool", "extractors")),
+                        Map.of("agent-session-close", "e1")));
         CompilationOutcome outcome = compiler.compile("test", content);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
 

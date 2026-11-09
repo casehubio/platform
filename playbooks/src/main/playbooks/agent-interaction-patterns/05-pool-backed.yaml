@@ -18,9 +18,9 @@ steps:
       system: "You are a senior financial analyst specializing in equity markets."
 
   - agent-query analyst-1: "What are the key indicators for tech sector performance in Q4?"
-    output: q4_outlook
+    capture: q4_outlook
 
   - agent-query analyst-1: "Which specific stocks would you watch based on those indicators?"
-    output: stock_picks
+    capture: stock_picks
 
   - agent-session-close: analyst-1

@@ -398,7 +398,7 @@ class AgentExampleExecutionTest {
                 if (step.containsKey("parallel")) continue;
                 InvokeBinding binding = null;
                 for (var key : step.keySet()) {
-                    if (key.startsWith("agent-session-") || key.equals("agent-query")) {
+                    if (key.startsWith("agent-session-") || key.startsWith("agent-query")) {
                         binding = DeclarationParser.parseInvoke(step);
                         break;
                     }

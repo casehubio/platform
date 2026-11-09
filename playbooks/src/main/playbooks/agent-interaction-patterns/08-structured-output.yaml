@@ -28,7 +28,7 @@ steps:
       name: invoice
       schema: |
         {"type":"object","properties":{"vendor":{"type":"string"},"invoiceNumber":{"type":"string"},"date":{"type":"string"},"lineItems":{"type":"array","items":{"type":"object","properties":{"description":{"type":"string"},"quantity":{"type":"integer"},"unitPrice":{"type":"number"}}}},"total":{"type":"number"},"paymentTerms":{"type":"string"},"poNumber":{"type":"string"}}}
-    output: extracted_invoice
+    capture: extracted_invoice
 
   # Priority query — jumps the admission queue (e.g., urgent correction)
   - agent-query extractor: "Correction: the tax rate should be 9% not 8%. Recalculate."
@@ -38,6 +38,6 @@ steps:
       name: corrected-invoice
       schema: |
         {"type":"object","properties":{"total":{"type":"number"},"tax":{"type":"number"},"taxRate":{"type":"string"}}}
-    output: corrected_totals
+    capture: corrected_totals
 
   - agent-session-close: extractor

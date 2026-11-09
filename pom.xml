@@ -345,26 +345,26 @@
                 <artifactId>anthropic-java-client-okhttp</artifactId>
                 <version>${version.com.anthropic}</version>
             </dependency>
-            <!-- Convergence pins: Spring AI (5.0.0) vs Anthropic SDK (4.38.0) -->
+            <!-- Convergence pins: Spring AI 2.0.0 requires victools 5.0.0 -->
             <dependency>
                 <groupId>com.github.victools</groupId>
                 <artifactId>jsonschema-generator</artifactId>
-                <version>4.36.0</version>
+                <version>5.0.0</version>
             </dependency>
             <dependency>
                 <groupId>com.github.victools</groupId>
                 <artifactId>jsonschema-module-swagger-2</artifactId>
-                <version>4.36.0</version>
+                <version>5.0.0</version>
             </dependency>
             <dependency>
                 <groupId>com.github.victools</groupId>
                 <artifactId>jsonschema-module-jackson</artifactId>
-                <version>4.36.0</version>
+                <version>5.0.0</version>
             </dependency>
             <dependency>
                 <groupId>com.github.victools</groupId>
                 <artifactId>jsonschema-module-jakarta-validation</artifactId>
-                <version>4.36.0</version>
+                <version>5.0.0</version>
             </dependency>
             <!-- Convergence pin: Spring AI (2.0.0) vs claude-code-sdk (0.15.0) -->
             <dependency>

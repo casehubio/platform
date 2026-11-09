@@ -27,7 +27,7 @@ steps:
         Be warm and direct.
 
   - agent-query voice-customer-1: "Hi, I need to change my delivery address."
-    output: voice_greeting
+    capture: voice_greeting
 
   - agent-session-close: voice-customer-1
 
@@ -42,6 +42,6 @@ steps:
       Ticket #42: Customer reports intermittent API timeouts when calling
       /v2/payments endpoint. Happens ~3 times per day, always between
       14:00-16:00 UTC. No error codes returned, just timeout after 30s.
-    output: email_response
+    capture: email_response
 
   - agent-session-close: email-ticket-42

@@ -9,6 +9,6 @@ steps:
         INVOICE, CONTRACT, RECEIPT, or UNKNOWN.
 
   - agent-query classifier: "Classify this document: 'Payment of $5,000 due by March 15'"
-    output: classification
+    capture: classification
 
   - agent-session-close: classifier

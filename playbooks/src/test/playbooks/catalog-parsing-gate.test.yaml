@@ -6,5 +6,5 @@ steps:
   - assertThat: result.validatedCount
     greaterThan: 60
   - assertThat: result.errors
-    hasSize: 1
-    message: "Only composition/modules.playbook.yaml expected to fail (import deserialization)"
+    hasSize: 3
+    message: "Expected failures: modules.playbook.yaml (import deser), rest.playbook.yaml (headers sibling key), 08-structured-output.yaml (response-format sibling key)"

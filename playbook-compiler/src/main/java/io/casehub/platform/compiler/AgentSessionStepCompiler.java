@@ -29,7 +29,13 @@ class AgentSessionStepCompiler implements StepCompiler {
             }
             config = Map.of("session", s);
         } else if (stepValue instanceof Map) {
-            config = (Map<String, Object>) stepValue;
+            config = new java.util.LinkedHashMap<>((Map<String, Object>) stepValue);
+            if (config.containsKey("_subject")) {
+                config.putIfAbsent("session", String.valueOf(config.remove("_subject")));
+            }
+            if (config.containsKey("_value")) {
+                config.putIfAbsent("user", String.valueOf(config.remove("_value")));
+            }
         } else {
             ctx.addDiagnostic(CompilationDiagnostic.Severity.ERROR,
                               stepType + " requires a string or map");

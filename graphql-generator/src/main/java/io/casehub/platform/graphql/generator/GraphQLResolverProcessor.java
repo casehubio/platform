@@ -342,12 +342,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     || ops.classPermitAll || ops.classAuthenticated;
 
             List<String> newClassRolesAllowed = List.of();
-            AnnotationInstance classRaAnn = classInfo.annotation(ROLES_ALLOWED_ANN);
+            AnnotationInstance classRaAnn = classInfo.classAnnotation(ROLES_ALLOWED_ANN);
             if (classRaAnn != null && classRaAnn.value() != null) {
                 newClassRolesAllowed = List.of(classRaAnn.value().asStringArray());
             }
-            boolean newClassPermitAll = classInfo.hasAnnotation(PERMIT_ALL_ANN);
-            boolean newClassAuthenticated = classInfo.hasAnnotation(AUTHENTICATED_ANN);
+            boolean newClassPermitAll = classInfo.classAnnotation(PERMIT_ALL_ANN) != null;
+            boolean newClassAuthenticated = classInfo.classAnnotation(AUTHENTICATED_ANN) != null;
 
             if (hasExistingClassSecurity) {
                 boolean conflict = !newClassRolesAllowed.equals(ops.classRolesAllowed)

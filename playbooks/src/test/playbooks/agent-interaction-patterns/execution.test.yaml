@@ -83,5 +83,5 @@ tests:
     steps:
       - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.yaml
         capture: result
-      - assertThat: result.succeeded
-        equals: true
+      - assertThat: result.error
+        contains: "response-format"

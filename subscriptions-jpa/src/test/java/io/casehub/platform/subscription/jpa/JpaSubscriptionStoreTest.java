@@ -137,6 +137,29 @@ public class JpaSubscriptionStoreTest extends SubscriptionStoreContractTest {
         assertThat(allIds).doesNotHaveDuplicates();
     }
 
+    @Test
+    void cursor_preservesSubMillisecondPrecision() {
+        var newer = blockingStore.store(createTestInput("user-1", "tenant-1", "Newer", "event-type"));
+        var older = blockingStore.store(createTestInput("user-1", "tenant-1", "Older", "event-type"));
+        setCreatedAt(newer.id(), java.time.Instant.parse("2026-11-09T10:00:00.123900Z"));
+        setCreatedAt(older.id(), java.time.Instant.parse("2026-11-09T10:00:00.123800Z"));
+
+        var page1 = blockingStore.find(new SubscriptionQuery("user-1", "tenant-1", null, null, null, 1));
+        assertThat(page1.subscriptions()).extracting(Subscription::id).containsExactly(newer.id());
+        assertThat(page1.nextCursor()).isNotNull();
+
+        var page2 = blockingStore.find(new SubscriptionQuery("user-1", "tenant-1", null, null, page1.nextCursor(), 1));
+        assertThat(page2.subscriptions()).extracting(Subscription::id).containsExactly(older.id());
+    }
+
+    @Transactional
+    void setCreatedAt(String id, java.time.Instant createdAt) {
+        em.createQuery("UPDATE SubscriptionEntity SET createdAt = :createdAt WHERE id = :id")
+          .setParameter("createdAt", createdAt)
+          .setParameter("id", id)
+          .executeUpdate();
+    }
+
     // Helper
 
     private SubscriptionInput createTestInput(String ownerId, String tenancyId, String name, String eventType) {

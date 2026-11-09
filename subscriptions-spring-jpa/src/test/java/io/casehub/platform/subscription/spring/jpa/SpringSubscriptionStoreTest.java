@@ -55,6 +55,7 @@ class SpringSubscriptionStoreTest {
     }
 
     @Autowired SpringSubscriptionStore store;
+    @Autowired jakarta.persistence.EntityManager em;
 
     private SubscriptionInput testInput(String name) {
         return new SubscriptionInput(
@@ -138,7 +139,31 @@ class SpringSubscriptionStoreTest {
         assertNotNull(page1.nextCursor());
 
         SubscriptionPage page2 = store.find(new SubscriptionQuery(OWNER, TENANT, SubscriptionScope.USER, null, page1.nextCursor(), 3));
-        int total = page1.subscriptions().size() + page2.subscriptions().size();
-        assertTrue(total >= 4 && total <= 5, "Expected 4-5 total, got " + total);
+        assertEquals(2, page2.subscriptions().size());
+        assertNull(page2.nextCursor());
+    }
+
+    @Test
+    void cursorPreservesSubMillisecondPrecision() {
+        Subscription newer = store.store(testInput("Newer"));
+        Subscription older = store.store(testInput("Older"));
+        setCreatedAt(newer.id(), java.time.Instant.parse("2026-11-09T10:00:00.123900Z"));
+        setCreatedAt(older.id(), java.time.Instant.parse("2026-11-09T10:00:00.123800Z"));
+
+        SubscriptionPage page1 = store.find(new SubscriptionQuery(OWNER, TENANT, SubscriptionScope.USER, null, null, 1));
+        assertEquals(List.of(newer.id()), page1.subscriptions().stream().map(Subscription::id).toList());
+        assertNotNull(page1.nextCursor());
+
+        SubscriptionPage page2 = store.find(new SubscriptionQuery(OWNER, TENANT, SubscriptionScope.USER, null, page1.nextCursor(), 1));
+        assertEquals(List.of(older.id()), page2.subscriptions().stream().map(Subscription::id).toList());
+    }
+
+    private void setCreatedAt(String id, java.time.Instant createdAt) {
+        em.flush();
+        em.createQuery("UPDATE SubscriptionEntity SET createdAt = :createdAt WHERE id = :id")
+          .setParameter("createdAt", createdAt)
+          .setParameter("id", id)
+          .executeUpdate();
+        em.clear();
     }
 }

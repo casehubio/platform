@@ -19,7 +19,6 @@ import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -88,12 +87,12 @@ public class JpaSubscriptionStore implements SubscriptionStore {
         }
 
         if (query.cursor() != null) {
-            CursorValue cursor = decodeCursor(query.cursor());
+            SubscriptionCursor.Value cursor = SubscriptionCursor.decode(query.cursor());
             if (cursor != null) {
                 hql.append(" AND (createdAt < :cursorCreatedAt")
                    .append(" OR (createdAt = :cursorCreatedAt AND id < :cursorId))");
-                params.put("cursorCreatedAt", cursor.createdAt);
-                params.put("cursorId", cursor.id);
+                params.put("cursorCreatedAt", cursor.createdAt());
+                params.put("cursorId", cursor.id());
             }
         }
 
@@ -118,7 +117,7 @@ public class JpaSubscriptionStore implements SubscriptionStore {
         String nextCursor = null;
         if (hasMore && !pageEntities.isEmpty()) {
             SubscriptionEntity last = pageEntities.getLast();
-            nextCursor = encodeCursor(last.createdAt, last.id);
+            nextCursor = SubscriptionCursor.encode(last.createdAt, last.id);
         }
         return new SubscriptionPage(subscriptions, nextCursor);
     }
@@ -202,23 +201,4 @@ public class JpaSubscriptionStore implements SubscriptionStore {
         entity.updatedAt = Instant.now();
     }
 
-    private static String encodeCursor(Instant createdAt, String id) {
-        String raw = createdAt.toEpochMilli() + "|" + id;
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes());
-    }
-
-    private static CursorValue decodeCursor(String cursor) {
-        try {
-            String raw = new String(Base64.getUrlDecoder().decode(cursor));
-            int    sep = raw.indexOf('|');
-            if (sep == -1) {return null;}
-            long   epochMillis = Long.parseLong(raw.substring(0, sep));
-            String id          = raw.substring(sep + 1);
-            return new CursorValue(Instant.ofEpochMilli(epochMillis), id);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private record CursorValue(Instant createdAt, String id) {}
 }

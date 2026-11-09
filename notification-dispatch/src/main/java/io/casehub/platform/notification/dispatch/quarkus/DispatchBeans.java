@@ -67,8 +67,10 @@ public class DispatchBeans {
     public DeliveryTracker deliveryTracker(DeliveryAttemptStore store,
                                            ObjectMapper objectMapper,
                                            @ConfigProperty(name = "casehub.delivery.retry.base-delay", defaultValue = "30s")
-                                           Duration baseDelay) {
-        return new DeliveryTracker(store, objectMapper, baseDelay);
+                                           Duration baseDelay,
+                                           @ConfigProperty(name = "casehub.delivery.retry.claim-timeout", defaultValue = "5m")
+                                           Duration claimTimeout) {
+        return new DeliveryTracker(store, objectMapper, baseDelay, claimTimeout);
     }
 
     // --- Event<T> → Consumer<T> ---

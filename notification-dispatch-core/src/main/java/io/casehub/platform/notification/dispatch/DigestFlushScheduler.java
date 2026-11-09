@@ -1,13 +1,13 @@
 package io.casehub.platform.notification.dispatch;
 
 import io.casehub.platform.api.delivery.DeliveryChannelRegistry;
+import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DigestBuffer;
 import io.casehub.platform.api.delivery.DigestBufferKey;
 import io.casehub.platform.api.delivery.DigestGroupBy;
 import io.casehub.platform.api.delivery.DigestSchedule;
 import io.casehub.platform.api.delivery.DigestSummary;
-import io.casehub.platform.api.notification.NotificationInput;
 import io.casehub.platform.api.notification.settings.ChannelPreference;
 import io.casehub.platform.api.notification.settings.NotificationPreferenceStore;
 import io.casehub.platform.api.notification.settings.NotificationPreferences;
@@ -15,7 +15,6 @@ import io.casehub.platform.api.notification.settings.SuppressionStore;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -109,31 +108,30 @@ public class DigestFlushScheduler {
         Instant periodStart = lastFlushTimes.getOrDefault(key,
                 digestBuffer.oldestPendingTimestamp(key).orElse(now));
 
-        List<NotificationInput> items = digestBuffer.drain(key);
-        if (items.isEmpty()) {
-            LOG.debugf("Empty drain for key %s — items consumed between pendingKeys() and drain()", key);
-            return;
-        }
-
-        var summary = new DigestSummary(
-                key.userId(), key.tenancyId(), key.channelId(),
-                items, periodStart, now, groupBy);
-
         var descriptor = channelRegistry.resolve(key.channelId()).orElse(null);
         var deliverer = channelRegistry.resolveDeliverer(key.channelId()).orElse(null);
         if (deliverer == null) {
-            LOG.warnf("No deliverer for channel '%s' — digest items lost", key.channelId());
+            LOG.warnf("No deliverer for channel '%s' — keeping digest buffered", key.channelId());
             return;
         }
 
         var guaranteedMinSeverity = descriptor != null ? descriptor.guaranteedMinSeverity() : null;
-        var preRecorded = deliveryTracker.preRecordDigest(key.channelId(), summary, guaranteedMinSeverity);
+        var prepared = digestBuffer.drain(key, items -> {
+            if (items.isEmpty()) return null;
+            var summary = new DigestSummary(key.userId(), key.tenancyId(), key.channelId(),
+                    items, periodStart, now, groupBy);
+            var attempt = deliveryTracker.preRecordDigest(key.channelId(), summary, guaranteedMinSeverity);
+            return new PreparedDigest(summary, attempt);
+        });
+        if (prepared == null) return;
+        var summary = prepared.summary();
+        var preRecorded = prepared.attempt();
 
         try {
             var result = deliverer.deliverDigest(summary);
             if (result.success()) {
                 LOG.infof("Digest flushed: user=%s, channel=%s, count=%d, period=%s→%s",
-                        key.userId(), key.channelId(), items.size(), periodStart, now);
+                        key.userId(), key.channelId(), summary.notifications().size(), periodStart, now);
                 lastFlushTimes.put(key, now);
                 deliveryTracker.confirmDigestSuccess(preRecorded);
             } else {
@@ -147,4 +145,6 @@ public class DigestFlushScheduler {
             deliveryTracker.confirmDigestFailure(preRecorded, e.getMessage());
         }
     }
+
+    private record PreparedDigest(DigestSummary summary, DeliveryAttempt attempt) {}
 }

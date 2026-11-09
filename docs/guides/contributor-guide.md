@@ -67,7 +67,7 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `delivery-tracking-inmem/` | `casehub-platform-delivery-tracking-inmem` | `@Alternative @Priority(100)` | In-memory `DeliveryAttemptStore` |
 | `delivery-tracking-jpa/` | `casehub-platform-delivery-tracking-jpa` | `@ApplicationScoped` | JPA `DeliveryAttemptStore` -- `SKIP LOCKED` claims, retention purge, tenant-scoped queries |
 | `digest-inmem/` | `casehub-platform-digest-inmem` | `@Alternative @Priority(100)` | In-memory `DigestBuffer` |
-| `digest-jpa/` | `casehub-platform-digest-jpa` | `@ApplicationScoped` | JPA `DigestBuffer` -- drain via SELECT+DELETE in transaction |
+| `digest-jpa/` | `casehub-platform-digest-jpa` | `@ApplicationScoped` | JPA `DigestBuffer` -- locked drain and transactional handoff to delivery tracking |
 | `subscriptions/` | `casehub-platform-subscriptions` | `@ApplicationScoped` | Subscription matching engine + REST -- alpha network wiring, expression compilation |
 | `subscriptions-inmem/` | `casehub-platform-subscriptions-inmem` | `@Alternative @Priority(100)` | In-memory `SubscriptionStore` -- scope-aware, CDI events |
 | `subscriptions-jpa/` | `casehub-platform-subscriptions-jpa` | `@ApplicationScoped` | JPA `SubscriptionStore` -- OR-disjunction scope queries, JSON TEXT columns |
@@ -233,6 +233,8 @@ Same composite pattern for `ActorDIDProvider` -- `ConfiguredActorDIDProvider` (@
 6. REST + SSE endpoints expose to clients
 7. `DeliveryChannelRegistry` maps channels to `NotificationDeliverer` implementations
 8. Delivery tracked by `DeliveryAttemptStore`; digests buffered by `DigestBuffer`
+
+Digest dispatch uses `DigestBuffer.drain(key, transfer)` to persist the delivery attempt before removing buffered notifications. Both JPA adapters execute this handoff in one transaction and select rows with `PESSIMISTIC_WRITE` / `SKIP LOCKED`, so overlapping drains do not return the same rows. Pair persistent digest and tracking adapters on the same database and transaction manager. The transfer must propagate persistence or serialization failures so the transaction rolls back; external delivery runs after commit. Guaranteed attempts carry a retry deadline using `casehub.delivery.retry.claim-timeout` (default five minutes), allowing recovery if the process stops before confirmation. Delivery remains at least once: a crash after an external send but before confirmation can cause a retry; deliverers must handle duplicates, and the lease must exceed normal send duration.
 9. Engagement events (`EngagementType`: OPENED/CLICKED/DISMISSED/REPLIED/CONVERTED) recorded via `EngagementCallbackHandler`
 
 **Quiet hours integration:** `QuietHoursAction.BUFFER_FOR_DIGEST` buffers suppressed notifications instead of dropping them. They are flushed to digest on the next scheduled flush.

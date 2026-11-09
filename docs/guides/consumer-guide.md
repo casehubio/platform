@@ -59,7 +59,7 @@ Each displaces its `@DefaultBean` mock automatically -- no exclusion config need
 | `casehub-platform-delivery-tracking-inmem` | In-memory `DeliveryAttemptStore` |
 | `casehub-platform-delivery-tracking-jpa` | JPA `DeliveryAttemptStore` -- `SKIP LOCKED` claims, retention purge |
 | `casehub-platform-digest-inmem` | In-memory `DigestBuffer` |
-| `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- drain via SELECT+DELETE in transaction |
+| `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- locked drain and transactional handoff to delivery tracking |
 
 ### YAML declaration primitives
 

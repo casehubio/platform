@@ -24,13 +24,20 @@ public class DeliveryTracker {
     private final DeliveryAttemptStore store;
     private final ObjectMapper objectMapper;
     private final Duration baseDelay;
+    private final Duration claimTimeout;
 
     public DeliveryTracker(DeliveryAttemptStore store,
                            ObjectMapper objectMapper,
                            Duration baseDelay) {
+        this(store, objectMapper, baseDelay, Duration.ofMinutes(5));
+    }
+
+    public DeliveryTracker(DeliveryAttemptStore store, ObjectMapper objectMapper,
+                           Duration baseDelay, Duration claimTimeout) {
         this.store = store;
         this.objectMapper = objectMapper;
         this.baseDelay = baseDelay;
+        this.claimTimeout = claimTimeout;
     }
 
     public void recordSuccess(String channelId, NotificationInput input,
@@ -88,15 +95,10 @@ public class DeliveryTracker {
                 DeliveryType.DIGEST,
                 retryEligible ? DeliveryStatus.RETRYING : DeliveryStatus.FAILED,
                 0, now, null, null,
-                null,
+                retryEligible ? now.plus(claimTimeout) : null,
                 null,
                 serialize(summary), null, null);
-        try {
-            store.store(attempt);
-        } catch (Exception e) {
-            LOG.warnf(e, "Failed to pre-record digest delivery for channel '%s', user '%s'",
-                      channelId, summary.userId());
-        }
+        store.store(attempt);
         return attempt;
     }
 
@@ -136,8 +138,7 @@ public class DeliveryTracker {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
-            LOG.errorf(e, "Failed to serialize delivery payload");
-            return "{}";
+            throw new IllegalStateException("Failed to serialize delivery payload", e);
         }
     }
 }

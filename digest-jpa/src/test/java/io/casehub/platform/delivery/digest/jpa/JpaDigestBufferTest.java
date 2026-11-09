@@ -12,10 +12,22 @@ import org.junit.jupiter.api.Test;
 
 import jakarta.persistence.EntityManager;
 import io.quarkus.test.TestTransaction;
+import jakarta.transaction.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.delivery.DeliveryAttemptStore;
+import io.casehub.platform.api.delivery.DigestSummary;
+import io.casehub.platform.notification.dispatch.DeliveryTracker;
+import java.time.Duration;
+import java.time.Instant;
+import io.quarkus.narayana.jta.QuarkusTransaction;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @QuarkusTest
 class JpaDigestBufferTest {
@@ -26,12 +38,19 @@ class JpaDigestBufferTest {
     @Inject
     EntityManager entityManager;
 
+    @Inject
+    DeliveryAttemptStore attempts;
+
+    @Inject
+    ObjectMapper mapper;
+
     private static final DigestBufferKey KEY = new DigestBufferKey("user-1", "tenant-1", "email");
 
     @BeforeEach
-    @TestTransaction
+    @Transactional
     void setUp() {
         entityManager.createQuery("DELETE FROM DigestBufferEntity").executeUpdate();
+        entityManager.createQuery("DELETE FROM DeliveryAttemptEntity").executeUpdate();
     }
 
     @Test
@@ -155,6 +174,66 @@ class JpaDigestBufferTest {
         var items = evictingBuffer.drain(KEY);
         assertThat(items).hasSize(3);
         assertThat(items.get(0).title()).isEqualTo("Item 2");
+    }
+
+    @Test
+    void concurrentDrainSkipsRowsClaimedByAnotherTransaction() throws Exception {
+        buffer.add(KEY, sampleInput("Only once"));
+        var drained = new CountDownLatch(1);
+        var commit = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> QuarkusTransaction.requiringNew().call(() -> {
+                var items = buffer.drain(KEY);
+                drained.countDown();
+                if (!commit.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Commit not released");
+                return items;
+            }));
+            try {
+                assertThat(drained.await(10, TimeUnit.SECONDS)).isTrue();
+                var second = executor.submit(() -> buffer.drain(KEY));
+                assertThat(second.get(5, TimeUnit.SECONDS)).isEmpty();
+            } finally {
+                commit.countDown();
+            }
+            assertThat(first.get(10, TimeUnit.SECONDS)).hasSize(1);
+        }
+        assertThat(buffer.pendingCount(KEY)).isZero();
+    }
+
+    @Test
+    void interruptedDeliveryCanBeClaimedFromPersistentTracking() {
+        buffer.add(KEY, sampleInput("Recover me"));
+        var tracker = new DeliveryTracker(attempts, mapper, Duration.ofSeconds(30));
+        var now = Instant.now();
+        var prepared = buffer.drain(KEY, items -> tracker.preRecordDigest(KEY.channelId(),
+                new DigestSummary(KEY.userId(), KEY.tenancyId(), KEY.channelId(), items, now, now, null),
+                NotificationSeverity.INFO));
+
+        // No confirmation: simulate stopping after the handoff and before delivery.
+        assertThat(buffer.pendingCount(KEY)).isZero();
+        assertThat(attempts.findById(prepared.id())).isNotNull();
+        assertThat(attempts.claimRetryable(now.plus(Duration.ofMinutes(6)), 10))
+                .extracting(a -> a.id()).containsExactly(prepared.id());
+    }
+
+    @Test
+    void failedHandoffRollsBackBothTrackingAndBufferRemoval() {
+        buffer.add(KEY, sampleInput("Keep me"));
+        var tracker = new DeliveryTracker(attempts, mapper, Duration.ofSeconds(30));
+        var now = Instant.now();
+        var attemptId = new java.util.concurrent.atomic.AtomicReference<String>();
+
+        assertThatThrownBy(() -> buffer.drain(KEY, items -> {
+            var prepared = tracker.preRecordDigest(KEY.channelId(),
+                    new DigestSummary(KEY.userId(), KEY.tenancyId(), KEY.channelId(), items, now, now, null),
+                    NotificationSeverity.INFO);
+            attemptId.set(prepared.id());
+            entityManager.flush();
+            throw new IllegalStateException("Interrupted before handoff commit");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(buffer.pendingCount(KEY)).isEqualTo(1);
+        assertThat(attempts.findById(attemptId.get())).isNull();
     }
 
     private static NotificationInput sampleInput(String title) {

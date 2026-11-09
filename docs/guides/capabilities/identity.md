@@ -2,6 +2,7 @@
 capability: identity
 audience: consumer
 repo: casehub-platform
+verified-current: 2026-11-09
 anchors:
   classes:
     - io.casehub.platform.api.identity.CurrentPrincipal
@@ -40,6 +41,8 @@ Not `SecurityIdentity`. CaseHub actors include AI agents, system actors, and int
 `membersOf(groupName, tenancyId)` is tenant-scoped -- every call requires a `tenancyId` parameter for tenant isolation. `groupsOf(actorId, tenancyId)` provides the reverse lookup.
 
 **Tenancy:** `tenancyId()` is abstract -- every implementor must provide it. Single-tenant deployments return `TenancyConstants.DEFAULT_TENANT_ID`. `isCrossTenantAdmin()` controls cross-tenant data access.
+
+**Delivery tenancy:** Digest buffers are partitioned by `(userId, tenancyId, channelId)` and delivery attempts retain the same tenant identity. The same user ID in two tenants must not share buffered notifications or tracking state. Configuring persistence schemas or Flyway locations does not select the acting tenant; obtain it from `CurrentPrincipal`.
 
 **Actor types:** `ActorType` enum with `HUMAN`, `AGENT`, `SYSTEM`. `ActorTypeResolver.resolve(actorId)` derives the type from the actor ID string. `actorType()` and `isSystem()` use this.
 

@@ -19,7 +19,7 @@ anchors:
   config-keys:
     - casehub.notification.digest.max-buffer-size
     - casehub.delivery.tracking.inmem.max-size
-    - casehub.delivery.engagement.enabled
+    - casehub.platform.delivery.engagement-enabled
 ---
 
 # Notifications, Subscriptions & Delivery
@@ -45,7 +45,7 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 | `casehub-platform-delivery-tracking-inmem` | In-memory `DeliveryAttemptStore` |
 | `casehub-platform-delivery-tracking-jpa` | JPA `DeliveryAttemptStore` -- `SKIP LOCKED` claims, retention purge |
 | `casehub-platform-digest-inmem` | In-memory `DigestBuffer` |
-| `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- drain via SELECT+DELETE in transaction |
+| `casehub-platform-digest-jpa` | JPA `DigestBuffer` -- locked drain and transactional handoff to delivery tracking |
 | `casehub-platform-notification-settings-inmem` | In-memory preference/suppression store |
 | `casehub-platform-notification-settings-jpa` | JPA preference/suppression store -- JSON TEXT columns, retention scheduler |
 
@@ -82,6 +82,10 @@ Configurable digest schedules via `DigestSchedule` sealed interface:
 - `DigestSchedule.DailyAt(LocalTime time, ZoneId timezone)` -- once per day
 - `DigestSchedule.WeeklyAt(DayOfWeek day, LocalTime time, ZoneId timezone)` -- once per week
 
+**Durable handoff:** Pair persistent digest and delivery-tracking adapters on the same database and transaction manager. The scheduler persists a delivery attempt and removes the buffered notifications in one transaction; a tracking failure leaves the notifications buffered. Both JPA adapters lock selected rows with `SKIP LOCKED`, so concurrent schedulers do not drain the same notifications.
+
+**Recovery:** Guaranteed in-flight digests become retryable after `casehub.delivery.retry.claim-timeout` (default five minutes). Set the timeout above normal send duration. Delivery remains at least once: if a process stops after sending but before confirming delivery, recovery can send the digest again.
+
 **Delivery retries:** A failed digest is retried when the channel defines a `guaranteedMinSeverity` and at least one buffered notification meets that threshold. Digests without a delivery guarantee or below the threshold remain `FAILED`, with the failure reason recorded and no retry deadline. Eligible failures remain `RETRYING` and are scheduled using the configured retry delay.
 
 **DigestGroupBy:** `FLAT` (no grouping), `CATEGORY` (by notification category), `ENTITY` (by entity type and ID).
@@ -94,9 +98,10 @@ Configurable digest schedules via `DigestSchedule` sealed interface:
 
 | Property | Purpose | Default |
 |----------|---------|---------|
-| `casehub.notification.digest.max-buffer-size` | Digest buffer size (0 = no eviction) | 0 |
+| `casehub.notification.digest.max-buffer-size` | Digest buffer size (0 = no eviction in JPA) | 0 (JPA), 500 (in-memory) |
+| `casehub.delivery.retry.claim-timeout` | Lease for an in-flight delivery attempt | 5m |
 | `casehub.delivery.tracking.inmem.max-size` | In-memory delivery attempt store size | 10000 |
-| `casehub.delivery.engagement.enabled` | Enable engagement event recording | false |
+| `casehub.platform.delivery.engagement-enabled` | Platform preference enabling engagement event recording | false |
 | `casehub.delivery.retention.attempt-days` | Delivery attempt retention | -- |
 | `casehub.delivery.retention.failed-attempt-days` | Failed attempt retention | -- |
 | `casehub.delivery.retention.engagement-days` | Engagement event retention | -- |

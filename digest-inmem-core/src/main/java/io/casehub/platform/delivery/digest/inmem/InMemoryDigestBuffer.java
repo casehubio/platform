@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -82,17 +84,23 @@ public class InMemoryDigestBuffer implements DigestBuffer {
 
     @Override
     public List<NotificationInput> drain(DigestBufferKey key) {
-        var entry = buffers.remove(key);
-        if (entry != null) {
-            userIndex.computeIfPresent(userKey(key.userId(), key.tenancyId()), (k, set) -> {
+        return drain(key, Function.identity());
+    }
+
+    @Override
+    public <T> T drain(DigestBufferKey key, Function<List<NotificationInput>, T> transfer) {
+        var result = new AtomicReference<T>();
+        buffers.compute(key, (k, entry) -> {
+            var items = entry == null || isExpired(entry) ? List.<NotificationInput>of()
+                    : List.copyOf(entry.notifications());
+            result.set(transfer.apply(items));
+            userIndex.computeIfPresent(userKey(key.userId(), key.tenancyId()), (u, set) -> {
                 set.remove(key);
                 return set.isEmpty() ? null : set;
             });
-            if (isExpired(entry)) {
-                return List.of();
-            }
-        }
-        return entry != null ? List.copyOf(entry.notifications()) : List.of();
+            return null;
+        });
+        return result.get();
     }
 
     @Override

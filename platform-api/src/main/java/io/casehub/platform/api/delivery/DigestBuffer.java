@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Temporary buffer for notifications awaiting digest delivery.
@@ -24,6 +25,22 @@ public interface DigestBuffer {
      * use atomic swap (e.g. ConcurrentHashMap.remove()) not clear().
      */
     List<NotificationInput> drain(DigestBufferKey key);
+
+    /**
+     * Transfer drained items before returning them to the caller. If transfer fails,
+     * retain the items. Persistent implementations must run transfer and removal in
+     * the same transaction; the transfer must enlist in that transaction as well.
+     * The default implementation restores items on failure for volatile adapters.
+     */
+    default <T> T drain(DigestBufferKey key, Function<List<NotificationInput>, T> transfer) {
+        var items = drain(key);
+        try {
+            return transfer.apply(items);
+        } catch (RuntimeException | Error e) {
+            items.forEach(item -> add(key, item));
+            throw e;
+        }
+    }
 
     /** Returns a snapshot of keys with pending items. Thread-safe. */
     Set<DigestBufferKey> pendingKeys();

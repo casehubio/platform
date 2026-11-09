@@ -11,6 +11,7 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @ApplicationScoped
 public class JpaDigestBuffer implements DigestBuffer {
@@ -89,6 +91,12 @@ public class JpaDigestBuffer implements DigestBuffer {
     @Override
     @Transactional
     public List<NotificationInput> drain(DigestBufferKey key) {
+        return drain(key, Function.identity());
+    }
+
+    @Override
+    @Transactional
+    public <T> T drain(DigestBufferKey key, Function<List<NotificationInput>, T> transfer) {
         List<DigestBufferEntity> entities = entityManager.createQuery(
                         "SELECT e FROM DigestBufferEntity e " +
                                 "WHERE e.userId = :userId AND e.tenancyId = :tenancyId " +
@@ -97,10 +105,13 @@ public class JpaDigestBuffer implements DigestBuffer {
                 .setParameter("userId", key.userId())
                 .setParameter("tenancyId", key.tenancyId())
                 .setParameter("channelId", key.channelId())
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .setHint("jakarta.persistence.lock.timeout", -2)
                 .getResultList();
 
+        var result = transfer.apply(entities.stream().map(DigestBufferEntity::toNotificationInput).toList());
         if (entities.isEmpty()) {
-            return List.of();
+            return result;
         }
 
         List<UUID> ids = entities.stream().map(e -> e.id).toList();
@@ -109,9 +120,7 @@ public class JpaDigestBuffer implements DigestBuffer {
                 .setParameter("ids", ids)
                 .executeUpdate();
 
-        return entities.stream()
-                .map(DigestBufferEntity::toNotificationInput)
-                .toList();
+        return result;
     }
 
     @Override

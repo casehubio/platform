@@ -272,7 +272,12 @@ public final class Walker {
                     } else if (value != null) {
                         actionParams = new LinkedHashMap<>();
                         String inputKey = entry.get().primaryInput();
-                        actionParams.put(inputKey != null ? inputKey : "_subject", value);
+                        if (inputKey != null) {
+                            actionParams.put(inputKey, value);
+                        } else {
+                            actionParams.put("_subject", value);
+                            actionParams.put("_value", value);
+                        }
                     } else {
                         actionParams = new LinkedHashMap<>();
                     }

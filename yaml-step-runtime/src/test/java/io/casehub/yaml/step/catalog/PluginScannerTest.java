@@ -88,4 +88,49 @@ class PluginScannerTest {
         assertThat(def.absorbSiblings()).isFalse();
     }
 
+    @Test
+    void streamingPluginResolvesFirstExecParamFromStepInput() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.StreamingPlugin.class, registry);
+
+        var def = registry.resolve("streaming-test").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("text", "hello"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("_output", "hello:hello");
+    }
+
+    @Test
+    void streamingPluginWithAllOptionalInputsFallsBackToExecuteParamName() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.AllOptionalStreamingPlugin.class, registry);
+
+        var def = registry.resolve("all-optional-streaming").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("_value", "test-data"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("_output", "test-data");
+    }
+
+    @Test
+    void streamingRecordReturnIsUnwrappedToMap() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.RecordOutputStreamingPlugin.class, registry);
+
+        var def = registry.resolve("record-output-streaming").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("_value", "hello world", "language", "fr"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("text", "hello world");
+        assertThat(result.output()).containsEntry("detected-language", "fr");
+        assertThat(result.output()).containsEntry("confidence", 0.95);
+    }
+
+
 }

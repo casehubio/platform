@@ -11,10 +11,18 @@ public record PlaybookRunResult(
         StepTraceNode trace,
         List<CapturedEvent> events,
         Map<String, Object> output,
+        Map<String, Map<String, Object>> captures,
         String error) {
 
     public PlaybookRunResult {
-        events = events != null ? List.copyOf(events) : List.of();
-        output = output != null ? Map.copyOf(output) : Map.of();
+        events   = events != null ? List.copyOf(events) : List.of();
+        output   = output != null ? Map.copyOf(output) : Map.of();
+        captures = captures != null ? Map.copyOf(captures) : Map.of();
+    }
+
+    public PlaybookRunResult(boolean success, String playbookName, String playbookPath,
+                             long durationMs, StepTraceNode trace, List<CapturedEvent> events,
+                             Map<String, Object> output, String error) {
+        this(success, playbookName, playbookPath, durationMs, trace, events, output, Map.of(), error);
     }
 }

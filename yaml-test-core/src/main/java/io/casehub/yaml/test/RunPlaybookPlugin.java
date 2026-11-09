@@ -74,6 +74,7 @@ public final class RunPlaybookPlugin implements Action {
         var resultMap = new java.util.LinkedHashMap<String, Object>();
         resultMap.put("succeeded", runResult.success());
         resultMap.put("output", runResult.output());
+        resultMap.put("captures", runResult.captures());
         resultMap.put("stepCount", stepEvents.size());
         resultMap.put("duration", runResult.durationMs());
         resultMap.put("stepEvents", stepEvents);

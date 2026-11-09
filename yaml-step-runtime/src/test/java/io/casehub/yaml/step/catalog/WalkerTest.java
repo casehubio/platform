@@ -1418,4 +1418,20 @@ class WalkerTest {
     }
 
 
+    @Test
+    void scalarValueSetsValueKeyWhenNoPrimaryInput() {
+        var noPrimaryDef = Definition.of("no-primary")
+                                     .execute((params, svc) -> Result.of(Map.of()))
+                                     .build();
+        var reg = new CompositePluginRegistry();
+        reg.register(noPrimaryDef);
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("no-primary", "hello world");
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), reg);
+        var                plugin   = (ResolvedStep.PluginStep) resolved.get(0);
+        assertThat(plugin.params()).containsEntry("_subject", "hello world");
+        assertThat(plugin.params()).containsEntry("_value", "hello world");
+    }
 }

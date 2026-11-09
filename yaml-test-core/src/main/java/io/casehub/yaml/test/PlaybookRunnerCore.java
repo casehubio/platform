@@ -121,6 +121,7 @@ public final class PlaybookRunnerCore {
             VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource);
 
             Map<String, Object> outputVars = new LinkedHashMap<>();
+            Map<String, Map<String, Object>> captures = new LinkedHashMap<>();
             boolean allPassed = true;
             String errorMsg = null;
 
@@ -142,6 +143,7 @@ public final class PlaybookRunnerCore {
                     var capture = ps.decorators().get("capture");
                     if (capture != null && result.output() != null) {
                         Map<String, Object> capturedOutput = result.output();
+                        captures.put(String.valueOf(capture), capturedOutput);
                         resolver = resolver.withObjectScope(
                                 String.valueOf(capture), capturedOutput::get);
                     }
@@ -155,7 +157,7 @@ public final class PlaybookRunnerCore {
 
             return new PlaybookRunResult(allPassed, playbookName,
                     playbookPath.toString(), durationMs, rootTrace,
-                    eventCapture.all(), outputVars, errorMsg);
+                    eventCapture.all(), outputVars, captures, errorMsg);
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;

@@ -12,12 +12,20 @@ public record TestFileDescriptor(
         List<Map<String, Object>> fileTeardown,
         List<TestCase> testCases,
         Map<String, Object> varsBlock,
-        Map<String, Object> paramsBlock) {
+        Map<String, Object> paramsBlock,
+        String servicesProfile) {
 
     public TestFileDescriptor(String name, Path file, Map<String, Object> simulateBlock,
                               List<Map<String, Object>> fileSetup, List<Map<String, Object>> fileTeardown,
                               List<TestCase> testCases) {
-        this(name, file, simulateBlock, fileSetup, fileTeardown, testCases, null, null);
+        this(name, file, simulateBlock, fileSetup, fileTeardown, testCases, null, null, null);
+    }
+
+    public TestFileDescriptor(String name, Path file, Map<String, Object> simulateBlock,
+                              List<Map<String, Object>> fileSetup, List<Map<String, Object>> fileTeardown,
+                              List<TestCase> testCases, Map<String, Object> varsBlock,
+                              Map<String, Object> paramsBlock) {
+        this(name, file, simulateBlock, fileSetup, fileTeardown, testCases, varsBlock, paramsBlock, null);
     }
 
     public TestFileDescriptor {

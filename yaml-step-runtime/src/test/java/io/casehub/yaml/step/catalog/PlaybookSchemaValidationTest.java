@@ -97,7 +97,7 @@ class PlaybookSchemaValidationTest {
             }
         }
 
-        Set<String> testOnlyPlugins = Set.of("test-plugin", "camel-test", "universal-plugin", "absorbing-plugin");
+        Set<String> testOnlyPlugins = Set.of("test-plugin", "camel-test", "universal-plugin", "absorbing-plugin", "streaming-test", "all-optional-streaming", "record-output-streaming");
         pluginNames.removeAll(testOnlyPlugins);
         assertThat(pluginNames).as("Should find production plugin schemas on classpath").isNotEmpty();
 

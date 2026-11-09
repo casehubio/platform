@@ -98,6 +98,41 @@ class RunPlaybookPluginTest {
         assertThat(result.isSuccess()).isTrue();
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void exposesNamedCapturesInResult(@TempDir Path tempDir) throws IOException {
+        var registry = new CompositePluginRegistry();
+        registry.register(Definition.of("echo")
+                                    .execute((params, svc) -> Result.of(Map.of("value", params.get("text"))))
+                                    .build());
+
+        Path playbook = tempDir.resolve("captures.yaml");
+        Files.writeString(playbook, """
+                                    name: captures test
+                                    steps:
+                                      - echo:
+                                          text: alpha
+                                        capture: first
+                                      - echo:
+                                          text: beta
+                                        capture: second
+                                    """);
+
+        var services = buildServices(registry, tempDir);
+        var params   = Map.<String, Object>of("_subject", "captures.yaml");
+
+        Result result = plugin.execute(params, services);
+        assertThat(result.isSuccess()).isTrue();
+
+        var captures = (Map<String, Map<String, Object>>) result.output().get("captures");
+        assertThat(captures).isNotNull();
+        assertThat(captures).containsKey("first");
+        assertThat(captures).containsKey("second");
+        assertThat(captures.get("first")).containsEntry("value", "alpha");
+        assertThat(captures.get("second")).containsEntry("value", "beta");
+    }
+
+
     private MapServiceRegistry buildServices(CompositePluginRegistry registry, Path root) {
         var services = new MapServiceRegistry();
         var ctx = new TestExecutionContext(registry, services, root,

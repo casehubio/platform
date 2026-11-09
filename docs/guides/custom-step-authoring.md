@@ -1,15 +1,14 @@
 # Custom Step Authoring
 
-Add domain-specific steps to the playbook engine. A step is a contract — a
-name, typed inputs, and a description. The same playbook YAML works whether
-the step executes against a real backend or a simulation corpus. The author
-doesn't choose; the runtime wiring does.
+Add domain-specific steps to the playbook engine. Write a Java record,
+add an annotation, and test with pure YAML — no manual registration,
+no Java test wiring, no configuration.
 
-## The primary path: `@Plugin` record
+## Writing a step
 
-Define a Java record annotated with `@Plugin`. The APT generates the step
-schema, manifest, and action class at compile time. `AptPluginSource` discovers
-it on the classpath at startup. No manual registration.
+A step is a `@Plugin` record. Fields are inputs. The `@Execute` method
+is the logic. Service dependencies are method parameters, resolved
+automatically from the `ServiceRegistry`.
 
 ```java
 @Plugin(value = "bank-balance",
@@ -41,27 +40,33 @@ steps:
     capture: balance
 ```
 
-The test uses the same YAML — simulation provides the response:
+Record field names become kebab-case YAML keys (`accountId` → `account-id`).
 
-```yaml
-simulate:
-  bank-balance:
-    - input: { accountId: "acc-100" }
-      output: { accountId: "acc-100", amount: 1500.0, currency: "EUR" }
+### Streaming steps
 
-tests:
-  - name: "balance lookup"
-    steps:
-      - bank-balance:
-          accountId: acc-100
-        capture: balance
-      - assertThat: balance.amount
-        equals: 1500.0
+Steps that participate in data pipelines use `streaming = true`. The
+`@Execute` method's first parameter is the pipeline input; the return
+type is the pipeline output. Both streaming and non-streaming execution
+work from the same record — no separate wiring.
+
+```java
+@Plugin(value = "tts-synthesise", streaming = true)
+public record TtsSynthesisePlugin(
+        @Optional String voice,
+        @Optional String language) {
+
+    @Execute
+    public SynthesisResult apply(String text, VoicePlatform voicePlatform) {
+        return voicePlatform.textToSpeech().synthesise(text, voice, language);
+    }
+}
 ```
 
-Same step name, same YAML syntax, same inputs. The test classpath doesn't need
-`BankPlatform` or any of its transitives — the simulation layer handles
-execution when the real action class isn't loadable.
+In non-streaming execution (playbook runner, test engine), the first
+`@Execute` parameter resolves from the step's scalar value. Record
+return types are auto-unwrapped to Maps with kebab-case keys — so
+`SynthesisResult(audioData, audioFormat)` becomes
+`{audio-data: "...", audio-format: "wav"}` in captures.
 
 ### What the APT generates
 
@@ -69,22 +74,20 @@ execution when the real action class isn't loadable.
 |------|---------|
 | `META-INF/yaml-plugins/<name>.json` | Manifest — action class, portability, capability |
 | `META-INF/yaml-plugins/<name>.schema.json` | JSON Schema from record fields |
-| `<Name>PluginAction.java` | `Action` implementation — constructs record, calls `@Execute` |
+| `<Name>PluginAction.java` | `Action` implementation |
 
 ### Annotation reference
 
 | Annotation | Target | Effect |
 |------------|--------|--------|
-| `@Plugin("name")` | Record class | Names the step, triggers APT generation |
-| `@Execute` | Method | Marks the execution method (exactly one) |
+| `@Plugin("name")` | Record class | Names the step, triggers APT |
+| `@Execute` | Method | Execution method (exactly one) |
 | `@Required` | Field | Must be present in YAML |
 | `@Optional` | Field | May be absent |
-
-Record field names become kebab-case YAML keys (`languageHint` → `language-hint`).
+| `streaming = true` | `@Plugin` | First `@Execute` param is pipeline input |
+| `absorbSiblings = true` | `@Plugin` | Unknown YAML keys passed as params |
 
 ### Maven setup
-
-Add the APT to the compiler:
 
 ```xml
 <annotationProcessorPaths>
@@ -98,30 +101,226 @@ Add the APT to the compiler:
 
 ---
 
-## How simulation makes this work
+## Testing — pure YAML, zero Java wiring
 
-The simulation layer wraps every registered step transparently. When a
-simulation is active and a corpus entry matches the inputs, the step returns
-the corpus response without calling the real backend. When no simulation is
-active, the real `@Execute` method runs.
+The `YamlTestEngine` auto-discovers everything on the classpath:
 
-This is not a test-mode flag. It's the same registration path — `AptPluginSource`
-loads the manifest, `SimulatingAction` wraps the action, and the runtime
-decides which path executes. The playbook YAML is identical in both cases.
+- **Plugins** — `AptPluginSource` scans `META-INF/yaml-plugins/*.json`
+- **Services** — `META-INF/yaml-services.yaml` maps SPI → implementation
+- **Simulation decorators** — `META-INF/simulation-decorators.properties` wraps services
 
-When the real action class can't be loaded (implementation SPI not on the
-classpath), the manifest still provides the step schema. The simulation layer
-handles execution. This is how test classpaths stay thin — they need the
-manifest JAR, not the implementation dependencies.
+A test suite is one Java file:
+
+```java
+@Suite
+@IncludeEngines("casehub-yaml")
+@SelectDirectories("src/test/playbooks")
+class ConnectorPlaybookSuite {}
+```
+
+Every `.test.yaml` under the directory runs automatically.
+
+### Service registration
+
+Drop `META-INF/yaml-services.yaml` in `src/test/resources/`:
+
+```yaml
+io.casehub.connectors.voice.spi.VoicePlatform: io.casehub.connectors.voice.ref.ReferenceVoicePlatform
+io.casehub.connectors.bank.spi.BankPlatform: io.casehub.connectors.bank.ref.RefBankPlatform
+```
+
+The test engine instantiates each implementation via no-arg constructor
+and registers it. Services registered this way are available to all
+`@Execute` method parameters via `ServiceRegistry` forwarding — per-test
+registries inherit from the base.
+
+### Service profiles
+
+Different profiles select different implementations or seeding
+configurations. Activate with a system property:
+
+```bash
+mvn test -Dcasehub.yaml.services.profile=integration
+```
+
+The engine loads `META-INF/yaml-services-integration.yaml` instead of
+the default `yaml-services.yaml`. No property = default file.
+
+```
+src/test/resources/META-INF/
+  yaml-services.yaml                  # default — lightweight ref impls
+  yaml-services-integration.yaml      # richer ref impls, full seed data
+  yaml-services-smoke.yaml            # minimal stubs for CI
+```
+
+Same YAML tests, different service configurations per profile.
+
+A test file can override the profile directly:
+
+```yaml
+services: integration
+
+tests:
+  - name: "full integration test"
+    steps:
+      - bank-balance:
+          account-id: acc-100
+        capture: balance
+```
+
+The `services:` key loads `yaml-services-integration.yaml` for that file,
+regardless of the system property. Per-file overrides inherit from the
+global registry — they add or replace, not reset.
+
+### Captures for precise assertions
+
+Playbook step outputs captured with `capture:` are available as named
+scopes in `PlaybookRunResult.captures()`:
+
+```yaml
+steps:
+  - tts-synthesise: "Hello"
+    capture: audio
+  - stt-transcribe: "${audio.audio-data}"
+    capture: roundTrip
+```
+
+Test assertions use precise scope paths, not flat-merged keys:
+
+```yaml
+tests:
+  - name: "round-trip preserves content"
+    steps:
+      - run-playbook: voice-interaction-patterns/01-voice-echo.playbook.yaml
+        capture: result
+      - assertThat: result.captures.roundTrip.text
+        equals: "Hello"
+      - assertThat: result.captures.audio.audio-format
+        equals: "wav"
+```
+
+---
+
+## Three execution modes
+
+The same YAML, same steps, same corpus format — one word switches the
+mode. The test author controls this from the `simulate:` block.
+
+### 1. No simulation — ref implementation executes
+
+```yaml
+tests:
+  - name: "real ref execution"
+    steps:
+      - bank-balance:
+          account-id: acc-100
+        capture: balance
+      - assertThat: balance.amount
+        not-null: true
+```
+
+The ref implementation registered via `yaml-services.yaml` executes.
+Whatever data is in its backend is what the step returns.
+
+### 2. Simulated — corpus-driven, no logic executes
+
+```yaml
+simulate:
+  methods:
+    bank-platform.get-balance:
+      strategy: sequential
+  corpus:
+    bank-platform.get-balance:
+      - input: { account-id: "acc-100" }
+        output: { account-id: "acc-100", amount: 1500.0, currency: "GBP" }
+
+tests:
+  - name: "simulated balance"
+    steps:
+      - bank-balance:
+          account-id: acc-100
+        capture: balance
+      - assertThat: balance.amount
+        equals: 1500.0
+```
+
+The simulation decorator intercepts the service call. The corpus entry
+is returned directly. The ref implementation is never called.
+
+Available strategies: `sequential`, `key-lookup`, `random`,
+`recorded-replay`, `nearest-match`.
+
+### 3. Reference — seed ref implementation, execute real logic
+
+```yaml
+simulate:
+  methods:
+    bank-platform.get-balance:
+      strategy: reference
+  corpus:
+    bank-platform.get-balance:
+      - input: { account-id: "acc-100" }
+        output: { account-id: "acc-100", amount: 1500.0, currency: "GBP" }
+
+tests:
+  - name: "seeded ref execution"
+    steps:
+      - bank-balance:
+          account-id: acc-100
+        capture: balance
+      - assertThat: balance.amount
+        equals: 1500.0
+```
+
+The corpus data seeds the ref implementation's backend via the `Seedable`
+interface. Then the real `@Execute` logic runs against the seeded data.
+Same corpus format as simulation — change `reference` to `sequential` to
+switch modes.
+
+Ref implementations opt into seeding:
+
+```java
+public class RefBankPlatform implements BankPlatform, Seedable {
+    @Override
+    public void seed(String qualifiedMethodName, List<Map<String, Object>> corpusOutputs) {
+        for (var entry : corpusOutputs) {
+            backend.addAccount(new Account(
+                (String) entry.get("account-id"),
+                ((Number) entry.get("amount")).doubleValue(),
+                (String) entry.get("currency")));
+        }
+    }
+}
+```
+
+### Mixed — selective simulation
+
+Simulate agents, use real ref implementations for connectors:
+
+```yaml
+simulate:
+  agent:
+    - prompt: "balance"
+      response: "BALANCE"
+```
+
+Only the agent is simulated. Voice, bank, email steps use their ref
+implementations.
+
+### What each mode tests
+
+| Mode | What it tests | When to use |
+|------|--------------|-------------|
+| No simulation | Plugin wiring + SPI contract | Verify connector logic |
+| Simulated | Playbook orchestration flow | Verify step ordering, captures, conditions |
+| Reference | SPI contract with known data | Verify ref implementation against corpus |
+| Mixed | Connector integration without LLM | End-to-end without API costs |
 
 ---
 
 ## Multi-operation steps with compact form
 
-Some domains group related operations under one step name. The `bank` step
-handles `balance`, `transactions`, and `accounts` as sub-operations.
-
-### Compact YAML syntax
+Some domains group related operations under one step name:
 
 ```yaml
 - bank balance: "acc-100"
@@ -133,42 +332,14 @@ handles `balance`, `transactions`, and `accounts` as sub-operations.
 ```
 
 The Walker splits `bank balance` at the space — `bank` is the plugin name,
-`balance` becomes the primary input. The scalar value `"acc-100"` goes into
-`_value`.
-
-### Implementing multi-operation plugins
-
-Use `Definition.of()` with `.absorbSiblings(true)` when the step dispatches
-on an operation parameter:
-
-```java
-public static Definition definition(BankPlatform bankPlatform) {
-    return Definition.of("bank")
-            .description("Bank operations — balance, transactions, accounts")
-            .input("operation", ParameterType.STRING, true)
-            .absorbSiblings(true)
-            .execute((params, services) -> {
-                String operation = (String) params.get("operation");
-                return switch (operation) {
-                    case "balance"      -> balance(params, bankPlatform);
-                    case "transactions" -> transactions(params, bankPlatform);
-                    case "accounts"     -> accounts(bankPlatform);
-                    default -> Result.failed("Unknown: " + operation);
-                };
-            })
-            .build();
-}
-```
-
-Registration is manual for `Definition.of()` — call `registry.register()` from
-a CDI startup bean.
+`balance` becomes the primary input. Use `absorbSiblings = true` on the
+`@Plugin` annotation.
 
 ---
 
 ## YAML definitions (zero Java)
 
-When a step wraps an existing API endpoint and needs no custom logic, define it
-in YAML. No Java required.
+When a step wraps an existing API endpoint and needs no custom logic:
 
 ```yaml
 # src/main/resources/definitions/crm-actions.yaml
@@ -178,89 +349,9 @@ actions:
     inputs:
       customerId: { type: string, required: true }
     invoke: { rest: GET /api/customers/${customerId} }
-
-  create-ticket:
-    description: Create a support ticket
-    inputs:
-      customerId: { type: string, required: true }
-      subject:    { type: string, required: true }
-      priority:   { type: string, default: "normal" }
-    invoke: { rest: POST /api/tickets }
 ```
 
-### Supported invoke bindings
-
-| Binding | Syntax | What it does |
-|---------|--------|-------------|
-| `rest` | `{ rest: METHOD /path }` | HTTP request |
-| `graphql` | `{ graphql: queryName }` | GraphQL query or mutation |
-| `mcp` | `{ mcp: tool-name }` | MCP tool invocation |
-| `agent` | `{ agent: prompt }` | Single-shot agent call |
-| `process` | `{ process: command }` | Subprocess execution |
-
-Register the file path in a `YamlDefinitionSource` CDI producer. Steps get
-simulation wrapping, input validation, and namespace support automatically.
-
-Same YAML in playbooks and tests — same principle as `@Plugin` steps.
-
----
-
-## Other registration paths
-
-These exist for specific situations. Prefer `@Plugin` + APT for new steps.
-
-**`Definition.of()` builder** — programmatic registration. Use when the step
-needs CDI-injected dependencies or multi-operation dispatch (see compact form
-section above). Manual `registry.register()` required.
-
-**CDI `PluginScanner`** — runtime scanning of `@Plugin` records without APT.
-Use when the APT processor isn't on the compile classpath. Same record, same
-annotations — discovered at startup instead of compile time.
-
-```java
-var scanner = new PluginScanner();
-scanner.scanAndRegister(MyPlugin.class, registry);
-```
-
----
-
-## Testing
-
-### Playbook tests with simulation
-
-```yaml
-simulate:
-  bank-balance:
-    - input: { accountId: "acc-100" }
-      output: { accountId: "acc-100", amount: 1500.0, currency: "EUR" }
-  chat-send:
-    - input: { channel: "family" }
-      output: { ok: true }
-
-tests:
-  - name: "balance check and alert"
-    steps:
-      - bank-balance:
-          accountId: acc-100
-        capture: balance
-      - chat-send:
-          channel: family
-          message: "Balance: ${balance.amount}"
-```
-
-No `BankPlatform`, no `ChatPlatform` on the test classpath. The manifest
-provides the step schema; the `simulate:` block provides the responses.
-
-### Unit testing the plugin record directly
-
-```java
-@Test
-void balanceLookup() {
-    var plugin = new BankBalancePlugin("acc-100", "user-1");
-    var result = plugin.execute(mockBankPlatform);
-    assertThat(result.output().get("amount")).isEqualTo(1500.0);
-}
-```
+Supported invoke bindings: `rest`, `graphql`, `mcp`, `agent`, `process`.
 
 ---
 
@@ -269,6 +360,6 @@ void balanceLookup() {
 | What you're doing | Dependencies needed |
 |-------------------|---------------------|
 | `@Plugin` + APT | `yaml-plugin-api` (compile) + `yaml-plugin-processor` (APT) |
-| YAML definitions | `yaml-plugin-api` + `yaml-step-runtime` |
-| `Definition.of()` | `yaml-plugin-api` |
-| Testing with simulation | `simulation-starter` (test scope) |
+| Pure YAML testing | `yaml-test` (test) + `simulation-starter` (test) |
+| Service registration | `yaml-services.yaml` in `src/test/resources/META-INF/` |
+| Seedable ref impl | `simulation-api` (compile) — implements `Seedable` |

@@ -24,6 +24,7 @@ public class SimulationRuntime {
     private final ConcurrentHashMap<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<SimulationOverlay> overlayStack = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<String, CorpusSelector> corpusSelectors = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Seedable> seedables = new ConcurrentHashMap<>();
     private       ProfileSource                           profileSource;
     private volatile double                               globalSpeed;
 
@@ -48,6 +49,10 @@ public class SimulationRuntime {
 
     public <I> void registerScorer(final String qualifiedName, final SimilarityScorer<I> scorer) {
         scorers.put(qualifiedName, scorer);
+    }
+
+    public void registerSeedable(final String spiPrefix, final Seedable seedable) {
+        seedables.put(spiPrefix, seedable);
     }
 
     public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(final String qualifiedName) {
@@ -168,6 +173,7 @@ public class SimulationRuntime {
             case "rand" -> "random";
             case "replay" -> "recorded-replay";
             case "nearest" -> "nearest-match";
+            case "ref" -> "reference";
             default -> name;
         };
     }
@@ -202,6 +208,11 @@ public class SimulationRuntime {
                 final SimilarityScorer scorer = requireScorer(qualifiedName);
                 final double threshold = effectiveConfig.threshold(qualifiedName).orElse(0.0);
                 yield new NearestMatchStrategy<>(effectiveCorpus, qualifiedName, scorer, threshold);
+            }
+            case "reference" -> {
+                String spiPrefix = qualifiedName.contains(".") ? qualifiedName.substring(0, qualifiedName.indexOf('.')) : qualifiedName;
+                Seedable seedable = seedables.get(spiPrefix);
+                yield new io.casehub.platform.simulation.strategy.ReferenceStrategy<>(effectiveCorpus, qualifiedName, seedable);
             }
             default -> throw new SimulationConfigException(
                     "Unknown strategy '" + strategyName + "' for " + qualifiedName);

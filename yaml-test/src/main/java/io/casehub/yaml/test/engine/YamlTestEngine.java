@@ -89,19 +89,25 @@ public class YamlTestEngine implements TestEngine {
         pluginRegistry.register(RunPlaybookPlugin.definition());
         pluginRegistry.register(VerifySimulationPlugin.definition());
         pluginRegistry.register(ValidatePlaybookPlugin.definition());
+        new io.casehub.yaml.step.catalog.AptPluginSource(new com.fasterxml.jackson.databind.ObjectMapper())
+                .populate(pluginRegistry);
         var serviceRegistry = new MapServiceRegistry();
         serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
                                  new io.casehub.yaml.test.DotPathExpressionEngine());
+        discoverServices(serviceRegistry);
 
         var simulationRuntime = new io.casehub.platform.simulation.SimulationRuntime(
                 io.casehub.platform.simulation.MapSimulationConfig.builder().build(),
                 new io.casehub.platform.simulation.inmem.InMemorySimulationCorpus<>());
+        wrapWithSimulationDecorators(serviceRegistry, simulationRuntime);
 
         for (var child : root.getChildren()) {
             if (child instanceof YamlFileDescriptor fileDesc) {
-                executeMultiTestFile(fileDesc, listener, pluginRegistry, serviceRegistry, simulationRuntime);
+                var effectiveRegistry = resolveFileServices(fileDesc.testFileDescriptor(), serviceRegistry);
+                executeMultiTestFile(fileDesc, listener, pluginRegistry, effectiveRegistry, simulationRuntime);
             } else if (child instanceof YamlCaseDescriptor caseDesc && caseDesc.fileDescriptor() != null) {
-                executeSingleTestFile(caseDesc, listener, pluginRegistry, serviceRegistry, simulationRuntime);
+                var effectiveRegistry = resolveFileServices(caseDesc.fileDescriptor(), serviceRegistry);
+                executeSingleTestFile(caseDesc, listener, pluginRegistry, effectiveRegistry, simulationRuntime);
             }
         }
 
@@ -198,13 +204,105 @@ public class YamlTestEngine implements TestEngine {
     }
 
     private static CompositePluginRegistry createFilePluginRegistry(CompositePluginRegistry base) {
-        var fileRegistry = new CompositePluginRegistry();
-        fileRegistry.register(AssertThatPlugin.definition());
-        fileRegistry.register(EmitEventPlugin.definition());
-        fileRegistry.register(RunPlaybookPlugin.definition());
-        fileRegistry.register(VerifySimulationPlugin.definition());
-        fileRegistry.register(ValidatePlaybookPlugin.definition());
-        return fileRegistry;
+        return base;
+    }
+
+    private static MapServiceRegistry resolveFileServices(
+            io.casehub.yaml.test.TestFileDescriptor fileDesc,
+            MapServiceRegistry baseRegistry) {
+        String fileProfile = fileDesc.servicesProfile();
+        if (fileProfile == null || fileProfile.isEmpty()) {
+            return baseRegistry;
+        }
+        var child = new MapServiceRegistry(baseRegistry);
+        discoverServices(child, fileProfile);
+        return child;
+    }
+
+
+    private static void discoverServices(MapServiceRegistry registry) {
+        String profile = System.getProperty("casehub.yaml.services.profile");
+        discoverServices(registry, profile);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void discoverServices(MapServiceRegistry registry, String profile) {
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper(
+                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
+            var cl = Thread.currentThread().getContextClassLoader();
+            String filename = (profile != null && !profile.isEmpty())
+                    ? "META-INF/yaml-services-" + profile + ".yaml"
+                    : "META-INF/yaml-services.yaml";
+            var urls = cl.getResources(filename);
+            while (urls.hasMoreElements()) {
+                try (var stream = urls.nextElement().openStream()) {
+                    var mappings = (java.util.Map<String, String>) mapper.readValue(stream, java.util.Map.class);
+                    if (mappings == null) {continue;}
+                    for (var entry : mappings.entrySet()) {
+                        Class<?> spiType = Class.forName(entry.getKey(), true, cl);
+                        Object instance = Class.forName(entry.getValue(), true, cl)
+                                               .getDeclaredConstructor().newInstance();
+                        registry.register((Class) spiType, instance);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                    .log(java.util.logging.Level.WARNING, "Failed to load yaml-services.yaml", e);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void wrapWithSimulationDecorators(MapServiceRegistry registry,
+                                                     io.casehub.platform.simulation.SimulationRuntime runtime) {
+        try {
+            var cl    = Thread.currentThread().getContextClassLoader();
+            var urls  = cl.getResources("META-INF/simulation-decorators.properties");
+            var props = new java.util.Properties();
+            while (urls.hasMoreElements()) {
+                try (var stream = urls.nextElement().openStream()) {
+                    props.load(stream);
+                }
+            }
+            for (var entry : props.entrySet()) {
+                String spiClassName       = (String) entry.getKey();
+                String decoratorClassName = (String) entry.getValue();
+                try {
+                    Class    spiType        = Class.forName(spiClassName, true, cl);
+                    Object   service        = registry.lookup(spiType);
+                    Class<?> decoratorClass = Class.forName(decoratorClassName, true, cl);
+                    Object decorator = decoratorClass
+                                               .getDeclaredConstructor(spiType, io.casehub.platform.simulation.SimulationRuntime.class)
+                                               .newInstance(service, runtime);
+                    registry.register(spiType, decorator);
+                    if (service instanceof io.casehub.platform.simulation.Seedable seedable) {
+                        String spiPrefix = toKebabCase(spiType.getSimpleName());
+                        runtime.registerSeedable(spiPrefix, seedable);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                } catch (Exception e) {
+                    java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                            .log(java.util.logging.Level.FINE, "Skipping simulation decorator for " + spiClassName, e);
+                }
+            }
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                    .log(java.util.logging.Level.WARNING, "Failed to load simulation-decorators.properties", e);
+        }
+    }
+
+    private static String toKebabCase(String name) {
+        var sb = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (Character.isUpperCase(c) && i > 0) {
+                sb.append('-').append(Character.toLowerCase(c));
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        return sb.toString();
     }
 
 

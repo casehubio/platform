@@ -53,6 +53,21 @@ class PlaybookRunnerCoreTest {
     }
 
     @Test
+    void capturesAreExposedInRunResult() {
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.captures()).isNotEmpty();
+        assertThat(result.captures()).containsKey("result");
+        assertThat(result.captures()).containsKey("result2");
+        assertThat(result.captures().get("result")).containsEntry("text", "hello");
+        assertThat(result.captures().get("result2")).containsEntry("text", "world");
+    }
+
+
+    @Test
     void runPlaybookWithParamsPassesVars() {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
                 PLAYBOOK_ROOT, null);

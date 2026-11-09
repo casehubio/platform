@@ -40,7 +40,14 @@ public class PluginScanner {
         Method executeMethod = findExecuteMethod(pluginClass);
         Map<String, Parameter> inputs = buildInputs(pluginClass);
 
-        Action action = createAction(pluginClass, executeMethod, inputs);
+        String streamingInputKey = null;
+        if (annotation.streaming()) {
+            streamingInputKey = primaryInputKey(inputs);
+            if (streamingInputKey == null) {
+                streamingInputKey = "_value";
+            }
+        }
+        Action action = createAction(pluginClass, executeMethod, inputs, streamingInputKey);
         java.util.Optional<StreamingTypeInfo> streamingType = java.util.Optional.empty();
         if (annotation.streaming()) {
             streamingType = buildStreamingTypeInfo(pluginClass, executeMethod);
@@ -73,12 +80,12 @@ public class PluginScanner {
     }
 
     private Action createAction(Class<?> pluginClass, Method executeMethod,
-                                Map<String, Parameter> inputs) {
+                                Map<String, Parameter> inputs, String streamingInputKey) {
         return (params, services) -> {
             try {
                 RecordComponent[] components = pluginClass.getRecordComponents();
-                Object[] args = new Object[components.length];
-                Class<?>[] ctorTypes = new Class<?>[components.length];
+                Object[]          args       = new Object[components.length];
+                Class<?>[]        ctorTypes  = new Class<?>[components.length];
 
                 for (int i = 0; i < components.length; i++) {
                     ctorTypes[i] = components[i].getType();
@@ -86,23 +93,46 @@ public class PluginScanner {
                     args[i] = extractParam(params, key, components[i].getType());
                 }
 
-                Constructor<?> ctor = pluginClass.getDeclaredConstructor(ctorTypes);
-                Object instance = ctor.newInstance(args);
+                Constructor<?> ctor     = pluginClass.getDeclaredConstructor(ctorTypes);
+                Object         instance = ctor.newInstance(args);
 
                 Class<?>[] execParamTypes = executeMethod.getParameterTypes();
-                Object[] execArgs = new Object[execParamTypes.length];
+                Object[]   execArgs       = new Object[execParamTypes.length];
                 for (int i = 0; i < execParamTypes.length; i++) {
-                    if (services != null) {
+                    if (i == 0 && streamingInputKey != null) {
+                        execArgs[i] = extractParam(params, streamingInputKey, execParamTypes[i]);
+                    } else if (services != null) {
                         execArgs[i] = services.lookup(execParamTypes[i]);
                     }
                 }
 
-                return (Result) executeMethod.invoke(instance, execArgs);
+                Object rawResult = executeMethod.invoke(instance, execArgs);
+                if (rawResult instanceof Result r) {
+                    return r;
+                }
+                if (rawResult != null && rawResult.getClass().isRecord()) {
+                    var map = new LinkedHashMap<String, Object>();
+                    for (var rc : rawResult.getClass().getRecordComponents()) {
+                        map.put(toKebabCase(rc.getName()), rc.getAccessor().invoke(rawResult));
+                    }
+                    return Result.of(map);
+                }
+                return Result.of(Map.of("_output", rawResult));
             } catch (Exception e) {
                 return Result.failed("Plugin execution failed: " + e.getMessage());
             }
         };
     }
+
+    private static String primaryInputKey(Map<String, Parameter> inputs) {
+        for (var entry : inputs.entrySet()) {
+            if (entry.getValue().required()) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private java.util.Optional<StreamingTypeInfo> buildStreamingTypeInfo(Class<?> pluginClass, Method executeMethod) {

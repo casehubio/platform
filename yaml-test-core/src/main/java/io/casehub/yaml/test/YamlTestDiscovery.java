@@ -57,6 +57,7 @@ public final class YamlTestDiscovery {
             List<Map<String, Object>> fileTeardown  = (List<Map<String, Object>>) doc.get("teardown");
             Map<String, Object>       varsBlock     = (Map<String, Object>) doc.get("vars");
             Map<String, Object>       paramsBlock   = (Map<String, Object>) doc.get("params");
+            String                    servicesProfile = (String) doc.get("services");
 
             List<TestCase> testCases;
             if (doc.containsKey("tests")) {
@@ -76,7 +77,7 @@ public final class YamlTestDiscovery {
             }
 
             return new TestFileDescriptor(name, file, simulateBlock, fileSetup, fileTeardown,
-                                          testCases, varsBlock, paramsBlock);
+                                          testCases, varsBlock, paramsBlock, servicesProfile);
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse test file: " + file, e);
         }

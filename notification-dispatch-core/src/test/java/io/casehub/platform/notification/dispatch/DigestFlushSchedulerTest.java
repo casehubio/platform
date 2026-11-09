@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -110,6 +112,43 @@ class DigestFlushSchedulerTest {
         assertThat(emailDeliverer.received).isEmpty();
     }
 
+    static Stream<NotificationPreferences> preferencesWithoutDigestSchedule() {
+        return Stream.of(null,
+                new NotificationPreferences(USER, TENANT, Map.of(), null, Instant.now()),
+                new NotificationPreferences(USER, TENANT,
+                        Map.of(DeliveryChannels.EMAIL,
+                                new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
+                        null, Instant.now()));
+    }
+
+    @ParameterizedTest
+    @MethodSource("preferencesWithoutDigestSchedule")
+    void processKey_usesChannelDefaultWhenUserScheduleAbsent(NotificationPreferences preferences) {
+        preferenceStore.prefs = preferences;
+        buffer.add(EMAIL_KEY, sampleInput("Wait for default schedule"));
+        Instant oldest = buffer.oldestPendingTimestamp(EMAIL_KEY).orElseThrow();
+
+        scheduler.processKey(EMAIL_KEY, oldest.plus(1, ChronoUnit.MINUTES));
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);
+
+        scheduler.processKey(EMAIL_KEY, oldest.plus(4, ChronoUnit.HOURS));
+        assertThat(emailDeliverer.received).hasSize(1);
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isZero();
+    }
+
+    @Test
+    void processKey_userScheduleOverridesChannelDefault() {
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        new DigestSchedule.Interval(Duration.ofMinutes(1)), null)), null, Instant.now());
+        buffer.add(EMAIL_KEY, sampleInput("Use user schedule"));
+        Instant oldest = buffer.oldestPendingTimestamp(EMAIL_KEY).orElseThrow();
+
+        scheduler.processKey(EMAIL_KEY, oldest.plus(1, ChronoUnit.MINUTES));
+        assertThat(emailDeliverer.received).hasSize(1);
+    }
+
     @Test
     void tick_defersWhenSnoozed() {
         buffer.add(EMAIL_KEY, sampleInput("Notification 1"));
@@ -149,7 +188,9 @@ class DigestFlushSchedulerTest {
     @Test
     void tick_drainsOrphansWhenScheduleRemoved() {
         buffer.add(EMAIL_KEY, sampleInput("Orphaned item"));
-        // User has no digest schedule anymore
+        // Neither the user nor the channel has a digest schedule anymore.
+        channelRegistry.register(new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                true, true, NotificationSeverity.INFO, null, null, null), emailDeliverer);
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
                 null, Instant.now());
@@ -232,7 +273,9 @@ class DigestFlushSchedulerTest {
         scheduler.processKey(EMAIL_KEY, duringQH);
         assertThat(emailDeliverer.received).isEmpty();
 
-        // Step 2: user removes digest schedule while still in quiet hours
+        // Step 2: user and channel schedules are removed while still in quiet hours.
+        channelRegistry.register(new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                true, true, NotificationSeverity.INFO, null, null, null), emailDeliverer);
         preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
                 Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO, null, null)),
                 qh, Instant.now());

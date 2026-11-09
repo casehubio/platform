@@ -68,7 +68,10 @@ public class DigestFlushScheduler {
             quietHoursDeferredKeys.remove(key);
             return;
         }
-        DigestSchedule schedule = channelPreference.map(ChannelPreference::digestSchedule).orElse(null);
+        DigestSchedule schedule = channelPreference.map(ChannelPreference::digestSchedule)
+                .orElseGet(() -> channelRegistry.resolve(key.channelId())
+                        .map(DeliveryChannelDescriptor::defaultDigestSchedule)
+                        .orElse(null));
 
         if (schedule == null) {
             LOG.debugf("Orphan drain for key %s — schedule removed", key);

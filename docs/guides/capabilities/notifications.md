@@ -2,6 +2,7 @@
 capability: notifications
 audience: consumer
 repo: casehub-platform
+verified-current: 2026-11-09
 anchors:
   classes:
     - io.casehub.platform.notification.dispatch.NotificationDispatcher
@@ -72,6 +73,8 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 **DestinationScope:** `PER_USER` (email, SMS, WhatsApp) or `PER_TENANT` (future -- Slack, Teams).
 
 ## Digest System
+
+Before flushing a pending digest, the scheduler checks the current channel enablement: an explicit user preference takes precedence over the channel's `defaultEnabled` setting. Disabled channels retain their buffered notifications, subject to normal retention and buffer limits. Re-enabling a channel makes that buffer eligible for delivery under the current scheduling and suppression rules; disabling also clears any earlier quiet-hours deferral.
 
 Configurable digest schedules via `DigestSchedule` sealed interface:
 - `DigestSchedule.Interval(Duration period)` -- fixed period (minimum 1 minute)

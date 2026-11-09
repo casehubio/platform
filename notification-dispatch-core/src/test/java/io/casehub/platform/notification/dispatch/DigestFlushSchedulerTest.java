@@ -29,6 +29,8 @@ import io.casehub.platform.api.notification.settings.SuppressionStore;
 import io.casehub.platform.delivery.digest.inmem.InMemoryDigestBuffer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -263,6 +265,78 @@ class DigestFlushSchedulerTest {
 
         assertThat(emailDeliverer.received).hasSize(1);
         assertThat(emailDeliverer.received.get(0).groupBy()).isEqualTo(DigestGroupBy.CATEGORY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void disabledChannelRetainsDigestUntilReenabled(boolean hasSchedule) {
+        buffer.add(EMAIL_KEY, sampleInput("Queued while enabled"));
+        var schedule = hasSchedule ? new DigestSchedule.Interval(Duration.ofHours(4)) : null;
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(false, NotificationSeverity.INFO,
+                        schedule, null)), null, Instant.now());
+        Instant due = buffer.oldestPendingTimestamp(EMAIL_KEY).orElseThrow().plus(5, ChronoUnit.HOURS);
+
+        scheduler.processKey(EMAIL_KEY, due);
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);
+
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        schedule, null)), null, Instant.now());
+        scheduler.processKey(EMAIL_KEY, due);
+        assertThat(emailDeliverer.received).hasSize(1);
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void channelDisabledByDefaultRetainsDigestWithoutUserOverride(boolean hasPreferences) {
+        channelRegistry.register(new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                true, false, NotificationSeverity.INFO, null, null, null), emailDeliverer);
+        preferenceStore.prefs = hasPreferences
+                ? new NotificationPreferences(USER, TENANT, Map.of(), null, Instant.now()) : null;
+        buffer.add(EMAIL_KEY, sampleInput("Channel now disabled"));
+
+        scheduler.processKey(EMAIL_KEY, Instant.now().plus(5, ChronoUnit.HOURS));
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);
+    }
+
+    @Test
+    void explicitUserEnablementOverridesDisabledChannelDefault() {
+        channelRegistry.register(new DeliveryChannelDescriptor(DeliveryChannels.EMAIL, "Email",
+                true, false, NotificationSeverity.INFO, null, null, null), emailDeliverer);
+        buffer.add(EMAIL_KEY, sampleInput("User enabled channel"));
+
+        scheduler.processKey(EMAIL_KEY, Instant.now().plus(5, ChronoUnit.HOURS));
+        assertThat(emailDeliverer.received).hasSize(1);
+    }
+
+    @Test
+    void disablingChannelClearsQuietHoursDeferral() {
+        buffer.add(EMAIL_KEY, sampleInput("Deferred before disabling"));
+        var schedule = new DigestSchedule.Interval(Duration.ofHours(4));
+        var quietHours = new QuietHours(LocalTime.of(22, 0), LocalTime.of(7, 0), ZoneId.of("UTC"),
+                QuietHoursAction.BUFFER_FOR_DIGEST);
+        Instant duringQuietHours = LocalDate.of(2026, 1, 1).atTime(23, 0).atZone(ZoneId.of("UTC")).toInstant();
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        schedule, null)), quietHours, Instant.now());
+        scheduler.processKey(EMAIL_KEY, duringQuietHours);
+
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(false, NotificationSeverity.INFO,
+                        schedule, null)), quietHours, Instant.now());
+        scheduler.processKey(EMAIL_KEY, duringQuietHours);
+
+        preferenceStore.prefs = new NotificationPreferences(USER, TENANT,
+                Map.of(DeliveryChannels.EMAIL, new ChannelPreference(true, NotificationSeverity.INFO,
+                        schedule, null)), null, Instant.now());
+        scheduler.processKey(EMAIL_KEY, buffer.oldestPendingTimestamp(EMAIL_KEY).orElseThrow()
+                .plus(1, ChronoUnit.MINUTES));
+        assertThat(emailDeliverer.received).isEmpty();
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);
     }
 
     // --- helpers ---

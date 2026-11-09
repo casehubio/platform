@@ -4,6 +4,8 @@ import io.casehub.platform.api.preferences.IntPreference;
 import io.casehub.platform.api.preferences.PlatformPreferenceKeys;
 import io.casehub.platform.delivery.channel.inmem.InMemoryDeliveryChannelRegistry;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.delivery.DeliveryAttempt;
 import io.casehub.platform.api.delivery.DeliveryChannelDescriptor;
 import io.casehub.platform.api.delivery.DeliveryChannels;
 import io.casehub.platform.api.delivery.DeliveryResult;
@@ -27,6 +29,7 @@ import io.casehub.platform.api.notification.settings.Snooze;
 import io.casehub.platform.api.notification.settings.SnoozeInput;
 import io.casehub.platform.api.notification.settings.SuppressionStore;
 import io.casehub.platform.delivery.digest.inmem.InMemoryDigestBuffer;
+import io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,6 +48,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DigestFlushSchedulerTest {
 
@@ -81,7 +85,7 @@ class DigestFlushSchedulerTest {
                 null, Instant.now());
 
         var deliveryAttemptStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore(10000);
-        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
         var deliveryTracker = new DeliveryTracker(deliveryAttemptStore, objectMapper, Duration.ofSeconds(30));
 
@@ -270,18 +274,18 @@ class DigestFlushSchedulerTest {
     @Test
     void trackingFailureKeepsDigestBufferedAndDoesNotSend() {
         buffer.add(EMAIL_KEY, sampleInput("Keep me"));
-        var failingStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore() {
+        var failingStore = new InMemoryDeliveryAttemptStore() {
             @Override
-            public void store(io.casehub.platform.api.delivery.DeliveryAttempt attempt) {
+            public void store(DeliveryAttempt attempt) {
                 throw new IllegalStateException("Tracking unavailable");
             }
         };
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var mapper = new ObjectMapper().findAndRegisterModules();
         var failingScheduler = new DigestFlushScheduler(buffer, preferenceStore, suppressionStore,
                 new SuppressionEvaluator(), channelRegistry,
                 new DeliveryTracker(failingStore, mapper, Duration.ofSeconds(30)));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        assertThatThrownBy(() ->
                 failingScheduler.processKey(EMAIL_KEY, Instant.now().plus(5, ChronoUnit.HOURS)))
                 .isInstanceOf(IllegalStateException.class).hasMessage("Tracking unavailable");
         assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);

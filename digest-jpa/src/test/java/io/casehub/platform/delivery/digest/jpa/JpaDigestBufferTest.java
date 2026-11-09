@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -221,7 +222,7 @@ class JpaDigestBufferTest {
         buffer.add(KEY, sampleInput("Keep me"));
         var tracker = new DeliveryTracker(attempts, mapper, Duration.ofSeconds(30));
         var now = Instant.now();
-        var attemptId = new java.util.concurrent.atomic.AtomicReference<String>();
+        var attemptId = new AtomicReference<String>();
 
         assertThatThrownBy(() -> buffer.drain(KEY, items -> {
             var prepared = tracker.preRecordDigest(KEY.channelId(),

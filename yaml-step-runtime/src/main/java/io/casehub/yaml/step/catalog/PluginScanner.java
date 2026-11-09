@@ -45,7 +45,7 @@ public class PluginScanner {
         if (annotation.streaming()) {
             streamingType = buildStreamingTypeInfo(pluginClass, executeMethod);
         }
-        registry.register(new Definition(name, description, inputs, Map.of(), portability, action, capability, streamingType));
+        registry.register(new Definition(name, description, inputs, Map.of(), portability, action, capability, streamingType, annotation.absorbSiblings()));
     }
 
     private Method findExecuteMethod(Class<?> pluginClass) {

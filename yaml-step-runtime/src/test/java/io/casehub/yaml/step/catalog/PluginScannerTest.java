@@ -67,4 +67,25 @@ class PluginScannerTest {
         assertThat(registry.resolve("universal-plugin").get().portability())
                 .isEqualTo(Portability.UNIVERSAL);
     }
+
+    @Test
+    void propagatesAbsorbSiblingsFromAnnotation() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.AbsorbingPlugin.class, registry);
+
+        var def = registry.resolve("absorbing-plugin").orElseThrow();
+        assertThat(def.absorbSiblings()).isTrue();
+    }
+
+    @Test
+    void absorbSiblingsDefaultsToFalse() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(TestPlugin.class, registry);
+
+        var def = registry.resolve("test-plugin").orElseThrow();
+        assertThat(def.absorbSiblings()).isFalse();
+    }
+
 }

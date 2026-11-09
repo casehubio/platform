@@ -5,7 +5,18 @@ import java.util.Map;
 
 public class MapServiceRegistry implements ServiceRegistry {
 
+
+    private final ServiceRegistry       parent;
     private final Map<Class<?>, Object> services = new HashMap<>();
+
+
+    public MapServiceRegistry() {
+        this.parent = null;
+    }
+
+    public MapServiceRegistry(ServiceRegistry parent) {
+        this.parent = parent;
+    }
 
     public <T> MapServiceRegistry register(Class<T> type, T instance) {
         services.put(type, instance);
@@ -16,10 +27,13 @@ public class MapServiceRegistry implements ServiceRegistry {
     @SuppressWarnings("unchecked")
     public <T> T lookup(Class<T> serviceType) {
         Object service = services.get(serviceType);
-        if (service == null) {
-            throw new IllegalArgumentException(
-                    "No service registered for " + serviceType.getName());
+        if (service != null) {
+            return (T) service;
         }
-        return (T) service;
+        if (parent != null) {
+            return parent.lookup(serviceType);
+        }
+        throw new IllegalArgumentException(
+                "No service registered for " + serviceType.getName());
     }
 }

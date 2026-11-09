@@ -1,6 +1,5 @@
 package io.casehub.yaml.test;
 
-import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 import io.casehub.platform.simulation.SimulationOverlay;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.core.resolver.VariableResolver;
@@ -79,12 +78,8 @@ public final class YamlTestExecutor {
         long         start        = System.nanoTime();
         EventCapture eventCapture = new EventCapture();
 
-        var testServices = new MapServiceRegistry();
+        var testServices = new MapServiceRegistry(baseServiceRegistry);
         testServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
-        try {
-            testServices.register(ExpressionEngineRegistry.class,
-                                  baseServiceRegistry.lookup(ExpressionEngineRegistry.class));
-        } catch (IllegalArgumentException ignored) {}
 
         var testContext = new TestExecutionContext(pluginRegistry, testServices, resourceRoot, null, simulationRuntime);
         testServices.register(TestExecutionContext.class, testContext);
@@ -187,7 +182,7 @@ public final class YamlTestExecutor {
     private void runLifecycleSteps(List<Map<String, Object>> steps, String context) {
         if (steps == null || steps.isEmpty()) return;
 
-        var lifecycleServices = new MapServiceRegistry();
+        var lifecycleServices = new MapServiceRegistry(baseServiceRegistry);
         var eventCapture = new EventCapture();
         lifecycleServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
 

@@ -107,7 +107,7 @@ public final class PlaybookRunnerCore {
                         eventCapture.all(), Map.of(), null);
             }
 
-            var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry();
+            var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
             runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
 
             List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);

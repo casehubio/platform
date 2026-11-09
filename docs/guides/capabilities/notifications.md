@@ -61,7 +61,7 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 **SubscribableEvent interface:** Compile-time contract for subscription POJOs. Must implement `type()` (reverse-DNS event type string, e.g. `"io.casehub.work.workitem.completed"`) and `tenancyId()`. POJOs not implementing this interface are silently rejected by the subscription engine.
 
-**SubscriptionScope:** `USER` (per-user subscriptions) or `SYSTEM` (admin-managed, system-wide subscriptions with admin authorization).
+**SubscriptionScope:** `USER` (per-user subscriptions) or `SYSTEM` (admin-managed, system-wide subscriptions with admin authorization). `SubscriptionService` enforces the same invariants on create and update (PATCH): every filter expression must pass `ExpressionEngineRegistry.validate()`, and a `SYSTEM` subscription must keep explicit targets and must not use `$me` filters. Updates are checked against the effective post-patch subscription and rejected with `IllegalArgumentException` before anything is persisted.
 
 **Event type glob matching:** Subscription `eventType` fields support prefix patterns (e.g. `"io.casehub.work.*"`) for matching groups of event types.
 

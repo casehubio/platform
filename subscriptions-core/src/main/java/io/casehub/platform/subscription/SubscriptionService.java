@@ -53,15 +53,7 @@ public class SubscriptionService {
             if (!principal.hasGroup(SubscriptionConstants.SYSTEM_SUBSCRIPTION_ADMIN_GROUP)) {
                 throw new SecurityException("SYSTEM scope requires admin group membership");
             }
-            if (input.targets() == null || input.targets().isEmpty()) {
-                throw new IllegalArgumentException("SYSTEM scope requires explicit targets");
-            }
-            for (var filter : input.filters()) {
-                String expr = extractExpression(filter);
-                if (expr.contains("$me")) {
-                    throw new IllegalArgumentException("$me filter not allowed for SYSTEM scope");
-                }
-            }
+            validateSystemInvariants(input.targets(), input.filters());
         }
 
         final var targets = (effectiveScope != SubscriptionScope.SYSTEM
@@ -81,13 +73,7 @@ public class SubscriptionService {
                 input.enabled(),
                 effectiveScope
         );
-        for (var filter : securedInput.filters()) {
-            try {
-                expressionRegistry.validate(filter.type(), extractExpression(filter));
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);
-            }
-        }
+        validateFilters(securedInput.filters());
 
         return store.store(securedInput);
     }
@@ -119,7 +105,9 @@ public class SubscriptionService {
         if (opt.isEmpty()) {
             return Optional.empty();
         }
-        checkSystemAccess(opt.get().scope());
+        var existing = opt.get();
+        checkSystemAccess(existing.scope());
+        validateUpdate(existing, update);
         return store.update(id, principal.actorId(), principal.tenancyId(), update);
     }
 
@@ -159,6 +147,52 @@ public class SubscriptionService {
         checkSystemAccess(opt.get().scope());
         return store.update(id, principal.actorId(), principal.tenancyId(),
                             new SubscriptionUpdate(null, null, null, null, null, null, false));
+    }
+
+    /**
+     * Applies the create-time invariants to the effective post-update subscription, so a
+     * PATCH can never persist state that {@link #create(SubscriptionInput)} would reject.
+     */
+    private void validateUpdate(Subscription existing, SubscriptionUpdate update) {
+        if (update == null) {
+            return;
+        }
+        if (update.filters() != null) {
+            validateFilters(update.filters());
+        }
+        if (existing.scope() == SubscriptionScope.SYSTEM) {
+            var effectiveTargets = update.targets() != null ? update.targets() : existing.targets();
+            var effectiveFilters = update.filters() != null ? update.filters() : existing.filters();
+            validateSystemInvariants(effectiveTargets, effectiveFilters);
+        }
+    }
+
+    private static void validateSystemInvariants(List<NotificationTarget> targets,
+                                                 List<ExpressionEvaluator> filters) {
+        if (targets == null || targets.isEmpty()) {
+            throw new IllegalArgumentException("SYSTEM scope requires explicit targets");
+        }
+        if (filters == null) {
+            return;
+        }
+        for (var filter : filters) {
+            if (extractExpression(filter).contains("$me")) {
+                throw new IllegalArgumentException("$me filter not allowed for SYSTEM scope");
+            }
+        }
+    }
+
+    private void validateFilters(List<ExpressionEvaluator> filters) {
+        if (filters == null) {
+            return;
+        }
+        for (var filter : filters) {
+            try {
+                expressionRegistry.validate(filter.type(), extractExpression(filter));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);
+            }
+        }
     }
 
     private void checkSystemAccess(SubscriptionScope scope) {

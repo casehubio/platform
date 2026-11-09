@@ -1,6 +1,7 @@
 package io.casehub.platform.subscription;
 
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
+import io.casehub.platform.api.expression.MvelExpressionEvaluator;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.notification.NotificationSeverity;
 import io.casehub.platform.api.subscription.NotificationTarget;
@@ -71,7 +72,11 @@ class SubscriptionServiceTest {
     private final ExpressionEngineRegistry expressionRegistry = new ExpressionEngineRegistry() {
         @Override public void register(io.casehub.platform.api.expression.ExpressionEngine engine) {}
         @Override public java.util.Optional<io.casehub.platform.api.expression.ExpressionEngine> resolve(String type) { return java.util.Optional.empty(); }
-        @Override public void validate(String type, String expression) {}
+        @Override public void validate(String type, String expression) {
+            if (expression.startsWith("(") && !expression.contains(")")) {
+                throw new IllegalArgumentException("unbalanced parenthesis");
+            }
+        }
         @Override public <C, R> io.casehub.platform.api.expression.CompiledExpression<C, R> compile(String type, String expression, Class<C> ct, Class<R> rt) { return null; }
         @Override public <C, R> io.casehub.platform.api.expression.CompiledExpression<C, R> compile(String type, String expression, Class<C> ct, Class<R> rt, java.util.Map<String, Object> variables) { return null; }
     };
@@ -121,8 +126,75 @@ class SubscriptionServiceTest {
                 .isInstanceOf(SecurityException.class);
     }
 
+    @Test
+    void update_rejects_invalid_filter_expression() {
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate(null, null,
+                List.of(new MvelExpressionEvaluator("(")), null, null, null, null);
+
+        assertThatThrownBy(() -> service.update("sub-1", update))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid filter expression");
+        assertThat(store.lastUpdate).isNull();
+    }
+
+    @Test
+    void update_accepts_valid_filter_expression() {
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate(null, null,
+                List.of(new MvelExpressionEvaluator("priority > 3")), null, null, null, null);
+
+        assertThat(service.update("sub-1", update)).isPresent();
+        assertThat(store.lastUpdate).isEqualTo(update);
+    }
+
+    @Test
+    void update_system_scope_rejects_empty_targets() {
+        store.systemSubscription = true;
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate(null, null, null, List.of(), null, null, null);
+
+        assertThatThrownBy(() -> service.update("sub-1", update))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SYSTEM scope requires explicit targets");
+        assertThat(store.lastUpdate).isNull();
+    }
+
+    @Test
+    void update_system_scope_rejects_me_filter() {
+        store.systemSubscription = true;
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate(null, null,
+                List.of(new MvelExpressionEvaluator("assignee == $me")), null, null, null, null);
+
+        assertThatThrownBy(() -> service.update("sub-1", update))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("$me filter not allowed for SYSTEM scope");
+        assertThat(store.lastUpdate).isNull();
+    }
+
+    @Test
+    void update_system_scope_keeps_existing_targets_when_not_patched() {
+        store.systemSubscription = true;
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate("renamed", null, null, null, null, null, null);
+
+        assertThat(service.update("sub-1", update)).isPresent();
+        assertThat(store.lastUpdate).isEqualTo(update);
+    }
+
+    @Test
+    void update_user_scope_allows_me_filter() {
+        var service = new SubscriptionService(store, principal, expressionRegistry);
+        var update = new SubscriptionUpdate(null, null,
+                List.of(new MvelExpressionEvaluator("assignee == $me")), null, null, null, null);
+
+        assertThat(service.update("sub-1", update)).isPresent();
+    }
+
     static class StubStore implements SubscriptionStore {
         SubscriptionInput lastInput;
+        SubscriptionUpdate lastUpdate;
         boolean systemSubscription = false;
 
         @Override
@@ -138,7 +210,9 @@ class SubscriptionServiceTest {
         public Optional<Subscription> findById(String id, String ownerId, String tenancyId) {
             if ("sub-1".equals(id)) {
                 return Optional.of(new Subscription(id, ownerId, tenancyId, "test", "evt",
-                        List.of(), List.of(), false, TEMPLATE, true,
+                        List.of(),
+                        systemSubscription ? List.of(new NotificationTarget(TargetType.GROUP, "ops")) : List.of(),
+                        false, TEMPLATE, true,
                         systemSubscription ? SubscriptionScope.SYSTEM : SubscriptionScope.USER,
                         Instant.now(), Instant.now()));
             }
@@ -152,6 +226,7 @@ class SubscriptionServiceTest {
 
         @Override
         public Optional<Subscription> update(String id, String ownerId, String tenancyId, SubscriptionUpdate update) {
+            lastUpdate = update;
             return findById(id, ownerId, tenancyId);
         }
 

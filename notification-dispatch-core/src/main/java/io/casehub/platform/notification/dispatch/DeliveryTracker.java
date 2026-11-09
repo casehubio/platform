@@ -122,9 +122,9 @@ public class DeliveryTracker {
                     preRecorded.id(), preRecorded.sourceId(), preRecorded.sourceType(),
                     preRecorded.channelId(),
                     preRecorded.userId(), preRecorded.tenancyId(), preRecorded.deliveryType(),
-                    DeliveryStatus.RETRYING, 1,
+                    preRecorded.status(), 1,
                     preRecorded.createdAt(), now, null,
-                    now.plus(baseDelay),
+                    preRecorded.status() == DeliveryStatus.RETRYING ? now.plus(baseDelay) : null,
                     failureReason, preRecorded.payload(),
                     preRecorded.firstOpenedAt(), preRecorded.firstClickedAt()));
         } catch (Exception e) {

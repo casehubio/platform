@@ -2,11 +2,13 @@
 capability: notifications
 audience: consumer
 repo: casehub-platform
+verified-current: 2026-11-09
 anchors:
   classes:
     - io.casehub.platform.notification.dispatch.NotificationDispatcher
     - io.casehub.platform.subscription.engine.SubscriptionEngine
     - io.casehub.platform.notification.dispatch.DeliveryRetryProcessor
+    - io.casehub.platform.notification.dispatch.DeliveryTracker
     - io.casehub.platform.notification.dispatch.DigestFlushScheduler
     - io.casehub.platform.event.CloudEventTypeDispatcher
   spis:
@@ -77,6 +79,8 @@ Configurable digest schedules via `DigestSchedule` sealed interface:
 - `DigestSchedule.Interval(Duration period)` -- fixed period (minimum 1 minute)
 - `DigestSchedule.DailyAt(LocalTime time, ZoneId timezone)` -- once per day
 - `DigestSchedule.WeeklyAt(DayOfWeek day, LocalTime time, ZoneId timezone)` -- once per week
+
+**Delivery retries:** A failed digest is retried when the channel defines a `guaranteedMinSeverity` and at least one buffered notification meets that threshold. Digests without a delivery guarantee or below the threshold remain `FAILED`, with the failure reason recorded and no retry deadline. Eligible failures remain `RETRYING` and are scheduled using the configured retry delay.
 
 **DigestGroupBy:** `FLAT` (no grouping), `CATEGORY` (by notification category), `ENTITY` (by entity type and ID).
 

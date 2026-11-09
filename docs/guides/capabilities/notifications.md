@@ -75,6 +75,8 @@ Domain modules produce `SubscribableEvent` objects into the notification DataSou
 
 ## Digest System
 
+The scheduler uses the user's channel-specific digest schedule when present, otherwise the delivery channel's default schedule. Missing preferences or a null user schedule therefore retain the channel's default timing. A pending buffer is flushed as an orphan only when neither source provides a schedule.
+
 Before flushing a pending digest, the scheduler checks the current channel enablement: an explicit user preference takes precedence over the channel's `defaultEnabled` setting. Disabled channels retain their buffered notifications, subject to normal retention and buffer limits. Re-enabling a channel makes that buffer eligible for delivery under the current scheduling and suppression rules; disabling also clears any earlier quiet-hours deferral.
 
 Configurable digest schedules via `DigestSchedule` sealed interface:

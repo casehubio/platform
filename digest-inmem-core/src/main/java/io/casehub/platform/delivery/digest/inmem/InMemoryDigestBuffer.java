@@ -13,10 +13,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 
 public class InMemoryDigestBuffer implements DigestBuffer {
 
@@ -87,20 +86,48 @@ public class InMemoryDigestBuffer implements DigestBuffer {
         return drain(key, Function.identity());
     }
 
+    /**
+     * Removes the entry before running {@code transfer} so that the transfer never runs while
+     * a map bin lock is held (it may perform I/O or touch this buffer). A concurrent drain of
+     * the same key sees an empty buffer, mirroring {@code SKIP LOCKED} in the JPA adapters.
+     * If the transfer fails, drained items are restored ahead of any items added meanwhile.
+     */
     @Override
     public <T> T drain(DigestBufferKey key, Function<List<NotificationInput>, T> transfer) {
-        var result = new AtomicReference<T>();
-        buffers.compute(key, (k, entry) -> {
-            var items = entry == null || isExpired(entry) ? List.<NotificationInput>of()
-                    : List.copyOf(entry.notifications());
-            result.set(transfer.apply(items));
-            userIndex.computeIfPresent(userKey(key.userId(), key.tenancyId()), (u, set) -> {
-                set.remove(key);
-                return set.isEmpty() ? null : set;
-            });
-            return null;
+        var entry = buffers.remove(key);
+        if (entry != null) {
+            removeFromUserIndex(key);
+        }
+        List<NotificationInput> items = entry == null || isExpired(entry) ? List.of()
+                : List.copyOf(entry.notifications());
+        try {
+            return transfer.apply(items);
+        } catch (RuntimeException | Error e) {
+            if (!items.isEmpty()) {
+                restore(key, entry);
+            }
+            throw e;
+        }
+    }
+
+    private void restore(DigestBufferKey key, BufferEntry drained) {
+        buffers.merge(key, drained, (current, restored) -> {
+            var merged = new CopyOnWriteArrayList<>(restored.notifications());
+            merged.addAll(current.notifications());
+            while (merged.size() > maxBufferSize) {
+                merged.remove(0);
+            }
+            return new BufferEntry(merged, restored.firstAdded(), current.lastModified());
         });
-        return result.get();
+        userIndex.computeIfAbsent(userKey(key.userId(), key.tenancyId()), k -> ConcurrentHashMap.newKeySet())
+                .add(key);
+    }
+
+    private void removeFromUserIndex(DigestBufferKey key) {
+        userIndex.computeIfPresent(userKey(key.userId(), key.tenancyId()), (k, set) -> {
+            set.remove(key);
+            return set.isEmpty() ? null : set;
+        });
     }
 
     @Override

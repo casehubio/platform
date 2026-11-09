@@ -11,10 +11,13 @@ import io.casehub.platform.api.preferences.PreferenceProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InMemoryDigestBufferTest {
 
@@ -149,6 +152,29 @@ class InMemoryDigestBufferTest {
         assertThat(ttlBuffer.oldestPendingTimestamp(KEY)).isEmpty();
     }
 
+    @Test
+    void failedHandoffKeepsBufferedNotifications() {
+        buffer.add(KEY, sampleInput("Keep me"));
+        assertThatThrownBy(() -> buffer.drain(KEY, items -> {
+            throw new IllegalStateException("Tracking unavailable");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(buffer.drain(KEY)).extracting(NotificationInput::title).containsExactly("Keep me");
+    }
+
+    @Test
+    void concurrentAddIsNotBlockedByTransferAndSurvivesFailedHandoff() {
+        buffer.add(KEY, sampleInput("Drained"));
+        assertThatThrownBy(() -> buffer.drain(KEY, items -> {
+            var add = CompletableFuture.runAsync(() -> buffer.add(KEY, sampleInput("Added during transfer")));
+            assertThat(add).succeedsWithin(Duration.ofSeconds(5));
+            throw new IllegalStateException("Tracking unavailable");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("Tracking unavailable");
+
+        assertThat(buffer.pendingKeysForUser("user-1", "tenant-1")).containsExactly(KEY);
+        assertThat(buffer.drain(KEY)).extracting(NotificationInput::title)
+                .containsExactly("Drained", "Added during transfer");
+    }
+
     private static PreferenceProvider retentionProvider(int days) {
         return scope -> new MapPreferences(Map.of(
                 PlatformPreferenceKeys.DIGEST_RETENTION_DAYS.qualifiedName(), IntPreference.of(days)));
@@ -159,13 +185,4 @@ class InMemoryDigestBufferTest {
                 NotificationSeverity.INFO, null,
                 new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"), null);
     }
-    @Test
-    void failedHandoffKeepsBufferedNotifications() {
-        buffer.add(KEY, sampleInput("Keep me"));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> buffer.drain(KEY, items -> {
-            throw new IllegalStateException("Tracking unavailable");
-        })).isInstanceOf(IllegalStateException.class);
-        assertThat(buffer.drain(KEY)).extracting(NotificationInput::title).containsExactly("Keep me");
-    }
-
 }

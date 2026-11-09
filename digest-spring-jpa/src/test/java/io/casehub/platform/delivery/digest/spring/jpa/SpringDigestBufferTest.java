@@ -117,6 +117,7 @@ class SpringDigestBufferTest {
         assertEquals("First", drained.get(0).title());
         assertEquals("Third", drained.get(2).title());
     }
+
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void failedHandoffKeepsBufferedNotifications() {
@@ -162,5 +163,4 @@ class SpringDigestBufferTest {
         }
         assertEquals(0, buffer.pendingCount(KEY));
     }
-
 }

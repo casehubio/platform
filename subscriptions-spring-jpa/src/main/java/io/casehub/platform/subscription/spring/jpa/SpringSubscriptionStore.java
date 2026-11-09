@@ -11,6 +11,7 @@ import io.casehub.platform.api.subscription.SubscriptionScope;
 import io.casehub.platform.api.subscription.SubscriptionStore;
 import io.casehub.platform.api.subscription.SubscriptionUpdate;
 import io.casehub.platform.api.subscription.SubscriptionUpdated;
+import io.casehub.platform.subscription.jpa.SubscriptionCursor;
 import io.casehub.platform.subscription.jpa.SubscriptionEntity;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
@@ -18,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -63,7 +63,7 @@ public class SpringSubscriptionStore implements SubscriptionStore {
 
         List<SubscriptionEntity> entities;
         if (query.cursor() != null) {
-            CursorValue cursor = decodeCursor(query.cursor());
+            SubscriptionCursor.Value cursor = SubscriptionCursor.decode(query.cursor());
             if (cursor != null) {
                 entities = findWithCursor(query, effectiveScope, cursor, pageable);
             } else {
@@ -86,7 +86,7 @@ public class SpringSubscriptionStore implements SubscriptionStore {
         String nextCursor = null;
         if (hasMore && !pageEntities.isEmpty()) {
             SubscriptionEntity last = pageEntities.getLast();
-            nextCursor = encodeCursor(last.createdAt, last.id);
+            nextCursor = SubscriptionCursor.encode(last.createdAt, last.id);
         }
         return new SubscriptionPage(subscriptions, nextCursor);
     }
@@ -109,12 +109,12 @@ public class SpringSubscriptionStore implements SubscriptionStore {
 
     private List<SubscriptionEntity> findWithCursor(SubscriptionQuery query,
                                                      SubscriptionScope scope,
-                                                     CursorValue cursor,
+                                                     SubscriptionCursor.Value cursor,
                                                      PageRequest pageable) {
         if (scope == SubscriptionScope.SYSTEM) {
-            return repo.findByTenantAndSystemAfterCursor(query.tenancyId(), cursor.createdAt, cursor.id, pageable);
+            return repo.findByTenantAndSystemAfterCursor(query.tenancyId(), cursor.createdAt(), cursor.id(), pageable);
         } else {
-            return repo.findByTenantAndOwnerAfterCursor(query.tenancyId(), query.ownerId(), cursor.createdAt, cursor.id, pageable);
+            return repo.findByTenantAndOwnerAfterCursor(query.tenancyId(), query.ownerId(), cursor.createdAt(), cursor.id(), pageable);
         }
     }
 
@@ -179,23 +179,4 @@ public class SpringSubscriptionStore implements SubscriptionStore {
         entity.updatedAt = Instant.now();
     }
 
-    private static String encodeCursor(Instant createdAt, String id) {
-        String raw = createdAt.toEpochMilli() + "|" + id;
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes());
-    }
-
-    private static CursorValue decodeCursor(String cursor) {
-        try {
-            String raw = new String(Base64.getUrlDecoder().decode(cursor));
-            int sep = raw.indexOf('|');
-            if (sep == -1) return null;
-            long epochMillis = Long.parseLong(raw.substring(0, sep));
-            String id = raw.substring(sep + 1);
-            return new CursorValue(Instant.ofEpochMilli(epochMillis), id);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private record CursorValue(Instant createdAt, String id) {}
 }

@@ -97,7 +97,15 @@ class StreamBinderEmitter {
             w.println("    public Result materialize(Map<String, Object> params, ServiceRegistry services) {");
             w.println("        " + inputType + " input = (" + inputType + ") params.get(\"" + model.streamingInputKey() + "\");");
             w.println("        " + outputType + " output = apply(input);");
-            w.println("        return Result.of(Map.of(OUTPUT_KEY, output));");
+            if (model.streamingOutputFields() != null) {
+                w.println("        var result = new java.util.LinkedHashMap<String, Object>();");
+                for (var field : model.streamingOutputFields()) {
+                    w.println("        result.put(\"" + field.kebabName() + "\", output." + field.name() + "());");
+                }
+                w.println("        return Result.of(result);");
+            } else {
+                w.println("        return Result.of(Map.of(OUTPUT_KEY, output));");
+            }
             w.println("    }");
 
             w.println("}");

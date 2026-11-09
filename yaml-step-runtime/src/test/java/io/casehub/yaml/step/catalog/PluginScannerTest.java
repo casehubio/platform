@@ -132,5 +132,16 @@ class PluginScannerTest {
         assertThat(result.output()).containsEntry("confidence", 0.95);
     }
 
+    @Test
+    void aptGeneratedMaterializeUnwrapsRecordOutputToKebabCaseMap() {
+        var    step   = new io.casehub.yaml.step.catalog.scannertest.RecordOutputStreamingPluginStreamingStep("fr");
+        Result result = step.materialize(Map.of("audio", "hello world"), new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("text", "hello world");
+        assertThat(result.output()).containsEntry("detected-language", "fr");
+        assertThat(result.output()).containsEntry("confidence", 0.95);
+        assertThat(result.output()).doesNotContainKey("output");
+    }
+
 
 }

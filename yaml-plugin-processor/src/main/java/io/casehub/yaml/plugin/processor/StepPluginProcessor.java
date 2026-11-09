@@ -127,11 +127,26 @@ public class StepPluginProcessor extends AbstractProcessor {
         boolean requiresConfirmation = confirmationAnn != null;
         String confirmationSummary = requiresConfirmation ? confirmationAnn.summary() : null;
 
+        List<PluginModel.OutputField> streamingOutputFields = null;
+        if (streaming) {
+            var outputElement = processingEnv.getTypeUtils().asElement(returnType);
+            if (outputElement != null && outputElement.getKind() == ElementKind.RECORD) {
+                streamingOutputFields = new ArrayList<>();
+                for (var rc : ((TypeElement) outputElement).getRecordComponents()) {
+                    streamingOutputFields.add(new PluginModel.OutputField(
+                        rc.getSimpleName().toString(),
+                        BinderEmitter.toKebabCase(rc.getSimpleName().toString()),
+                        rc.asType().toString()));
+                }
+            }
+        }
+
         return new PluginModel(annotation.value(), annotation.description(),
             annotation.portability().name(), annotation.capability(),
             typeElement, fields, executeMethod, serviceParams,
             requiresConfirmation, confirmationSummary,
-            streaming, streamingInputType, streamingOutputType, streamingInputKey);
+            streaming, streamingInputType, streamingOutputType, streamingInputKey,
+            streamingOutputFields);
     }
 
     private void generate(PluginModel model) {

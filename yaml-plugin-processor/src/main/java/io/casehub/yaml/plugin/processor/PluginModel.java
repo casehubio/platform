@@ -19,7 +19,11 @@ record PluginModel(
         boolean streaming,
         String streamingInputType,
         String streamingOutputType,
-        String streamingInputKey
+        String streamingInputKey,
+        List<OutputField> streamingOutputFields
 ) {
     record ServiceParam(String typeName, String qualifiedTypeName) {}
+
+    record OutputField(String name, String kebabName, String type) {}
+
 }

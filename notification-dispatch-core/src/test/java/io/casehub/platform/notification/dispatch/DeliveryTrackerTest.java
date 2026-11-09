@@ -88,7 +88,7 @@ class DeliveryTrackerTest {
     }
 
     @Test
-    void preRecordDigestCreatesRetryingWithNullNextRetryAt() {
+    void preRecordDigestRecoversInterruptedDeliveryAfterLeaseExpires() {
         var summary = testDigestSummary(NotificationSeverity.URGENT);
         var preRecorded = tracker.preRecordDigest("email", summary,
                 NotificationSeverity.WARNING);
@@ -99,9 +99,12 @@ class DeliveryTrackerTest {
         assertThat(page.attempts()).anyMatch(a ->
                 a.id().equals(preRecorded.id())
                         && a.status() == DeliveryStatus.RETRYING
-                        && a.nextRetryAt() == null
+                        && a.nextRetryAt() != null
                         && a.attemptCount() == 0
                         && a.deliveryType() == DeliveryType.DIGEST);
+        assertThat(store.claimRetryable(preRecorded.createdAt(), 10)).isEmpty();
+        assertThat(store.claimRetryable(preRecorded.createdAt().plus(Duration.ofMinutes(6)), 10))
+                .extracting(a -> a.id()).containsExactly(preRecorded.id());
     }
 
     @Test

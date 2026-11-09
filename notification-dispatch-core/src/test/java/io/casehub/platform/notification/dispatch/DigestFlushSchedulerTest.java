@@ -267,6 +267,27 @@ class DigestFlushSchedulerTest {
         assertThat(emailDeliverer.received.get(0).groupBy()).isEqualTo(DigestGroupBy.CATEGORY);
     }
 
+    @Test
+    void trackingFailureKeepsDigestBufferedAndDoesNotSend() {
+        buffer.add(EMAIL_KEY, sampleInput("Keep me"));
+        var failingStore = new io.casehub.platform.delivery.tracking.inmem.InMemoryDeliveryAttemptStore() {
+            @Override
+            public void store(io.casehub.platform.api.delivery.DeliveryAttempt attempt) {
+                throw new IllegalStateException("Tracking unavailable");
+            }
+        };
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var failingScheduler = new DigestFlushScheduler(buffer, preferenceStore, suppressionStore,
+                new SuppressionEvaluator(), channelRegistry,
+                new DeliveryTracker(failingStore, mapper, Duration.ofSeconds(30)));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                failingScheduler.processKey(EMAIL_KEY, Instant.now().plus(5, ChronoUnit.HOURS)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Tracking unavailable");
+        assertThat(buffer.pendingCount(EMAIL_KEY)).isEqualTo(1);
+        assertThat(emailDeliverer.received).isEmpty();
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void disabledChannelRetainsDigestUntilReenabled(boolean hasSchedule) {

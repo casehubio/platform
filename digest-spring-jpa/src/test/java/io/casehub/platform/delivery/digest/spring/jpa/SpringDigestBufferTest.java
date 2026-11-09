@@ -17,6 +17,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,6 +46,8 @@ class SpringDigestBufferTest {
     }
 
     @Autowired SpringDigestBuffer buffer;
+    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired DigestBufferEntityRepository repo;
 
     private NotificationInput testNotification(String title) {
         return new NotificationInput(
@@ -108,4 +117,50 @@ class SpringDigestBufferTest {
         assertEquals("First", drained.get(0).title());
         assertEquals("Third", drained.get(2).title());
     }
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void failedHandoffKeepsBufferedNotifications() {
+        buffer.add(KEY, testNotification("Keep me"));
+        try {
+            assertThrows(IllegalStateException.class, () -> buffer.drain(KEY, items -> {
+                throw new IllegalStateException("Tracking unavailable");
+            }));
+            assertEquals(1, buffer.pendingCount(KEY));
+        } finally {
+            repo.deleteAll();
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentDrainSkipsRowsClaimedByAnotherTransaction() throws Exception {
+        buffer.add(KEY, testNotification("Only once"));
+        var drained = new CountDownLatch(1);
+        var commit = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                var items = buffer.drain(KEY);
+                drained.countDown();
+                try {
+                    if (!commit.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Commit not released");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+                return items;
+            }));
+            try {
+                assertTrue(drained.await(10, TimeUnit.SECONDS));
+                var second = executor.submit(() -> buffer.drain(KEY));
+                assertTrue(second.get(5, TimeUnit.SECONDS).isEmpty());
+            } finally {
+                commit.countDown();
+            }
+            assertEquals(1, first.get(10, TimeUnit.SECONDS).size());
+        } finally {
+            repo.deleteAll();
+        }
+        assertEquals(0, buffer.pendingCount(KEY));
+    }
+
 }

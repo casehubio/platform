@@ -159,4 +159,13 @@ class InMemoryDigestBufferTest {
                 NotificationSeverity.INFO, null,
                 new NotificationSource(UUID.randomUUID().toString(), "work-item", "wi-1", "actor-1"), null);
     }
+    @Test
+    void failedHandoffKeepsBufferedNotifications() {
+        buffer.add(KEY, sampleInput("Keep me"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> buffer.drain(KEY, items -> {
+            throw new IllegalStateException("Tracking unavailable");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(buffer.drain(KEY)).extracting(NotificationInput::title).containsExactly("Keep me");
+    }
+
 }

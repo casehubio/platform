@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 public class SpringDigestBuffer implements DigestBuffer {
 
@@ -51,19 +52,24 @@ public class SpringDigestBuffer implements DigestBuffer {
     @Override
     @Transactional
     public List<NotificationInput> drain(DigestBufferKey key) {
+        return drain(key, Function.identity());
+    }
+
+    @Override
+    @Transactional
+    public <T> T drain(DigestBufferKey key, Function<List<NotificationInput>, T> transfer) {
         List<DigestBufferEntity> entities = repo
                 .findByUserIdAndTenancyIdAndChannelIdOrderByBufferedAtAsc(
                         key.userId(), key.tenancyId(), key.channelId());
+        var result = transfer.apply(entities.stream().map(DigestBufferEntity::toNotificationInput).toList());
         if (entities.isEmpty()) {
-            return List.of();
+            return result;
         }
 
         List<UUID> ids = entities.stream().map(e -> e.id).toList();
         repo.deleteByIds(ids);
 
-        return entities.stream()
-                .map(DigestBufferEntity::toNotificationInput)
-                .toList();
+        return result;
     }
 
     @Override

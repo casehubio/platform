@@ -3,6 +3,10 @@ package io.casehub.platform.delivery.digest.spring.jpa;
 import io.casehub.platform.delivery.digest.jpa.DigestBufferEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.QueryHints;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
@@ -11,6 +15,8 @@ import java.util.UUID;
 
 public interface DigestBufferEntityRepository extends JpaRepository<DigestBufferEntity, UUID> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
     List<DigestBufferEntity> findByUserIdAndTenancyIdAndChannelIdOrderByBufferedAtAsc(
             String userId, String tenancyId, String channelId);
 

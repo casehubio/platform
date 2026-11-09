@@ -13,6 +13,9 @@ import io.casehub.platform.api.notification.NotificationSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -130,9 +133,10 @@ class DeliveryTrackerTest {
                         && a.deliveredAt() != null);
     }
 
-    @Test
-    void confirmDigestFailure() {
-        var summary = testDigestSummary(NotificationSeverity.URGENT);
+    @ParameterizedTest
+    @EnumSource(value = NotificationSeverity.class, names = {"WARNING", "URGENT"})
+    void confirmDigestFailureRetainsEligibleRetry(NotificationSeverity severity) {
+        var summary = testDigestSummary(severity);
         var preRecorded = tracker.preRecordDigest("email", summary,
                 NotificationSeverity.WARNING);
 
@@ -146,6 +150,27 @@ class DeliveryTrackerTest {
                         && a.nextRetryAt() != null
                         && a.attemptCount() == 1
                         && a.failureReason().equals("SMTP timeout"));
+        var updated = store.findById(preRecorded.id());
+        assertThat(store.claimRetryable(updated.nextRetryAt().minusNanos(1), 10)).isEmpty();
+        assertThat(store.claimRetryable(updated.nextRetryAt(), 10))
+                .extracting(a -> a.id()).containsExactly(preRecorded.id());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @EnumSource(value = NotificationSeverity.class, names = {"WARNING", "URGENT"})
+    void confirmDigestFailureDoesNotRetryIneligibleDigest(NotificationSeverity guaranteedMinSeverity) {
+        var summary = testDigestSummary(NotificationSeverity.INFO);
+        var preRecorded = tracker.preRecordDigest("email", summary, guaranteedMinSeverity);
+
+        tracker.confirmDigestFailure(preRecorded, "SMTP timeout");
+
+        var updated = store.findById(preRecorded.id());
+        assertThat(updated.status()).isEqualTo(DeliveryStatus.FAILED);
+        assertThat(updated.nextRetryAt()).isNull();
+        assertThat(updated.attemptCount()).isEqualTo(1);
+        assertThat(updated.failureReason()).isEqualTo("SMTP timeout");
+        assertThat(store.claimRetryable(Instant.now().plus(Duration.ofDays(1)), 10)).isEmpty();
     }
 
     @Test

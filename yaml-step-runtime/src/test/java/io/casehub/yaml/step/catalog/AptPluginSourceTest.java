@@ -115,6 +115,31 @@ class AptPluginSourceTest {
                 .isEqualTo(io.casehub.yaml.plugin.api.ParameterType.STRING);
     }
 
+
+    @Test
+    void loadManifest_streamingByteArrayTypes_resolvedCorrectly() throws IOException {
+        String manifest = """
+                          {
+                            "actionClass": "io.casehub.yaml.step.catalog.AptPluginSourceTest$TestAction",
+                            "streaming": {
+                              "inputType": "byte[]",
+                              "outputType": "java.lang.String",
+                              "inputKey": "audio",
+                              "streamingStepClass": "io.casehub.yaml.step.catalog.AptPluginSourceTest$TestStreamingStep"
+                            }
+                          }
+                          """;
+        var source = new AptPluginSource(mapper);
+        Definition def = source.loadManifest("stt-transcribe",
+                                             new ByteArrayInputStream(manifest.getBytes(StandardCharsets.UTF_8)),
+                                             null);
+
+        assertThat(def.streamingType()).isPresent();
+        assertThat(def.streamingType().get().inputType()).isEqualTo(byte[].class);
+        assertThat(def.streamingType().get().outputType()).isEqualTo(String.class);
+        assertThat(def.streamingType().get().inputKey()).isEqualTo("audio");
+    }
+
     public static class TestAction implements Action {
         @Override
         public Result execute(
@@ -123,4 +148,16 @@ class AptPluginSourceTest {
             return Result.of(Map.of());
         }
     }
+
+    public static class TestStreamingStep implements io.casehub.yaml.plugin.api.StreamingStep<byte[], String> {
+        @Override
+        public Class<byte[]> inputType() {return byte[].class;}
+
+        @Override
+        public Class<String> outputType() {return String.class;}
+
+        @Override
+        public String apply(byte[] input) {return new String(input);}
+    }
+
 }

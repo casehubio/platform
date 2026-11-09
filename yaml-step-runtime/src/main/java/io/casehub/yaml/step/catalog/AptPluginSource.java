@@ -141,8 +141,8 @@ public class AptPluginSource {
             String inputKey = (String) streaming.get("inputKey");
             String streamingStepClassName = (String) streaming.get("streamingStepClass");
             try {
-                Class<?> inputType = Class.forName(inputTypeName);
-                Class<?> outputType = Class.forName(outputTypeName);
+                Class<?> inputType = resolveType(inputTypeName);
+                Class<?> outputType = resolveType(outputTypeName);
                 builder.streamingType(new StreamingTypeInfo(inputType, outputType, inputKey,
                     loadStreamingStepFactory(streamingStepClassName, actionClass)));
             } catch (ClassNotFoundException e) {
@@ -189,6 +189,21 @@ public class AptPluginSource {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load streaming step class: " + streamingStepClassName, e);
         }
+    }
+
+
+    private static Class<?> resolveType(String name) throws ClassNotFoundException {
+        return switch (name) {
+            case "byte[]" -> byte[].class;
+            case "int[]" -> int[].class;
+            case "long[]" -> long[].class;
+            case "double[]" -> double[].class;
+            case "float[]" -> float[].class;
+            case "boolean[]" -> boolean[].class;
+            case "char[]" -> char[].class;
+            case "short[]" -> short[].class;
+            default -> Class.forName(name);
+        };
     }
 
     private static String toKebabCase(String camelCase) {

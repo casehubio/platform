@@ -272,8 +272,12 @@ public final class Walker {
                     } else if (value != null) {
                         actionParams = new LinkedHashMap<>();
                         String inputKey = entry.get().primaryInput();
+                        if (inputKey == null && entry.get().streamingType().isPresent()) {
+                            inputKey = entry.get().streamingType().get().inputKey();
+                        }
                         if (inputKey != null) {
                             actionParams.put(inputKey, value);
+                            actionParams.put("_value", value);
                         } else {
                             actionParams.put("_subject", value);
                             actionParams.put("_value", value);
@@ -320,6 +324,9 @@ public final class Walker {
                         Object value  = e.getValue();
                         actionParams  = new LinkedHashMap<>();
                         String primaryKey = resolvedDef.primaryInput();
+                        if (primaryKey == null && resolvedDef.streamingType().isPresent()) {
+                            primaryKey = resolvedDef.streamingType().get().inputKey();
+                        }
                         actionParams.put(primaryKey != null ? primaryKey : "_subject", keySuffix);
                         if (value instanceof Map) {
                             actionParams.putAll((Map<String, Object>) value);

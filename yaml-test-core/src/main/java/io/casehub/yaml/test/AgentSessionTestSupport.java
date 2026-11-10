@@ -37,7 +37,6 @@ public final class AgentSessionTestSupport implements AutoCloseable {
             CompositePluginRegistry pluginRegistry,
             List<PoolDeclaration> compiledPools,
             io.casehub.platform.simulation.SimulationRuntime simulationRuntime) {
-
         Map<String, String> corpus            = extractCorpus(simulateBlock);
         int                 clearingThreshold = extractConfigInt(simulateBlock, "clearing-threshold", 8000);
         int                 maxActive         = extractConfigInt(simulateBlock, "max-active", 20);
@@ -45,15 +44,17 @@ public final class AgentSessionTestSupport implements AutoCloseable {
         AgentBackend            backend  = new CorpusBackend(corpus, simulationRuntime);
         BackendInstanceRegistry backends = new SingleBackendRegistry(backend);
 
-        List<PoolDeclaration> pools = compiledPools != null && !compiledPools.isEmpty()
-                                      ? compiledPools.stream()
-                                                     .map(p -> new PoolDeclaration(p.name(), p.agentId(), "stub",
-                                                                                   p.minActive(), p.maxActive(), p.workingDir(),
-                                                                                   p.scaling(), p.extensions(), p.salience(), p.clearing(),
-                                                                                   p.maxPromptTokens()))
-                                                     .toList()
-                                      : List.of(new PoolDeclaration("default", "agent", "stub",
-                                                                    0, maxActive, null, Map.of(), Map.of()));
+        List<PoolDeclaration> pools;
+        if (compiledPools != null && !compiledPools.isEmpty()) {
+            pools = compiledPools.stream()
+                                 .map(p -> new PoolDeclaration(p.name(), p.agentId(), "stub",
+                                                               p.minActive(), p.maxActive(), p.workingDir(),
+                                                               p.scaling(), p.extensions(), p.salience(), p.clearing(),
+                                                               p.maxPromptTokens()))
+                                 .toList();
+        } else {
+            pools = discoverPools(maxActive);
+        }
 
         var poolRegistry = new SessionPoolRegistry(pools, backends);
         var manager      = new SessionLifecycleManager(poolRegistry);
@@ -70,6 +71,28 @@ public final class AgentSessionTestSupport implements AutoCloseable {
     public void close() {
         pipeline.shutdown();
         poolRegistry.shutdown();
+    }
+
+
+    private static List<PoolDeclaration> discoverPools(int fallbackMaxActive) {
+        try {
+            var loader = io.casehub.platform.agent.config.AgentConfigLoader.withDefaults(
+                    java.nio.file.Path.of(System.getProperty("user.dir")));
+            var result = loader.load();
+            if (!result.pools().isEmpty()) {
+                return result.pools().stream()
+                             .map(p -> new PoolDeclaration(p.name(), p.agentId(), "stub",
+                                                           p.minActive(), p.maxActive(), p.workingDir(),
+                                                           p.scaling(), p.extensions(), p.salience(), p.clearing(),
+                                                           p.maxPromptTokens()))
+                             .toList();
+            }
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(AgentSessionTestSupport.class.getName())
+                                    .log(java.util.logging.Level.FINE, "No agent-config.yaml discovered", e);
+        }
+        return List.of(new PoolDeclaration("default", "agent", "stub",
+                                           0, fallbackMaxActive, null, Map.of(), Map.of()));
     }
 
     @SuppressWarnings("unchecked")

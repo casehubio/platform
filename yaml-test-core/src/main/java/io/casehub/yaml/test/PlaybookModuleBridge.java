@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Object>> {
 
@@ -30,18 +29,32 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
 
     @SuppressWarnings("unchecked")
     public static Map<String, Object> expandUseSteps(Map<String, Object> content,
-                                                      Map<String, Object> expandedStepSections) {
+                                                     Map<String, Object> expandedStepSections) {
         var steps = (List<Map<String, Object>>) content.get("steps");
         if (steps == null || steps.isEmpty()) {
             return content;
         }
 
-        List<Map<String, Object>> expandedSteps = new ArrayList<>();
+        List<Map<String, Object>> expandedSteps = expandStepList(steps, expandedStepSections);
+
+        Map<String, Object> result = new LinkedHashMap<>(content);
+        result.put("steps", expandedSteps);
+        result.remove(EXPANDED_STEP_SECTIONS_KEY);
+        return result;
+    }
+
+    private static final Set<String> BRANCH_KEYS = Set.of(
+            "then", "else", "catch", "finally", "block", "parallel", "try", "race");
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> expandStepList(
+            List<Map<String, Object>> steps, Map<String, Object> expandedStepSections) {
+        List<Map<String, Object>> result = new ArrayList<>();
 
         for (Map<String, Object> step : steps) {
             if (step.containsKey("use")) {
                 String ref = String.valueOf(step.get("use"));
-                int dot = ref.indexOf('.');
+                int    dot = ref.indexOf('.');
                 if (dot < 0) {
                     throw new IllegalArgumentException(
                             "Invalid use: reference '" + ref
@@ -49,26 +62,47 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
                 }
                 Object sequence = expandedStepSections.get(ref);
                 if (sequence == null) {
-                    String alias = ref.substring(0, dot);
+                    String alias    = ref.substring(0, dot);
                     String stepName = ref.substring(dot + 1);
                     Set<String> available = expandedStepSections.keySet().stream()
-                            .filter(k -> k.startsWith(alias + "."))
-                            .collect(Collectors.toSet());
+                                                                .filter(k -> k.startsWith(alias + "."))
+                                                                .collect(java.util.stream.Collectors.toSet());
                     throw new UnknownStepSequenceException(alias, stepName, available);
                 }
                 if (sequence instanceof List<?> stepList) {
                     for (Object s : stepList) {
-                        expandedSteps.add((Map<String, Object>) s);
+                        result.add((Map<String, Object>) s);
                     }
                 }
             } else {
-                expandedSteps.add(step);
+                result.add(expandBranches(step, expandedStepSections));
             }
         }
-
-        Map<String, Object> result = new LinkedHashMap<>(content);
-        result.put("steps", expandedSteps);
-        result.remove(EXPANDED_STEP_SECTIONS_KEY);
         return result;
     }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> expandBranches(
+            Map<String, Object> step, Map<String, Object> expandedStepSections) {
+        boolean hasBranch = false;
+        for (String key : step.keySet()) {
+            if (BRANCH_KEYS.contains(key) && step.get(key) instanceof List) {
+                hasBranch = true;
+                break;
+            }
+        }
+        if (!hasBranch) {return step;}
+
+        Map<String, Object> expanded = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : step.entrySet()) {
+            if (BRANCH_KEYS.contains(entry.getKey()) && entry.getValue() instanceof List<?> branch) {
+                expanded.put(entry.getKey(),
+                             expandStepList((List<Map<String, Object>>) branch, expandedStepSections));
+            } else {
+                expanded.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return expanded;
+    }
+
 }

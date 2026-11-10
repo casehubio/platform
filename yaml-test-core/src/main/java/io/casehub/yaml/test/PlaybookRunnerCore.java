@@ -75,7 +75,9 @@ public final class PlaybookRunnerCore {
             PlaybookDocument doc = PlaybookParser.parse(yaml);
             Map<String, Object> content = new LinkedHashMap<>(doc.content());
 
-            VariableSource moduleOutputSource = expandImports(content, playbookPath);
+            ImportExpansionResult importResult = expandImports(content, playbookPath);
+            VariableSource moduleOutputSource = importResult != null ? importResult.outputSource() : null;
+            Map<String, Map<String, String>> moduleScopes = importResult != null ? importResult.moduleScopes() : Map.of();
 
             String playbookName = extractName(doc, content, playbookPath);
 
@@ -118,7 +120,7 @@ public final class PlaybookRunnerCore {
                     new io.casehub.yaml.core.condition.ConditionEvaluator(null))
                     .withListener(traceCollector);
 
-            VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource);
+            VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource, moduleScopes);
 
             Map<String, Object> outputVars = new LinkedHashMap<>();
             Map<String, Map<String, Object>> captures = new LinkedHashMap<>();
@@ -262,8 +264,12 @@ public final class PlaybookRunnerCore {
     }
 
 
+    private record ImportExpansionResult(
+            io.casehub.yaml.core.resolver.VariableSource outputSource,
+            Map<String, Map<String, String>> moduleScopes) {}
+
     @SuppressWarnings("unchecked")
-    private VariableSource expandImports(Map<String, Object> content, Path playbookPath) {
+    private ImportExpansionResult expandImports(Map<String, Object> content, Path playbookPath) {
         var rawImports = (List<Map<String, Object>>) content.remove("imports");
         if (rawImports == null || rawImports.isEmpty()) {
             return null;
@@ -299,20 +305,25 @@ public final class PlaybookRunnerCore {
             content.putAll(expandedContent);
         }
 
-        return expanded.outputSource();
+        return new ImportExpansionResult(expanded.outputSource(), expanded.moduleScopes());
     }
 
     private static VariableResolver buildResolver(
             PlaybookVariableParser.ParsedVariables parsed, Map<String, String> callerParams,
-            VariableSource moduleOutputSource) {
+            VariableSource moduleOutputSource, Map<String, Map<String, String>> moduleScopes) {
         VariableResolver resolver = parsed.params().isEmpty() && parsed.vars().values().isEmpty()
-                ? new VariableResolver(Map.of(), Set.of("events"))
-                : VariableResolver.forParams(parsed.params(), callerParams, Set.of("events"));
+                                    ? new VariableResolver(Map.of(), Set.of("events"))
+                                    : VariableResolver.forParams(parsed.params(), callerParams, Set.of("events"));
 
-        if (!parsed.vars().values().isEmpty()) {
-            resolver = resolver.withObjectScope("var",
-                    name -> parsed.vars().values().get(name));
+        Map<String, Object> mergedVars = new LinkedHashMap<>();
+        for (Map<String, String> scope : moduleScopes.values()) {
+            mergedVars.putAll(scope);
         }
+        mergedVars.putAll(parsed.vars().values());
+        if (!mergedVars.isEmpty()) {
+            resolver = resolver.withObjectScope("var", mergedVars::get);
+        }
+
         if (moduleOutputSource != null) {
             resolver = resolver.withScope("module", moduleOutputSource);
         }

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class StructuralStepEvaluatorTest {
 
@@ -1509,7 +1511,32 @@ class StructuralStepEvaluatorTest {
     }
 
     @Nested
+    @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     class RaceStepTests {
+
+        @Test
+        void raceImmediateWinnerCancelsBranchesStillBeingSubmitted() {
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+                for (int iteration = 0; iteration < 50; iteration++) {
+                    try (var scope = new DefaultExecutionScope()) {
+                        var scopedEval = new StructuralStepEvaluator(new ConditionEvaluator(null), scope);
+                        var branches = new ArrayList<ResolvedStep>();
+                        branches.add(leaf("winner"));
+                        for (int i = 0; i < 64; i++) {
+                            branches.add(new ResolvedStep.BlockStep(null, List.of(),
+                                    Map.of("from", Map.of("channel", "never"))));
+                        }
+                        var race = new ResolvedStep.RaceStep(null, branches, Map.of());
+
+                        Result result = scopedEval.evaluate(race, resolver,
+                                (step, r) -> Result.of(Map.of("winner", true)));
+
+                        assertThat(result.isSuccess()).as("iteration %s", iteration).isTrue();
+                        assertThat(result.output()).containsEntry("winner", true);
+                    }
+                }
+            });
+        }
 
         @Test
         void raceFirstSuccessfulBranchWins() throws Exception {
@@ -1568,26 +1595,36 @@ class StructuralStepEvaluatorTest {
         }
 
         @Test
-        void raceCancelsLosingBranches() throws Exception {
+        void raceCancelsLosingBranches() throws InterruptedException {
             try (var scope = new DefaultExecutionScope()) {
-                var condEval   = new ConditionEvaluator(null);
-                var scopedEval = new StructuralStepEvaluator(condEval, scope);
-
-                var fastChannel = scope.<Object>channel("fast");
+                var scopedEval = new StructuralStepEvaluator(new ConditionEvaluator(null), scope);
                 var slowChannel = scope.<Object>channel("slow");
+                var slowStarted = new CountDownLatch(1);
+                var slowInterrupted = new CountDownLatch(1);
+                var race = new ResolvedStep.RaceStep(null,
+                        List.of(namedLeaf("fast"), namedLeaf("slow")), Map.of());
 
-                var fastBranch = new ResolvedStep.BlockStep(null, List.of(),
-                                                            Map.of("from", Map.of("channel", "fast")));
-                var slowBranch = new ResolvedStep.BlockStep(null, List.of(),
-                                                            Map.of("from", Map.of("channel", "slow")));
+                Result result = scopedEval.evaluate(race, resolver, (step, r) -> {
+                    try {
+                        if ("slow".equals(step.name())) {
+                            slowStarted.countDown();
+                            slowChannel.receive();
+                            return Result.failed("Losing channel unexpectedly completed");
+                        }
+                        if (!slowStarted.await(5, TimeUnit.SECONDS)) {
+                            return Result.failed("Losing branch did not start");
+                        }
+                        return Result.of(Map.of("winner", true));
+                    } catch (InterruptedException e) {
+                        slowInterrupted.countDown();
+                        Thread.currentThread().interrupt();
+                        return Result.failed("Losing branch interrupted");
+                    }
+                });
 
-                var race = new ResolvedStep.RaceStep(null, List.of(fastBranch, slowBranch), Map.of());
-
-                fastChannel.send("winner");
-
-                Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
                 assertThat(result.isSuccess()).isTrue();
-                assertThat(slowChannel.isEmpty()).isTrue();
+                assertThat(result.output()).containsEntry("winner", true);
+                assertThat(slowInterrupted.await(5, TimeUnit.SECONDS)).isTrue();
             }
         }
 

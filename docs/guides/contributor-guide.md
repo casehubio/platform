@@ -161,7 +161,7 @@ Two patterns exist:
 | Pattern | Used by | Behaviour |
 |---------|---------|-----------|
 | **Configurable mock** | `PreferenceProvider`, `CurrentPrincipal`, `GroupMembershipProvider` | Returns `@ConfigProperty` values -- tests set specific returns |
-| **Silent no-op** | `CaseMemoryStore`, `AgentProvider`, `AccessControlProvider`, `ExpressionEngineRegistry`, `PreferenceStore`, `PreferenceSchemaRegistry`, `CredentialResolver`, `DataSourceRegistry`, `EndpointRegistry`, `RegistryService`, `MarshallerRegistry`, `NotificationStore`, `SubscriptionStore`, `SuppressionStore`, `NotificationPreferenceStore`, `DeliveryAttemptStore`, `DigestBuffer`, `DeliveryChannelRegistry`, `SubjectViewStore`, `ViewMembershipTracker`, `CrossTenantSubjectViewStore`, `DIDResolver`, `ActorDIDProvider`, `EventTypeRegistry`, `EntityWatcherProvider`, `StrategyResolver`, `DisplayTermResolver`, `PdfGenerator`, `DocumentSigningService`, `DocumentVerificationService`, `McpResourceRegistry`, `ModelRegistry` (`NoOpModelRegistry`), `CallbackRegistry`, `LlmCredentialStore`, `SessionIsolator`, `WorkerCredentialStore`, `AgentCredentialValidator`, `WorkerAuthorizationPolicy` (`AutoApproveWorkerAuthorizationPolicy`) | Returns empty/void -- system works without the capability |
+| **Silent no-op** | `CaseMemoryStore`, `AgentProvider`, `AccessControlProvider`, `ExpressionEngineRegistry`, `PreferenceStore`, `PreferenceSchemaRegistry`, `CredentialResolver`, `DataSourceRegistry`, `EndpointRegistry`, `RegistryService`, `MarshallerRegistry`, `NotificationStore`, `SubscriptionStore`, `SuppressionStore`, `NotificationPreferenceStore`, `DeliveryAttemptStore`, `DigestBuffer`, `DeliveryChannelRegistry`, `SubjectViewStore`, `ViewMembershipTracker`, `CrossTenantSubjectViewStore`, `DIDResolver`, `ActorDIDProvider`, `EventTypeRegistry`, `EntityWatcherProvider`, `StrategyResolver`, `DisplayTermResolver`, `PdfGenerator`, `DocumentSigningService`, `DocumentVerificationService`, `McpResourceRegistry`, `ModelRegistry` (`NoOpModelRegistry`), `CallbackRegistry`, `LlmCredentialStore`, `SessionIsolator`, `WorkerCredentialStore`, `AgentCredentialValidator`, `WorkerAuthorizationPolicy` (`AutoApproveWorkerAuthorizationPolicy`), `ServiceConnectionProvider` (`NoOpServiceConnectionProvider` -- reports `DISCONNECTED`, `getAccessToken()` throws `ServiceConnectionException`) | Returns empty/void -- system works without the capability |
 
 ### CDI Priority Ladder
 
@@ -411,6 +411,26 @@ Cross-domain actor overload detection and automated work redistribution. The SPI
 **Signals are tenant-agnostic.** An agent's context window or session slots are physical resources shared across tenants. Pressure represents aggregate physical state. Tenant scoping happens at the domain executor level during redistribution.
 
 ---
+
+### Service Connection Architecture
+
+`ServiceConnectionProvider` is a **derived view**: it owns no storage. `ServiceConnectionProviderCore` (`authn-social-core`) is a facade over three existing pieces:
+
+| Collaborator | Role |
+|--------------|------|
+| `OAuthTokenStore` | Source of truth: one `OAuthTokenRecord` per (actorId, provider, tenancyId) written by social login |
+| `ScopeRegistry` (`ScopeRegistryCore`, `authn-core`) | Required scopes per provider, aggregated across consumers |
+| `OAuthTokenManagerCore` | Token validity check, refresh via `TokenRefreshClient`, revocation |
+
+Status is computed on every call. No token means `DISCONNECTED`. Otherwise `ScopeRegistry.missingScopes(provider, token.grantedScopes())` decides: empty means `CONNECTED`, non-empty means `PARTIAL`. Because the view is derived, it cannot drift from the token store. A new consumer that registers more scopes immediately flips existing connections to `PARTIAL`. `listConnections()` unions providers that have a token with `ScopeRegistry.registeredProviders()`.
+
+**Scope registration.** `@RequiresScopes(provider, scopes)` (platform-api) is a type-level annotation. The Quarkus `AuthnBeans` producer scans CDI beans via `BeanManager`. `AuthnSpringAutoConfiguration` scans the application context, unwrapping AOP proxies. Each annotated class is registered as a consumer, so `requiredScopes(provider, consumer)` can attribute scopes.
+
+**Login-time scope merging.** `ScopeMergingLoginCustomizer` (`authn-core`) is an optional constructor argument to `AuthenticationRouterCore`. Before `initiate()` dispatches to a provider, the router calls `customize(context, context.method())`. That adds the provider's registered scopes as the `additionalScopes` hint, which `AbstractOAuthAuthenticationProvider` appends to the authorization request. `casehub.authn.merge-service-scopes=false` turns it into a pass-through (`AuthnConfig` / `AuthnSpringProperties`).
+
+**Incremental consent.** `IncrementalConsentHandlerCore` (`authn-social-core`) keeps a map of `AbstractOAuthAuthenticationProvider` keyed by `method()`. It re-runs `initiate()` with origin `incremental-consent`, the existing principal and `additionalScopes = missingScopes`. It then returns the resulting `OAuthChallengeResponse` as a `ConsentRequest` (`challengeId` becomes `state`). Completion goes through the normal OAuth callback, which updates the stored token's granted scopes.
+
+**Default bean.** `NoOpServiceConnectionProvider` exists twice: as a POJO in `platform-core` and as a `@DefaultBean` in `platform`. It is a silent no-op for reads and fails closed for `getAccessToken()`, so code that calls external APIs never gets a token when no social stack is installed. The real `ServiceConnectionProviderCore`, `ScopeRegistryCore`, `IncrementalConsentHandlerCore` and `ScopeMergingLoginCustomizer` are produced by `AuthnBeans` (Quarkus) and `AuthnSpringAutoConfiguration` (Spring).
 
 ## Dependencies
 

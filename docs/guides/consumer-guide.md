@@ -435,6 +435,9 @@ Pluggable identity authentication — WebAuthn/passkeys, social login (Google/Gi
 | `WebAuthnCredentialStore` | WebAuthn credential persistence — COSE public keys, sign counts |
 | `JwtSigningKeyResolver` | Per-tenant JWT signing key resolution |
 | `UserResolver` | SCIM user lookup for identity binding |
+| `ServiceConnectionProvider` | Per-actor view of connected external services (Google, GitHub, ...) — connection status, access tokens with transparent refresh, missing scopes. `NoOpServiceConnectionProvider` `@DefaultBean` reports every provider `DISCONNECTED` |
+| `ScopeRegistry` | Registry of OAuth scopes each provider must grant, aggregated from consumers (populated from `@RequiresScopes`) |
+| `IncrementalConsentHandler` | Builds a `ConsentRequest` (authorization URL + state) asking an actor to grant additional scopes |
 | `AuthenticationEventListener` | Callback for authentication events — `onAuthenticationSuccess()`, `onAuthenticationFailure()`, `onSocialLoginCompleted()`, `onOAuthTokenRefreshFailed()`. No-op default; implement to audit or react |
 
 **Configuration** (Quarkus and Spring):
@@ -444,6 +447,7 @@ casehub:
   authn:
     access-token-ttl-seconds: 900
     refresh-token-ttl-seconds: 2592000
+    merge-service-scopes: true   # request registered service scopes during social login
     webauthn:
       rp-id: example.com
       rp-name: Example App
@@ -458,6 +462,57 @@ casehub:
         client-secret: ${GITHUB_CLIENT_SECRET}
         redirect-uri: https://example.com/auth/github/callback
 ```
+
+#### Service Connections
+
+A social login stores the provider's OAuth token in `OAuthTokenStore`. `ServiceConnectionProvider` lets application code reuse that token to call the provider's APIs (Gmail, GitHub, Calendar, ...) on the actor's behalf. It needs `casehub-platform-authn-social-core` plus an `OAuthTokenStore` backend (`casehub-platform-authn-social-jpa` in production). Without them, the `@DefaultBean` no-op is active.
+
+**1. Declare the scopes you need.** Annotate the bean that calls the provider API. At startup, `ScopeRegistry` collects every `@RequiresScopes` (Quarkus via `BeanManager`, Spring via the application context):
+
+```java
+@ApplicationScoped
+@RequiresScopes(provider = "google", scopes = {"https://www.googleapis.com/auth/gmail.readonly"})
+public class GmailInboxReader { ... }
+```
+
+You can also register scopes programmatically with `scopeRegistry.register(provider, scopes, consumerClass)`. While `casehub.authn.merge-service-scopes` is `true` (the default), `ScopeMergingLoginCustomizer` adds every registered scope for the provider to the social login request. Users then grant service access when they sign in, with no second consent prompt.
+
+**2. Check connection status.**
+
+```java
+ServiceConnection conn = connections.getConnection(actorId, "google", tenancyId);
+switch (conn.status()) {
+    case CONNECTED    -> { /* token present, all registered scopes granted */ }
+    case PARTIAL      -> { /* token present, conn.missingScopes() not yet granted */ }
+    case DISCONNECTED -> { /* no token stored for this provider */ }
+}
+List<ServiceConnection> all = connections.listConnections(actorId, tenancyId);
+```
+
+`listConnections()` returns every provider the actor holds a token for, plus every provider with registered scopes. A provider the app needs but the actor never connected therefore shows up as `DISCONNECTED`.
+
+**3. Get an access token.**
+
+```java
+ServiceAccessToken token = connections.getAccessToken(actorId, "google", tenancyId);
+httpRequest.header("Authorization", "Bearer " + token.accessToken());
+```
+
+An expired token is refreshed transparently via `OAuthTokenManagerCore` when a refresh token is stored. When there is no usable token (never connected, or the refresh failed), the call throws `ServiceConnectionException`, which carries `requiredScopes()`, `grantedScopes()` and `missingScopes()`. A failed refresh also fires `AuthenticationEventListener.onOAuthTokenRefreshFailed()`. `disconnect()` revokes the stored token.
+
+**4. Fall back to incremental consent.** When `missingScopes()` is non-empty, ask the actor for just those scopes:
+
+```java
+Set<String> missing = connections.missingScopes(actorId, "google", tenancyId);
+if (!missing.isEmpty()) {
+    ConsentRequest consent = consentHandler.requestAdditionalScopes(actorId, "google", tenancyId, missing);
+    return redirectTo(consent.authorizationUrl()); // complete via the normal OAuth callback, state = consent.state()
+}
+```
+
+`requestAdditionalScopes()` rejects an empty scope set with `IllegalArgumentException`. It throws `ProviderUnavailableException` when no OAuth provider is configured for that provider key.
+
+**Security note:** an access token from `ServiceConnectionProvider` acts with the user's full delegated authority on the external service. Never pass it to an LLM context or an agent tool without the confirmation gate described under [Operation Confirmation](#operation-confirmation-confirmation).
 
 ### User Registration
 

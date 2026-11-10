@@ -58,6 +58,9 @@ public class DefaultPolicyEnforcer implements PolicyEnforcer, AutoCloseable {
     }
 
     private <T> T executeWithTimeout(Integer timeoutMs, Supplier<T> action) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedPolicyException("Interrupted before execution", new InterruptedException());
+        }
         if (timeoutMs == null) {
             try {
                 return action.get();

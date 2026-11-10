@@ -681,6 +681,7 @@ public final class StructuralStepEvaluator {
         var         branchFailures = new AtomicReference[branchCount];
         Future<?>[] futures        = new Future<?>[branchCount];
 
+        // Publish every Future before a winner can cancel the other branches.
         var allSubmitted = new CountDownLatch(1);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < branchCount; i++) {

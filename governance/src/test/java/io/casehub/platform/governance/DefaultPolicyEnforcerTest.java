@@ -3,8 +3,9 @@ package io.casehub.platform.governance;
 import io.casehub.platform.api.governance.BackoffStrategy;
 import io.casehub.platform.api.governance.ExecutionPolicy;
 import io.casehub.platform.api.governance.RetryPolicy;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -133,21 +134,26 @@ class DefaultPolicyEnforcerTest {
         assertThat(elapsed).isLessThan(500);
     }
 
-    @Test
-    @Disabled("Release 0.3: restore interrupted execution coverage — https://github.com/casehubio/platform/issues/621")
-    void execute_interrupted_throwsInterruptedPolicyException() {
-        ExecutionPolicy policy = new ExecutionPolicy(5000, new RetryPolicy(1, 0));
+    @ParameterizedTest
+    @CsvSource(value = {"null, 1", "null, 3", "5000, 1", "5000, 3"}, nullValues = "null")
+    void execute_interrupted_throwsInterruptedPolicyException(Integer timeoutMs, int maxAttempts) {
+        ExecutionPolicy policy = new ExecutionPolicy(timeoutMs, new RetryPolicy(maxAttempts, 0));
+        AtomicInteger attempts = new AtomicInteger();
 
         Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> enforcer.execute(policy, () -> {
+                attempts.incrementAndGet();
+                throw new RuntimeException("fail while interrupted");
+            }))
+                .isInstanceOf(InterruptedPolicyException.class)
+                .hasMessageContaining("Interrupted");
 
-        assertThatThrownBy(() -> enforcer.execute(policy, () -> {
-            throw new RuntimeException("fail while interrupted");
-        }))
-            .isInstanceOf(InterruptedPolicyException.class)
-            .hasMessageContaining("Interrupted");
-
-        assertThat(Thread.currentThread().isInterrupted()).isTrue();
-        Thread.interrupted(); // clear flag for other tests
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(attempts.get()).isZero();
+        } finally {
+            Thread.interrupted(); // clear flag even if an assertion fails
+        }
     }
 
     @Test

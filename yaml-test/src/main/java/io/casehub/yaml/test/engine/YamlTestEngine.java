@@ -227,29 +227,41 @@ public class YamlTestEngine implements TestEngine {
 
     @SuppressWarnings("unchecked")
     private static void discoverServices(MapServiceRegistry registry, String profile) {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper(
+                new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
+        var cl = Thread.currentThread().getContextClassLoader();
+        String filename = (profile != null && !profile.isEmpty())
+                          ? "META-INF/yaml-services-" + profile + ".yaml"
+                          : "META-INF/yaml-services.yaml";
+        java.util.Enumeration<java.net.URL> urls;
         try {
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper(
-                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
-            var cl = Thread.currentThread().getContextClassLoader();
-            String filename = (profile != null && !profile.isEmpty())
-                    ? "META-INF/yaml-services-" + profile + ".yaml"
-                    : "META-INF/yaml-services.yaml";
-            var urls = cl.getResources(filename);
-            while (urls.hasMoreElements()) {
-                try (var stream = urls.nextElement().openStream()) {
-                    var mappings = (java.util.Map<String, String>) mapper.readValue(stream, java.util.Map.class);
-                    if (mappings == null) {continue;}
-                    for (var entry : mappings.entrySet()) {
+            urls = cl.getResources(filename);
+        } catch (java.io.IOException e) {
+            java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                    .log(java.util.logging.Level.WARNING, "Failed to discover " + filename, e);
+            return;
+        }
+        while (urls.hasMoreElements()) {
+            var url = urls.nextElement();
+            try (var stream = url.openStream()) {
+                var mappings = (java.util.Map<String, String>) mapper.readValue(stream, java.util.Map.class);
+                if (mappings == null) {continue;}
+                for (var entry : mappings.entrySet()) {
+                    try {
                         Class<?> spiType = Class.forName(entry.getKey(), true, cl);
                         Object instance = Class.forName(entry.getValue(), true, cl)
                                                .getDeclaredConstructor().newInstance();
                         registry.register((Class) spiType, instance);
+                    } catch (Exception e) {
+                        java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                                .log(java.util.logging.Level.WARNING,
+                                                     "Skipping service " + entry.getKey() + " → " + entry.getValue(), e);
                     }
                 }
+            } catch (Exception e) {
+                java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
+                                        .log(java.util.logging.Level.WARNING, "Failed to process " + url, e);
             }
-        } catch (Exception e) {
-            java.util.logging.Logger.getLogger(YamlTestEngine.class.getName())
-                                    .log(java.util.logging.Level.WARNING, "Failed to load yaml-services.yaml", e);
         }
     }
 

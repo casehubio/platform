@@ -238,6 +238,33 @@ class PlaybookRunnerCoreTest {
     }
 
     @Test
+    void moduleParametersResolveInVarScope() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-module-params.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.captures()).containsKey("greeting");
+        assertThat(result.captures().get("greeting")).containsEntry("text", "Hello Bob");
+    }
+
+    @Test
+    void useDirectiveExpandsInsideIfThenBranch() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-use-in-branch.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+    }
+
+
+    @Test
     void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"),
                           "name: Sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");

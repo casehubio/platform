@@ -1,0 +1,10 @@
+name: Playbook with module parameters
+
+imports:
+  - module: parameterised
+    as: p
+    parameters:
+      caller-name: "Bob"
+
+steps:
+  - use: p.greet-caller

@@ -1,0 +1,12 @@
+name: Playbook with use in branch
+
+imports:
+  - module: greetings
+    as: g
+
+steps:
+  - if: "true"
+    then:
+      - use: g.say-hello
+    else:
+      - use: g.say-goodbye

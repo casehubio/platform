@@ -138,4 +138,84 @@ class PlaybookModuleBridgeTest {
         assertThat(result).containsEntry("name", "empty");
         assertThat(result).doesNotContainKey("steps");
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void expandUseStepsInsideThenBranch() {
+        List<Map<String, Object>> moduleSteps = List.of(
+                Map.of("agent-invoke", Map.of("prompt", "from module")));
+
+        Map<String, Object> expandedSections = Map.of(
+                "g.say-hello", (Object) moduleSteps);
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("steps", new ArrayList<>(List.of(
+                Map.of("if", "true",
+                       "then", new ArrayList<>(List.of(
+                                Map.of("use", "g.say-hello")))))));
+
+        Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
+                content, expandedSections);
+
+        var steps = (List<Map<String, Object>>) result.get("steps");
+        assertThat(steps).hasSize(1);
+        var ifStep    = steps.get(0);
+        var thenSteps = (List<Map<String, Object>>) ifStep.get("then");
+        assertThat(thenSteps).hasSize(1);
+        assertThat(((Map<String, Object>) thenSteps.get(0).get("agent-invoke")).get("prompt"))
+                .isEqualTo("from module");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void expandUseStepsInsideElseBranch() {
+        List<Map<String, Object>> moduleSteps = List.of(
+                Map.of("agent-invoke", Map.of("prompt", "goodbye")));
+
+        Map<String, Object> expandedSections = Map.of(
+                "g.say-goodbye", (Object) moduleSteps);
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("steps", new ArrayList<>(List.of(
+                Map.of("if", "true",
+                       "then", new ArrayList<>(List.of(
+                                Map.of("agent-invoke", Map.of("prompt", "inline")))),
+                       "else", new ArrayList<>(List.of(
+                                Map.of("use", "g.say-goodbye")))))));
+
+        Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
+                content, expandedSections);
+
+        var steps     = (List<Map<String, Object>>) result.get("steps");
+        var ifStep    = steps.get(0);
+        var elseSteps = (List<Map<String, Object>>) ifStep.get("else");
+        assertThat(elseSteps).hasSize(1);
+        assertThat(((Map<String, Object>) elseSteps.get(0).get("agent-invoke")).get("prompt"))
+                .isEqualTo("goodbye");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void expandUseStepsInsideNestedBlock() {
+        List<Map<String, Object>> moduleSteps = List.of(
+                Map.of("agent-invoke", Map.of("prompt", "nested")));
+
+        Map<String, Object> expandedSections = Map.of(
+                "g.say-hello", (Object) moduleSteps);
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("steps", new ArrayList<>(List.of(
+                Map.of("block", new ArrayList<>(List.of(
+                        Map.of("use", "g.say-hello")))))));
+
+        Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
+                content, expandedSections);
+
+        var steps      = (List<Map<String, Object>>) result.get("steps");
+        var blockSteps = (List<Map<String, Object>>) steps.get(0).get("block");
+        assertThat(blockSteps).hasSize(1);
+        assertThat(((Map<String, Object>) blockSteps.get(0).get("agent-invoke")).get("prompt"))
+                .isEqualTo("nested");
+    }
+
 }

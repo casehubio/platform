@@ -1,0 +1,12 @@
+module:
+  name: parameterised
+  parameters:
+    caller-name:
+      type: STRING
+      default: Alice
+
+steps:
+  greet-caller:
+    - agent-invoke:
+        prompt: "Hello ${var.caller-name}"
+      capture: greeting

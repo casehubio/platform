@@ -16,14 +16,14 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ManifestLoaderSecurityTest {
+class AgentManifestLoaderSecurityTest {
 
     @Test
     void verifyDigestAcceptsMatchingHash() throws Exception {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
         var hash = HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(content));
-        var result = ManifestLoader.verifyDigest(content, "sha256:" + hash, "test-uri");
+        var result = AgentManifestLoader.verifyDigest(content, "sha256:" + hash, "test-uri");
         assertThat(result).isTrue();
     }
 
@@ -31,14 +31,14 @@ class ManifestLoaderSecurityTest {
     void verifyDigestRejectsMismatch() throws Exception {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
         var wrongHash = "0".repeat(64);
-        var result = ManifestLoader.verifyDigest(content, "sha256:" + wrongHash, "test-uri");
+        var result = AgentManifestLoader.verifyDigest(content, "sha256:" + wrongHash, "test-uri");
         assertThat(result).isFalse();
     }
 
     @Test
     void verifyDigestSkipsWhenNotDeclared() {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
-        var result = ManifestLoader.verifyDigest(content, null, "test-uri");
+        var result = AgentManifestLoader.verifyDigest(content, null, "test-uri");
         assertThat(result).isTrue();
     }
 
@@ -59,8 +59,8 @@ class ManifestLoaderSecurityTest {
         DIDResolver resolver = (actorId, did) -> Optional.of(didDoc);
 
         var signatureB64 = Base64.getUrlEncoder().withoutPadding().encodeToString(sigBytes);
-        var result = ManifestLoader.verifySignature(content, signatureB64,
-                "did:web:test.example", resolver, "test-uri");
+        var result = AgentManifestLoader.verifySignature(content, signatureB64,
+                                                         "did:web:test.example", resolver, "test-uri");
         assertThat(result).isTrue();
     }
 
@@ -76,16 +76,16 @@ class ManifestLoaderSecurityTest {
         DIDResolver resolver = (actorId, did) -> Optional.of(didDoc);
 
         var badSig = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[64]);
-        var result = ManifestLoader.verifySignature(content, badSig,
-                "did:web:test.example", resolver, "test-uri");
+        var result = AgentManifestLoader.verifySignature(content, badSig,
+                                                         "did:web:test.example", resolver, "test-uri");
         assertThat(result).isFalse();
     }
 
     @Test
     void verifySignatureRejectsNullResolver() {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
-        var result = ManifestLoader.verifySignature(content, "dGVzdA",
-                "did:web:test.example", null, "test-uri");
+        var result = AgentManifestLoader.verifySignature(content, "dGVzdA",
+                                                         "did:web:test.example", null, "test-uri");
         assertThat(result).isFalse();
     }
 
@@ -93,8 +93,8 @@ class ManifestLoaderSecurityTest {
     void verifySignatureRejectsUnresolvableDid() {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
         DIDResolver resolver = (actorId, did) -> Optional.empty();
-        var result = ManifestLoader.verifySignature(content, "dGVzdA",
-                "did:web:test.example", resolver, "test-uri");
+        var result = AgentManifestLoader.verifySignature(content, "dGVzdA",
+                                                         "did:web:test.example", resolver, "test-uri");
         assertThat(result).isFalse();
     }
 
@@ -103,14 +103,14 @@ class ManifestLoaderSecurityTest {
         var content = "models: []\n".getBytes(StandardCharsets.UTF_8);
         var didDoc = new DIDDocument("did:web:test.example", List.of(), List.of());
         DIDResolver resolver = (actorId, did) -> Optional.of(didDoc);
-        var result = ManifestLoader.verifySignature(content, "dGVzdA",
-                "did:web:test.example", resolver, "test-uri");
+        var result = AgentManifestLoader.verifySignature(content, "dGVzdA",
+                                                         "did:web:test.example", resolver, "test-uri");
         assertThat(result).isFalse();
     }
 
     @Test
     void verifySignatureSkipsWhenNotDeclared() {
-        var result = ManifestLoader.verifySignature("data".getBytes(), null, null, null, "test-uri");
+        var result = AgentManifestLoader.verifySignature("data".getBytes(), null, null, null, "test-uri");
         assertThat(result).isTrue();
     }
 }

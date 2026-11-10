@@ -18,12 +18,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ManifestLoaderTest {
+class AgentManifestLoaderTest {
 
-    private final ManifestLoader loader = new ManifestLoader();
+    private final AgentManifestLoader loader = new AgentManifestLoader();
 
     @Test
-    void loadsSingleManifestFromClasspath() throws URISyntaxException {
+    void loadsSingleAgentManifestFromClasspath() throws URISyntaxException {
         var uri = getClass().getClassLoader().getResource("manifests/base.yaml").toURI();
         var manifest = loader.loadResource(uri);
         assertThat(manifest.providers()).hasSize(1);
@@ -33,7 +33,7 @@ class ManifestLoaderTest {
     }
 
     @Test
-    void loadsOverrideManifest() throws URISyntaxException {
+    void loadsOverrideAgentManifest() throws URISyntaxException {
         var uri = getClass().getClassLoader().getResource("manifests/override.yaml").toURI();
         var manifest = loader.loadResource(uri);
         assertThat(manifest.providers()).hasSize(1);
@@ -46,11 +46,11 @@ class ManifestLoaderTest {
         var seedModel = testModel("claude-opus-5", ModelTier.FLAGSHIP);
         var overrideModel = testModel("claude-opus-5", ModelTier.STANDARD);
 
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(seedModel), List.of(), Map.of()), 0));
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(overrideModel), List.of(), Map.of()), 30));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(seedModel), List.of(), Map.of()), 0));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(overrideModel), List.of(), Map.of()), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.models()).hasSize(1);
@@ -62,11 +62,11 @@ class ManifestLoaderTest {
         var p1 = new ProviderDeclaration("anthropic", "env:KEY_A", null);
         var p2 = new ProviderDeclaration("anthropic", "env:KEY_B", null);
 
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(), List.of(p1), Map.of()), 10));
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(), List.of(p2), Map.of()), 30));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(), List.of(p1), Map.of()), 10));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(), List.of(p2), Map.of()), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.providers()).hasSize(1);
@@ -78,11 +78,11 @@ class ManifestLoaderTest {
         var a1 = new AliasDeclaration("FLAGSHIP", List.of("reasoning"), null, null, null, null, null, null, null);
         var a2 = new AliasDeclaration("FAST", List.of("text"), null, null, null, null, null, null, null);
 
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(), List.of(), Map.of("fast-mode", a1)), 10));
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                manifestWith(List.of(), List.of(), Map.of("fast-mode", a2)), 30));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(), List.of(), Map.of("fast-mode", a1)), 10));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                agentManifestWith(List.of(), List.of(), Map.of("fast-mode", a2)), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.aliases().get("fast-mode").tier()).isEqualTo("FAST");
@@ -93,12 +93,12 @@ class ManifestLoaderTest {
         var lm1 = new LocalModelDeclaration("llama-4-scout", "present");
         var lm2 = new LocalModelDeclaration("codestral", "present");
 
-        var m1 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm1), null, Map.of());
-        var m2 = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm2), null, Map.of());
+        var m1 = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm1), null, Map.of());
+        var m2 = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(lm2), null, Map.of());
 
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(m1, 10));
-        entries.add(new ManifestLoader.PrioritizedManifest(m2, 20));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(m1, 10));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(m2, 20));
 
         var merged = loader.merge(entries);
         assertThat(merged.localModels()).hasSize(2);
@@ -106,11 +106,11 @@ class ManifestLoaderTest {
 
     @Test
     void mergeDefaultsLastWriterWins() {
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("claude"), Map.of()), 10));
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("ollama"), Map.of()), 30));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("claude"), Map.of()), 10));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), new ManifestDefaults("ollama"), Map.of()), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.defaults().backend()).isEqualTo("ollama");
@@ -367,13 +367,13 @@ class ManifestLoaderTest {
         var p2 = new PoolDeclaration("review-pool", "agent-b", "claudony", 2, 8, null, null, null);
         var p3 = new PoolDeclaration("other-pool", "agent-c", "claudony", 0, 2, null, null, null);
 
-        var entries = new ArrayList<ManifestLoader.PrioritizedManifest>();
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
-                             Map.of("review-pool", p1, "other-pool", p3)), 10));
-        entries.add(new ManifestLoader.PrioritizedManifest(
-                new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
-                             Map.of("review-pool", p2)), 30));
+        var entries = new ArrayList<AgentManifestLoader.PrioritizedManifest>();
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                                  Map.of("review-pool", p1, "other-pool", p3)), 10));
+        entries.add(new AgentManifestLoader.PrioritizedManifest(
+                new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                                  Map.of("review-pool", p2)), 30));
 
         var merged = loader.merge(entries);
         assertThat(merged.pools()).hasSize(2);
@@ -386,8 +386,8 @@ class ManifestLoaderTest {
                 Set.of("text"), 200000, 16384, ModelLocality.CLOUD, CostTier.MEDIUM, "api-key", Map.of());
     }
 
-    private Manifest manifestWith(List<ModelDescriptor> models, List<ProviderDeclaration> providers,
-                                  Map<String, AliasDeclaration> aliases) {
-        return new Manifest(models, providers, List.of(), aliases, List.of(), null, Map.of());
+    private AgentManifest agentManifestWith(List<ModelDescriptor> models, List<ProviderDeclaration> providers,
+                                            Map<String, AliasDeclaration> aliases) {
+        return new AgentManifest(models, providers, List.of(), aliases, List.of(), null, Map.of());
     }
 }

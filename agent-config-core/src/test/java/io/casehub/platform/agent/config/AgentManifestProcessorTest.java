@@ -21,33 +21,33 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ManifestProcessorTest {
+class AgentManifestProcessorTest {
 
     private final TestCredentialStore credStore = new TestCredentialStore();
-    private final TestModelRegistry registry = new TestModelRegistry();
-    private final ManifestCredentialResolver credResolver = new ManifestCredentialResolver(ref -> Map.of());
-    private final List<String> reconciledModels = new ArrayList<>();
+    private final TestModelRegistry               registry         = new TestModelRegistry();
+    private final AgentManifestCredentialResolver credResolver     = new AgentManifestCredentialResolver(ref -> Map.of());
+    private final List<String>                    reconciledModels = new ArrayList<>();
     private final LocalModelReconciler reconciler = reconciledModels::add;
 
-    private ManifestProcessor processor(Map<String, List<String>> vendorReqs) {
-        return new ManifestProcessor(credStore, registry, credResolver, vendorReqs, reconciler);
+    private AgentManifestProcessor processor(Map<String, List<String>> vendorReqs) {
+        return new AgentManifestProcessor(credStore, registry, credResolver, vendorReqs, reconciler);
     }
 
     @Test
     void processStoresCredentialsWithCloudPrefix() {
-        var manifest = new Manifest(
+        var manifest = new AgentManifest(
                 List.of(),
                 List.of(new ProviderDeclaration("anthropic", "env:ANTHROPIC_API_KEY", null)),
                 List.of(), Map.of(), List.of(), null, Map.of());
 
-        var envResolver = new ManifestCredentialResolver(ref -> Map.of()) {
+        var envResolver = new AgentManifestCredentialResolver(ref -> Map.of()) {
             @Override
             public String resolve(CredentialRef ref) {
                 return "sk-test-123";
             }
         };
-        var proc = new ManifestProcessor(credStore, registry, envResolver,
-                Map.of("anthropic", List.of("api-key")), reconciler);
+        var proc = new AgentManifestProcessor(credStore, registry, envResolver,
+                                              Map.of("anthropic", List.of("api-key")), reconciler);
         proc.process(manifest);
 
         var stored = credStore.resolve("platform", "cloud-anthropic");
@@ -57,7 +57,7 @@ class ManifestProcessorTest {
     @Test
     void processRegistersModelsAtPriority8() {
         var model = testModel("custom-model", ModelTier.STANDARD);
-        var manifest = new Manifest(List.of(model), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
+        var manifest = new AgentManifest(List.of(model), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
 
         processor(Map.of()).process(manifest);
 
@@ -69,7 +69,7 @@ class ManifestProcessorTest {
     @Test
     void processConvertsAliasToSingleEntryChain() {
         var alias = new AliasDeclaration("FLAGSHIP", List.of("reasoning", "code"), null, "HIGH", 128000, null, "anthropic", null, null);
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of("reasoning-heavy", alias), List.of(), null, Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of("reasoning-heavy", alias), List.of(), null, Map.of());
 
         var result = processor(Map.of()).process(manifest);
 
@@ -90,7 +90,7 @@ class ManifestProcessorTest {
         var entry2 = new ChainEntry(null, "FAST", List.of(), "CLOUD", null, null, null, null, null);
         var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry1, entry2));
 
-        var chain = ManifestProcessor.toModelChain(alias);
+        var chain = AgentManifestProcessor.toModelChain(alias);
 
         assertThat(chain.entries()).hasSize(2);
         var q1 = (ModelChain.ModelChainEntry.Queried) chain.entries().get(0);
@@ -105,7 +105,7 @@ class ManifestProcessorTest {
         var entry = new ChainEntry("claude-opus-5", null, List.of(), null, null, null, null, null, null);
         var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry));
 
-        var chain = ManifestProcessor.toModelChain(alias);
+        var chain = AgentManifestProcessor.toModelChain(alias);
 
         assertThat(chain.entries()).hasSize(1);
         assertThat(chain.entries().get(0)).isInstanceOf(ModelChain.ModelChainEntry.Named.class);
@@ -117,7 +117,7 @@ class ManifestProcessorTest {
         var entry = new ChainEntry(null, "FAST", List.of(), null, null, null, null, null, "simulation");
         var alias = new AliasDeclaration(null, List.of(), null, null, null, null, null, null, List.of(entry));
 
-        var chain = ManifestProcessor.toModelChain(alias);
+        var chain = AgentManifestProcessor.toModelChain(alias);
 
         var q = (ModelChain.ModelChainEntry.Queried) chain.entries().get(0);
         assertThat(q.query().backendKey()).isEqualTo("simulation");
@@ -128,47 +128,47 @@ class ManifestProcessorTest {
         var entry = new ChainEntry(null, "FAST", List.of(), null, null, null, null, null, null);
         var alias = new AliasDeclaration("STANDARD", List.of(), null, null, null, null, null, null, List.of(entry));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ManifestProcessor.toModelChain(alias))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> AgentManifestProcessor.toModelChain(alias))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("mutually exclusive");
     }
 
     @Test
     void processReturnsDefaultBackend() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(),
-                new ManifestDefaults("ollama"), Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(),
+                                         new ManifestDefaults("ollama"), Map.of());
         var result = processor(Map.of()).process(manifest);
         assertThat(result.defaultBackendKey()).isEqualTo("ollama");
     }
 
     @Test
     void processReturnsNullDefaultWhenNotSet() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
         var result = processor(Map.of()).process(manifest);
         assertThat(result.defaultBackendKey()).isNull();
     }
 
     @Test
     void processCallsReconcilerForLocalModels() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(),
-                List.of(new LocalModelDeclaration("llama-4-scout", "present")), null, Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(),
+                                         List.of(new LocalModelDeclaration("llama-4-scout", "present")), null, Map.of());
         processor(Map.of()).process(manifest);
         assertThat(reconciledModels).containsExactly("llama-4-scout");
     }
 
     @Test
     void processSkipsLocalModelWithoutEnsurePresent() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(),
-                List.of(new LocalModelDeclaration("llama-4-scout", null)), null, Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(),
+                                         List.of(new LocalModelDeclaration("llama-4-scout", null)), null, Map.of());
         processor(Map.of()).process(manifest);
         assertThat(reconciledModels).isEmpty();
     }
 
     @Test
     void processHandlesProviderWithNoCredential() {
-        var manifest = new Manifest(List.of(),
-                List.of(new ProviderDeclaration("ollama", null, "localhost:11434")),
-                List.of(), Map.of(), List.of(), null, Map.of());
+        var manifest = new AgentManifest(List.of(),
+                                         List.of(new ProviderDeclaration("ollama", null, "localhost:11434")),
+                                         List.of(), Map.of(), List.of(), null, Map.of());
         processor(Map.of("ollama", List.of())).process(manifest);
         assertThat(credStore.listRefs("platform")).isEmpty();
     }
@@ -178,8 +178,8 @@ class ManifestProcessorTest {
     void processPassesPoolsToResult() {
         var pool = new PoolDeclaration("review-pool", "code-reviewer", "claudony",
                                        2, 8, "~/reviews", Map.of("type", "target-tracking"), Map.of());
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
-                                    Map.of("review-pool", pool));
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null,
+                                         Map.of("review-pool", pool));
 
         var result = processor(Map.of()).process(manifest);
         assertThat(result.pools()).hasSize(1);
@@ -189,7 +189,7 @@ class ManifestProcessorTest {
 
     @Test
     void processEmptyPoolsReturnsEmptyList() {
-        var manifest = new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
+        var manifest = new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
         var result   = processor(Map.of()).process(manifest);
         assertThat(result.pools()).isEmpty();
     }

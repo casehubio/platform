@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public record Manifest(
+public record AgentManifest(
         List<ModelDescriptor> models,
         List<ProviderDeclaration> providers,
         List<SourceDeclaration> sources,
@@ -15,7 +15,7 @@ public record Manifest(
         ManifestDefaults defaults,
         Map<String, PoolDeclaration> pools
 ) {
-    public Manifest {
+    public AgentManifest {
         models = models != null ? List.copyOf(models) : List.of();
         providers = providers != null ? List.copyOf(providers) : List.of();
         sources = sources != null ? List.copyOf(sources) : List.of();

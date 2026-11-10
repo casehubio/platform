@@ -14,23 +14,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ManifestProcessor {
+public class AgentManifestProcessor {
 
-    private static final Logger LOG = Logger.getLogger(ManifestProcessor.class);
+    private static final Logger LOG = Logger.getLogger(AgentManifestProcessor.class);
     private static final String PLATFORM_TENANT_ID = "platform";
     private static final int MANIFEST_SOURCE_PRIORITY = 8;
 
     private final LlmCredentialStore credentialStore;
-    private final MutableModelRegistry modelRegistry;
-    private final ManifestCredentialResolver credentialResolver;
-    private final Map<String, List<String>> vendorRequiredFields;
+    private final MutableModelRegistry            modelRegistry;
+    private final AgentManifestCredentialResolver credentialResolver;
+    private final Map<String, List<String>>       vendorRequiredFields;
     private final LocalModelReconciler reconciler;
 
-    public ManifestProcessor(LlmCredentialStore credentialStore,
-                             MutableModelRegistry modelRegistry,
-                             ManifestCredentialResolver credentialResolver,
-                             Map<String, List<String>> vendorRequiredFields,
-                             LocalModelReconciler reconciler) {
+    public AgentManifestProcessor(LlmCredentialStore credentialStore,
+                                  MutableModelRegistry modelRegistry,
+                                  AgentManifestCredentialResolver credentialResolver,
+                                  Map<String, List<String>> vendorRequiredFields,
+                                  LocalModelReconciler reconciler) {
         this.credentialStore = credentialStore;
         this.modelRegistry = modelRegistry;
         this.credentialResolver = credentialResolver;
@@ -38,15 +38,15 @@ public class ManifestProcessor {
         this.reconciler = reconciler;
     }
 
-    public ManifestResult process(Manifest manifest) {
-        processProviders(manifest);
-        processModels(manifest);
-        processLocalModels(manifest);
-        return processAliasesAndDefaults(manifest);
+    public AgentManifestResult process(AgentManifest agentManifest) {
+        processProviders(agentManifest);
+        processModels(agentManifest);
+        processLocalModels(agentManifest);
+        return processAliasesAndDefaults(agentManifest);
     }
 
-    private void processProviders(Manifest manifest) {
-        for (var provider : manifest.providers()) {
+    private void processProviders(AgentManifest agentManifest) {
+        for (var provider : agentManifest.providers()) {
             try {
                 var resolved = resolveProviderCredentials(provider);
                 if (!resolved.isEmpty()) {
@@ -87,15 +87,15 @@ public class ManifestProcessor {
         return credentialResolver.resolveMap(refMap);
     }
 
-    private void processModels(Manifest manifest) {
-        if (manifest.models().isEmpty()) return;
-        var delta = modelRegistry.replaceSource("manifest", MANIFEST_SOURCE_PRIORITY, manifest.models());
+    private void processModels(AgentManifest agentManifest) {
+        if (agentManifest.models().isEmpty()) return;
+        var delta = modelRegistry.replaceSource("manifest", MANIFEST_SOURCE_PRIORITY, agentManifest.models());
         LOG.infof("Registered %d manifest models (added: %d, updated: %d, removed: %d)",
-                manifest.models().size(), delta.addedIds().size(), delta.updatedIds().size(), delta.removedIds().size());
+                  agentManifest.models().size(), delta.addedIds().size(), delta.updatedIds().size(), delta.removedIds().size());
     }
 
-    private void processLocalModels(Manifest manifest) {
-        for (var local : manifest.localModels()) {
+    private void processLocalModels(AgentManifest agentManifest) {
+        for (var local : agentManifest.localModels()) {
             if ("present".equals(local.ensure())) {
                 try {
                     reconciler.ensurePresent(local.id());
@@ -107,17 +107,17 @@ public class ManifestProcessor {
         }
     }
 
-    private ManifestResult processAliasesAndDefaults(Manifest manifest) {
+    private AgentManifestResult processAliasesAndDefaults(AgentManifest agentManifest) {
         var aliases = new LinkedHashMap<String, ModelChain>();
-        for (var entry : manifest.aliases().entrySet()) {
+        for (var entry : agentManifest.aliases().entrySet()) {
             aliases.put(entry.getKey(), toModelChain(entry.getValue()));
         }
 
-        String defaultBackend = manifest.defaults() != null ? manifest.defaults().backend() : null;
-        var pools = new java.util.ArrayList<>(manifest.pools().values());
+        String defaultBackend = agentManifest.defaults() != null ? agentManifest.defaults().backend() : null;
+        var pools = new java.util.ArrayList<>(agentManifest.pools().values());
 
         var providers = new LinkedHashMap<String, Map<String, String>>();
-        for (var pd : manifest.providers()) {
+        for (var pd : agentManifest.providers()) {
             var props = new LinkedHashMap<String, String>();
             if (pd.host() != null) props.put("host", pd.host());
             if (pd.hasScalarCredential()) props.put("credential", pd.scalarCredential());
@@ -127,7 +127,7 @@ public class ManifestProcessor {
         LOG.infof("Manifest processed: %d aliases, %d pools, %d providers, default backend: %s",
                 aliases.size(), pools.size(), providers.size(),
                 defaultBackend != null ? defaultBackend : "(not set)");
-        return new ManifestResult(aliases, defaultBackend, pools, providers);
+        return new AgentManifestResult(aliases, defaultBackend, pools, providers);
     }
 
     static ModelChain toModelChain(AliasDeclaration alias) {
@@ -143,7 +143,7 @@ public class ManifestProcessor {
         }
         if (hasChain) {
             return ModelChain.of(alias.chain().stream()
-                    .map(ManifestProcessor::toChainEntry)
+                    .map(AgentManifestProcessor::toChainEntry)
                     .toList());
         }
         return ModelChain.of(List.of(new ModelChain.ModelChainEntry.Queried(toModelQuery(alias))));

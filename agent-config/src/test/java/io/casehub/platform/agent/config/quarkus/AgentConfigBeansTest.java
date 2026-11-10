@@ -1,6 +1,6 @@
 package io.casehub.platform.agent.config.quarkus;
 
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -10,18 +10,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentConfigBeansTest {
 
     @Inject
-    ManifestResult manifestResult;
+    AgentManifestResult agentManifestResult;
 
     @Test
     void manifestResultProducedAtStartup() {
-        assertThat(manifestResult).isNotNull();
-        assertThat(manifestResult.defaultBackendKey()).isEqualTo("claude");
+        assertThat(agentManifestResult).isNotNull();
+        assertThat(agentManifestResult.defaultBackendKey()).isEqualTo("claude");
     }
 
     @Test
     void aliasesLoadedFromConfig() {
-        assertThat(manifestResult.aliases()).containsKey("fast");
-        var fastChain = manifestResult.aliases().get("fast");
+        assertThat(agentManifestResult.aliases()).containsKey("fast");
+        var fastChain = agentManifestResult.aliases().get("fast");
         assertThat(fastChain.entries()).isNotEmpty();
     }
 }

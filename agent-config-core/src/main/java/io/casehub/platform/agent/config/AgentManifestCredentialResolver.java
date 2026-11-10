@@ -6,11 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-public class ManifestCredentialResolver {
+public class AgentManifestCredentialResolver {
 
     private final CredentialResolver externalResolver;
 
-    public ManifestCredentialResolver(CredentialResolver externalResolver) {
+    public AgentManifestCredentialResolver(CredentialResolver externalResolver) {
         this.externalResolver = externalResolver;
     }
 

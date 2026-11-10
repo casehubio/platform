@@ -8,7 +8,7 @@ import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.casehub.platform.api.FactoryMethod;
 import io.casehub.platform.api.model.ModelAvailabilityFilter;
 import io.casehub.platform.api.model.ModelChain;
@@ -82,7 +82,7 @@ public class RoutingAgentProvider implements AgentProvider {
             BackendInstanceRegistry registry,
             String configDefaultBackend,
             ModelRegistry modelRegistry,
-            Optional<ManifestResult> manifestResult) {
+            Optional<AgentManifestResult> manifestResult) {
         return create(registry, configDefaultBackend, modelRegistry, manifestResult, null, null);
     }
 
@@ -91,7 +91,7 @@ public class RoutingAgentProvider implements AgentProvider {
             BackendInstanceRegistry registry,
             String configDefaultBackend,
             ModelRegistry modelRegistry,
-            Optional<ManifestResult> manifestResult,
+            Optional<AgentManifestResult> manifestResult,
             ModelAvailabilityFilter availabilityFilter,
             io.casehub.platform.agent.session.SessionPoolRegistry poolRegistry) {
         if (manifestResult.isPresent()) {
@@ -106,15 +106,15 @@ public class RoutingAgentProvider implements AgentProvider {
     }
 
     public static RoutingAgentProvider of(AgentBackend... backends) {
-        return of(java.util.List.of(backends), ManifestResult.empty());
+        return of(java.util.List.of(backends), AgentManifestResult.empty());
     }
 
-    public static RoutingAgentProvider of(java.util.List<AgentBackend> backends, ManifestResult manifest) {
+    public static RoutingAgentProvider of(java.util.List<AgentBackend> backends, AgentManifestResult manifest) {
         return of(backends, manifest, ModelRegistry.empty());
     }
 
     public static RoutingAgentProvider of(java.util.List<AgentBackend> backends,
-                                          ManifestResult manifest, ModelRegistry modelRegistry) {
+                                          AgentManifestResult manifest, ModelRegistry modelRegistry) {
         var registry = InMemoryBackendInstanceRegistry.of(backends.toArray(AgentBackend[]::new));
         String defaultKey = manifest.defaultBackendKey() != null
                             ? manifest.defaultBackendKey()

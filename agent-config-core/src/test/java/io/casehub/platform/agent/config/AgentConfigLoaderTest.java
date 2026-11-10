@@ -36,7 +36,7 @@ class AgentConfigLoaderTest {
                 tempDir,
                 null, false);
 
-        ManifestResult result = loader.load();
+        AgentManifestResult result = loader.load();
 
         assertThat(result).isNotNull();
         assertThat(result.defaultBackendKey()).isEqualTo("claude");
@@ -55,7 +55,7 @@ class AgentConfigLoaderTest {
                 tempDir,
                 null, false);
 
-        ManifestResult result = loader.load();
+        AgentManifestResult result = loader.load();
 
         assertThat(result).isNotNull();
         // System-level config (~/.casehub/agent-config.yaml) may contribute aliases

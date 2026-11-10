@@ -5,14 +5,13 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +32,7 @@ class RoutingAgentProviderFactoryTest {
 
     @Test
     void ofWithManifest() {
-        var manifest = ManifestResult.empty();
+        var manifest = AgentManifestResult.empty();
         var provider = RoutingAgentProvider.of(List.of(stubBackend("ollama")), manifest);
         assertThat(provider).isNotNull();
     }

@@ -44,13 +44,13 @@ public class AgentConfigLoader {
         this.allowInsecure = allowInsecure;
     }
 
-    public ManifestResult load() {
-        var resolver = new ManifestCredentialResolver(credentialResolver);
-        var securityConfig = new ManifestSecurityConfig(allowInsecure);
-        var loader = new ManifestLoader(resolver, didResolver, securityConfig);
+    public AgentManifestResult load() {
+        var resolver = new AgentManifestCredentialResolver(credentialResolver);
+        var securityConfig = new AgentManifestSecurityConfig(allowInsecure);
+        var loader = new AgentManifestLoader(resolver, didResolver, securityConfig);
         var manifest = loader.load(projectDir, profile);
 
-        var processor = new ManifestProcessor(
+        var processor = new AgentManifestProcessor(
                 credentialStore, modelRegistry, resolver, vendorRequirements, reconciler);
         var result = processor.process(manifest);
 

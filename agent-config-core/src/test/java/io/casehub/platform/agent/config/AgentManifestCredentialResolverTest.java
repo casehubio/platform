@@ -9,9 +9,9 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ManifestCredentialResolverTest {
+class AgentManifestCredentialResolverTest {
 
-    private final ManifestCredentialResolver resolver = new ManifestCredentialResolver(ref -> Map.of());
+    private final AgentManifestCredentialResolver resolver = new AgentManifestCredentialResolver(ref -> Map.of());
 
     @Test
     void resolvesFileRef(@TempDir Path tempDir) throws IOException {
@@ -38,7 +38,7 @@ class ManifestCredentialResolverTest {
 
     @Test
     void externalRefDelegatesToResolver() {
-        var resolver = new ManifestCredentialResolver(
+        var resolver = new AgentManifestCredentialResolver(
                 ref -> "vault/anthropic".equals(ref)
                         ? Map.of("api-key", "sk-vault-123")
                         : Map.of());
@@ -61,7 +61,7 @@ class ManifestCredentialResolverTest {
         var refs = Map.of(
                 "field-a", "file:" + keyFile,
                 "field-b", "ref:vault/secret");
-        var resolver = new ManifestCredentialResolver(
+        var resolver = new AgentManifestCredentialResolver(
                 ref -> "vault/secret".equals(ref) ? Map.of("k", "vault-value") : Map.of());
         var result = resolver.resolveMap(refs);
         assertThat(result).containsEntry("field-a", "file-value");

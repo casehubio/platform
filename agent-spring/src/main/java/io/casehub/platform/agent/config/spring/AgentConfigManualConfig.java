@@ -1,7 +1,7 @@
 package io.casehub.platform.agent.config.spring;
 
 import io.casehub.platform.agent.config.AgentConfigLoader;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.credentials.LlmCredentialStore;
 import io.casehub.platform.api.identity.DIDResolver;
@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Map;
 
 @AutoConfiguration
-@ConditionalOnClass(ManifestResult.class)
+@ConditionalOnClass(AgentManifestResult.class)
 public class AgentConfigManualConfig {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgentConfigManualConfig.class);
 
     @Bean
-    public ManifestResult manifestResult(
+    public AgentManifestResult manifestResult(
             LlmCredentialStore credentialStore,
             MutableModelRegistry modelRegistry,
             CredentialResolver credentialResolver,

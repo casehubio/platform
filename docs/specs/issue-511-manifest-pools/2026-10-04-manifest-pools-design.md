@@ -104,11 +104,11 @@ public record ManifestResult(
 ) { ... }
 ```
 
-`ManifestResult.empty()` returns empty pools list. Pools are pass-through — no processing by `ManifestProcessor`, just collected and forwarded.
+`ManifestResult.empty()` returns empty pools list. Pools are pass-through — no processing by `AgentManifestProcessor`, just collected and forwarded.
 
 ### ManifestProcessor
 
-`process()` collects `manifest.pools()` values into a `List<PoolDeclaration>` and includes them in the returned `ManifestResult`. Logs pool count alongside existing alias/backend logging.
+`process()` collects `manifest.pools()` values into a `List<PoolDeclaration>` and includes them in the returned `AgentManifestResult`. Logs pool count alongside existing alias/backend logging.
 
 ### ManifestLoader
 

@@ -1,7 +1,7 @@
 package io.casehub.platform.agent.session.quarkus;
 
 import io.casehub.platform.agent.BackendInstanceRegistry;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.casehub.platform.agent.session.SessionLifecycleManager;
 import io.casehub.platform.agent.session.SessionPoolRegistry;
 import jakarta.annotation.PreDestroy;
@@ -20,7 +20,7 @@ public class SessionBeans {
     BackendInstanceRegistry backends;
 
     @Inject @Any
-    Instance<ManifestResult> manifestResult;
+    Instance<AgentManifestResult> manifestResult;
 
     private volatile SessionPoolRegistry registry;
 

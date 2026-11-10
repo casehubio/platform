@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ManifestLoader {
+public class AgentManifestLoader {
 
-    private static final Logger LOG = Logger.getLogger(ManifestLoader.class);
+    private static final Logger LOG = Logger.getLogger(AgentManifestLoader.class);
     private static final int MAX_DEPTH = 3;
     private static final int MAX_SOURCES = 20;
     private static final int MAX_BODY_SIZE = 1_048_576;
@@ -40,53 +40,53 @@ public class ManifestLoader {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "application/yaml", "application/x-yaml", "text/yaml", "application/json");
 
-    private final ObjectMapper mapper;
-    private final ManifestCredentialResolver credentialResolver;
-    private final DIDResolver didResolver;
-    private final ManifestSecurityConfig securityConfig;
-    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+    private final ObjectMapper                    mapper;
+    private final AgentManifestCredentialResolver credentialResolver;
+    private final DIDResolver                 didResolver;
+    private final AgentManifestSecurityConfig securityConfig;
+    private final java.net.http.HttpClient    httpClient = java.net.http.HttpClient.newBuilder()
             .connectTimeout(FETCH_TIMEOUT)
             .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
             .build();
 
-    public ManifestLoader(ManifestCredentialResolver credentialResolver,
-                          DIDResolver didResolver,
-                          ManifestSecurityConfig securityConfig) {
+    public AgentManifestLoader(AgentManifestCredentialResolver credentialResolver,
+                               DIDResolver didResolver,
+                               AgentManifestSecurityConfig securityConfig) {
         this.mapper = YamlMappers.create()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.credentialResolver = credentialResolver;
         this.didResolver = didResolver;
-        this.securityConfig = securityConfig != null ? securityConfig : new ManifestSecurityConfig(false);
+        this.securityConfig = securityConfig != null ? securityConfig : new AgentManifestSecurityConfig(false);
     }
 
-    public ManifestLoader() {
-        this(null, null, new ManifestSecurityConfig(false));
+    public AgentManifestLoader() {
+        this(null, null, new AgentManifestSecurityConfig(false));
     }
 
-    public Manifest loadResource(URI uri) {
+    public AgentManifest loadResource(URI uri) {
         if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
             throw new IllegalArgumentException(
                     "HTTP/HTTPS URIs must be fetched via SourceDeclaration — use sources: in the manifest");
         }
         try (InputStream is = uri.toURL().openStream()) {
-            return mapper.readValue(is, Manifest.class);
+            return mapper.readValue(is, AgentManifest.class);
         } catch (IOException e) {
             LOG.warnf("Failed to load manifest from %s: %s", uri, e.getMessage());
             return emptyManifest();
         }
     }
 
-    public Manifest loadFile(Path path) {
+    public AgentManifest loadFile(Path path) {
         if (!Files.exists(path)) return null;
         try {
-            return mapper.readValue(path.toFile(), Manifest.class);
+            return mapper.readValue(path.toFile(), AgentManifest.class);
         } catch (IOException e) {
             LOG.warnf("Failed to parse manifest %s: %s", path, e.getMessage());
             return emptyManifest();
         }
     }
 
-    public Manifest load(Path projectDir, String profile) {
+    public AgentManifest load(Path projectDir, String profile) {
         var entries = new ArrayList<PrioritizedManifest>();
 
         addClasspathResource(entries, "models/seed-catalog.yaml", 0);
@@ -104,16 +104,16 @@ public class ManifestLoader {
 
         var loadedUris = new LinkedHashSet<String>();
         for (var entry : new ArrayList<>(entries)) {
-            followSources(entry.manifest, entries, loadedUris, 1);
+            followSources(entry.agentManifest, entries, loadedUris, 1);
         }
 
         return merge(entries);
     }
 
-    private void followSources(Manifest manifest, List<PrioritizedManifest> entries,
+    private void followSources(AgentManifest agentManifest, List<PrioritizedManifest> entries,
                                Set<String> loadedUris, int depth) {
         if (depth > MAX_DEPTH) return;
-        for (var source : manifest.sources()) {
+        for (var source : agentManifest.sources()) {
             if (loadedUris.size() >= MAX_SOURCES) {
                 LOG.warnf("Max source limit (%d) reached — skipping %s", MAX_SOURCES, source.uri());
                 return;
@@ -130,7 +130,7 @@ public class ManifestLoader {
         }
     }
 
-    Manifest fetchRemote(SourceDeclaration source) {
+    AgentManifest fetchRemote(SourceDeclaration source) {
         var uri = URI.create(source.uri());
 
         // Step 1: HTTPS enforcement
@@ -225,7 +225,7 @@ public class ManifestLoader {
                 }
 
                 // Step 11: Parse
-                return mapper.readValue(bodyBytes, Manifest.class);
+                return mapper.readValue(bodyBytes, AgentManifest.class);
             }
         } catch (Exception e) {
             LOG.warnf("Failed to fetch remote source %s: %s", source.uri(), e.getMessage());
@@ -322,7 +322,7 @@ public class ManifestLoader {
         var is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource);
         if (is == null) return;
         try (is) {
-            var manifest = mapper.readValue(is, Manifest.class);
+            var manifest = mapper.readValue(is, AgentManifest.class);
             entries.add(new PrioritizedManifest(manifest, priority));
             LOG.debugf("Loaded classpath resource: %s (priority %d)", resource, priority);
         } catch (IOException e) {
@@ -338,7 +338,7 @@ public class ManifestLoader {
         }
     }
 
-    Manifest merge(List<PrioritizedManifest> entries) {
+    AgentManifest merge(List<PrioritizedManifest> entries) {
         entries.sort(Comparator.comparingInt(PrioritizedManifest::priority));
 
         var models = new LinkedHashMap<String, ModelDescriptor>();
@@ -350,7 +350,7 @@ public class ManifestLoader {
         ManifestDefaults defaults = null;
 
         for (var entry : entries) {
-            var m = entry.manifest;
+            var m = entry.agentManifest;
             for (var model : m.models()) models.put(model.id(), model);
             for (var provider : m.providers()) providers.put(provider.vendor(), provider);
             for (var alias : m.aliases().entrySet()) aliases.put(alias.getKey(), alias.getValue());
@@ -360,7 +360,7 @@ public class ManifestLoader {
             if (m.defaults() != null) defaults = m.defaults();
         }
 
-        return new Manifest(
+        return new AgentManifest(
                 new ArrayList<>(models.values()),
                 new ArrayList<>(providers.values()),
                 new ArrayList<>(sources.values()),
@@ -371,9 +371,9 @@ public class ManifestLoader {
         );
     }
 
-    private static Manifest emptyManifest() {
-        return new Manifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
+    private static AgentManifest emptyManifest() {
+        return new AgentManifest(List.of(), List.of(), List.of(), Map.of(), List.of(), null, Map.of());
     }
 
-    record PrioritizedManifest(Manifest manifest, int priority) {}
+    record PrioritizedManifest(AgentManifest agentManifest, int priority) {}
 }

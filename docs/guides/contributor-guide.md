@@ -49,9 +49,9 @@ testing/                    <- companion: @Alternative @Priority(200) test fixtu
 | `agent-codex/` | `casehub-platform-agent-codex` | `@ApplicationScoped` | AgentBackend "codex" -- Codex CLI via `AgentRuntime` |
 | `agent-gemini/` | `casehub-platform-agent-gemini` | `@ApplicationScoped` | AgentBackend "gemini" -- native Google GenAI SDK (v1.65.0), explicit caching |
 | `agent-gemini-cli/` | `casehub-platform-agent-gemini-cli` | `@ApplicationScoped` | AgentBackend "gemini-cli" -- Gemini CLI via `AgentRuntime` |
-| `agent-config-core/` | `casehub-platform-agent-config-core` | (none) | Manifest types, `ManifestLoader`, `ManifestProcessor`, `ManifestCredentialResolver`, `CredentialRef` sealed interface, `ManifestResult`, `LocalModelReconciler`. Pure Java + Jackson |
+| `agent-config-core/` | `casehub-platform-agent-config-core` | (none) | Manifest types, `AgentManifestLoader`, `AgentManifestProcessor`, `AgentManifestCredentialResolver`, `CredentialRef` sealed interface, `AgentManifestResult`, `LocalModelReconciler`. Pure Java + Jackson |
 | `agent-config/` | `casehub-platform-agent-config` | `@Startup @Priority(50)` | `AgentConfigBeans` -- discovers `agent-config.yaml`, runs loader+processor, produces `ManifestResult @Singleton` |
-| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking; consumes `ManifestResult`; `NoOpModelRegistry @DefaultBean` fallback |
+| `agent-router/` | `casehub-platform-agent-router` | `@ApplicationScoped` | `RoutingAgentProvider` -- four-step model resolution (alias → tier → registry → key → fail-fast) with preferVendor tiebreaking; consumes `AgentManifestResult`; `NoOpModelRegistry @DefaultBean` fallback |
 | `agent-gate/` | `casehub-platform-agent-gate` | `@Decorator @Priority(APPLICATION)` | Token bucket + concurrency gate rate limiter -- wraps RoutingAgentProvider |
 | `endpoints-memory/` | `casehub-platform-endpoints-memory` | `@Alternative @Priority(100)` | In-memory `EndpointRegistry` -- volatile, Tier 4 CDI |
 | `registry-inmem/` | `casehub-platform-registry-inmem` | `@Alternative @Priority(50)` | In-memory `RegistryService` -- volatile, heartbeat/TTL, relationships, watch |
@@ -279,10 +279,10 @@ agent-config.yaml files → ManifestLoader → ManifestProcessor → existing SP
 
 **ManifestProcessor pipeline (in agent-config-core):**
 
-1. **Providers → Credentials:** Resolve `env:`/`file:`/`ref:` references via `ManifestCredentialResolver`, validate against `VendorInfo.requiredFields()` (injected as `Map<String, List<String>>` by Quarkus layer), store in `LlmCredentialStore` as `"cloud-{vendorKey}"` (matches `BackendInstanceFactory` pattern)
+1. **Providers → Credentials:** Resolve `env:`/`file:`/`ref:` references via `AgentManifestCredentialResolver`, validate against `VendorInfo.requiredFields()` (injected as `Map<String, List<String>>` by Quarkus layer), store in `LlmCredentialStore` as `"cloud-{vendorKey}"` (matches `BackendInstanceFactory` pattern)
 2. **Models → Registry:** Register via `MutableModelRegistry.replaceSource("manifest", 8, models)`. Priority 8 sits above cloud sources (5) but below per-tenant runtime config (10)
 3. **Local models → Reconciliation:** Delegate to `LocalModelReconciler` functional interface (Quarkus layer provides implementation via `OllamaModelSource` + `LlmConfigService.pullModel()`)
-4. **Aliases + Defaults → ManifestResult:** Convert `AliasDeclaration` → `ModelQuery`, produce `ManifestResult` record consumed by `RouterBeans`
+4. **Aliases + Defaults → ManifestResult:** Convert `AliasDeclaration` → `ModelQuery`, produce `AgentManifestResult` record consumed by `RouterBeans`
 
 **Credential reference resolution chain:**
 - `env:VAR` → `System.getenv()` (dev, CI)

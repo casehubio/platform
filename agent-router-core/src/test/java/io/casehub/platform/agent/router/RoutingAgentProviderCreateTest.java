@@ -6,7 +6,7 @@ import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import java.util.List;
 import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelQuery;
@@ -33,7 +33,7 @@ class RoutingAgentProviderCreateTest {
     void create_withManifestResult_usesManifestDefaultAndAliases() {
         var aliases = Map.of("fast", ModelChain.of(List.of(
                 new ModelChain.ModelChainEntry.Queried(ModelQuery.builder().build()))));
-        var manifest = new ManifestResult(aliases, "custom-backend", List.of(), Map.of());
+        var manifest = new AgentManifestResult(aliases, "custom-backend", List.of(), Map.of());
 
         var provider = RoutingAgentProvider.create(
                 registry, "fallback-backend", modelRegistry, Optional.of(manifest));
@@ -43,7 +43,7 @@ class RoutingAgentProviderCreateTest {
 
     @Test
     void create_withManifestResultNullDefaultKey_usesConfigDefault() {
-        var manifest = new ManifestResult(Map.of(), null, List.of(), Map.of());
+        var manifest = new AgentManifestResult(Map.of(), null, List.of(), Map.of());
 
         var provider = RoutingAgentProvider.create(
                 registry, "config-default", modelRegistry, Optional.of(manifest));

@@ -13,7 +13,7 @@ import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ManifestLoaderFetchTest {
+class AgentManifestLoaderFetchTest {
 
     private static final String VALID_YAML = """
             providers:
@@ -39,7 +39,7 @@ class ManifestLoaderFetchTest {
     }
 
     @Test
-    void fetchesManifestWithoutAuth() {
+    void fetchesAgentManifestWithoutAuth() {
         server.createContext("/models.yaml", exchange -> {
             var bytes = VALID_YAML.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/yaml");
@@ -48,7 +48,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -68,8 +68,8 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var credResolver = new ManifestCredentialResolver(ref -> java.util.Map.of("token", "test-token-123"));
-        var loader = new ManifestLoader(credResolver, null, new ManifestSecurityConfig(false));
+        var credResolver = new AgentManifestCredentialResolver(ref -> java.util.Map.of("token", "test-token-123"));
+        var loader = new AgentManifestLoader(credResolver, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10,
                 new SourceAuth("bearer", "ref:test-cred", null), null);
         var result = loader.fetchRemote(source);
@@ -90,8 +90,8 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var credResolver = new ManifestCredentialResolver(ref -> java.util.Map.of("key", "my-api-key"));
-        var loader = new ManifestLoader(credResolver, null, new ManifestSecurityConfig(false));
+        var credResolver = new AgentManifestCredentialResolver(ref -> java.util.Map.of("key", "my-api-key"));
+        var loader = new AgentManifestLoader(credResolver, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10,
                 new SourceAuth("header", "ref:test-cred", "X-Api-Key"), null);
         var result = loader.fetchRemote(source);
@@ -108,7 +108,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/redirect", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -125,7 +125,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/login.html", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -141,7 +141,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -158,7 +158,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -176,7 +176,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/huge.yaml", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -195,7 +195,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null,
                 new SourceIntegrity("sha256:" + hash, null, null));
         var result = loader.fetchRemote(source);
@@ -214,7 +214,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null,
                 new SourceIntegrity("sha256:" + "0".repeat(64), null, null));
         var result = loader.fetchRemote(source);
@@ -229,7 +229,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/error", 10, null, null);
         var result = loader.fetchRemote(source);
 
@@ -238,7 +238,7 @@ class ManifestLoaderFetchTest {
 
     @Test
     void failsClosedWhenAuthDeclaredButNoResolver() {
-        var loader = new ManifestLoader(null, null, new ManifestSecurityConfig(false));
+        var loader = new AgentManifestLoader(null, null, new AgentManifestSecurityConfig(false));
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10,
                 new SourceAuth("bearer", "env:TOKEN", null), null);
         var result = loader.fetchRemote(source);
@@ -256,7 +256,7 @@ class ManifestLoaderFetchTest {
             exchange.close();
         });
 
-        var loader = new ManifestLoader();
+        var loader = new AgentManifestLoader();
         var source = new SourceDeclaration(baseUrl + "/models.yaml", 10, null, null);
         var result = loader.fetchRemote(source);
 

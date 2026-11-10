@@ -123,7 +123,7 @@ Four factories move wiring logic from Quarkus modules to core. After extraction,
 
 Constructor-injected POJO (~7 dependencies). Single `load()` method encapsulates YAML discovery, profile resolution, ManifestLoader + ManifestProcessor orchestration. Both frameworks instantiate via constructor injection and call `load()` from their respective startup hooks (`@Observes StartupEvent` / `@EventListener ApplicationStartedEvent`).
 
-The generator detects this pattern via a new `@StartupProducer` marker annotation on the Quarkus `@Produces` method (or by convention: a `@Startup`-annotated declaring class). When detected, the generator emits an `@EventListener(ApplicationStartedEvent.class)` method that calls `load()` on the injected `AgentConfigLoader` and publishes the `ManifestResult` as a singleton bean. This is a targeted extension — only needed when the Quarkus module uses startup lifecycle hooks.
+The generator detects this pattern via a new `@StartupProducer` marker annotation on the Quarkus `@Produces` method (or by convention: a `@Startup`-annotated declaring class). When detected, the generator emits an `@EventListener(ApplicationStartedEvent.class)` method that calls `load()` on the injected `AgentConfigLoader` and publishes the `AgentManifestResult` as a singleton bean. This is a targeted extension — only needed when the Quarkus module uses startup lifecycle hooks.
 
 **D11: `RoutingAgentProvider.create(...)` (agent-router-core)**
 

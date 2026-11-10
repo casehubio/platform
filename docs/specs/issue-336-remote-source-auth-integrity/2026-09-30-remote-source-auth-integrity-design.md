@@ -133,7 +133,7 @@ public record ManifestSecurityConfig(
 ) {}
 ```
 
-`AgentConfigLoader` passes these through from its own constructor parameters. `ManifestLoader` remains a plain Java class (no CDI) with constructor injection.
+`AgentConfigLoader` passes these through from its own constructor parameters. `AgentManifestLoader` remains a plain Java class (no CDI) with constructor injection.
 
 When `didResolver` is null, any source with a declared signature is rejected (fail-closed per D5) — the source declared a security intent that the deployment cannot fulfil. This means adding signatures to a published catalog is a compatibility-affecting change for consumers without DID resolution infrastructure.
 
@@ -293,9 +293,9 @@ All changes are in **agent-config-core** — the framework-neutral module. No ne
 | `ManifestSecurityConfig.java` | **New** — HTTPS enforcement config |
 | `ManifestLoader.java` | Constructor injection, fetch pipeline, HTTPS enforcement, redirect handling, content-type validation, size limit, digest/signature verification. `loadResource(URI)` restricted to non-HTTP schemes — throws `IllegalArgumentException` for `http`/`https` URIs (all remote fetching must go through the `fetchRemote` pipeline) |
 | `AgentConfigLoader.java` | Pass dependencies through to ManifestLoader |
-| `ManifestLoader` tests | Auth, integrity, HTTPS, redirect, content-type, size limit tests |
+| `AgentManifestLoader` tests | Auth, integrity, HTTPS, redirect, content-type, size limit tests |
 
-No changes to: `ManifestProcessor`, `Manifest`, `ManifestCredentialResolver`, `CredentialRef`.
+No changes to: `AgentManifestProcessor`, `AgentManifest`, `AgentManifestCredentialResolver`, `CredentialRef`.
 
 **AgentConfigBeans changes** (in `agent-config/` Quarkus module):
 - Inject `Instance<DIDResolver>` (optional)
@@ -321,7 +321,7 @@ No changes to: `ManifestProcessor`, `Manifest`, `ManifestCredentialResolver`, `C
 
 Fully backward compatible. All new fields on `SourceDeclaration` are nullable — existing YAML manifests without `auth:` or `integrity:` blocks continue to work unchanged. The fetch pipeline skips security checks when the corresponding fields are absent.
 
-`ManifestLoader`'s constructor change is a source-breaking change for direct callers, but the only direct caller is `AgentConfigLoader` (same module). `AgentConfigBeans` (the only CDI consumer of `AgentConfigLoader`) is updated to pass the new dependencies.
+`AgentManifestLoader`'s constructor change is a source-breaking change for direct callers, but the only direct caller is `AgentConfigLoader` (same module). `AgentConfigBeans` (the only CDI consumer of `AgentConfigLoader`) is updated to pass the new dependencies.
 
 ## Future Extensions
 

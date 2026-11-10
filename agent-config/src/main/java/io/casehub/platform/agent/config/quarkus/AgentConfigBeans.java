@@ -2,7 +2,7 @@ package io.casehub.platform.agent.config.quarkus;
 
 import io.casehub.platform.agent.config.AgentConfigLoader;
 import io.casehub.platform.agent.config.LocalModelReconciler;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.casehub.platform.api.credentials.LlmCredentialStore;
 import io.casehub.platform.api.identity.DIDResolver;
@@ -41,7 +41,7 @@ public class AgentConfigBeans {
     @ConfigProperty(name = "casehub.agent.manifest.allow-insecure", defaultValue = "false")
     boolean allowInsecure;
 
-    private ManifestResult result;
+    private AgentManifestResult result;
 
     void onStartup(@Observes @Priority(50) StartupEvent event) {
         var didResolver = didResolvers.isResolvable() ? didResolvers.get() : null;
@@ -55,8 +55,8 @@ public class AgentConfigBeans {
 
     @Produces
     @jakarta.inject.Singleton
-    public ManifestResult manifestResult() {
-        return result != null ? result : ManifestResult.empty();
+    public AgentManifestResult manifestResult() {
+        return result != null ? result : AgentManifestResult.empty();
     }
 
     private Map<String, List<String>> buildVendorRequirements() {

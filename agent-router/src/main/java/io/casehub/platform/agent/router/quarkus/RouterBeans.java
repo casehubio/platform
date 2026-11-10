@@ -2,7 +2,7 @@ package io.casehub.platform.agent.router.quarkus;
 
 import dev.langchain4j.model.chat.ChatModel;
 import io.casehub.platform.agent.BackendInstanceRegistry;
-import io.casehub.platform.agent.config.ManifestResult;
+import io.casehub.platform.agent.config.AgentManifestResult;
 import io.casehub.platform.agent.router.ChatModelBackend;
 import io.casehub.platform.agent.router.RoutingAgentProvider;
 import io.casehub.platform.agent.router.RoutingChatModel;
@@ -26,7 +26,7 @@ public class RouterBeans {
     ModelRegistry                                                   modelRegistry;
     @Inject
     @Any
-    Instance<ManifestResult>                                        manifestResult;
+    Instance<AgentManifestResult>                                   manifestResult;
     @Inject
     @Any
     Instance<io.casehub.platform.agent.session.SessionPoolRegistry> poolRegistryInstance;
@@ -53,7 +53,7 @@ public class RouterBeans {
     public RoutingAgentProvider routingAgentProvider(RoutingAgentConfig config) {
         var manifest = manifestResult.isResolvable()
                        ? java.util.Optional.of(manifestResult.get())
-                       : java.util.Optional.<io.casehub.platform.agent.config.ManifestResult>empty();
+                       : java.util.Optional.<AgentManifestResult>empty();
         var availabilityFilter = availabilityFilterInstance.isResolvable()
                                  ? availabilityFilterInstance.get() : null;
         var poolRegistry = poolRegistryInstance.isResolvable()

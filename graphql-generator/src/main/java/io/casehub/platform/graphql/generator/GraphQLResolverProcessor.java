@@ -2336,8 +2336,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return fields;
     }
 
+
+    private static final Set<String> PAGINATION_PARAMS = Set.of(
+            "cursor", "nextPageToken", "pageToken", "syncToken");
+
+    static boolean isPaginationParam(String name) {
+        return PAGINATION_PARAMS.contains(name);
+    }
+
     private static boolean resolveRequired(ResolvedParam p, Set<String> optionalParams) {
         if (optionalParams.contains(p.name())) return false;
+        if (isPaginationParam(p.name())) return false;
         if (p.isPathParam()) return true;
         if (p.defaultValue() != null) return false;
         if (p.isQueryParam()) {

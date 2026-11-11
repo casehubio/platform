@@ -98,5 +98,30 @@ class PluginGenerationTest {
         assertThat(GraphQLResolverProcessor.formatDefaultLiteral("SomeEnum", "VALUE")).isEqualTo("\"VALUE\"");
     }
 
+    @Test
+    void isPaginationParam_cursor() {
+        assertThat(GraphQLResolverProcessor.isPaginationParam("cursor")).isTrue();
+    }
+
+    @Test
+    void isPaginationParam_nextPageToken() {
+        assertThat(GraphQLResolverProcessor.isPaginationParam("nextPageToken")).isTrue();
+    }
+
+    @Test
+    void isPaginationParam_syncToken() {
+        assertThat(GraphQLResolverProcessor.isPaginationParam("syncToken")).isTrue();
+    }
+
+    @Test
+    void isPaginationParam_pageToken() {
+        assertThat(GraphQLResolverProcessor.isPaginationParam("pageToken")).isTrue();
+    }
+
+    @Test
+    void isPaginationParam_regular_param() {
+        assertThat(GraphQLResolverProcessor.isPaginationParam("accountId")).isFalse();
+    }
+
 
 }

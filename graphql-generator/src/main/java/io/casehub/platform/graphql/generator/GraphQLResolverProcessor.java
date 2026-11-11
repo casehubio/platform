@@ -39,7 +39,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedOptions() {
         return Set.of("generateGraphQL", "generateRest", "domainFilter",
-                      "restPackage", "graphqlPackage", "restPathPrefix");
+                      "restPackage", "graphqlPackage", "restPathPrefix",
+                      "generatePlugins", "pluginPackage");
     }
 
 
@@ -75,6 +76,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static final DotName DEFAULT_VALUE_ANN = DotName.createSimple("io.casehub.platform.api.mcp.DefaultValue");
     private static final DotName HAND_WRITTEN_ANN  = DotName.createSimple("io.casehub.platform.api.mcp.HandWrittenEndpoint");
     private static final DotName UNLESS_PROFILE    = DotName.createSimple("io.quarkus.arc.profile.UnlessBuildProfile");
+    private static final DotName GENERATE_PLUGIN_ANN = DotName.createSimple("io.casehub.platform.api.mcp.GeneratePlugin");
+    private static final DotName PLUGIN_ANN          = DotName.createSimple("io.casehub.yaml.plugin.api.Plugin");
+    private static final DotName NULLABLE_JAKARTA     = DotName.createSimple("jakarta.annotation.Nullable");
+    private static final DotName NULLABLE_JSPECIFY    = DotName.createSimple("org.jspecify.annotations.Nullable");
+    private static final DotName NULLABLE_JETBRAINS   = DotName.createSimple("org.jetbrains.annotations.Nullable");
+    private static final DotName INJECT_ANN           = DotName.createSimple("jakarta.inject.Inject");
 
 
     private boolean   processed = false;
@@ -95,6 +102,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
         Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index, roundEnv);
         Set<String> restSkipMethods    = scanHandWrittenRestMethods(index, roundEnv);
+        Set<String> pluginSkipNames    = scanHandWrittenPluginNames();
 
         Map<String, DomainOperations> jandexDomains =
                 index != null ? scanAnnotatedDomains(index) : new HashMap<>();
@@ -123,6 +131,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
         boolean generateGraphQL = !"false".equals(processingEnv.getOptions().get("generateGraphQL"));
         boolean generateRest    = !"false".equals(processingEnv.getOptions().get("generateRest"));
+        boolean generatePlugins = "true".equals(processingEnv.getOptions().get("generatePlugins"));
         String  domainFilter    = processingEnv.getOptions().get("domainFilter");
         Set<String> allowedDomains = domainFilter != null
                                      ? java.util.Arrays.stream(domainFilter.split(",")).map(String::trim)
@@ -150,6 +159,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             }
             if (generateRest) {
                 generateRestResourceSource(entry.getKey(), entry.getValue(), restSkipMethods);
+            }
+            if (generatePlugins) {
+                generatePluginSource(entry.getKey(), entry.getValue(), pluginSkipNames);
             }
         }
 
@@ -337,6 +349,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             if (ann.value("app") != null && !ann.value("app").asString().isEmpty()) {
                 ops.app = ann.value("app").asString();
             }
+            ops.isInterface = classInfo.isInterface();
+            ops.declaringClassFqcn = classInfo.name().toString();
 
             boolean hasExistingClassSecurity = !ops.classRolesAllowed.isEmpty()
                     || ops.classPermitAll || ops.classAuthenticated;
@@ -692,6 +706,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             if (roundApp != null && !roundApp.isEmpty()) {
                 ops.app = roundApp;
             }
+            ops.isInterface = element.getKind() == javax.lang.model.element.ElementKind.INTERFACE;
+            ops.declaringClassFqcn = typeElement.getQualifiedName().toString();
 
             boolean hasExistingClassSecurity = !ops.classRolesAllowed.isEmpty()
                     || ops.classPermitAll || ops.classAuthenticated;
@@ -1745,6 +1761,595 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         out.println();
     }
 
+    // ── Plugin generation ──────────────────────────────────────────────────────
+
+    private void generatePluginSource(String domain, DomainOperations ops, Set<String> pluginSkipNames) {
+        // Tier 2: resolve SPI type from @Inject fields for connector classes
+        String resolvedSpiTypeFqcn = null;
+        String resolvedSpiTypeSimple = null;
+        String routingParamName = null;
+        if (!ops.isInterface && ops.declaringClassFqcn != null && jandexIndex != null) {
+            ClassInfo classInfo = jandexIndex.getClassByName(DotName.createSimple(ops.declaringClassFqcn));
+            if (classInfo != null) {
+                List<String[]> spiCandidates = new ArrayList<>();
+                for (org.jboss.jandex.FieldInfo field : classInfo.fields()) {
+                    if (field.hasAnnotation(INJECT_ANN)) {
+                        ClassInfo fieldType = jandexIndex.getClassByName(field.type().name());
+                        if (fieldType != null) {
+                            for (org.jboss.jandex.MethodInfo method : fieldType.methods()) {
+                                if (method.name().equals("platform") && method.parametersCount() == 1
+                                        && method.parameterType(0).name().equals(DotName.createSimple("java.lang.String"))) {
+                                    String spiTypeFqcn = method.returnType().name().toString();
+                                    String paramName = method.parameterName(0);
+                                    spiCandidates.add(new String[]{spiTypeFqcn, paramName != null ? paramName : "platform"});
+                                }
+                            }
+                        }
+                    }
+                }
+                if (spiCandidates.size() == 1) {
+                    resolvedSpiTypeFqcn = spiCandidates.get(0)[0];
+                    resolvedSpiTypeSimple = resolvedSpiTypeFqcn.contains(".")
+                            ? resolvedSpiTypeFqcn.substring(resolvedSpiTypeFqcn.lastIndexOf('.') + 1)
+                            : resolvedSpiTypeFqcn;
+                    routingParamName = spiCandidates.get(0)[1];
+                } else if (spiCandidates.size() > 1) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                            "Plugin generator: domain '" + domain + "' has multiple SPI candidates — "
+                            + "use @GeneratePlugin(spi = ...) to disambiguate. Skipping Tier 2 generation.");
+                }
+            }
+        }
+
+        String pluginPkgOverride = processingEnv.getOptions().get("pluginPackage");
+        String packageName = pluginPkgOverride != null
+                ? pluginPkgOverride
+                : deriveOutputPackage(spiPackage(ops), "plugin");
+
+        for (ResolvedOperation op : ops.operations) {
+            if (op.type() == OperationType.WEBHOOK) continue;
+            if (op.type() == OperationType.STREAM) continue;
+            if (isReactiveReturn(op.returnTypeStr())) continue;
+            if (isMapReturn(op.returnTypeStr())) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                        "Plugin generator: skipping " + domain + ":" + op.methodName()
+                        + " — unsupported return type " + op.returnTypeStr());
+                continue;
+            }
+
+            // Read @GeneratePlugin if present
+            PluginMeta meta = resolvePluginMeta(op);
+            if (meta.exclude) continue;
+
+            String pluginName = meta.name.isEmpty()
+                    ? derivePluginName(domain, op.methodName())
+                    : meta.name;
+
+            if (pluginSkipNames.contains(pluginName)) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        "Plugin generator: skipping " + pluginName + " — hand-written plugin exists");
+                continue;
+            }
+
+            String className = toPascalCase(pluginName) + "Plugin";
+            String fqcn = packageName + "." + className;
+
+            String description = meta.description.isEmpty() ? op.description() : meta.description;
+
+            // Determine execute param type and delegate call strategy
+            String executeParamType;
+            String executeParamFqcn;
+            String capabilityAccessor = null;
+            List<PluginField> accessorFields = new ArrayList<>();
+            String spiMethodName = op.methodName();
+            String effectiveRoutingParam = null;
+
+            if (ops.isInterface) {
+                // Tier 1: delegate directly to interface
+                executeParamType = op.declaringClassSimple();
+                executeParamFqcn = op.declaringClassFqcn();
+            } else {
+                // Tier 2: use SPI type
+                String spiOverride = meta.spiFqcn;
+                if (!spiOverride.isEmpty()) {
+                    executeParamFqcn = spiOverride;
+                    executeParamType = spiOverride.contains(".")
+                            ? spiOverride.substring(spiOverride.lastIndexOf('.') + 1) : spiOverride;
+                } else if (resolvedSpiTypeFqcn != null) {
+                    executeParamFqcn = resolvedSpiTypeFqcn;
+                    executeParamType = resolvedSpiTypeSimple;
+                } else {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                            "Plugin generator: skipping " + domain + ":" + op.methodName()
+                            + " — cannot resolve SPI type. Use @GeneratePlugin(spi = ...)");
+                    continue;
+                }
+                effectiveRoutingParam = routingParamName;
+
+                // Resolve capability call chain
+                if (!meta.capabilityFqcn.isEmpty()) {
+                    String capSimple = meta.capabilityFqcn.contains(".")
+                            ? meta.capabilityFqcn.substring(meta.capabilityFqcn.lastIndexOf('.') + 1)
+                            : meta.capabilityFqcn;
+                    capabilityAccessor = !meta.accessor.isEmpty()
+                            ? meta.accessor
+                            : decapitalize(capSimple);
+
+                    // Introspect accessor parameters via Jandex
+                    if (jandexIndex != null) {
+                        ClassInfo spiClass = jandexIndex.getClassByName(DotName.createSimple(executeParamFqcn));
+                        if (spiClass != null) {
+                            boolean found = false;
+                            for (org.jboss.jandex.MethodInfo method : spiClass.methods()) {
+                                if (method.name().equals(capabilityAccessor)) {
+                                    found = true;
+                                    for (int pi = 0; pi < method.parametersCount(); pi++) {
+                                        String pName = method.parameterName(pi);
+                                        String pType = method.parameterType(pi).name().toString();
+                                        String pTypeSimple = pType.contains(".") ? pType.substring(pType.lastIndexOf('.') + 1) : pType;
+                                        if (pName == null) pName = "arg" + pi;
+                                        accessorFields.add(new PluginField(pName, pTypeSimple, false));
+                                    }
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                        "Plugin generator: SPI type " + executeParamFqcn + " has no method '"
+                                        + capabilityAccessor + "' — required by @GeneratePlugin(capability = "
+                                        + meta.capabilityFqcn + ") on " + domain + ":" + op.methodName());
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                if (!meta.spiMethod.isEmpty()) {
+                    spiMethodName = meta.spiMethod;
+                }
+            }
+
+            Set<String> effectiveOptionalParams = resolveEffectiveOptionalParams(op, meta);
+            List<PluginField> fields = mapParamsToFields(op, meta, effectiveOptionalParams, effectiveRoutingParam);
+            // Add capability accessor params (e.g., userId for accountInformation(userId))
+            for (PluginField af : accessorFields) {
+                boolean alreadyPresent = fields.stream().anyMatch(f -> f.name.equals(af.name));
+                if (!alreadyPresent) {
+                    fields.add(af);
+                }
+            }
+
+            try {
+                JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile(fqcn);
+                try (PrintWriter out = new PrintWriter(sourceFile.openWriter())) {
+                    out.println("package " + packageName + ";");
+                    out.println();
+                    out.println("import io.casehub.yaml.plugin.api.Execute;");
+                    out.println("import io.casehub.yaml.plugin.api.Optional;");
+                    out.println("import io.casehub.yaml.plugin.api.Plugin;");
+                    out.println("import io.casehub.yaml.plugin.api.Required;");
+                    out.println("import io.casehub.yaml.plugin.api.Result;");
+                    out.println("import io.casehub.yaml.step.util.Records;");
+                    out.println("import " + executeParamFqcn + ";");
+
+                    Set<String> typeImports = op.typeImports();
+                    for (String imp : typeImports) {
+                        if (!imp.startsWith("java.lang.") && imp.contains(".")
+                                && !imp.equals(executeParamFqcn)) {
+                            out.println("import " + imp + ";");
+                        }
+                    }
+                    out.println("import java.util.Map;");
+                    out.println();
+
+                    out.println("// GENERATED by GraphQLResolverProcessor — do not edit");
+
+                    StringBuilder pluginAnn = new StringBuilder();
+                    pluginAnn.append("@Plugin(value = \"").append(escapeJavaString(pluginName)).append("\"");
+                    if (description != null && !description.isEmpty()) {
+                        pluginAnn.append(", description = \"").append(escapeJavaString(description)).append("\"");
+                    }
+                    if (meta.absorb) {
+                        pluginAnn.append(", absorbSiblings = true");
+                    }
+                    boolean isStreaming = op.type() == OperationType.STREAMING_MUTATION
+                            || (op.type() == OperationType.MUTATION && isStreamingMutation(op));
+                    if (isStreaming) {
+                        pluginAnn.append(", streaming = true");
+                    }
+                    pluginAnn.append(")");
+                    out.println(pluginAnn);
+
+                    // Record declaration
+                    out.print("public record " + className + "(");
+                    for (int i = 0; i < fields.size(); i++) {
+                        PluginField f = fields.get(i);
+                        if (i > 0) out.print(", ");
+                        out.println();
+                        out.print("        " + (f.required ? "@Required " : "@Optional ") + f.typeStr + " " + f.name);
+                    }
+                    if (!fields.isEmpty()) out.println();
+                    out.println(") {");
+                    out.println();
+
+                    // Compact constructor for default values
+                    List<PluginField> fieldsWithDefaults = fields.stream()
+                            .filter(f -> f.defaultValue != null && !f.defaultValue.isEmpty())
+                            .toList();
+                    if (!fieldsWithDefaults.isEmpty()) {
+                        out.println("    public " + className + " {");
+                        for (PluginField f : fieldsWithDefaults) {
+                            if ("boolean".equals(f.typeStr)) {
+                                out.println("        if (!" + f.name + ") " + f.name + " = " + f.defaultValue + ";");
+                            } else {
+                                out.println("        if (" + f.name + " == null) " + f.name + " = \"" + escapeJavaString(f.defaultValue) + "\";");
+                            }
+                        }
+                        out.println("    }");
+                        out.println();
+                    }
+
+                    // @Execute method
+                    out.println("    @Execute");
+                    String paramVarName = ops.isInterface ? "api" : "spi";
+                    if (isStreaming && !meta.subject.isEmpty()) {
+                        String subjectType = findParamType(op, meta.subject);
+                        out.println("    public " + op.returnTypeStr() + " process("
+                                + subjectType + " " + meta.subject + ", " + executeParamType + " " + paramVarName + ") {");
+                    } else {
+                        out.println("    public Result execute(" + executeParamType + " " + paramVarName + ") {");
+                    }
+
+                    // Delegate call
+                    StringBuilder methodArgs = new StringBuilder();
+                    for (ResolvedParam p : op.params()) {
+                        if (p.isContextParam()) continue;
+                        if (effectiveRoutingParam != null && p.name().equals(effectiveRoutingParam)) continue;
+                        if (isStreaming && !meta.subject.isEmpty() && p.name().equals(meta.subject)) continue;
+                        if (!methodArgs.isEmpty()) methodArgs.append(", ");
+                        methodArgs.append(p.name());
+                    }
+
+                    String delegateCall;
+                    if (capabilityAccessor != null) {
+                        StringBuilder accessorArgs = new StringBuilder();
+                        for (PluginField af : accessorFields) {
+                            if (!accessorArgs.isEmpty()) accessorArgs.append(", ");
+                            accessorArgs.append(af.name);
+                        }
+                        delegateCall = paramVarName + "." + capabilityAccessor + "(" + accessorArgs + ")."
+                                + spiMethodName + "(" + methodArgs + ")";
+                    } else {
+                        delegateCall = paramVarName + "." + spiMethodName + "(" + methodArgs + ")";
+                    }
+
+                    if (isStreaming && !meta.subject.isEmpty()) {
+                        out.println("        return " + delegateCall + ";");
+                    } else {
+                        String resultCode = generatePluginResultCode(op.returnTypeStr(), delegateCall);
+                        out.println("        " + resultCode);
+                    }
+
+                    out.println("    }");
+                    out.println("}");
+                }
+
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        "Plugin generator: generated " + fqcn + " (plugin: " + pluginName + ")");
+
+            } catch (IOException e) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "Plugin generator: failed to write " + fqcn + ": " + e.getMessage());
+            }
+        }
+    }
+
+    static String derivePluginName(String domain, String methodName) {
+        String domainSuffix = domain.contains("/")
+                ? domain.substring(domain.lastIndexOf('/') + 1)
+                : domain;
+        return domainSuffix + "-" + toKebabCase(methodName);
+    }
+
+    private record PluginField(String name, String typeStr, boolean required, String defaultValue) {
+        PluginField(String name, String typeStr, boolean required) {
+            this(name, typeStr, required, null);
+        }
+    }
+
+    private record PluginMeta(String name, String description, boolean absorb, String subject,
+                              String capabilityFqcn, String spiFqcn, String accessor,
+                              String spiMethod, Set<String> optionalParams, boolean exclude) {
+        static final PluginMeta DEFAULT = new PluginMeta("", "", false, "", "", "", "", "", Set.of(), false);
+    }
+
+    private PluginMeta resolvePluginMeta(ResolvedOperation op) {
+        int paramCount = op.params().size();
+        // Try Jandex first
+        if (jandexIndex != null) {
+            ClassInfo ci = jandexIndex.getClassByName(DotName.createSimple(op.declaringClassFqcn()));
+            if (ci != null) {
+                for (org.jboss.jandex.MethodInfo method : ci.methods()) {
+                    if (method.name().equals(op.methodName()) && method.parametersCount() == paramCount) {
+                        AnnotationInstance gpAnn = method.annotation(GENERATE_PLUGIN_ANN);
+                        if (gpAnn != null) {
+                            return extractPluginMeta(gpAnn);
+                        }
+                    }
+                }
+            }
+        }
+        // Try RoundEnvironment via TypeElement
+        javax.lang.model.element.TypeElement te =
+                processingEnv.getElementUtils().getTypeElement(op.declaringClassFqcn());
+        if (te != null) {
+            for (javax.lang.model.element.Element enclosed : te.getEnclosedElements()) {
+                if (enclosed.getSimpleName().toString().equals(op.methodName())
+                        && enclosed instanceof javax.lang.model.element.ExecutableElement exec
+                        && exec.getParameters().size() == paramCount) {
+                    javax.lang.model.element.AnnotationMirror am =
+                            findAnnotationMirror(enclosed, "io.casehub.platform.api.mcp.GeneratePlugin");
+                    if (am != null) {
+                        return extractPluginMetaFromMirror(am);
+                    }
+                }
+            }
+        }
+        return PluginMeta.DEFAULT;
+    }
+
+    private PluginMeta extractPluginMeta(AnnotationInstance ann) {
+        String name = ann.value("name") != null ? ann.value("name").asString() : "";
+        String description = ann.value("description") != null ? ann.value("description").asString() : "";
+        boolean absorb = ann.value("absorb") != null && ann.value("absorb").asBoolean();
+        String subject = ann.value("subject") != null ? ann.value("subject").asString() : "";
+        String capFqcn = ann.value("capability") != null ? ann.value("capability").asClass().name().toString() : "";
+        if ("void".equals(capFqcn) || "java.lang.Void".equals(capFqcn)) capFqcn = "";
+        String spiFqcn = ann.value("spi") != null ? ann.value("spi").asClass().name().toString() : "";
+        if ("void".equals(spiFqcn) || "java.lang.Void".equals(spiFqcn)) spiFqcn = "";
+        String accessor = ann.value("accessor") != null ? ann.value("accessor").asString() : "";
+        String spiMethod = ann.value("spiMethod") != null ? ann.value("spiMethod").asString() : "";
+        Set<String> optionalParams = Set.of();
+        if (ann.value("optionalParams") != null) {
+            optionalParams = Set.of(ann.value("optionalParams").asStringArray());
+        }
+        boolean exclude = ann.value("exclude") != null && ann.value("exclude").asBoolean();
+        return new PluginMeta(name, description, absorb, subject, capFqcn, spiFqcn, accessor, spiMethod, optionalParams, exclude);
+    }
+
+    private PluginMeta extractPluginMetaFromMirror(javax.lang.model.element.AnnotationMirror am) {
+        String name = "";
+        String description = "";
+        boolean absorb = false;
+        String subject = "";
+        String capFqcn = "";
+        String spiFqcn = "";
+        String accessor = "";
+        String spiMethod = "";
+        Set<String> optionalParams = Set.of();
+        boolean exclude = false;
+
+        for (var e : am.getElementValues().entrySet()) {
+            String key = e.getKey().getSimpleName().toString();
+            switch (key) {
+                case "name" -> name = e.getValue().getValue().toString();
+                case "description" -> description = e.getValue().getValue().toString();
+                case "absorb" -> absorb = (Boolean) e.getValue().getValue();
+                case "subject" -> subject = e.getValue().getValue().toString();
+                case "accessor" -> accessor = e.getValue().getValue().toString();
+                case "spiMethod" -> spiMethod = e.getValue().getValue().toString();
+                case "exclude" -> exclude = (Boolean) e.getValue().getValue();
+                case "capability" -> {
+                    String val = e.getValue().getValue().toString();
+                    if (!"void".equals(val) && !"java.lang.Void".equals(val)) capFqcn = val;
+                }
+                case "spi" -> {
+                    String val = e.getValue().getValue().toString();
+                    if (!"void".equals(val) && !"java.lang.Void".equals(val)) spiFqcn = val;
+                }
+                case "optionalParams" -> {
+                    @SuppressWarnings("unchecked")
+                    var values = (java.util.List<? extends javax.lang.model.element.AnnotationValue>) e.getValue().getValue();
+                    optionalParams = values.stream().map(v -> v.getValue().toString()).collect(java.util.stream.Collectors.toSet());
+                }
+            }
+        }
+        return new PluginMeta(name, description, absorb, subject, capFqcn, spiFqcn, accessor, spiMethod, optionalParams, exclude);
+    }
+
+    private Set<String> resolveEffectiveOptionalParams(ResolvedOperation op, PluginMeta meta) {
+        Set<String> result = new HashSet<>(meta.optionalParams);
+
+        // Validate optionalParams names against actual parameters
+        Set<String> paramNames = op.params().stream().map(ResolvedParam::name).collect(java.util.stream.Collectors.toSet());
+        for (String optName : meta.optionalParams) {
+            if (!paramNames.contains(optName)) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "Plugin generator: @GeneratePlugin(optionalParams) names parameter '"
+                        + optName + "' which does not exist on method " + op.declaringClassFqcn()
+                        + "." + op.methodName() + ". Available: " + paramNames);
+            }
+        }
+
+        // Check @Nullable annotations via Jandex
+        if (jandexIndex != null) {
+            ClassInfo ci = jandexIndex.getClassByName(DotName.createSimple(op.declaringClassFqcn()));
+            if (ci != null) {
+                for (org.jboss.jandex.MethodInfo method : ci.methods()) {
+                    if (method.name().equals(op.methodName()) && method.parametersCount() == op.params().size()) {
+                        for (int i = 0; i < method.parametersCount(); i++) {
+                            if (findParameterAnnotation(method, i, NULLABLE_JAKARTA) != null
+                                    || findParameterAnnotation(method, i, NULLABLE_JSPECIFY) != null
+                                    || findParameterAnnotation(method, i, NULLABLE_JETBRAINS) != null) {
+                                String pName = method.parameterName(i);
+                                if (pName != null) result.add(pName);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check @Nullable via TypeElement (RoundEnvironment path)
+        javax.lang.model.element.TypeElement te =
+                processingEnv.getElementUtils().getTypeElement(op.declaringClassFqcn());
+        if (te != null) {
+            for (javax.lang.model.element.Element enclosed : te.getEnclosedElements()) {
+                if (enclosed.getSimpleName().toString().equals(op.methodName())
+                        && enclosed instanceof javax.lang.model.element.ExecutableElement exec
+                        && exec.getParameters().size() == op.params().size()) {
+                    for (var param : exec.getParameters()) {
+                        if (findAnnotationMirror(param, "jakarta.annotation.Nullable") != null
+                                || findAnnotationMirror(param, "org.jspecify.annotations.Nullable") != null
+                                || findAnnotationMirror(param, "org.jetbrains.annotations.Nullable") != null) {
+                            result.add(param.getSimpleName().toString());
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private List<PluginField> mapParamsToFields(ResolvedOperation op, PluginMeta meta,
+                                                 Set<String> effectiveOptionalParams, String routingParam) {
+        List<PluginField> fields = new ArrayList<>();
+        for (ResolvedParam p : op.params()) {
+            if (p.isContextParam()) continue;
+            if (routingParam != null && p.name().equals(routingParam)) continue;
+            if (!meta.subject.isEmpty() && p.name().equals(meta.subject)
+                    && (op.type() == OperationType.STREAMING_MUTATION || op.type() == OperationType.MUTATION)) {
+                continue;
+            }
+            boolean required = resolveRequired(p, effectiveOptionalParams);
+            String defaultVal = p.defaultValue();
+            fields.add(new PluginField(p.name(), p.typeStr(), required, defaultVal));
+        }
+        return fields;
+    }
+
+    private static boolean resolveRequired(ResolvedParam p, Set<String> optionalParams) {
+        if (optionalParams.contains(p.name())) return false;
+        if (p.isPathParam()) return true;
+        if (p.defaultValue() != null) return false;
+        if (p.isQueryParam()) {
+            return isPrimitiveType(p.typeStr());
+        }
+        if (isBoxedPrimitive(p.typeStr())) return false;
+        return !isPrimitiveType(p.typeStr());
+    }
+
+    private static final Set<String> BOXED_PRIMITIVES = Set.of(
+            "Integer", "Long", "Boolean", "Double", "Float", "Short", "Byte", "Character",
+            "java.lang.Integer", "java.lang.Long", "java.lang.Boolean", "java.lang.Double",
+            "java.lang.Float", "java.lang.Short", "java.lang.Byte", "java.lang.Character");
+
+    private static boolean isBoxedPrimitive(String typeStr) {
+        return BOXED_PRIMITIVES.contains(typeStr);
+    }
+
+    private String generatePluginResultCode(String returnType, String delegateCall) {
+        if ("void".equals(returnType)) {
+            return delegateCall + ";\n        return Result.of(Map.of());";
+        }
+        if ("boolean".equals(returnType) || "Boolean".equals(returnType) || "java.lang.Boolean".equals(returnType)) {
+            return "var result = " + delegateCall + ";\n        return Result.of(Map.of(\"result\", result));";
+        }
+        if ("String".equals(returnType) || "java.lang.String".equals(returnType)) {
+            return "var result = " + delegateCall + ";\n        return Result.of(Map.of(\"result\", result));";
+        }
+        if (isPrimitiveType(returnType) || isBoxedPrimitive(returnType)) {
+            return "var result = " + delegateCall + ";\n        return Result.of(Map.of(\"result\", result));";
+        }
+        if (returnType.startsWith("List<") || returnType.startsWith("java.util.List<")) {
+            return "var result = " + delegateCall + ";\n        return Result.of(Map.of(\"items\", result.stream().map(Records::toMap).toList()));";
+        }
+        if (returnType.startsWith("Set<") || returnType.startsWith("java.util.Set<")) {
+            return "var result = " + delegateCall + ";\n        return Result.of(Map.of(\"items\", result.stream().map(Records::toMap).toList()));";
+        }
+        if (returnType.startsWith("Optional<")) {
+            return "var result = " + delegateCall + ";\n        return Result.of(result.map(Records::toMap).orElse(Map.of()));";
+        }
+        if (returnType.startsWith("Page<") || returnType.endsWith(".Page<")) {
+            return "var result = " + delegateCall + ";\n"
+                    + "        var output = new java.util.LinkedHashMap<String, Object>();\n"
+                    + "        output.put(\"items\", result.items().stream().map(Records::toMap).toList());\n"
+                    + "        output.put(\"cursor\", result.cursor());\n"
+                    + "        output.put(\"hasMore\", result.hasMore());\n"
+                    + "        return Result.of(output);";
+        }
+        // Default: assume record type
+        return "var result = " + delegateCall + ";\n        return Result.of(Records.toMap(result));";
+    }
+
+    private static boolean isReactiveReturn(String returnType) {
+        return returnType.startsWith("Multi<") || returnType.startsWith("Flow.Publisher<")
+                || returnType.startsWith("Publisher<") || returnType.startsWith("io.smallrye.mutiny.Multi<")
+                || returnType.startsWith("java.util.concurrent.Flow.Publisher<");
+    }
+
+    private static boolean isMapReturn(String returnType) {
+        return returnType.startsWith("Map<") || returnType.startsWith("java.util.Map<");
+    }
+
+    private boolean isStreamingMutation(ResolvedOperation op) {
+        // Check Jandex first
+        if (jandexIndex != null) {
+            ClassInfo ci = jandexIndex.getClassByName(DotName.createSimple(op.declaringClassFqcn()));
+            if (ci != null) {
+                for (org.jboss.jandex.MethodInfo method : ci.methods()) {
+                    if (method.name().equals(op.methodName())) {
+                        AnnotationInstance pmAnn = method.annotation(PLATFORM_MUTATION);
+                        if (pmAnn != null && pmAnn.value("streaming") != null) {
+                            return pmAnn.value("streaming").asBoolean();
+                        }
+                    }
+                }
+            }
+        }
+        // Check RoundEnvironment via TypeElement
+        javax.lang.model.element.TypeElement te =
+                processingEnv.getElementUtils().getTypeElement(op.declaringClassFqcn());
+        if (te != null) {
+            for (javax.lang.model.element.Element enclosed : te.getEnclosedElements()) {
+                if (enclosed.getSimpleName().toString().equals(op.methodName())) {
+                    javax.lang.model.element.AnnotationMirror am =
+                            findAnnotationMirror(enclosed, "io.casehub.platform.api.mcp.PlatformMutation");
+                    if (am != null) {
+                        return extractAnnotationBooleanValue(am, "streaming");
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private String findParamType(ResolvedOperation op, String paramName) {
+        for (ResolvedParam p : op.params()) {
+            if (p.name().equals(paramName)) return p.typeStr();
+        }
+        return "String";
+    }
+
+    private Set<String> scanHandWrittenPluginNames() {
+        Set<String> names = new HashSet<>();
+        if (jandexIndex != null) {
+            for (AnnotationInstance ann : jandexIndex.getAnnotations(PLUGIN_ANN)) {
+                if (ann.value() != null) {
+                    names.add(ann.value().asString());
+                }
+            }
+        }
+        // Jandex covers dependency JARs where hand-written plugins live.
+        // Same-module hand-written plugins are unlikely — skip detection is best-effort.
+        return names;
+    }
+
+    // ── End Plugin generation ─────────────────────────────────────────────────
+
     private List<String> resolveBeanFields(String typeFqcn) {
         if (jandexIndex != null) {
             ClassInfo ci = jandexIndex.getClassByName(DotName.createSimple(typeFqcn));
@@ -2302,6 +2907,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         final List<ResolvedOperation> operations = new ArrayList<>();
         String basePath;
         String app;
+        boolean isInterface;
+        String declaringClassFqcn;
         List<String> classRolesAllowed = List.of();
         boolean classPermitAll = false;
         boolean classAuthenticated = false;

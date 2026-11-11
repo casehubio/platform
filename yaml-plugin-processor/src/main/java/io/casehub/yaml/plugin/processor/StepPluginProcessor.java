@@ -23,7 +23,7 @@ import java.util.Set;
 @SupportedAnnotationTypes("*")
 public class StepPluginProcessor extends AbstractProcessor {
 
-    private boolean processed;
+    private final java.util.Set<String> processedTypes = new java.util.HashSet<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -32,10 +32,12 @@ public class StepPluginProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (processed || roundEnv.processingOver()) return false;
-        processed = true;
+        if (roundEnv.processingOver()) return false;
 
         for (Element element : roundEnv.getElementsAnnotatedWith(Plugin.class)) {
+            String qname = ((TypeElement) element).getQualifiedName().toString();
+            if (processedTypes.contains(qname)) continue;
+            processedTypes.add(qname);
             if (element.getKind() != ElementKind.RECORD) {
                 error(element, "@Plugin must be applied to a record");
                 continue;

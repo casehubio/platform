@@ -56,10 +56,15 @@ class FakeResolved {
 class FakeSpiType {
     FakeCapability capability(String... args) { return null; }
     java.util.List<FakeResult> listAll() { return null; }
+    void removeItem(String id) {}
 }
 
 class FakeCapability {
     FakeResult targetMethod(String arg) { return null; }
+    FakeResult defaultMethod() { return null; }
+    FakeResult listItems(String id, int size) { return null; }
+    FakeResult export(String fmt) { return null; }
+    void deleteItem(String id) {}
 }
 
 class FakeResult {}

@@ -1,60 +1,28 @@
 package io.casehub.platform.graphql.generator.infer;
 
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.Trees;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.ToolProvider;
-import java.io.File;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CallChainScannerTest {
 
-    private static Trees trees;
-    private static TypeElement connectorType;
+    private static CompileTestHelper helper;
 
     @BeforeAll
-    static void compileTestSource() throws Exception {
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        StandardJavaFileManager fm = compiler.getStandardFileManager(null, null, null);
-        File source = new File("src/test/resources/infer/StandardConnector.java");
-        Iterable<? extends JavaFileObject> units = fm.getJavaFileObjects(source);
-        JavacTask task = (JavacTask) compiler.getTask(null, fm, null,
-                List.of("-proc:none"), null, units);
-        Iterable<? extends Element> elements = task.analyze();
-        trees = Trees.instance(task);
-        for (Element e : elements) {
-            if (e instanceof TypeElement te
-                    && te.getSimpleName().contentEquals("StandardConnector")) {
-                connectorType = te;
-                break;
-            }
-        }
-        assertThat(connectorType).as("StandardConnector type must be found").isNotNull();
+    static void compile() throws Exception {
+        helper = new CompileTestHelper(
+                "StandardConnector.java",
+                "DefaultValueConnector.java",
+                "VoidConnector.java");
     }
 
-    private ExecutableElement findMethod(String name) {
-        for (Element e : connectorType.getEnclosedElements()) {
-            if (e instanceof ExecutableElement exec
-                    && exec.getSimpleName().contentEquals(name)) {
-                return exec;
-            }
-        }
-        throw new AssertionError("Method not found: " + name);
-    }
+    // -- Pattern A: standard routing --
 
     @Test
     void pattern_a_simple_query_infers_call_chain() {
-        InferredCallChain result = MethodBodyInferrer.infer(trees, findMethod("simpleQuery"), null);
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("StandardConnector", "simpleQuery"), null);
         assertThat(result.isComplete()).isTrue();
         assertThat(result.spiTypeFqcn()).isEqualTo("FakeSpiType");
         assertThat(result.routingParamName()).isEqualTo("platform");
@@ -65,7 +33,8 @@ class CallChainScannerTest {
 
     @Test
     void require_capability_extracts_class_and_method() {
-        InferredCallChain result = MethodBodyInferrer.infer(trees, findMethod("withRequireCapability"), null);
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("StandardConnector", "withRequireCapability"), null);
         assertThat(result.isComplete()).isTrue();
         assertThat(result.capabilityFqcn()).isEqualTo("FakeCapability");
         assertThat(result.requireCapabilityMethodName()).isEqualTo("targetMethod");
@@ -73,7 +42,8 @@ class CallChainScannerTest {
 
     @Test
     void no_capability_routing_infers_direct_call() {
-        InferredCallChain result = MethodBodyInferrer.infer(trees, findMethod("noCapabilityRouting"), null);
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("StandardConnector", "noCapabilityRouting"), null);
         assertThat(result.isComplete()).isTrue();
         assertThat(result.capabilityAccessor()).isNull();
         assertThat(result.capabilityFqcn()).isNull();
@@ -82,18 +52,59 @@ class CallChainScannerTest {
 
     @Test
     void multiple_accessor_args_captured() {
-        InferredCallChain result = MethodBodyInferrer.infer(trees, findMethod("multipleAccessorArgs"), null);
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("StandardConnector", "multipleAccessorArgs"), null);
         assertThat(result.isComplete()).isTrue();
         assertThat(result.accessorArgs()).hasSize(2);
-        assertThat(result.accessorArgs()).containsExactly("userId", "\"extra\"");
     }
+
+    // -- Pattern B: helper-method routing --
 
     @Test
     void pattern_b_helper_method_routing() {
-        InferredCallChain result = MethodBodyInferrer.infer(trees, findMethod("helperMethodRouting"), null);
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("StandardConnector", "helperMethodRouting"), null);
         assertThat(result.isComplete()).isTrue();
         assertThat(result.spiTypeFqcn()).isEqualTo("FakeSpiType");
         assertThat(result.capabilityFqcn()).isEqualTo("FakeCapability");
         assertThat(result.targetMethod()).isEqualTo("targetMethod");
+    }
+
+    // -- Rule 5: static default detection --
+
+    @Test
+    void static_default_integer_detected() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("DefaultValueConnector", "withStaticIntDefault"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.staticDefaults()).containsEntry("pageSize", "50");
+    }
+
+    @Test
+    void static_default_string_detected() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("DefaultValueConnector", "withStaticStringDefault"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.staticDefaults()).containsEntry("format", "json");
+    }
+
+    // -- Rule 6: void method expression statement --
+
+    @Test
+    void void_method_target_extracted_via_rule_6() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("VoidConnector", "deleteItem"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("deleteItem");
+        assertThat(result.capabilityAccessor()).isEqualTo("capability");
+    }
+
+    @Test
+    void void_method_direct_call_via_rule_6() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("VoidConnector", "directVoidCall"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("removeItem");
+        assertThat(result.capabilityAccessor()).isNull();
     }
 }

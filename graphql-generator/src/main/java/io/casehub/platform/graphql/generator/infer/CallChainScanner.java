@@ -118,15 +118,42 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
                 spiTypeFqcn = resolvedType;
             }
         }
+
+        // Rule 5: static default detection — x != null ? x : literal
+        if (node.getInitializer() instanceof ConditionalExpressionTree ternary) {
+            if (ternary.getFalseExpression() instanceof LiteralTree lit) {
+                String paramName = extractParamName(ternary.getCondition(),
+                        ternary.getTrueExpression());
+                if (paramName != null && lit.getValue() != null) {
+                    staticDefaults.put(paramName, lit.getValue().toString());
+                }
+            }
+        }
         return super.visitVariable(node, p);
     }
 
+    private String extractParamName(ExpressionTree condition, ExpressionTree trueExpr) {
+        if (!(condition instanceof BinaryTree binary)) return null;
+        if (binary.getKind() != Tree.Kind.NOT_EQUAL_TO) return null;
+        ExpressionTree left = binary.getLeftOperand();
+        ExpressionTree right = binary.getRightOperand();
+        boolean leftIsNull = right instanceof LiteralTree lit && lit.getValue() == null;
+        boolean rightIsNull = left instanceof LiteralTree lit2 && lit2.getValue() == null;
+        if (!leftIsNull && !rightIsNull) return null;
+        ExpressionTree paramExpr = leftIsNull ? left : right;
+        if (!(paramExpr instanceof IdentifierTree paramId)) return null;
+        if (!(trueExpr instanceof IdentifierTree trueId)) return null;
+        if (!paramId.getName().contentEquals(trueId.getName())) return null;
+        return paramId.getName().toString();
+    }
+
     // -- Rule 3: requireCapability() --
-    // -- Rule 6: void method expression statement -- (deferred to Task 3)
+    // -- Rule 6: void method expression statement --
 
     @Override
     public Void visitExpressionStatement(ExpressionStatementTree node, Void p) {
         if (node.getExpression() instanceof MethodInvocationTree inv) {
+            // Rule 3: requireCapability()
             if (methodName(inv).equals("requireCapability")) {
                 List<? extends ExpressionTree> args = inv.getArguments();
                 if (args.size() >= 2) {
@@ -138,6 +165,32 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
                     if (args.size() >= 3 && args.get(2) instanceof LiteralTree lit) {
                         requireCapabilityMethodName = lit.getValue().toString();
                     }
+                }
+            }
+
+            // Rule 6: void method SPI chain as expression statement
+            List<MethodCallInfo> chain = flattenMethodChain(inv);
+            if (chain.size() >= 2) {
+                MethodCallInfo first = chain.get(0);
+                if (first.receiverName() != null
+                        && variableTypes.containsKey(first.receiverName())
+                        && variableTypes.get(first.receiverName()).equals(spiTypeFqcn)) {
+                    if (targetMethod == null) {
+                        capabilityAccessor = first.methodName();
+                        accessorArgs = first.args();
+                        MethodCallInfo last = chain.get(chain.size() - 1);
+                        targetMethod = last.methodName();
+                        targetArgs = last.args();
+                    }
+                }
+            } else if (chain.size() == 1) {
+                MethodCallInfo call = chain.get(0);
+                if (call.receiverName() != null
+                        && variableTypes.containsKey(call.receiverName())
+                        && variableTypes.get(call.receiverName()).equals(spiTypeFqcn)
+                        && targetMethod == null) {
+                    targetMethod = call.methodName();
+                    targetArgs = call.args();
                 }
             }
         }

@@ -1,12 +1,26 @@
 package io.casehub.platform.graphql.generator.infer;
 
-import com.sun.source.tree.*;
+import com.sun.source.tree.BinaryTree;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.ConditionalExpressionTree;
+import com.sun.source.tree.ExpressionStatementTree;
+import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.LambdaExpressionTree;
+import com.sun.source.tree.LiteralTree;
+import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.MethodInvocationTree;
+import com.sun.source.tree.NewClassTree;
+import com.sun.source.tree.ReturnTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.IndexView;
 
-import javax.lang.model.element.Name;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -38,6 +52,24 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         this.jandexIndex = jandexIndex;
         this.importMap = buildImportMap(methodPath);
         this.currentPackage = extractPackage(methodPath);
+        populateFieldTypes(methodPath);
+    }
+
+    private void populateFieldTypes(TreePath methodPath) {
+        TreePath current = methodPath;
+        while (current != null) {
+            if (current.getLeaf() instanceof ClassTree classTree) {
+                for (var member : classTree.getMembers()) {
+                    if (member instanceof VariableTree field && field.getType() != null) {
+                        String name = field.getName().toString();
+                        String type = resolveTypeName(field.getType().toString());
+                        variableTypes.put(name, type);
+                    }
+                }
+                break;
+            }
+            current = current.getParentPath();
+        }
     }
 
     private static Map<String, String> buildImportMap(TreePath methodPath) {
@@ -92,6 +124,23 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         return simpleName;
     }
 
+    private String resolveVarPlatformType(MethodInvocationTree inv) {
+        if (inv.getMethodSelect() instanceof MemberSelectTree sel) {
+            String receiver     = sel.getExpression().toString();
+            String receiverType = variableTypes.get(receiver);
+            if (receiverType != null && receiverType.endsWith("PlatformService")) {
+                String spiType = receiverType.substring(0, receiverType.length() - "Service".length());
+                if (jandexIndex != null) {
+                    var ci = jandexIndex.getClassByName(spiType);
+                    if (ci != null) {return spiType;}
+                }
+                return spiType;
+            }
+        }
+        return null;
+    }
+
+
     // -- Scope guards --
 
     @Override
@@ -111,12 +160,21 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitVariable(VariableTree node, Void p) {
-        String typeName = node.getType().toString();
+        String typeName = node.getType() != null ? node.getType().toString() : "var";
 
         if ("var".equals(typeName)) {
             if (node.getInitializer() instanceof MethodInvocationTree inv
                     && methodName(inv).equals("platform")) {
-                failureReason = InferenceFailure.VAR_TYPED_SPI;
+                String resolved = resolveVarPlatformType(inv);
+                if (resolved != null) {
+                    variableTypes.put(node.getName().toString(), resolved);
+                    spiTypeFqcn = resolved;
+                    if (inv.getArguments().size() == 1) {
+                        routingParamName = inv.getArguments().get(0).toString();
+                    }
+                } else {
+                    failureReason = InferenceFailure.VAR_TYPED_SPI;
+                }
             }
             return super.visitVariable(node, p);
         }

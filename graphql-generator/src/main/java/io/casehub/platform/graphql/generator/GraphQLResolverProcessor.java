@@ -1,5 +1,9 @@
 package io.casehub.platform.graphql.generator;
 
+import com.sun.source.util.Trees;
+import io.casehub.platform.graphql.generator.infer.InferenceFailure;
+import io.casehub.platform.graphql.generator.infer.InferredCallChain;
+import io.casehub.platform.graphql.generator.infer.MethodBodyInferrer;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassInfo;
@@ -9,11 +13,6 @@ import org.jboss.jandex.IndexReader;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
-
-import com.sun.source.util.Trees;
-import io.casehub.platform.graphql.generator.infer.InferenceFailure;
-import io.casehub.platform.graphql.generator.infer.InferredCallChain;
-import io.casehub.platform.graphql.generator.infer.MethodBodyInferrer;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -2084,10 +2083,11 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     if (!fieldsWithDefaults.isEmpty()) {
                         out.println("    public " + className + " {");
                         for (PluginField f : fieldsWithDefaults) {
+                            String literal = formatDefaultLiteral(f.typeStr, f.defaultValue);
                             if ("boolean".equals(f.typeStr)) {
-                                out.println("        if (!" + f.name + ") " + f.name + " = " + f.defaultValue + ";");
+                                out.println("        if (!" + f.name + ") " + f.name + " = " + literal + ";");
                             } else {
-                                out.println("        if (" + f.name + " == null) " + f.name + " = \"" + escapeJavaString(f.defaultValue) + "\";");
+                                out.println("        if (" + f.name + " == null) " + f.name + " = " + literal + ";");
                             }
                         }
                         out.println("    }");
@@ -2355,6 +2355,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     private static boolean isBoxedPrimitive(String typeStr) {
         return BOXED_PRIMITIVES.contains(typeStr);
     }
+
+    static String formatDefaultLiteral(String typeStr, String value) {
+        return switch (typeStr) {
+            case "int", "Integer", "java.lang.Integer",
+                 "short", "Short", "java.lang.Short",
+                 "byte", "Byte", "java.lang.Byte" -> value;
+            case "long", "Long", "java.lang.Long" -> value + "L";
+            case "float", "Float", "java.lang.Float" -> value + "f";
+            case "double", "Double", "java.lang.Double" -> value.contains(".") ? value : value + ".0";
+            case "boolean", "Boolean", "java.lang.Boolean" -> value;
+            default -> "\"" + escapeJavaString(value) + "\"";
+        };
+    }
+
 
     private String generatePluginResultCode(String returnType, String delegateCall) {
         if ("void".equals(returnType)) {

@@ -47,4 +47,56 @@ class PluginGenerationTest {
         assertThat(GraphQLResolverProcessor.derivePluginName("agent-http", "listHTTPMethods"))
                 .isEqualTo("agent-http-list-http-methods");
     }
+
+    @Test
+    void formatDefaultLiteral_integer_unquoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Integer", "20")).isEqualTo("20");
+    }
+
+    @Test
+    void formatDefaultLiteral_int_primitive_unquoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("int", "20")).isEqualTo("20");
+    }
+
+    @Test
+    void formatDefaultLiteral_long_with_suffix() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Long", "100")).isEqualTo("100L");
+    }
+
+    @Test
+    void formatDefaultLiteral_long_primitive_with_suffix() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("long", "100")).isEqualTo("100L");
+    }
+
+    @Test
+    void formatDefaultLiteral_double_unquoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Double", "3.14")).isEqualTo("3.14");
+    }
+
+    @Test
+    void formatDefaultLiteral_double_whole_number_gets_dot() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Double", "20")).isEqualTo("20.0");
+    }
+
+    @Test
+    void formatDefaultLiteral_float_with_suffix() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Float", "1.5")).isEqualTo("1.5f");
+    }
+
+    @Test
+    void formatDefaultLiteral_boolean_unquoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("Boolean", "true")).isEqualTo("true");
+    }
+
+    @Test
+    void formatDefaultLiteral_string_quoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("String", "json")).isEqualTo("\"json\"");
+    }
+
+    @Test
+    void formatDefaultLiteral_unknown_type_quoted() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("SomeEnum", "VALUE")).isEqualTo("\"VALUE\"");
+    }
+
+
 }

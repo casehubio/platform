@@ -117,4 +117,49 @@ class AstInferenceIntegrationTest {
         assertThat(source).contains(".listAll()");
         assertThat(source).doesNotContain("testCapability(");
     }
+
+
+    private static final String HAND_WRITTEN_PLUGIN = """
+                                                      package test.connector;
+                                                      
+                                                      import io.casehub.yaml.plugin.api.Plugin;
+                                                      import io.casehub.yaml.plugin.api.Execute;
+                                                      import io.casehub.yaml.plugin.api.Required;
+                                                      import io.casehub.yaml.plugin.api.Result;
+                                                      
+                                                      @Plugin(value = "test-bank-balance", description = "Hand-written balance plugin")
+                                                      public record HandWrittenBalancePlugin(@Required String accountId) {
+                                                          @Execute
+                                                          public Result execute(TestCapability api) {
+                                                              return Result.of(java.util.Map.of("result", api.balance(accountId)));
+                                                          }
+                                                      }
+                                                      """;
+
+    @Test
+    void hand_written_plugin_with_same_name_skips_generated() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=connectors/test-bank")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankConnector", CONNECTOR_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.HandWrittenBalancePlugin", HAND_WRITTEN_PLUGIN));
+
+        Optional<JavaFileObject> balancePlugin = compilation.generatedSourceFiles().stream()
+                                                            .filter(f -> f.getName().contains("TestBankBalancePlugin"))
+                                                            .findFirst();
+
+        assertThat(balancePlugin).as("Generated balance plugin should be skipped — hand-written exists").isEmpty();
+
+        Optional<JavaFileObject> listPlugin = compilation.generatedSourceFiles().stream()
+                                                         .filter(f -> f.getName().contains("TestBankListAccountsPlugin"))
+                                                         .findFirst();
+
+        assertThat(listPlugin).as("ListAccounts plugin should still be generated").isPresent();
+    }
+
 }

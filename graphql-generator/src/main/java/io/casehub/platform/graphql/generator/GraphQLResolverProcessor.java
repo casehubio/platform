@@ -124,7 +124,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
         Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index, roundEnv);
         Set<String> restSkipMethods    = scanHandWrittenRestMethods(index, roundEnv);
-        Set<String> pluginSkipNames    = scanHandWrittenPluginNames();
+        Set<String> pluginSkipNames    = scanHandWrittenPluginNames(roundEnv);
 
         Map<String, DomainOperations> jandexDomains =
                 index != null ? scanAnnotatedDomains(index) : new HashMap<>();
@@ -2462,7 +2462,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return "String";
     }
 
-    private Set<String> scanHandWrittenPluginNames() {
+
+    private Set<String> scanHandWrittenPluginNames(RoundEnvironment roundEnv) {
         Set<String> names = new HashSet<>();
         if (jandexIndex != null) {
             for (AnnotationInstance ann : jandexIndex.getAnnotations(PLUGIN_ANN)) {
@@ -2471,10 +2472,19 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
             }
         }
-        // Jandex covers dependency JARs where hand-written plugins live.
-        // Same-module hand-written plugins are unlikely — skip detection is best-effort.
+        for (javax.lang.model.element.Element element : roundEnv.getRootElements()) {
+            if (element.getKind() != javax.lang.model.element.ElementKind.RECORD) {continue;}
+            javax.lang.model.element.AnnotationMirror pluginAnn = findAnnotationMirror(element,
+                                                                                       "io.casehub.yaml.plugin.api.Plugin");
+            if (pluginAnn == null) {continue;}
+            String pluginName = extractAnnotationStringValue(pluginAnn);
+            if (pluginName != null) {
+                names.add(pluginName);
+            }
+        }
         return names;
     }
+
 
     // ── End Plugin generation ─────────────────────────────────────────────────
 

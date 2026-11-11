@@ -10,10 +10,17 @@ import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
 
+import com.sun.source.util.Trees;
+import io.casehub.platform.graphql.generator.infer.InferenceFailure;
+import io.casehub.platform.graphql.generator.infer.InferredCallChain;
+import io.casehub.platform.graphql.generator.infer.MethodBodyInferrer;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
@@ -86,6 +93,12 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     private boolean   processed = false;
     private IndexView jandexIndex;
+    private Trees     trees;
+    private boolean   treesAvailable;
+    private int       inferredCount;
+    private int       totalPluginCount;
+    private final java.util.EnumMap<InferenceFailure, Integer> failureReasons = new java.util.EnumMap<>(InferenceFailure.class);
+    private final List<String> fallbackMethods = new ArrayList<>();
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -99,6 +112,16 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
         IndexView index = loadCombinedIndex();
         this.jandexIndex = index;
+
+        try {
+            trees = Trees.instance(processingEnv);
+            treesAvailable = true;
+        } catch (Exception e) {
+            trees = null;
+            treesAvailable = false;
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                    "AST inference unavailable — using annotation-based resolution");
+        }
 
         Set<String> graphqlSkipMethods = scanHandWrittenGraphQLMethods(index, roundEnv);
         Set<String> restSkipMethods    = scanHandWrittenRestMethods(index, roundEnv);
@@ -177,6 +200,21 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
                                                      "GraphQL generator: no domainFilter set — generating for all "
                                                      + allDomains.size() + " domains. Set -AdomainFilter=... to restrict.");
+        }
+
+        if (generatePlugins && totalPluginCount > 0) {
+            int fallbackCount = fallbackMethods.size();
+            StringBuilder summary = new StringBuilder();
+            summary.append("AST inference: ").append(inferredCount).append("/")
+                   .append(totalPluginCount).append(" methods inferred");
+            if (fallbackCount > 0) {
+                summary.append(", ").append(fallbackCount).append(" fell back (");
+                failureReasons.forEach((reason, count) ->
+                        summary.append(count).append(" ").append(reason.name().toLowerCase()).append(", "));
+                summary.setLength(summary.length() - 2);
+                summary.append("): ").append(fallbackMethods);
+            }
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, summary.toString());
         }
 
         enforceNoHandWrittenRest(roundEnv);
@@ -1763,6 +1801,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
     // ── Plugin generation ──────────────────────────────────────────────────────
 
+    private ExecutableElement findMethodElement(ResolvedOperation op) {
+        TypeElement te = processingEnv.getElementUtils().getTypeElement(op.declaringClassFqcn());
+        if (te == null) return null;
+        int paramCount = op.params().size();
+        for (Element enclosed : te.getEnclosedElements()) {
+            if (enclosed.getSimpleName().toString().equals(op.methodName())
+                    && enclosed instanceof ExecutableElement exec
+                    && exec.getParameters().size() == paramCount) {
+                return exec;
+            }
+        }
+        return null;
+    }
+
     private void generatePluginSource(String domain, DomainOperations ops, Set<String> pluginSkipNames) {
         // Tier 2: resolve SPI type from @Inject fields for connector classes
         String resolvedSpiTypeFqcn = null;
@@ -1836,6 +1888,24 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
             String description = meta.description.isEmpty() ? op.description() : meta.description;
 
+            // AST inference for Tier 2 connector methods
+            InferredCallChain inferred = null;
+            if (!ops.isInterface && treesAvailable) {
+                ExecutableElement methodElement = findMethodElement(op);
+                if (methodElement != null) {
+                    inferred = MethodBodyInferrer.infer(trees, methodElement, jandexIndex);
+                }
+                if (inferred != null && !inferred.isComplete()) {
+                    failureReasons.merge(inferred.failureReason(), 1, Integer::sum);
+                    fallbackMethods.add(op.methodName());
+                    inferred = null;
+                }
+            }
+            if (!ops.isInterface) {
+                totalPluginCount++;
+                if (inferred != null) inferredCount++;
+            }
+
             // Determine execute param type and delegate call strategy
             String executeParamType;
             String executeParamFqcn;
@@ -1843,37 +1913,45 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             List<PluginField> accessorFields = new ArrayList<>();
             String spiMethodName = op.methodName();
             String effectiveRoutingParam = null;
+            boolean usedInference = false;
 
             if (ops.isInterface) {
                 // Tier 1: delegate directly to interface
                 executeParamType = op.declaringClassSimple();
                 executeParamFqcn = op.declaringClassFqcn();
             } else {
-                // Tier 2: use SPI type
-                String spiOverride = meta.spiFqcn;
-                if (!spiOverride.isEmpty()) {
-                    executeParamFqcn = spiOverride;
-                    executeParamType = spiOverride.contains(".")
-                            ? spiOverride.substring(spiOverride.lastIndexOf('.') + 1) : spiOverride;
-                } else if (resolvedSpiTypeFqcn != null) {
-                    executeParamFqcn = resolvedSpiTypeFqcn;
-                    executeParamType = resolvedSpiTypeSimple;
+                // Tier 2: merge annotation + inference with precedence (D8)
+                String effectiveSpiType = !meta.spiFqcn.isEmpty() ? meta.spiFqcn
+                        : (inferred != null ? inferred.spiTypeFqcn() : resolvedSpiTypeFqcn);
+                String effectiveCapability = !meta.capabilityFqcn.isEmpty() ? meta.capabilityFqcn
+                        : (inferred != null ? inferred.capabilityFqcn() : null);
+                String effectiveAccessor = !meta.accessor.isEmpty() ? meta.accessor
+                        : (inferred != null ? inferred.capabilityAccessor() : null);
+                String effectiveSpiMethod = !meta.spiMethod.isEmpty() ? meta.spiMethod
+                        : (inferred != null ? inferred.targetMethod() : op.methodName());
+                effectiveRoutingParam = inferred != null && inferred.routingParamName() != null
+                        ? inferred.routingParamName() : routingParamName;
+                usedInference = (inferred != null);
+
+                if (effectiveSpiType != null) {
+                    executeParamFqcn = effectiveSpiType;
+                    executeParamType = effectiveSpiType.contains(".")
+                            ? effectiveSpiType.substring(effectiveSpiType.lastIndexOf('.') + 1)
+                            : effectiveSpiType;
                 } else {
                     processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
                             "Plugin generator: skipping " + domain + ":" + op.methodName()
                             + " — cannot resolve SPI type. Use @GeneratePlugin(spi = ...)");
                     continue;
                 }
-                effectiveRoutingParam = routingParamName;
 
-                // Resolve capability call chain
-                if (!meta.capabilityFqcn.isEmpty()) {
-                    String capSimple = meta.capabilityFqcn.contains(".")
-                            ? meta.capabilityFqcn.substring(meta.capabilityFqcn.lastIndexOf('.') + 1)
-                            : meta.capabilityFqcn;
-                    capabilityAccessor = !meta.accessor.isEmpty()
-                            ? meta.accessor
-                            : decapitalize(capSimple);
+                // Resolve capability call chain from effective values
+                if (effectiveCapability != null && !effectiveCapability.isEmpty()) {
+                    String capSimple = effectiveCapability.contains(".")
+                            ? effectiveCapability.substring(effectiveCapability.lastIndexOf('.') + 1)
+                            : effectiveCapability;
+                    capabilityAccessor = effectiveAccessor != null && !effectiveAccessor.isEmpty()
+                            ? effectiveAccessor : decapitalize(capSimple);
 
                     // Introspect accessor parameters via Jandex
                     if (jandexIndex != null) {
@@ -1896,17 +1974,15 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                             if (!found) {
                                 processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                                         "Plugin generator: SPI type " + executeParamFqcn + " has no method '"
-                                        + capabilityAccessor + "' — required by @GeneratePlugin(capability = "
-                                        + meta.capabilityFqcn + ") on " + domain + ":" + op.methodName());
+                                        + capabilityAccessor + "' — required for capability "
+                                        + effectiveCapability + " on " + domain + ":" + op.methodName());
                                 continue;
                             }
                         }
                     }
                 }
 
-                if (!meta.spiMethod.isEmpty()) {
-                    spiMethodName = meta.spiMethod;
-                }
+                spiMethodName = effectiveSpiMethod;
             }
 
             Set<String> effectiveOptionalParams = resolveEffectiveOptionalParams(op, meta);
@@ -1916,6 +1992,18 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 boolean alreadyPresent = fields.stream().anyMatch(f -> f.name.equals(af.name));
                 if (!alreadyPresent) {
                     fields.add(af);
+                }
+            }
+
+            // Apply AST-inferred static defaults (Rule 5)
+            if (inferred != null && inferred.staticDefaults() != null) {
+                for (int i = 0; i < fields.size(); i++) {
+                    PluginField f = fields.get(i);
+                    if ((f.defaultValue == null || f.defaultValue.isEmpty())
+                            && inferred.staticDefaults().containsKey(f.name)) {
+                        fields.set(i, new PluginField(f.name, f.typeStr, false,
+                                inferred.staticDefaults().get(f.name)));
+                    }
                 }
             }
 
@@ -1943,6 +2031,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     out.println();
 
                     out.println("// GENERATED by GraphQLResolverProcessor — do not edit");
+                    if (!ops.isInterface) {
+                        out.println("// resolved via: " + (usedInference ? "AST inference" : "@GeneratePlugin annotation"));
+                    }
 
                     StringBuilder pluginAnn = new StringBuilder();
                     pluginAnn.append("@Plugin(value = \"").append(escapeJavaString(pluginName)).append("\"");

@@ -2026,6 +2026,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
             }
 
+            // Reorder: subject field first for bare-value YAML syntax
+            if (!meta.subject.isEmpty()) {
+                for (int i = 0; i < fields.size(); i++) {
+                    if (fields.get(i).name.equals(meta.subject)) {
+                        PluginField subjectField = fields.remove(i);
+                        fields.add(0, new PluginField(subjectField.name, subjectField.typeStr, true, subjectField.defaultValue));
+                        break;
+                    }
+                }
+            }
+
             try {
                 JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile(fqcn);
                 try (PrintWriter out = new PrintWriter(sourceFile.openWriter())) {

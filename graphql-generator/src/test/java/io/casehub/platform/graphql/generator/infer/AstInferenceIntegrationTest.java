@@ -136,6 +136,48 @@ class AstInferenceIntegrationTest {
                                                       }
                                                       """;
 
+
+    private static final String SUBJECT_INTERFACE_SOURCE = """
+                                                           package test.connector;
+                                                           
+                                                           import io.casehub.platform.api.mcp.McpDomain;
+                                                           import io.casehub.platform.api.mcp.PlatformQuery;
+                                                           import io.casehub.platform.api.mcp.GeneratePlugin;
+                                                           
+                                                           @McpDomain("test-voice")
+                                                           public interface TestVoiceApi {
+                                                           
+                                                               @PlatformQuery("Speak text")
+                                                               @GeneratePlugin(subject = "text", absorb = true)
+                                                               String speak(String text, String voice);
+                                                           }
+                                                           """;
+
+
+    @Test
+    void subject_field_is_first_and_required() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=test-voice")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestVoiceApi", SUBJECT_INTERFACE_SOURCE));
+
+        Optional<JavaFileObject> plugin = compilation.generatedSourceFiles().stream()
+                                                     .filter(f -> f.getName().contains("VoiceSpeakPlugin"))
+                                                     .findFirst();
+
+        assertThat(plugin).as("Speak plugin should be generated").isPresent();
+
+        String source = new String(plugin.get().openInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(source).contains("absorbSiblings = true");
+        assertThat(source).contains("@Required String text");
+        int textPos  = source.indexOf("@Required String text");
+        int voicePos = source.indexOf("String voice");
+        assertThat(textPos).as("text (subject) should appear before voice in record").isLessThan(voicePos);
+    }
+
+
     @Test
     void hand_written_plugin_with_same_name_skips_generated() throws IOException {
         Compilation compilation = javac()

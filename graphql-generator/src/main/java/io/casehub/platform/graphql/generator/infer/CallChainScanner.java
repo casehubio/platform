@@ -17,6 +17,7 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 
     private final IndexView jandexIndex;
     private final Map<String, String> importMap;
+    private final String currentPackage;
 
     private final Map<String, String> variableTypes = new HashMap<>();
 
@@ -36,6 +37,7 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
     CallChainScanner(IndexView jandexIndex, TreePath methodPath) {
         this.jandexIndex = jandexIndex;
         this.importMap = buildImportMap(methodPath);
+        this.currentPackage = extractPackage(methodPath);
     }
 
     private static Map<String, String> buildImportMap(TreePath methodPath) {
@@ -59,6 +61,18 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         return map;
     }
 
+    private static String extractPackage(TreePath methodPath) {
+        TreePath current = methodPath;
+        while (current != null) {
+            if (current.getLeaf() instanceof CompilationUnitTree cu) {
+                ExpressionTree pkgName = cu.getPackageName();
+                return pkgName != null ? pkgName.toString() : "";
+            }
+            current = current.getParentPath();
+        }
+        return "";
+    }
+
     private String resolveTypeName(String simpleName) {
         if (simpleName.contains(".")) return simpleName;
         String fromImports = importMap.get(simpleName);
@@ -66,11 +80,14 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         if (jandexIndex != null) {
             List<ClassInfo> candidates = new ArrayList<>();
             for (ClassInfo ci : jandexIndex.getKnownClasses()) {
-                if (ci.simpleName().equals(simpleName)) {
+                if (ci.simpleName() != null && ci.simpleName().equals(simpleName)) {
                     candidates.add(ci);
                 }
             }
             if (candidates.size() == 1) return candidates.get(0).name().toString();
+        }
+        if (!currentPackage.isEmpty()) {
+            return currentPackage + "." + simpleName;
         }
         return simpleName;
     }

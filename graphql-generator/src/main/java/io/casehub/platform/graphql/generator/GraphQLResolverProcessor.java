@@ -1995,6 +1995,20 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 }
             }
 
+            // When Jandex didn't find accessor params but AST inference has them, use inferred args
+            if (accessorFields.isEmpty() && inferred != null && inferred.accessorArgs() != null) {
+                for (String argExpr : inferred.accessorArgs()) {
+                    String raw = argExpr.endsWith("()") ? argExpr.substring(0, argExpr.length() - 2) : argExpr;
+                    String fn = raw.contains(".") ? raw.substring(raw.lastIndexOf('.') + 1) : raw;
+                    if (fn.startsWith("\"")) continue;
+                    boolean alreadyPresent = fields.stream().anyMatch(f -> f.name.equals(fn));
+                    if (!alreadyPresent) {
+                        accessorFields.add(new PluginField(fn, "String", false));
+                        fields.add(new PluginField(fn, "String", false));
+                    }
+                }
+            }
+
             // Apply AST-inferred static defaults (Rule 5)
             if (inferred != null && inferred.staticDefaults() != null) {
                 for (int i = 0; i < fields.size(); i++) {

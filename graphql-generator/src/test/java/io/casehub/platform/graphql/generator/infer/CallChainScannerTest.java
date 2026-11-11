@@ -24,7 +24,7 @@ class CallChainScannerTest {
         InferredCallChain result = MethodBodyInferrer.infer(
                 helper.trees, helper.findMethod("StandardConnector", "simpleQuery"), null);
         assertThat(result.isComplete()).isTrue();
-        assertThat(result.spiTypeFqcn()).isEqualTo("FakeSpiType");
+        assertThat(result.spiTypeFqcn()).isEqualTo("infer.FakeSpiType");
         assertThat(result.routingParamName()).isEqualTo("platform");
         assertThat(result.capabilityAccessor()).isEqualTo("capability");
         assertThat(result.targetMethod()).isEqualTo("targetMethod");
@@ -36,7 +36,7 @@ class CallChainScannerTest {
         InferredCallChain result = MethodBodyInferrer.infer(
                 helper.trees, helper.findMethod("StandardConnector", "withRequireCapability"), null);
         assertThat(result.isComplete()).isTrue();
-        assertThat(result.capabilityFqcn()).isEqualTo("FakeCapability");
+        assertThat(result.capabilityFqcn()).isEqualTo("infer.FakeCapability");
         assertThat(result.requireCapabilityMethodName()).isEqualTo("targetMethod");
     }
 
@@ -65,8 +65,8 @@ class CallChainScannerTest {
         InferredCallChain result = MethodBodyInferrer.infer(
                 helper.trees, helper.findMethod("StandardConnector", "helperMethodRouting"), null);
         assertThat(result.isComplete()).isTrue();
-        assertThat(result.spiTypeFqcn()).isEqualTo("FakeSpiType");
-        assertThat(result.capabilityFqcn()).isEqualTo("FakeCapability");
+        assertThat(result.spiTypeFqcn()).isEqualTo("infer.FakeSpiType");
+        assertThat(result.capabilityFqcn()).isEqualTo("infer.FakeCapability");
         assertThat(result.targetMethod()).isEqualTo("targetMethod");
     }
 

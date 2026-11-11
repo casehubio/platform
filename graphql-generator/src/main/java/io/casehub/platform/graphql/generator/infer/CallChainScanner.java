@@ -160,38 +160,38 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitVariable(VariableTree node, Void p) {
-        String typeName = node.getType() != null ? node.getType().toString() : "var";
+        String typeName = node.getType() != null ? node.getType().toString() : null;
+        boolean isVar = typeName == null || "var".equals(typeName);
+        String varName = node.getName().toString();
 
-        if ("var".equals(typeName)) {
-            if (node.getInitializer() instanceof MethodInvocationTree inv
-                    && methodName(inv).equals("platform")) {
-                String resolved = resolveVarPlatformType(inv);
-                if (resolved != null) {
-                    variableTypes.put(node.getName().toString(), resolved);
-                    spiTypeFqcn = resolved;
-                    if (inv.getArguments().size() == 1) {
-                        routingParamName = inv.getArguments().get(0).toString();
-                    }
-                } else {
-                    failureReason = InferenceFailure.VAR_TYPED_SPI;
-                }
-            }
-            return super.visitVariable(node, p);
+        // Track variable type — use declared type when available
+        String resolvedType = null;
+        if (!isVar) {
+            resolvedType = resolveTypeName(typeName);
+            variableTypes.put(varName, resolvedType);
         }
 
-        String resolvedType = resolveTypeName(typeName);
-        variableTypes.put(node.getName().toString(), resolvedType);
-
-        if (node.getInitializer() instanceof MethodInvocationTree inv) {
-            String mName = methodName(inv);
-            if (mName.equals("platform") && inv.getArguments().size() == 1) {
-                // Rule 1: service.platform(routingParam)
+        // Rule 1 & 2: detect .platform() calls — works for both var and explicit types
+        if (node.getInitializer() instanceof MethodInvocationTree inv
+                && methodName(inv).equals("platform")) {
+            if (resolvedType != null) {
+                // Explicit type — use the declared type (most reliable)
                 spiTypeFqcn = resolvedType;
-                routingParamName = inv.getArguments().get(0).toString();
-            } else if (mName.equals("platform") && inv.getArguments().isEmpty()) {
-                // Rule 2: resolved.platform() — voice-style
-                spiTypeFqcn = resolvedType;
+            } else {
+                // var or null type — resolve SPI type from receiver's field type
+                String fromReceiver = resolveVarPlatformType(inv);
+                if (fromReceiver != null) {
+                    variableTypes.put(varName, fromReceiver);
+                    spiTypeFqcn = fromReceiver;
+                } else {
+                    failureReason = InferenceFailure.VAR_TYPED_SPI;
+                    return super.visitVariable(node, p);
+                }
             }
+            if (inv.getArguments().size() == 1) {
+                routingParamName = inv.getArguments().get(0).toString();
+            }
+            return super.visitVariable(node, p);
         }
 
         // Rule 5: static default detection — x != null ? x : literal

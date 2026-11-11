@@ -11,7 +11,7 @@ class VarResolutionTest {
 
     @BeforeAll
     static void compile() throws Exception {
-        helper = new CompileTestHelper("StandardConnector.java", "VarConnector.java");
+        helper = new CompileTestHelper("StandardConnector.java", "VarConnector.java", "ContactsConnector.java");
     }
 
     @Test
@@ -50,5 +50,38 @@ class VarResolutionTest {
         System.out.println("failureReason=" + result.failureReason());
         assertThat(result.isComplete()).isTrue();
         assertThat(result.targetMethod()).isEqualTo("deleteItem");
+    }
+
+    // -- Contacts-style reproduction (issue #802) --
+
+    @Test
+    void contacts_listContacts_with_var() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("ContactsConnector", "listContacts"), null);
+        System.out.println("=== ContactsConnector.listContacts ===");
+        System.out.println("spiTypeFqcn=" + result.spiTypeFqcn());
+        System.out.println("routingParam=" + result.routingParamName());
+        System.out.println("capability=" + result.capabilityFqcn());
+        System.out.println("accessor=" + result.capabilityAccessor());
+        System.out.println("targetMethod=" + result.targetMethod());
+        System.out.println("targetArgs=" + result.targetArgs());
+        System.out.println("staticDefaults=" + result.staticDefaults());
+        System.out.println("failureReason=" + result.failureReason());
+        System.out.println("isComplete=" + result.isComplete());
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("list");
+        assertThat(result.capabilityAccessor()).isEqualTo("contactRead");
+    }
+
+    @Test
+    void contacts_getContact_with_var() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("ContactsConnector", "getContact"), null);
+        System.out.println("=== ContactsConnector.getContact ===");
+        System.out.println("spiTypeFqcn=" + result.spiTypeFqcn());
+        System.out.println("targetMethod=" + result.targetMethod());
+        System.out.println("failureReason=" + result.failureReason());
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("get");
     }
 }

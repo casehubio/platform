@@ -354,10 +354,9 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
     // -- Result assembly --
 
     InferredCallChain result() {
-        if (requireCapabilityMethodName != null && targetMethod != null
-                && !requireCapabilityMethodName.equals(targetMethod)) {
-            failureReason = InferenceFailure.CAPABILITY_MISMATCH;
-        }
+        // requireCapabilityMethodName is the API operation name (for error messages),
+        // NOT the SPI method name — e.g. "listContacts" vs SPI method "list".
+        // No cross-validation: they are intentionally different.
         if (spiTypeFqcn == null && failureReason == null) {
             failureReason = InferenceFailure.NO_SPI_VARIABLE;
         }

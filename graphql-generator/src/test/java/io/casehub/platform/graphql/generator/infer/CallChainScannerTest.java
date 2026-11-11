@@ -107,4 +107,40 @@ class CallChainScannerTest {
         assertThat(result.targetMethod()).isEqualTo("removeItem");
         assertThat(result.capabilityAccessor()).isNull();
     }
+
+
+    @org.junit.jupiter.api.Nested
+    class StarImportResolution {
+
+        private CompileTestHelper starHelper;
+
+        @org.junit.jupiter.api.BeforeEach
+        void compile() throws Exception {
+            starHelper = new CompileTestHelper(
+                    "StarImportConnector.java",
+                    "spi/StarSpiType.java",
+                    "spi/StarCapability.java",
+                    "spi/StarResult.java",
+                    "spi/StarPlatformService.java");
+        }
+
+        @Test
+        void star_import_resolves_spi_type() {
+            InferredCallChain result = MethodBodyInferrer.infer(
+                    starHelper.trees, starHelper.findMethod("StarImportConnector", "simpleQuery"), null);
+            assertThat(result.isComplete()).isTrue();
+            assertThat(result.spiTypeFqcn()).isEqualTo("infer.spi.StarSpiType");
+            assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        }
+
+        @Test
+        void star_import_direct_call() {
+            InferredCallChain result = MethodBodyInferrer.infer(
+                    starHelper.trees, starHelper.findMethod("StarImportConnector", "noCapabilityRouting"), null);
+            assertThat(result.isComplete()).isTrue();
+            assertThat(result.spiTypeFqcn()).isEqualTo("infer.spi.StarSpiType");
+            assertThat(result.targetMethod()).isEqualTo("listAll");
+        }
+    }
+
 }

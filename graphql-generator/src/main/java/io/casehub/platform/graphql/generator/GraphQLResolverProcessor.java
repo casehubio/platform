@@ -1823,20 +1823,26 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             ClassInfo classInfo = jandexIndex.getClassByName(DotName.createSimple(ops.declaringClassFqcn));
             if (classInfo != null) {
                 List<String[]> spiCandidates = new ArrayList<>();
-                for (org.jboss.jandex.FieldInfo field : classInfo.fields()) {
-                    if (field.hasAnnotation(INJECT_ANN)) {
-                        ClassInfo fieldType = jandexIndex.getClassByName(field.type().name());
-                        if (fieldType != null) {
-                            for (org.jboss.jandex.MethodInfo method : fieldType.methods()) {
-                                if (method.name().equals("platform") && method.parametersCount() == 1
-                                        && method.parameterType(0).name().equals(DotName.createSimple("java.lang.String"))) {
-                                    String spiTypeFqcn = method.returnType().name().toString();
-                                    String paramName = method.parameterName(0);
-                                    spiCandidates.add(new String[]{spiTypeFqcn, paramName != null ? paramName : "platform"});
+                ClassInfo current = classInfo;
+                while (current != null) {
+                    for (org.jboss.jandex.FieldInfo field : current.fields()) {
+                        if (field.hasAnnotation(INJECT_ANN)) {
+                            ClassInfo fieldType = jandexIndex.getClassByName(field.type().name());
+                            if (fieldType != null) {
+                                for (org.jboss.jandex.MethodInfo method : fieldType.methods()) {
+                                    if (method.name().equals("platform") && method.parametersCount() == 1
+                                            && method.parameterType(0).name().equals(DotName.createSimple("java.lang.String"))) {
+                                        String spiTypeFqcn = method.returnType().name().toString();
+                                        String paramName = method.parameterName(0);
+                                        spiCandidates.add(new String[]{spiTypeFqcn, paramName != null ? paramName : "platform"});
+                                    }
                                 }
                             }
                         }
                     }
+                    DotName superName = current.superName();
+                    current = (superName != null && !superName.equals(DotName.createSimple("java.lang.Object")))
+                            ? jandexIndex.getClassByName(superName) : null;
                 }
                 if (spiCandidates.size() == 1) {
                     resolvedSpiTypeFqcn = spiCandidates.get(0)[0];

@@ -31,6 +31,10 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 
     private final IndexView jandexIndex;
     private final Map<String, String> importMap;
+
+    private final List<String> starImportPackages;
+
+
     private final String currentPackage;
 
     private final Map<String, String> variableTypes = new HashMap<>();
@@ -48,12 +52,15 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
     private int returnCount;
     private InferenceFailure failureReason;
 
+
     CallChainScanner(IndexView jandexIndex, TreePath methodPath) {
-        this.jandexIndex = jandexIndex;
-        this.importMap = buildImportMap(methodPath);
-        this.currentPackage = extractPackage(methodPath);
+        this.jandexIndex        = jandexIndex;
+        this.importMap          = buildImportMap(methodPath);
+        this.starImportPackages = collectStarImports(methodPath);
+        this.currentPackage     = extractPackage(methodPath);
         populateFieldTypes(methodPath);
     }
+
 
     private void populateFieldTypes(TreePath methodPath) {
         TreePath current = methodPath;
@@ -93,6 +100,27 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         return map;
     }
 
+    private static List<String> collectStarImports(TreePath methodPath) {
+        List<String> packages = new ArrayList<>();
+        TreePath     current  = methodPath;
+        while (current != null) {
+            if (current.getLeaf() instanceof CompilationUnitTree cu) {
+                for (ImportTree imp : cu.getImports()) {
+                    if (!imp.isStatic()) {
+                        String fqcn = imp.getQualifiedIdentifier().toString();
+                        if (fqcn.endsWith(".*")) {
+                            packages.add(fqcn.substring(0, fqcn.length() - 2));
+                        }
+                    }
+                }
+                break;
+            }
+            current = current.getParentPath();
+        }
+        return packages;
+    }
+
+
     private static String extractPackage(TreePath methodPath) {
         TreePath current = methodPath;
         while (current != null) {
@@ -105,24 +133,34 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         return "";
     }
 
+
     private String resolveTypeName(String simpleName) {
-        if (simpleName.contains(".")) return simpleName;
+        if (simpleName.contains(".")) {return simpleName;}
         String fromImports = importMap.get(simpleName);
-        if (fromImports != null) return fromImports;
+        if (fromImports != null) {return fromImports;}
         if (jandexIndex != null) {
+            for (String pkg : starImportPackages) {
+                String candidate = pkg + "." + simpleName;
+                if (jandexIndex.getClassByName(candidate) != null) {
+                    return candidate;
+                }
+            }
             List<ClassInfo> candidates = new ArrayList<>();
             for (ClassInfo ci : jandexIndex.getKnownClasses()) {
                 if (ci.simpleName() != null && ci.simpleName().equals(simpleName)) {
                     candidates.add(ci);
                 }
             }
-            if (candidates.size() == 1) return candidates.get(0).name().toString();
+            if (candidates.size() == 1) {return candidates.get(0).name().toString();}
+        } else if (starImportPackages.size() == 1) {
+            return starImportPackages.get(0) + "." + simpleName;
         }
         if (!currentPackage.isEmpty()) {
             return currentPackage + "." + simpleName;
         }
         return simpleName;
     }
+
 
     private String resolveVarPlatformType(MethodInvocationTree inv) {
         if (inv.getMethodSelect() instanceof MemberSelectTree sel) {

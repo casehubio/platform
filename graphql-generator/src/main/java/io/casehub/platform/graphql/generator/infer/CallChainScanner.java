@@ -243,29 +243,9 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
             }
         }
 
-        // Rule 7: SPI method chain in variable initializer (result assigned to local, then transformed in return)
-        if (spiTypeFqcn != null && targetMethod == null && node.getInitializer() != null) {
-            List<MethodCallInfo> chain = flattenMethodChain(node.getInitializer());
-            if (chain.size() >= 2) {
-                MethodCallInfo first = chain.get(0);
-                if (first.receiverName() != null
-                        && variableTypes.containsKey(first.receiverName())
-                        && variableTypes.get(first.receiverName()).equals(spiTypeFqcn)) {
-                    capabilityAccessor = first.methodName();
-                    accessorArgs = first.args();
-                    MethodCallInfo last = chain.get(chain.size() - 1);
-                    targetMethod = last.methodName();
-                    targetArgs = last.args();
-                }
-            } else if (chain.size() == 1) {
-                MethodCallInfo call = chain.get(0);
-                if (call.receiverName() != null
-                        && variableTypes.containsKey(call.receiverName())
-                        && variableTypes.get(call.receiverName()).equals(spiTypeFqcn)) {
-                    targetMethod = call.methodName();
-                    targetArgs = call.args();
-                }
-            }
+        // SPI method chain in variable initializer (result assigned to local, then transformed in return)
+        if (node.getInitializer() != null) {
+            tryExtractSpiChain(node.getInitializer());
         }
         return super.visitVariable(node, p);
     }
@@ -306,31 +286,8 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
                 }
             }
 
-            // Rule 6: void method SPI chain as expression statement
-            List<MethodCallInfo> chain = flattenMethodChain(inv);
-            if (chain.size() >= 2) {
-                MethodCallInfo first = chain.get(0);
-                if (first.receiverName() != null
-                        && variableTypes.containsKey(first.receiverName())
-                        && variableTypes.get(first.receiverName()).equals(spiTypeFqcn)) {
-                    if (targetMethod == null) {
-                        capabilityAccessor = first.methodName();
-                        accessorArgs = first.args();
-                        MethodCallInfo last = chain.get(chain.size() - 1);
-                        targetMethod = last.methodName();
-                        targetArgs = last.args();
-                    }
-                }
-            } else if (chain.size() == 1) {
-                MethodCallInfo call = chain.get(0);
-                if (call.receiverName() != null
-                        && variableTypes.containsKey(call.receiverName())
-                        && variableTypes.get(call.receiverName()).equals(spiTypeFqcn)
-                        && targetMethod == null) {
-                    targetMethod = call.methodName();
-                    targetArgs = call.args();
-                }
-            }
+            // SPI chain as expression statement (void methods)
+            tryExtractSpiChain(inv);
         }
         return super.visitExpressionStatement(node, p);
     }
@@ -356,36 +313,7 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         ExpressionTree expr = node.getExpression();
         if (expr == null) {return super.visitReturn(node, p);}
 
-        // Unwrap ternary: return x != null ? transform(x) : null → extract from true branch
-        if (expr instanceof ConditionalExpressionTree ternary) {
-            ExpressionTree falseExpr = ternary.getFalseExpression();
-            if (falseExpr instanceof LiteralTree) {
-                expr = ternary.getTrueExpression();
-            }
-        }
-
-        List<MethodCallInfo> chain = flattenMethodChain(expr);
-
-        if (chain.size() >= 2) {
-            MethodCallInfo first = chain.get(0);
-            if (first.receiverName() != null
-                && variableTypes.containsKey(first.receiverName())
-                && variableTypes.get(first.receiverName()).equals(spiTypeFqcn)) {
-                capabilityAccessor = first.methodName();
-                accessorArgs       = first.args();
-                MethodCallInfo last = chain.get(chain.size() - 1);
-                targetMethod = last.methodName();
-                targetArgs   = last.args();
-            }
-        } else if (chain.size() == 1) {
-            MethodCallInfo call = chain.get(0);
-            if (call.receiverName() != null
-                && variableTypes.containsKey(call.receiverName())
-                && variableTypes.get(call.receiverName()).equals(spiTypeFqcn)) {
-                targetMethod = call.methodName();
-                targetArgs   = call.args();
-            }
-        }
+        tryExtractSpiChain(expr);
         return super.visitReturn(node, p);
     }
 
@@ -409,6 +337,39 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         return true;
     }
 
+
+    private boolean tryExtractSpiChain(ExpressionTree expr) {
+        if (spiTypeFqcn == null || targetMethod != null) {return false;}
+        if (expr instanceof ConditionalExpressionTree ternary) {
+            if (ternary.getFalseExpression() instanceof LiteralTree) {
+                expr = ternary.getTrueExpression();
+            }
+        }
+        List<MethodCallInfo> chain = flattenMethodChain(expr);
+        if (chain.size() >= 2) {
+            MethodCallInfo first = chain.get(0);
+            if (first.receiverName() != null
+                && variableTypes.containsKey(first.receiverName())
+                && variableTypes.get(first.receiverName()).equals(spiTypeFqcn)) {
+                capabilityAccessor = first.methodName();
+                accessorArgs       = first.args();
+                MethodCallInfo last = chain.get(chain.size() - 1);
+                targetMethod = last.methodName();
+                targetArgs   = last.args();
+                return true;
+            }
+        } else if (chain.size() == 1) {
+            MethodCallInfo call = chain.get(0);
+            if (call.receiverName() != null
+                && variableTypes.containsKey(call.receiverName())
+                && variableTypes.get(call.receiverName()).equals(spiTypeFqcn)) {
+                targetMethod = call.methodName();
+                targetArgs   = call.args();
+                return true;
+            }
+        }
+        return false;
+    }
 
     private List<MethodCallInfo> flattenMethodChain(ExpressionTree expr) {
         List<MethodCallInfo> chain = new ArrayList<>();

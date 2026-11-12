@@ -134,3 +134,6 @@ playbook-compiler
 playbooks
 # Durable coordination primitives — framework-neutral, no CDI beans
 coordination-core
+
+# Framework-neutral standalone MCP consumer proof; has no Quarkus wiring to port.
+mcp-standalone-test

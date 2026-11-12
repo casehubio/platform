@@ -238,6 +238,7 @@
         <module>spring-generator</module>
         <module>rest-spring-generator</module>
         <module>graphql-spring-generator</module>
+        <module>mcp-standalone-test</module>
         <module>mcp-spring-generator</module>
         <module>agent-spring</module>
         <module>identity-spring</module>

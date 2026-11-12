@@ -49,6 +49,7 @@
     <module>spring-generator</module>
     <module>rest-spring-generator</module>
     <module>graphql-spring-generator</module>
+    <module>mcp-standalone-test</module>
     <module>mcp-spring-generator</module>
 
     <!-- Spring modules from Slice A -->

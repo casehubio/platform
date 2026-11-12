@@ -166,6 +166,25 @@ class CallChainScannerTest {
         assertThat(result.failureReason()).isNull();
     }
 
+    @Test
+    void spi_chain_in_variable_initializer() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withResultTransform"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.capabilityAccessor()).isEqualTo("capability");
+        assertThat(result.failureReason()).isNull();
+    }
+
+    @Test
+    void ternary_conditional_return() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withTernaryReturn"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.failureReason()).isNull();
+    }
+
 
     @org.junit.jupiter.api.Nested
     class StarImportResolution {

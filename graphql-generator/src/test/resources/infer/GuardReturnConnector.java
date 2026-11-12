@@ -58,5 +58,21 @@ public class GuardReturnConnector {
         }
     }
 
+    // Variable-initializer SPI chain — result transformed in return
+    public FakeResult withResultTransform(String platform, String accountId) {
+        FakeSpiType p = service.platform(platform);
+        if (p == null) return null;
+        FakeResult result = p.capability(userId()).targetMethod(accountId);
+        return transform(result);
+    }
+
+    // Ternary conditional return
+    public FakeResult withTernaryReturn(String platform, String accountId) {
+        FakeSpiType p = service.platform(platform);
+        FakeResult result = p.capability(userId()).targetMethod(accountId);
+        return result != null ? transform(result) : null;
+    }
+
+    private FakeResult transform(FakeResult r) { return r; }
     private String userId() { return "user"; }
 }

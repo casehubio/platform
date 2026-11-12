@@ -75,9 +75,11 @@ class SpringSubscriptionStoreTest {
         assertNotNull(sub.id());
         assertEquals("Sub 1", sub.name());
 
+        em.clear();
         Optional<Subscription> found = store.findById(sub.id(), OWNER, TENANT);
         assertTrue(found.isPresent());
         assertEquals("Sub 1", found.get().name());
+        assertEquals(sub.createdAt(), found.get().createdAt());
     }
 
     @Test
@@ -126,6 +128,27 @@ class SpringSubscriptionStoreTest {
         List<Subscription> enabled = store.findAllEnabled().toList();
         assertEquals(1, enabled.size());
         assertEquals("Enabled", enabled.getFirst().name());
+    }
+
+    @Test
+    void cursorPaginationUsesPersistedPrecisionWithManagedEntities() {
+        var base = java.time.Instant.parse("2026-11-09T10:00:00.123456123Z");
+        for (int i = 0; i < 5; i++) {
+            var entity = SubscriptionEntity.fromInput(testInput("Nano " + i), new ObjectMapper());
+            entity.createdAt = base.plusSeconds(i);
+            em.persist(entity);
+        }
+        em.flush();
+
+        var first = store.find(new SubscriptionQuery(OWNER, TENANT, SubscriptionScope.USER, null, null, 3));
+        assertEquals(3, first.subscriptions().size());
+        assertNotNull(first.nextCursor());
+        var second = store.find(new SubscriptionQuery(OWNER, TENANT, SubscriptionScope.USER, null, first.nextCursor(), 3));
+        assertEquals(2, second.subscriptions().size());
+        assertNull(second.nextCursor());
+        var ids = java.util.stream.Stream.concat(first.subscriptions().stream(), second.subscriptions().stream())
+                .map(Subscription::id).collect(java.util.stream.Collectors.toSet());
+        assertEquals(5, ids.size());
     }
 
     @Test

@@ -16,9 +16,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +76,12 @@ public class SubscriptionEntity {
 
     @Column(name = "updated_at", nullable = false)
     public Instant updatedAt;
+
+    @PrePersist
+    void normalizeCreatedAt() {
+        // Keep managed cursor timestamps equal to the SQL timestamp(6) value.
+        createdAt = createdAt.truncatedTo(ChronoUnit.MICROS);
+    }
 
     public static SubscriptionEntity fromInput(SubscriptionInput input, ObjectMapper mapper) {
         SubscriptionEntity entity = new SubscriptionEntity();

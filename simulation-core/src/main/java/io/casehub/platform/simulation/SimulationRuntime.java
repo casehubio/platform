@@ -85,6 +85,17 @@ public class SimulationRuntime {
         corpus.record(qualifiedName, tenancyId, key, input, output);
     }
 
+    public java.util.Map<String, TriggerConfig> triggers() {
+        if (overlayStack.isEmpty()) {
+            return config.triggers();
+        }
+        var triggers = new java.util.LinkedHashMap<>(config.triggers());
+        for (var overlay : overlayStack) {
+            triggers.putAll(overlay.config().triggers());
+        }
+        return java.util.Map.copyOf(triggers);
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     public SimulationOverlay pushOverlay(final SimulationConfig config, final SimulationCorpus corpus) {
         final var overlay = new SimulationOverlay(config, corpus);

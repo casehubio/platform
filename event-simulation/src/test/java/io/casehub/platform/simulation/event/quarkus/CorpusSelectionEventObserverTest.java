@@ -107,4 +107,74 @@ class CorpusSelectionEventObserverTest {
         assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
     }
 
+    @Test
+    void overlayOverridesEventTypeAndPopRestoresBaseBinding() {
+        var config = triggerConfig("""
+                triggers:
+                  activate:
+                    event-type: profile.activate
+                """);
+        var overlay = runtime.pushOverlay(config);
+        try {
+            observer.onCloudEvent(event("test.activate", null));
+            assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+            observer.onCloudEvent(event("profile.activate", null));
+            assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("active");
+            runtime.resetSelector("test-spi.invoke");
+        } finally {
+            runtime.popOverlay(overlay);
+        }
+        observer.onCloudEvent(event("profile.activate", null));
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+        observer.onCloudEvent(event("test.activate", null));
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("active");
+    }
+
+    @Test
+    void changedConditionIsRecompiledAndPopRestoresBaseCondition() {
+        var overlay = runtime.pushOverlay(triggerConfig("""
+                triggers:
+                  conditional-activate:
+                    event-type: test.conditional
+                    condition: "level > 20"
+                """));
+        try {
+            observer.onCloudEvent(event("test.conditional", "{\"level\": 10}"));
+            assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("idle");
+            observer.onCloudEvent(event("test.conditional", "{\"level\": 30}"));
+            assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("active");
+            runtime.resetSelector("test-spi.invoke");
+        } finally {
+            runtime.popOverlay(overlay);
+        }
+        observer.onCloudEvent(event("test.conditional", "{\"level\": 10}"));
+        assertThat(runtime.stateMachineStates().get("test-spi.invoke")).isEqualTo("active");
+    }
+
+    private static io.casehub.platform.simulation.config.YamlSimulationConfig triggerConfig(String yaml) {
+        return new io.casehub.platform.simulation.config.YamlSimulationConfig(
+                new java.io.ByteArrayInputStream(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                "test-tenant");
+    }
+
+    private static CloudEvent event(String type, String json) {
+        var builder = CloudEventBuilder.v1().withType(type).withId(java.util.UUID.randomUUID().toString())
+                .withSource(URI.create("//test"));
+        if (json != null) {
+            builder.withData("application/json", json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return builder.build();
+    }
+
+    // Keep trigger dispatch tests independent of MVEL's dynamic Java compiler.
+    @jakarta.enterprise.context.ApplicationScoped
+    @jakarta.enterprise.inject.Alternative
+    @jakarta.annotation.Priority(1)
+    public static class TriggerExpressionRegistry extends io.casehub.platform.expression.DefaultExpressionEngineRegistry {
+        public TriggerExpressionRegistry() {
+            super(java.util.List.of(new io.casehub.platform.expression.JexlExpressionEngine()));
+            registerDefault(io.casehub.platform.api.expression.ExpressionContext.CONDITION, "jexl");
+        }
+    }
+
 }

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.platform.api.expression.CompiledExpression;
 import io.casehub.platform.api.expression.ExpressionContext;
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
-import io.casehub.platform.simulation.SimulationConfig;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.TriggerConfig;
 import io.cloudevents.CloudEvent;
@@ -31,19 +30,18 @@ public class CorpusSelectionEventObserver {
     SimulationRuntime simulationRuntime;
 
     @Inject
-    SimulationConfig simulationConfig;
-
-    @Inject
     Instance<ExpressionEngineRegistry> expressionRegistryInstance;
 
-    private final Map<String, List<TriggerBinding>> bindingsByEventType = new HashMap<>();
+    private Map<String, List<TriggerBinding>> bindingsByEventType = Map.of();
+    private Map<String, TriggerConfig> indexedTriggers = Map.of();
 
     @PostConstruct
-    void init() {
-        Map<String, TriggerConfig> triggers = simulationConfig.triggers();
-        if (triggers.isEmpty()) {
-            return;
-        }
+    synchronized void init() {
+        rebuildIndex(simulationRuntime.triggers());
+    }
+
+    private void rebuildIndex(Map<String, TriggerConfig> triggers) {
+        Map<String, List<TriggerBinding>> rebuilt = new HashMap<>();
 
         ExpressionEngineRegistry registry = expressionRegistryInstance.isResolvable()
                 ? expressionRegistryInstance.get() : null;
@@ -68,18 +66,29 @@ public class CorpusSelectionEventObserver {
                 compiled = registry.compile(engineType, config.condition(), mapClass, Boolean.class);
             }
 
-            bindingsByEventType
+            rebuilt
                     .computeIfAbsent(config.eventType(), k -> new ArrayList<>())
                     .add(new TriggerBinding(triggerName, compiled));
         }
+
+        bindingsByEventType = Map.copyOf(rebuilt);
+        indexedTriggers = Map.copyOf(triggers);
 
         LOG.info("Registered " + triggers.size() + " corpus selection trigger(s) for "
                 + bindingsByEventType.size() + " event type(s)");
     }
 
+    private synchronized List<TriggerBinding> bindingsForEventType(String eventType) {
+        var triggers = simulationRuntime.triggers();
+        if (!triggers.equals(indexedTriggers)) {
+            rebuildIndex(triggers);
+        }
+        return bindingsByEventType.get(eventType);
+    }
+
     @SuppressWarnings("unchecked")
     void onCloudEvent(@ObservesAsync CloudEvent event) {
-        List<TriggerBinding> bindings = bindingsByEventType.get(event.getType());
+        List<TriggerBinding> bindings = bindingsForEventType(event.getType());
         if (bindings == null) {
             return;
         }

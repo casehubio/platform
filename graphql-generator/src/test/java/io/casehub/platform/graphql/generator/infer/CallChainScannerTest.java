@@ -14,7 +14,8 @@ class CallChainScannerTest {
         helper = new CompileTestHelper(
                 "StandardConnector.java",
                 "DefaultValueConnector.java",
-                "VoidConnector.java");
+                "VoidConnector.java",
+                "GuardReturnConnector.java");
     }
 
     // -- Pattern A: standard routing --
@@ -108,6 +109,35 @@ class CallChainScannerTest {
         assertThat(result.capabilityAccessor()).isNull();
     }
 
+
+// -- Guard returns --
+
+    @Test
+    void null_guard_return_does_not_trigger_multiple_returns() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withNullGuard"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.spiTypeFqcn()).isEqualTo("infer.FakeSpiType");
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.failureReason()).isNull();
+    }
+
+    @Test
+    void empty_list_guard_return_does_not_trigger_multiple_returns() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withEmptyListGuard"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("listAll");
+        assertThat(result.failureReason()).isNull();
+    }
+
+    @Test
+    void genuine_ambiguity_still_rejected() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "genuineAmbiguity"), null);
+        assertThat(result.isComplete()).isFalse();
+        assertThat(result.failureReason()).isEqualTo(InferenceFailure.MULTIPLE_RETURNS);
+    }
 
     @org.junit.jupiter.api.Nested
     class StarImportResolution {

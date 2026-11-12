@@ -1815,48 +1815,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 
     private void generatePluginSource(String domain, DomainOperations ops, Set<String> pluginSkipNames) {
-        // Tier 2: resolve SPI type from @Inject fields for connector classes
-        String resolvedSpiTypeFqcn = null;
-        String resolvedSpiTypeSimple = null;
-        String routingParamName = null;
-        if (!ops.isInterface && ops.declaringClassFqcn != null && jandexIndex != null) {
-            ClassInfo classInfo = jandexIndex.getClassByName(DotName.createSimple(ops.declaringClassFqcn));
-            if (classInfo != null) {
-                List<String[]> spiCandidates = new ArrayList<>();
-                ClassInfo current = classInfo;
-                while (current != null) {
-                    for (org.jboss.jandex.FieldInfo field : current.fields()) {
-                        if (field.hasAnnotation(INJECT_ANN)) {
-                            ClassInfo fieldType = jandexIndex.getClassByName(field.type().name());
-                            if (fieldType != null) {
-                                for (org.jboss.jandex.MethodInfo method : fieldType.methods()) {
-                                    if (method.name().equals("platform") && method.parametersCount() == 1
-                                            && method.parameterType(0).name().equals(DotName.createSimple("java.lang.String"))) {
-                                        String spiTypeFqcn = method.returnType().name().toString();
-                                        String paramName = method.parameterName(0);
-                                        spiCandidates.add(new String[]{spiTypeFqcn, paramName != null ? paramName : "platform"});
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    DotName superName = current.superName();
-                    current = (superName != null && !superName.equals(DotName.createSimple("java.lang.Object")))
-                            ? jandexIndex.getClassByName(superName) : null;
-                }
-                if (spiCandidates.size() == 1) {
-                    resolvedSpiTypeFqcn = spiCandidates.get(0)[0];
-                    resolvedSpiTypeSimple = resolvedSpiTypeFqcn.contains(".")
-                            ? resolvedSpiTypeFqcn.substring(resolvedSpiTypeFqcn.lastIndexOf('.') + 1)
-                            : resolvedSpiTypeFqcn;
-                    routingParamName = spiCandidates.get(0)[1];
-                } else if (spiCandidates.size() > 1) {
-                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
-                            "Plugin generator: domain '" + domain + "' has multiple SPI candidates — "
-                            + "use @GeneratePlugin(spi = ...) to disambiguate. Skipping Tier 2 generation.");
-                }
-            }
-        }
 
         String pluginPkgOverride = processingEnv.getOptions().get("pluginPackage");
         String packageName = pluginPkgOverride != null
@@ -1911,108 +1869,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 if (inferred != null) inferredCount++;
             }
 
-            // Determine execute param type and delegate call strategy
-            String executeParamType;
-            String executeParamFqcn;
-            String capabilityAccessor = null;
-            List<PluginField> accessorFields = new ArrayList<>();
-            String spiMethodName = op.methodName();
-            String effectiveRoutingParam = null;
-            boolean usedInference = false;
-
-            if (ops.isInterface) {
-                // Tier 1: delegate directly to interface
-                executeParamType = op.declaringClassSimple();
-                executeParamFqcn = op.declaringClassFqcn();
-            } else {
-                // Tier 2: merge annotation + inference with precedence (D8)
-                String effectiveSpiType = !meta.spiFqcn.isEmpty() ? meta.spiFqcn
-                        : (inferred != null ? inferred.spiTypeFqcn() : resolvedSpiTypeFqcn);
-                String effectiveCapability = !meta.capabilityFqcn.isEmpty() ? meta.capabilityFqcn
-                        : (inferred != null ? inferred.capabilityFqcn() : null);
-                String effectiveAccessor = !meta.accessor.isEmpty() ? meta.accessor
-                        : (inferred != null ? inferred.capabilityAccessor() : null);
-                String effectiveSpiMethod = !meta.spiMethod.isEmpty() ? meta.spiMethod
-                        : (inferred != null ? inferred.targetMethod() : op.methodName());
-                effectiveRoutingParam = inferred != null && inferred.routingParamName() != null
-                        ? inferred.routingParamName() : routingParamName;
-                usedInference = (inferred != null);
-
-                if (effectiveSpiType != null) {
-                    executeParamFqcn = effectiveSpiType;
-                    executeParamType = effectiveSpiType.contains(".")
-                            ? effectiveSpiType.substring(effectiveSpiType.lastIndexOf('.') + 1)
-                            : effectiveSpiType;
-                } else {
-                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
-                            "Plugin generator: skipping " + domain + ":" + op.methodName()
-                            + " — cannot resolve SPI type. Use @GeneratePlugin(spi = ...)");
-                    continue;
-                }
-
-                // Resolve capability call chain from effective values
-                if (effectiveCapability != null && !effectiveCapability.isEmpty()) {
-                    String capSimple = effectiveCapability.contains(".")
-                            ? effectiveCapability.substring(effectiveCapability.lastIndexOf('.') + 1)
-                            : effectiveCapability;
-                    capabilityAccessor = effectiveAccessor != null && !effectiveAccessor.isEmpty()
-                            ? effectiveAccessor : decapitalize(capSimple);
-
-                    // Introspect accessor parameters via Jandex
-                    if (jandexIndex != null) {
-                        ClassInfo spiClass = jandexIndex.getClassByName(DotName.createSimple(executeParamFqcn));
-                        if (spiClass != null) {
-                            boolean found = false;
-                            for (org.jboss.jandex.MethodInfo method : spiClass.methods()) {
-                                if (method.name().equals(capabilityAccessor)) {
-                                    found = true;
-                                    for (int pi = 0; pi < method.parametersCount(); pi++) {
-                                        String pName = method.parameterName(pi);
-                                        String pType = method.parameterType(pi).name().toString();
-                                        String pTypeSimple = pType.contains(".") ? pType.substring(pType.lastIndexOf('.') + 1) : pType;
-                                        if (pName == null) pName = "arg" + pi;
-                                        accessorFields.add(new PluginField(pName, pTypeSimple, false));
-                                    }
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                                        "Plugin generator: SPI type " + executeParamFqcn + " has no method '"
-                                        + capabilityAccessor + "' — required for capability "
-                                        + effectiveCapability + " on " + domain + ":" + op.methodName());
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                spiMethodName = effectiveSpiMethod;
-            }
+            // Both tiers delegate to the declaring class — the API method handles all transformation
+            String executeParamType = op.declaringClassSimple();
+            String executeParamFqcn = op.declaringClassFqcn();
+            boolean usedInference = (inferred != null);
 
             Set<String> effectiveOptionalParams = resolveEffectiveOptionalParams(op, meta);
-            List<PluginField> fields = mapParamsToFields(op, meta, effectiveOptionalParams, effectiveRoutingParam);
-            // Add capability accessor params (e.g., userId for accountInformation(userId))
-            for (PluginField af : accessorFields) {
-                boolean alreadyPresent = fields.stream().anyMatch(f -> f.name.equals(af.name));
-                if (!alreadyPresent) {
-                    fields.add(af);
-                }
-            }
-
-            // When Jandex didn't find accessor params but AST inference has them, use inferred args
-            if (accessorFields.isEmpty() && inferred != null && inferred.accessorArgs() != null) {
-                for (String argExpr : inferred.accessorArgs()) {
-                    String raw = argExpr.endsWith("()") ? argExpr.substring(0, argExpr.length() - 2) : argExpr;
-                    String fn = raw.contains(".") ? raw.substring(raw.lastIndexOf('.') + 1) : raw;
-                    if (fn.startsWith("\"")) continue;
-                    boolean alreadyPresent = fields.stream().anyMatch(f -> f.name.equals(fn));
-                    if (!alreadyPresent) {
-                        accessorFields.add(new PluginField(fn, "String", false));
-                        fields.add(new PluginField(fn, "String", false));
-                    }
-                }
-            }
+            List<PluginField> fields = mapParamsToFields(op, meta, effectiveOptionalParams, null);
 
             // Apply AST-inferred static defaults (Rule 5)
             if (inferred != null && inferred.staticDefaults() != null) {
@@ -2113,37 +1976,24 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
                     // @Execute method
                     out.println("    @Execute");
-                    String paramVarName = ops.isInterface ? "api" : "spi";
                     if (isStreaming && !meta.subject.isEmpty()) {
                         String subjectType = findParamType(op, meta.subject);
                         out.println("    public " + op.returnTypeStr() + " process("
-                                + subjectType + " " + meta.subject + ", " + executeParamType + " " + paramVarName + ") {");
+                                + subjectType + " " + meta.subject + ", " + executeParamType + " api) {");
                     } else {
-                        out.println("    public Result execute(" + executeParamType + " " + paramVarName + ") {");
+                        out.println("    public Result execute(" + executeParamType + " api) {");
                     }
 
-                    // Delegate call
+                    // Delegate call — always api.methodName(params)
                     StringBuilder methodArgs = new StringBuilder();
                     for (ResolvedParam p : op.params()) {
                         if (p.isContextParam()) continue;
-                        if (effectiveRoutingParam != null && p.name().equals(effectiveRoutingParam)) continue;
                         if (isStreaming && !meta.subject.isEmpty() && p.name().equals(meta.subject)) continue;
                         if (!methodArgs.isEmpty()) methodArgs.append(", ");
                         methodArgs.append(p.name());
                     }
 
-                    String delegateCall;
-                    if (capabilityAccessor != null) {
-                        StringBuilder accessorArgs = new StringBuilder();
-                        for (PluginField af : accessorFields) {
-                            if (!accessorArgs.isEmpty()) accessorArgs.append(", ");
-                            accessorArgs.append(af.name);
-                        }
-                        delegateCall = paramVarName + "." + capabilityAccessor + "(" + accessorArgs + ")."
-                                + spiMethodName + "(" + methodArgs + ")";
-                    } else {
-                        delegateCall = paramVarName + "." + spiMethodName + "(" + methodArgs + ")";
-                    }
+                    String delegateCall = "api." + op.methodName() + "(" + methodArgs + ")";
 
                     if (isStreaming && !meta.subject.isEmpty()) {
                         out.println("        return " + delegateCall + ";");

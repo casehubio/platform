@@ -70,52 +70,55 @@ class AstInferenceIntegrationTest {
             }
             """;
 
+
     @Test
-    void ast_inference_generates_plugin_with_correct_call_chain() throws IOException {
+    void ast_inference_generates_plugin_delegating_to_api_class() throws IOException {
         Compilation compilation = javac()
-                .withProcessors(new GraphQLResolverProcessor())
-                .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
-                        "-AdomainFilter=connectors/test-bank")
-                .compile(
-                        JavaFileObjects.forSourceString("test.connector.TestBankConnector", CONNECTOR_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=connectors/test-bank")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankConnector", CONNECTOR_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
 
         Optional<JavaFileObject> balancePlugin = compilation.generatedSourceFiles().stream()
-                .filter(f -> f.getName().contains("TestBankBalancePlugin"))
-                .findFirst();
+                                                            .filter(f -> f.getName().contains("TestBankBalancePlugin"))
+                                                            .findFirst();
 
         assertThat(balancePlugin).as("Balance plugin should be generated").isPresent();
 
         String source = new String(balancePlugin.get().openInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertThat(source).contains("resolved via: AST inference");
-        assertThat(source).contains("testCapability(");
-        assertThat(source).contains(".balance(accountId)");
+        assertThat(source).contains("TestBankConnector api");
+        assertThat(source).contains("api.balance(platform, accountId)");
+        assertThat(source).doesNotContain("testCapability(");
     }
 
+
     @Test
-    void ast_inference_generates_plugin_without_capability_for_direct_call() throws IOException {
+    void direct_call_delegates_to_api_method() throws IOException {
         Compilation compilation = javac()
-                .withProcessors(new GraphQLResolverProcessor())
-                .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
-                        "-AdomainFilter=connectors/test-bank")
-                .compile(
-                        JavaFileObjects.forSourceString("test.connector.TestBankConnector", CONNECTOR_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
-                        JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=connectors/test-bank")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankConnector", CONNECTOR_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
 
         Optional<JavaFileObject> listPlugin = compilation.generatedSourceFiles().stream()
-                .filter(f -> f.getName().contains("TestBankListAccountsPlugin"))
-                .findFirst();
+                                                         .filter(f -> f.getName().contains("TestBankListAccountsPlugin"))
+                                                         .findFirst();
 
         assertThat(listPlugin).as("ListAccounts plugin should be generated").isPresent();
 
         String source = new String(listPlugin.get().openInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertThat(source).contains("resolved via: AST inference");
-        assertThat(source).contains(".listAll()");
-        assertThat(source).doesNotContain("testCapability(");
+        assertThat(source).contains("TestBankConnector api");
+        assertThat(source).contains("api.listAccounts(platform)");
     }
 
 

@@ -1938,9 +1938,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     if (description != null && !description.isEmpty()) {
                         pluginAnn.append(", description = \"").append(escapeJavaString(description)).append("\"");
                     }
-                    if (meta.absorb) {
-                        pluginAnn.append(", absorbSiblings = true");
-                    }
+                    pluginAnn.append(", absorbSiblings = true");
                     boolean isStreaming = op.type() == OperationType.STREAMING_MUTATION
                             || (op.type() == OperationType.MUTATION && isStreamingMutation(op));
                     if (isStreaming) {

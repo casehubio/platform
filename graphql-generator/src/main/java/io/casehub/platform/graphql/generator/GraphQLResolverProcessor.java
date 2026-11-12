@@ -2275,10 +2275,8 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         }
         if (returnType.startsWith("Page<") || returnType.endsWith(".Page<")) {
             return "var result = " + delegateCall + ";\n"
-                    + "        var output = new java.util.LinkedHashMap<String, Object>();\n"
+                    + "        var output = new java.util.LinkedHashMap<String, Object>(Records.toMap(result));\n"
                     + "        output.put(\"items\", result.items().stream().map(Records::toMap).toList());\n"
-                    + "        output.put(\"cursor\", result.cursor());\n"
-                    + "        output.put(\"hasMore\", result.hasMore());\n"
                     + "        return Result.of(output);";
         }
         // Default: assume record type

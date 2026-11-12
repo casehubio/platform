@@ -16,6 +16,8 @@ import io.casehub.platform.api.model.ModelRegistry;
 import io.casehub.platform.api.model.ModelTier;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 import java.util.Map;
@@ -152,6 +154,48 @@ class RoutingAgentProviderChainTest {
                 Map.of(), ModelAvailabilityFilter.ALWAYS_AVAILABLE);
         var init = AgentSessionInit.of("prompt").withModelChain(ModelChain.of("nonexistent", "sonnet"));
         assertThatCode(() -> provider.openSession(init)).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ollama", "simulation"})
+    void unavailableProvidersFallThroughAndReportActualBackend(String fallback) {
+        var calls = new java.util.ArrayList<String>();
+        var backends = new InMemoryBackendInstanceRegistry();
+        for (String key : List.of("claude", "ollama", "simulation")) {
+            backends.register(new StubBackend(key) {
+                @Override
+                public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+                    calls.add(key);
+                    if (!key.equals(fallback)) {
+                        return Multi.createFrom().failure(new java.net.ConnectException("Unavailable " + key));
+                    }
+                    return Multi.createFrom().items(
+                            new AgentEvent.TextDelta("from-" + key),
+                            new AgentEvent.InvocationComplete(1, 2, 0, 0, 0, null,
+                                    1, 1, "session", 1, false, null, null));
+                }
+            });
+        }
+        var models = registryWith(descriptor("primary", "claude"),
+                descriptor("local", "ollama"), descriptor("simulated", "simulation"));
+        var provider = new RoutingAgentProvider(backends, "claude", models);
+        var config = AgentSessionConfig.of("sys", "user")
+                .withModelChain(ModelChain.of("primary", "local", "simulated"));
+
+        var events = provider.invoke(config).collect().asList().await()
+                .atMost(java.time.Duration.ofSeconds(5));
+
+        assertThat(calls).containsExactlyElementsOf(fallback.equals("ollama")
+                ? List.of("claude", "ollama") : List.of("claude", "ollama", "simulation"));
+        assertThat(events).filteredOn(AgentEvent.TextDelta.class::isInstance)
+                .singleElement().isEqualTo(new AgentEvent.TextDelta("from-" + fallback));
+        assertThat(events).filteredOn(AgentEvent.InvocationComplete.class::isInstance)
+                .singleElement().satisfies(event -> {
+                    var complete = (AgentEvent.InvocationComplete) event;
+                    assertThat(complete.backendKey()).isEqualTo(fallback);
+                    assertThat(complete.instanceId()).isEqualTo("default");
+                    assertThat(complete.isError()).isFalse();
+                });
     }
 
     private static class StubBackend implements AgentBackend {

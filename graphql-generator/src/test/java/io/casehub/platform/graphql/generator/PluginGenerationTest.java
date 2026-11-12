@@ -123,5 +123,10 @@ class PluginGenerationTest {
         assertThat(GraphQLResolverProcessor.isPaginationParam("accountId")).isFalse();
     }
 
+    @Test
+    void formatDefaultLiteral_boolean_false_is_noop() {
+        assertThat(GraphQLResolverProcessor.formatDefaultLiteral("boolean", "false")).isEqualTo("false");
+    }
+
 
 }

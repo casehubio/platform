@@ -1875,6 +1875,10 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             boolean usedInference = (inferred != null);
 
             Set<String> effectiveOptionalParams = resolveEffectiveOptionalParams(op, meta);
+            if (inferred != null && inferred.routingParamName() != null) {
+                effectiveOptionalParams = new HashSet<>(effectiveOptionalParams);
+                effectiveOptionalParams.add(inferred.routingParamName());
+            }
             List<PluginField> fields = mapParamsToFields(op, meta, effectiveOptionalParams, null);
 
             // Apply AST-inferred static defaults (Rule 5)
@@ -1883,8 +1887,9 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     PluginField f = fields.get(i);
                     if ((f.defaultValue == null || f.defaultValue.isEmpty())
                             && inferred.staticDefaults().containsKey(f.name)) {
-                        fields.set(i, new PluginField(f.name, f.typeStr, false,
-                                inferred.staticDefaults().get(f.name)));
+                        String defaultVal = inferred.staticDefaults().get(f.name);
+                        if ("boolean".equals(f.typeStr) && "false".equals(defaultVal)) continue;
+                        fields.set(i, new PluginField(f.name, f.typeStr, false, defaultVal));
                     }
                 }
             }

@@ -93,6 +93,7 @@ class AstInferenceIntegrationTest {
         assertThat(source).contains("resolved via: AST inference");
         assertThat(source).contains("TestBankConnector api");
         assertThat(source).contains("api.balance(platform, accountId)");
+        assertThat(source).contains("@Optional String platform");
         assertThat(source).doesNotContain("testCapability(");
     }
 

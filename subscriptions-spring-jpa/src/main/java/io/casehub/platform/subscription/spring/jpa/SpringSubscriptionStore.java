@@ -41,7 +41,7 @@ public class SpringSubscriptionStore implements SubscriptionStore {
     @Transactional
     public Subscription store(SubscriptionInput input) {
         SubscriptionEntity entity = SubscriptionEntity.fromInput(input, mapper);
-        repo.saveAndFlush(entity);
+        entity = repo.saveAndFlush(entity);
         Subscription subscription = entity.toSubscription(mapper);
         events.publishEvent(new SubscriptionCreated(subscription));
         return subscription;

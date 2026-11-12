@@ -139,6 +139,34 @@ class CallChainScannerTest {
         assertThat(result.failureReason()).isEqualTo(InferenceFailure.MULTIPLE_RETURNS);
     }
 
+    @Test
+    void pre_spi_guard_return_skipped() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withPreSpiGuard"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.failureReason()).isNull();
+    }
+
+    @Test
+    void try_catch_error_return_skipped() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withTryCatch"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.failureReason()).isNull();
+    }
+
+    @Test
+    void three_returns_with_one_spi_chain() {
+        InferredCallChain result = MethodBodyInferrer.infer(
+                helper.trees, helper.findMethod("GuardReturnConnector", "withThreeReturns"), null);
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.targetMethod()).isEqualTo("targetMethod");
+        assertThat(result.failureReason()).isNull();
+    }
+
+
     @org.junit.jupiter.api.Nested
     class StarImportResolution {
 

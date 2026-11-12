@@ -30,5 +30,33 @@ public class GuardReturnConnector {
         }
     }
 
+    // Pre-SPI guard return — supports() check before .platform() call
+    public FakeResult withPreSpiGuard(String platform, String text) {
+        if (!service.supports(platform)) return null;
+        FakeSpiType p = service.platform(platform);
+        return p.capability(userId()).targetMethod(text);
+    }
+
+    // Try/catch — success return in try, error return in catch
+    public FakeResult withTryCatch(String platform, String accountId) {
+        FakeSpiType p = service.platform(platform);
+        try {
+            return p.capability(userId()).targetMethod(accountId);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // Three returns — pre-SPI guard + try/catch
+    public FakeResult withThreeReturns(String platform, String text) {
+        if (!service.supports(platform)) return null;
+        FakeSpiType p = service.platform(platform);
+        try {
+            return p.capability(userId()).targetMethod(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private String userId() { return "user"; }
 }

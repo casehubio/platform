@@ -361,24 +361,12 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 
 
     private boolean isGuardReturn(ReturnTree node) {
-        TreePath path     = getCurrentPath();
-        boolean  insideIf = false;
-        for (TreePath ancestor = path.getParentPath(); ancestor != null; ancestor = ancestor.getParentPath()) {
-            if (ancestor.getLeaf() instanceof com.sun.source.tree.IfTree) {
-                insideIf = true;
-                break;
-            }
-            if (ancestor.getLeaf() instanceof com.sun.source.tree.MethodTree) {
-                break;
-            }
-        }
-        if (!insideIf) {return false;}
         ExpressionTree expr = node.getExpression();
         if (expr == null) {return true;}
         if (expr instanceof LiteralTree) {return true;}
+        if (spiTypeFqcn == null) {return true;}
         List<MethodCallInfo> chain = flattenMethodChain(expr);
         if (chain.isEmpty()) {return true;}
-        if (chain.size() == 1 && chain.get(0).receiverName() == null) {return true;}
         MethodCallInfo first = chain.get(0);
         if (first.receiverName() != null
             && variableTypes.containsKey(first.receiverName())
@@ -387,6 +375,7 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
         }
         return true;
     }
+
 
     private List<MethodCallInfo> flattenMethodChain(ExpressionTree expr) {
         List<MethodCallInfo> chain = new ArrayList<>();

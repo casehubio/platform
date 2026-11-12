@@ -47,6 +47,7 @@ public class StandardConnector {
 
 class FakePlatformService {
     FakeSpiType platform(String name) { return null; }
+    boolean supports(String name) { return true; }
 }
 
 class FakeResolved {

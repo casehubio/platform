@@ -6,6 +6,7 @@ import io.casehub.platform.api.expression.ExpressionEngine;
 import io.casehub.platform.api.expression.ExpressionEngineRegistry;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 public final class DotPathExpressionEngine implements ExpressionEngine, ExpressionEngineRegistry {
@@ -19,14 +20,23 @@ public final class DotPathExpressionEngine implements ExpressionEngine, Expressi
     @Override
     public <C, R> CompiledExpression<C, R> compile(String expression,
                                                     Class<C> contextType, Class<R> resultType) {
+        String path = expression.replaceAll("\\[(\\d+)\\]", ".$1");
         return new CompiledExpression<>() {
             @Override public String type() { return TYPE; }
             @Override public R eval(C context) {
                 if (!(context instanceof Map<?, ?> map)) return null;
                 Object current = map;
-                for (String segment : expression.split("\\.")) {
+                for (String segment : path.split("\\.")) {
                     if (current instanceof Map<?, ?> m) {
                         current = m.get(segment);
+                    } else if (current instanceof List<?> list) {
+                        try {
+                            int index = Integer.parseInt(segment);
+                            if (index < 0 || index >= list.size()) return null;
+                            current = list.get(index);
+                        } catch (NumberFormatException e) {
+                            return null;
+                        }
                     } else {
                         return null;
                     }

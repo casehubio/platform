@@ -19,6 +19,24 @@ class ResultTest {
     }
 
     @Test
+    void nullableOutputFieldsArePreservedInAnImmutableSnapshot() {
+        var output = new HashMap<String, Object>();
+        output.put("nextCursor", null);
+        Result result = Result.of(output);
+        output.put("nextCursor", "later");
+        assertThat(result.output()).containsEntry("nextCursor", null);
+        assertThrows(UnsupportedOperationException.class,
+                () -> result.output().put("nextCursor", "changed"));
+    }
+
+    @Test
+    void nullOutputKeysRemainInvalid() {
+        var output = new HashMap<String, Object>();
+        output.put(null, "value");
+        assertThrows(NullPointerException.class, () -> Result.of(output));
+    }
+
+    @Test
     void failureResult() {
         Result result = Result.failed("connection refused");
         assertThat(result.isSuccess()).isFalse();

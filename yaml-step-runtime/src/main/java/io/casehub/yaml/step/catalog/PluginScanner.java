@@ -101,6 +101,10 @@ public class PluginScanner {
                 for (int i = 0; i < execParamTypes.length; i++) {
                     if (i == 0 && streamingInputKey != null) {
                         execArgs[i] = extractParam(params, streamingInputKey, execParamTypes[i]);
+                        if (execArgs[i] == null) {
+                            String inputKey = toKebabCase(executeMethod.getParameters()[i].getName());
+                            execArgs[i] = extractParam(params, inputKey, execParamTypes[i]);
+                        }
                     } else if (services != null) {
                         execArgs[i] = services.lookup(execParamTypes[i]);
                     }

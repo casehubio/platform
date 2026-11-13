@@ -8,6 +8,8 @@ import io.casehub.yaml.step.catalog.scannertest.CamelCasePlugin;
 import io.casehub.yaml.step.catalog.scannertest.TestPlugin;
 import io.casehub.yaml.step.catalog.scannertest.UniversalPlugin;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Map;
 
@@ -102,18 +104,19 @@ class PluginScannerTest {
         assertThat(result.output()).containsEntry("_output", "hello:hello");
     }
 
-    @Test
-    void streamingPluginWithAllOptionalInputsFallsBackToExecuteParamName() {
+    @ParameterizedTest
+    @ValueSource(strings = {"_value", "audio"})
+    void streamingPluginWithAllOptionalInputsAcceptsScalarAndNamedInput(String inputKey) {
         PluginScanner           scanner  = new PluginScanner();
         CompositePluginRegistry registry = new CompositePluginRegistry();
         scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.AllOptionalStreamingPlugin.class, registry);
 
         var def = registry.resolve("all-optional-streaming").orElseThrow();
         Result result = def.action().execute(
-                Map.of("_value", "test-data"),
+                Map.of(inputKey, "test-data", "language", "fr"),
                 new MapServiceRegistry());
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.output()).containsEntry("_output", "test-data");
+        assertThat(result.output()).containsEntry("_output", "fr:test-data");
     }
 
     @Test

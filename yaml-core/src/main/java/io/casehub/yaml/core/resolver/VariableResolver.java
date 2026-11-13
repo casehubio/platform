@@ -143,7 +143,7 @@ public class VariableResolver {
         if (dot < 0) {return null;}
 
         String prefix = key.substring(0, dot);
-        String name   = key.substring(dot + 1);
+        String name   = key.substring(dot + 1).replaceAll("\\[(\\d+)\\]", ".$1");
 
         if (deferredPrefixes.contains(prefix)) {return null;}
 
@@ -164,8 +164,8 @@ public class VariableResolver {
         }
 
         String fieldPath = name.substring(nextDot + 1);
-        if (root instanceof Map<?, ?> map) {
-            return FieldDriller.drill((Map<String, Object>) map, fieldPath);
+        if (root instanceof Map || root instanceof List) {
+            return FieldDriller.drill(root, fieldPath);
         }
         return null;
     }
@@ -274,6 +274,7 @@ public class VariableResolver {
         ObjectVariableSource objSource = objectPrefixSources.get(prefix);
         if (objSource != null) {
             Object value = objSource.resolve(name);
+            if (value == null) {value = resolveTyped("${" + prefix + "." + name + "}");}
             if (value != null) {return value.toString();}
         }
 

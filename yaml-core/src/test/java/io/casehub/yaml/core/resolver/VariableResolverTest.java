@@ -17,6 +17,17 @@ class VariableResolverTest {
     }
 
     @Test
+    void resolves_captured_list_indexes_with_map_sources() {
+        Map<String, Object> capture = Map.of("items", List.of(
+                Map.of("id", "first", "location", Map.of("lat", 51.4430))));
+        var resolver = new VariableResolver(Map.of(), Set.of()).withObjectScope("restaurants", capture::get);
+        assertThat(resolver.resolve("${restaurants.items[0].id}")).isEqualTo("first");
+        assertThat(resolver.resolve("${restaurants.items[0].location.lat}")).isEqualTo(51.4430);
+        assertThat(resolver.resolveString("Place ${restaurants.items[0].id}", "test"))
+                .isEqualTo("Place first");
+    }
+
+    @Test
     void resolves_prefixed_variable() {
         var resolver = new VariableResolver(
                 Map.of("var", mapSource(Map.of("batch", "500"))), Set.of());

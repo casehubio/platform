@@ -1,6 +1,9 @@
 package io.casehub.yaml.plugin.api;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.Objects;
 
 public sealed interface Result permits Result.Success, Result.Failure {
 
@@ -13,7 +16,9 @@ public sealed interface Result permits Result.Success, Result.Failure {
     record Success(Map<String, Object> output,
                    Map<String, Object> executionMetadata) implements Result {
         public Success {
-            output            = Map.copyOf(output);
+            var snapshot = new LinkedHashMap<String, Object>();
+            output.forEach((key, value) -> snapshot.put(Objects.requireNonNull(key), value));
+            output = Collections.unmodifiableMap(snapshot);
             executionMetadata = executionMetadata != null ? Map.copyOf(executionMetadata) : Map.of();
         }
 

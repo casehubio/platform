@@ -4,6 +4,7 @@ import io.casehub.yaml.core.resolver.VariableResolver;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +12,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScopeUtilsTest {
 
     private final VariableResolver base = new VariableResolver(Map.of(), Set.of());
+
+    @Test
+    void capturedListItemsResolveWithTheirOriginalTypes() {
+        Map<String, Object> data = Map.of("items", List.of(
+                Map.of("id", "first", "location", Map.of("lat", 51.4430))));
+        var scoped = ScopeUtils.pushScope(base, "restaurants", data);
+        assertThat(scoped.resolve("${restaurants.items[0].id}")).isEqualTo("first");
+        assertThat(scoped.resolve("${restaurants.items[0].location.lat}")).isEqualTo(51.4430);
+        assertThat(scoped.resolveString("Place ${restaurants.items[0].id}", "test"))
+                .isEqualTo("Place first");
+    }
 
     @Test
     void pushScopeWithMapRegistersExpressionContext() {

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PlaybookRunResultTest {
 
@@ -47,10 +48,14 @@ class PlaybookRunResultTest {
     void runResultDefensiveCopyOnOutput() {
         var mutable = new java.util.HashMap<String, Object>();
         mutable.put("k", "v");
+        mutable.put("nextCursor", null);
         var result = new PlaybookRunResult(true, "p", "p.yaml", 1,
                 null, List.of(), mutable, null);
         mutable.put("extra", "no");
         assertThat(result.output()).doesNotContainKey("extra");
+        assertThat(result.output()).containsEntry("nextCursor", null);
+        assertThatThrownBy(() -> result.output().put("other", "value"))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test

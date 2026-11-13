@@ -2,6 +2,9 @@ package io.casehub.yaml.test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Objects;
 
 public record PlaybookRunResult(
         boolean success,
@@ -16,7 +19,8 @@ public record PlaybookRunResult(
 
     public PlaybookRunResult {
         events   = events != null ? List.copyOf(events) : List.of();
-        output   = output != null ? Map.copyOf(output) : Map.of();
+        output   = output != null ? Collections.unmodifiableMap(new LinkedHashMap<>(output)) : Map.of();
+        output.keySet().forEach(Objects::requireNonNull);
         captures = captures != null ? Map.copyOf(captures) : Map.of();
     }
 

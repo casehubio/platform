@@ -91,6 +91,8 @@ public class YamlTestEngine implements TestEngine {
         pluginRegistry.register(ValidatePlaybookPlugin.definition());
         new io.casehub.yaml.step.catalog.AptPluginSource(new com.fasterxml.jackson.databind.ObjectMapper())
                 .populate(pluginRegistry);
+        new io.casehub.yaml.step.catalog.JandexPluginSource()
+                .populate(pluginRegistry);
         var serviceRegistry = new MapServiceRegistry();
         serviceRegistry.register(io.casehub.platform.api.expression.ExpressionEngineRegistry.class,
                                  new io.casehub.yaml.test.DotPathExpressionEngine());

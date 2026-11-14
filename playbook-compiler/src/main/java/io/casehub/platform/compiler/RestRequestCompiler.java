@@ -7,6 +7,7 @@ import io.serverlessworkflow.api.types.HTTPArguments;
 import io.serverlessworkflow.api.types.Task;
 import io.serverlessworkflow.api.types.TaskItem;
 import io.serverlessworkflow.api.types.UriTemplate;
+import jakarta.validation.ConstraintViolationException;
 
 import java.net.URI;
 import java.util.Map;
@@ -52,7 +53,7 @@ class RestRequestCompiler implements StepCompiler {
             UriTemplate uriTemplate;
             try {
                 uriTemplate = new UriTemplate().withLiteralUriTemplate(url);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException | ConstraintViolationException e) {
                 uriTemplate = new UriTemplate().withLiteralUri(URI.create(url));
             }
             endpoint = new Endpoint().withUriTemplate(uriTemplate);

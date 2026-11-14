@@ -5,6 +5,8 @@ import io.casehub.platform.simulation.generator.test.TestBaseCapability;
 import io.casehub.platform.simulation.generator.test.TestCapability;
 import io.casehub.platform.simulation.generator.test.TestCapabilitySpi;
 import io.casehub.platform.simulation.generator.test.TestDefaultNameSpi;
+import io.casehub.platform.simulation.generator.test.TestExtensibleBase;
+import io.casehub.platform.simulation.generator.test.TestExtensibleSpi;
 import io.casehub.platform.simulation.generator.test.TestSimpleService;
 import io.casehub.platform.simulation.generator.test.TestSpiWithDefaults;
 import io.casehub.platform.simulation.generator.test.TestUnannotatedSpi;
@@ -34,6 +36,8 @@ class SimulationDecoratorProcessorTest {
         indexer.indexClass(TestCapabilitySpi.class);
         indexer.indexClass(TestCapability.class);
         indexer.indexClass(TestBaseCapability.class);
+        indexer.indexClass(TestExtensibleBase.class);
+        indexer.indexClass(TestExtensibleSpi.class);
         index = indexer.complete();
     }
 
@@ -68,7 +72,7 @@ class SimulationDecoratorProcessorTest {
                 .map(SimulationDecoratorProcessor.GeneratedSource::className)
                 .toList();
 
-        assertThat(classNames).hasSize(10);
+        assertThat(classNames).hasSize(12);
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestSimpleService"));
         assertThat(classNames).anyMatch(n -> n.contains("SimulatedTestDefaultNameSpi"));
     }
@@ -447,6 +451,31 @@ class SimulationDecoratorProcessorTest {
         assertThat(source).contains("new DoWork_Wrapper(delegate.doWork(), simulation, currentPrincipal, dataRealismContext)");
     }
 
+
+// --- inherited super-interface methods ---
+
+    @Test
+    void inheritedMethodsFromSuperInterfaceGenerated() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "SimulatedTestExtensibleSpi");
+        assertThat(source).contains("\"extensible-spi.as\"");
+        assertThat(source).contains("delegate.as(");
+    }
+
+    @Test
+    void inheritedMethodQNConstantsGenerated() {
+        var    sources = new SimulationDecoratorProcessor().generateFromIndex(index);
+        String source  = findSource(sources, "TestExtensibleSpiQN");
+        assertThat(source).contains("AS = \"extensible-spi.as\"");
+        assertThat(source).contains("RESOLVE = \"extensible-spi.resolve\"");
+    }
+
+    @Test
+    void inheritedMethodParameterEntriesGenerated() {
+        var entries = new SimulationDecoratorProcessor().generateParameterEntries(index);
+        assertThat(entries).containsKey("extensible-spi.as");
+        assertThat(entries).containsKey("extensible-spi.resolve");
+    }
 
     private static int occurrences(final String text, final String sub) {
         int count = 0;

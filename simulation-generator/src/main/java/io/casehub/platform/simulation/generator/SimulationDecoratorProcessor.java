@@ -209,8 +209,9 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("        this.dataRealismContext = new DataRealismContext();\n");
         sb.append("    }\n\n");
 
-        for (final MethodInfo method : spiClass.methods()) {
-            if (!isOverridable(method)) {continue;}
+        final Set<String> seenMethods = new HashSet<>();
+        for (final MethodInfo method : collectAllMethods(spiClass, index)) {
+            if (!seenMethods.add(methodSignatureKey(method))) {continue;}
             if (capabilitySet.contains(method.name())) {
                 generateCapabilityAccessor(sb, method, spiName, index);
             } else if (!capabilitySet.isEmpty() && method.name().equals("supports")
@@ -330,8 +331,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         sb.append("public final class ").append(qnClassName).append(" {\n\n");
 
         final Set<String> emittedConstants = new HashSet<>();
-        for (final MethodInfo method : spiClass.methods()) {
-            if (!isOverridable(method)) {continue;}
+        for (final MethodInfo method : collectAllMethods(spiClass, index)) {
             if (!emittedConstants.add(method.name())) {continue;}
             if (capabilitySet.contains(method.name())) {
                 final ClassInfo capInterface = resolveClassInfo(method.returnType().name(), index);
@@ -555,8 +555,7 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
                                      final Set<String> capabilitySet,
                                      final IndexView index) {
         final Set<String> seen = new HashSet<>();
-        for (final MethodInfo method : classInfo.methods()) {
-            if (!isOverridable(method)) {continue;}
+        for (final MethodInfo method : collectAllMethods(classInfo, index)) {
             if (!seen.add(method.name())) {continue;}
 
             if (capabilitySet.contains(method.name())) {
@@ -620,6 +619,11 @@ public class SimulationDecoratorProcessor extends AbstractProcessor {
         if (!java.lang.reflect.Modifier.isPublic(method.flags())) {return false;}
         return true;
     }
+
+    private static String methodSignatureKey(final MethodInfo method) {
+        return method.name() + ":" + method.parameterTypes().size();
+    }
+
 
     private static MethodInfo findMethod(final ClassInfo classInfo, final String methodName) {
         for (final MethodInfo m : classInfo.methods()) {

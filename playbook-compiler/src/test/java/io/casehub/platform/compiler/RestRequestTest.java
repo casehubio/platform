@@ -28,6 +28,19 @@ class RestRequestTest {
     }
 
     @Test
+    void restRequest_relativeUrl() {
+        var outcome = compiler.compile("test", Map.of("steps", List.of(
+                Map.of("rest-request:POST", "/api/connectors/contacts/searchContacts"))));
+
+        assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
+        var result = ((CompilationOutcome.Success) outcome).result();
+        var endpoint = result.workflow().getDo().getFirst().getTask()
+                .getCallTask().getCallHTTP().getWith().getEndpoint();
+        assertThat(endpoint.getUriTemplate().getLiteralUri().toString())
+                .isEqualTo("/api/connectors/contacts/searchContacts");
+    }
+
+    @Test
     void restRequest_post_includesBody() {
         var step = new LinkedHashMap<String, Object>();
         step.put("rest-request:POST", "https://api.example.com/orders");

@@ -2,7 +2,7 @@
 layout: post
 title: "The Annotation the Code Already Knew"
 date: 2026-11-11
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [apt, ast, code-generation, compiler-tree-api, plugins, annotation-processing]

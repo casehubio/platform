@@ -2,7 +2,7 @@
 layout: post
 title: "The Test Double That Changes Its Mind"
 date: 2026-11-07
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [simulation, corpus-selection, testing, dynamic-responses, state-machine]

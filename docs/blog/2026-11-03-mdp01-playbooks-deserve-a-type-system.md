@@ -2,7 +2,7 @@
 layout: post
 title: "Playbooks Deserve a Type System"
 date: 2026-11-03
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [yaml-core, playbooks, type-safety, variables, design]

@@ -2,7 +2,7 @@
 layout: post
 title: "One Source, Four Surfaces: Generating YAML Playbook Steps from API Annotations"
 date: 2026-11-11
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [apt, code-generation, playbooks, yaml, plugins, annotation-processing]

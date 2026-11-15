@@ -2,7 +2,7 @@
 layout: post
 title: "Your Catch Block Is Lying to You"
 date: 2026-11-04
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [yaml-core, playbooks, error-handling, architecture, design]

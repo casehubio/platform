@@ -2,7 +2,7 @@
 layout: post
 title: "The Defaults Nobody Registered"
 date: 2026-11-08
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [expression-engine, platform-defaults, silent-degradation, registry-pattern, CDI, fail-fast]

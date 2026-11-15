@@ -2,7 +2,7 @@
 layout: post
 title: "When the World Changes Around Your Test"
 date: 2026-11-08
-entry_type: article
+entry_type: note
 subtype: diary
 projects: [casehubio/platform]
 tags: [simulation, corpus-selection, event-driven, testing, profiles, state-machine]

@@ -23,12 +23,32 @@ Your YAML schema (pages, desiredstate, engine, anything)
     │
     ├── Variable resolution     ${prefix.name}
     ├── Conditional inclusion   if: "${var.enabled}"
-    ├── ForEach expansion       forEach + stamp N copies
+    ├── ForEach expansion       for-each + stamp N copies
     ├── Typed CSV data          inline tabular data as iteration sources
     ├── Module system           import, parameterise, alias, compose
-    ├── Inline control flow     block, if/then/else, match/cases
+    ├── Inline control flow     block, if/then/else, match/cases, when guard
     └── Typed expansion         ModuleBridge<T> for domain-specific compilation
 ```
+
+### Canonical playbook file shape
+
+Playbook files use a two-document YAML format — a front matter header and a content document with an explicit `steps:` key:
+
+```yaml
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "My Playbook"
+  description: "What this playbook demonstrates."
+  tags: [flow-control, example]
+steps:
+  - action-one: "value"
+  - action-two:
+      param: value
+```
+
+The first document declares the playbook version and schema. The second document contains metadata and the step list. All playbook files use the `.playbook.yaml` suffix.
 
 ---
 
@@ -96,7 +116,7 @@ Applications register sources per prefix. Built-in sources:
 | `VariableSource.systemProperty()` | `System.getProperty()` |
 | `VariableSource.nested(data)` | Dot-path drilling into nested maps |
 | `VariableSource.chain(a, b, c)` | First non-null across multiple sources |
-| `VariableSource.forEachContext(...)` | ForEach iteration values (see §3) |
+| `VariableSource.forEachContext(...)` | for-each iteration values (see §3) |
 | `VariableSource.matchContext(scrutinee)` | Match case variable scoping (see §9) |
 
 Scoping is immutable — `resolver.withScope("myprefix", mySource)` returns a new resolver with the added prefix. This makes it safe to layer sources without mutation.
@@ -138,14 +158,14 @@ Anything else delegates to the configured expression engine (MVEL, JQ, or custom
 
 Expression engines support operators like `==`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `startsWith`, `endsWith`. The expression receives the resolved variable values and returns a boolean.
 
-### Interaction with forEach
+### Interaction with for-each
 
-When `if` appears on an element that also has `forEach`, the condition is evaluated per iteration value. Individual copies can be excluded while others are included:
+When `if` appears on an element that also has `for-each`, the condition is evaluated per iteration value. Individual copies can be excluded while others are included:
 
 ```yaml
 nodes:
   regional-cache:
-    forEach:
+    for-each:
       as: region
       in: [us-east, eu-west, ap-south]
     if: "${var.cache_enabled_${each.region}}"
@@ -153,11 +173,15 @@ nodes:
       region: ${each.region}
 ```
 
+> **Step domain note:** In step workflows (§9), the guard decorator is `when`, not `if`. The `if` keyword in steps is reserved for structural branching (`if/then/else`). The composition domain (nodes, imports, elements) continues to use `if` for conditional inclusion.
+
 ---
 
 ## 3. ForEach Expansion
 
 **What it does:** Takes a single element and stamps N copies of it, one per value in a list. Each copy gets a stamped ID and access to the current iteration value via `${each.*}`.
+
+The YAML keyword is `for-each` (kebab-case).
 
 ### Inline iteration
 
@@ -166,7 +190,7 @@ The values are declared directly:
 ```yaml
 nodes:
   shipping:
-    forEach:
+    for-each:
       as: warehouse
       in: [us-east, eu-west, ap-south]
     spec:
@@ -188,12 +212,12 @@ iterations:
 
 nodes:
   shipping:
-    forEach: warehouses
+    for-each: warehouses
     spec:
       warehouse: ${each.warehouse}
 
   monitoring:
-    forEach: warehouses
+    for-each: warehouses
     spec:
       target: shipping.${each.warehouse}
 ```
@@ -220,7 +244,7 @@ This is the key difference from a simple loop. It preserves the topology of your
 
 ## 4. Typed CSV Data
 
-Inline tabular data with typed columns, usable as forEach sources.
+Inline tabular data with typed columns, usable as for-each sources.
 
 ```yaml
 data:
@@ -232,7 +256,7 @@ data:
 
 nodes:
   service:
-    forEach:
+    for-each:
       as: env
       in: environments
     if: "${each.env.enabled}"
@@ -257,7 +281,7 @@ Parse-time validation catches type errors before expansion — an `INTEGER` colu
 When iterating over CSV data, `${each.<as>.<column>}` drills into row fields:
 
 ```yaml
-forEach:
+for-each:
   as: env
   in: environments        # references the data source above
 
@@ -433,7 +457,7 @@ The plugin uses multiple variable prefixes, each resolved by a different source:
 | `${auth.*}` | Credential store (API keys, endpoints) | Runtime |
 | `${result.*}` | Step outputs (REST responses, command results) | Runtime (deferred) |
 | `${var.*}` | User-defined variables section | Compile time |
-| `${each.*}` | ForEach iteration context | Expansion time |
+| `${each.*}` | for-each iteration context | Expansion time |
 | `${match.*}` | Match case scrutinee fields | Runtime (see §9) |
 | `${fault.*}` | Fault context (error details) | Runtime (deferred) |
 
@@ -449,7 +473,7 @@ Teaches yaml-core how to stamp copies of your domain elements:
 
 ```java
 public interface ForEachAdapter<E> {
-    ForEachDirective getForEach(E element);      // read the forEach field
+    ForEachDirective getForEach(E element);      // read the for-each field
     String getCondition(E element);              // read the if condition
     E stamp(E element, String stampedId, ...);   // create a copy with new ID + resolved vars
     List<Reference> getReferences(E element);    // extract cross-references for rewriting
@@ -457,7 +481,7 @@ public interface ForEachAdapter<E> {
 }
 ```
 
-DesiredState implements `YamlNodeForEachAdapter` — it knows that nodes have a `spec` map to resolve, a `dependsOn` list to rewrite, and a `forEach` field to read.
+DesiredState implements `YamlNodeForEachAdapter` — it knows that nodes have a `spec` map to resolve, a `dependsOn` list to rewrite, and a `for-each` field to read.
 
 ### ModuleBridge
 
@@ -510,14 +534,14 @@ iterations:
 
 nodes:
   api-gateway:
-    forEach: regional
+    for-each: regional
     spec:
       region: ${each.region.name}
       primary: ${each.region.primary}
       cache: ${var.cache_enabled}
 
   cache:
-    forEach: regional
+    for-each: regional
     if: "${var.cache_enabled}"
     spec:
       region: ${each.region.name}
@@ -534,7 +558,7 @@ nodes:
 1. **Variables** resolve `${var.environment}`, `${var.cache_enabled}`, `${var.monitoring_enabled}`
 2. **CSV data** parses the `regions` table into typed rows
 3. **Module import** expands `monitoring-stack` with alias `infra`, conditional on `monitoring_enabled`
-4. **ForEach** stamps `api-gateway` and `cache` per region row → `api-gateway.us-east`, `api-gateway.eu-west`, etc.
+4. **for-each** stamps `api-gateway` and `cache` per region row → `api-gateway.us-east`, `api-gateway.eu-west`, etc.
 5. **Conditions** filter `cache` copies per region — only included where `cache_enabled` is truthy
 6. **Reference rewriting** updates any `dependsOn` between `api-gateway` and `cache` to use stamped IDs
 
@@ -551,11 +575,13 @@ Steps in a `steps:` list support structural control flow. Every step has a **typ
 | Step type | Key | Purpose |
 |-----------|-----|---------|
 | Plugin action | plugin name | Execute one action |
-| Invoke | `invoke:` | Execute one binding (MCP, script, agent, process) |
 | Block | `block:` | Execute N steps sequentially |
 | If/else | `if:` + `then:` | Branch on condition |
 | Match | `match:` + `cases:` | Branch on pattern |
 | Parallel | `parallel:` | Execute N steps concurrently |
+| Race | `race:` | Execute N steps concurrently, first to complete wins |
+| Try/catch | `try:` + `catch:` | Error handling |
+| Select | `select:` | Wait for one of several events |
 
 ### `block:` — compound step
 
@@ -563,18 +589,18 @@ Groups steps into a single unit that decorators can wrap:
 
 ```yaml
 - block:
-    - rest-call: { url: ${endpoint}/status }
-    - assert: { condition: ${result.rest-call.status} == "ok" }
-  loop: { count: 3, until: ${status} == "ok" }
+    - rest-call: { url: "${var.endpoint}/status" }
+    - assert: { condition: "${result.rest-call.status} == 'ok'" }
+  loop: { count: 3, until: "${var.status} == 'ok'" }
   timeout: 30s
 ```
 
 ### `if/then/else` — branching
 
-Two-way branching over step lists. Disambiguated from the `if` decorator guard by presence of `then:`:
+Two-way branching over step lists. `if:` is always structural in the step domain — it requires `then:` (and optional `else:`). For conditional skip/guard behaviour, use the `when` decorator instead.
 
 ```yaml
-- if: ${risk} == 'HIGH'
+- if: "${var.risk} == 'HIGH'"
   then:
     - escalate: ...
     - notify-team: ...
@@ -582,17 +608,27 @@ Two-way branching over step lists. Disambiguated from the `if` decorator guard b
     - proceed: ...
 ```
 
-`if` without `then:` is a guard (decorator) — skips the step if false. `if` with `then:` is a structural branch.
+### `when` — guard decorator
+
+Conditionally skips a single step. Accepts `true`/`false` literals or an expression string evaluated by the configured expression engine:
+
+```yaml
+- rest-call: { url: "/api/data" }
+  when: "${var.data_enabled}"
+
+- notify: "done"
+  when: true
+```
 
 ### `match/cases` — pattern matching
 
 N-way branching with value matching, structural matching, and guards:
 
 ```yaml
-- match: ${event}
+- match: "${var.event}"
   cases:
     - pattern: { type: "trade" }
-      guard: ${match.amount} > 1000000
+      guard: "${match.amount} > 1000000"
       steps:
         - escalate: ...
         - notify-compliance: ...
@@ -617,8 +653,8 @@ All decorators apply uniformly to all step types:
 
 | Order | Decorator | Role |
 |-------|-----------|------|
-| 1 | `if` | Guard — skip if false |
-| 2 | `forEach` | Iteration |
+| 1 | `when` | Guard — skip if false |
+| 2 | `for-each` | Iteration |
 | 3 | `loop` | Repetition |
 | 4 | `on-error` | Error handler |
 | 5 | `timeout` | Deadline |
@@ -630,6 +666,26 @@ All decorators apply uniformly to all step types:
 | 11 | `signal`/`publish` | Post-action notification |
 | 12 | `transition` | Post-action state event |
 | 13 | `transform` | Post-action data reshape |
+
+Additional decorators:
+
+| Decorator | Role |
+|-----------|------|
+| `at` | Scheduled execution time |
+| `from` | Channel source binding |
+| `cancel` | Cancellation target |
+| `background` | Run step asynchronously |
+| `mutex` | Mutual exclusion lock |
+| `barrier` | Barrier synchronisation point |
+| `quorum` | Quorum synchronisation point |
+| `capture` | Capture step output into named variable |
+| `priority` | Execution priority hint |
+| `resource` | Resource allocation |
+| `on-complete` | Completion callback |
+| `on-success` | Success handler |
+| `on-failure` | Failure handler |
+
+> **Step domain truthiness:** In step workflows, `when` and `if` conditions accept only `true`/`false` literals as boolean fast-path. Anything else is routed to the configured expression engine (MVEL default for conditions). The broader YAML truthiness (`yes`/`no`/`on`/`off`/`1`/`0`) applies only in the composition domain (§2).
 
 ---
 
@@ -775,9 +831,11 @@ Every step definition has an `InvokeBinding` that determines how it executes:
 
 The step catalog enforces type safety at two levels:
 
-1. **Parse-time:** `Walker` resolves step maps against the registry. Unknown action keys are rejected with the list of available actions. Parameter types are checked against the `Parameter` definitions.
+1. **Parse-time (structural):** `Walker` resolves step maps against the registry. Unknown action keys are rejected with the list of available actions. Step structure is validated — required companions (`then` for `if`, `cases` for `match`), illegal combinations, and nesting depth limits.
 
-2. **Schema composition:** `StepSchemaComposer` generates a composed JSON Schema covering all discovered actions. Each action becomes a `oneOf` variant with its parameters schema. Structural step types (block, if/else, match, parallel) are included as additional variants. This schema can be served to editors for validation and auto-complete.
+2. **Execution-time (parameter types):** `ValidatingAction` checks parameter types against `Parameter` definitions when the step runs. This is not a parse-time check — the walker verifies structure and names, not parameter value types.
+
+3. **Schema composition:** `StepSchemaComposer` generates a composed JSON Schema covering all discovered actions. Each action becomes a `oneOf` variant with its parameters schema. Structural step types (block, if/else, match, parallel) are included as additional variants. This schema can be served to editors for validation and auto-complete.
 
 ```java
 // Generate composed schema for all discovered steps
@@ -786,9 +844,10 @@ ObjectNode schema = StepSchemaComposer.compose(catalog, objectMapper);
 
 The composed schema includes:
 - One `oneOf` variant per plugin action (with typed parameter properties)
-- `invoke:` escape hatch variant
 - `block:`, `if/then/else`, `match/cases`, `parallel:` structural variants
-- Shared decorator properties (`if`, `forEach`, `loop`, `timeout`, `retry`, etc.)
+- Shared decorator properties (`when`, `for-each`, `loop`, `timeout`, `retry`, etc.)
+
+> **Note:** `invoke:` is parsed by Walker but not yet supported at execution time — `CatalogStepRunner` returns a failure for `invoke:` steps. Use plugin steps or YAML step definition files instead.
 
 ### Adding the step runtime dependency
 
@@ -817,7 +876,7 @@ yaml-core publishes JSON Schema fragments for each construct in `src/main/resour
 | Fragment | What it defines |
 |----------|----------------|
 | `variable.schema.json` | `${prefix.name}` string pattern |
-| `foreach.schema.json` | `forEach` field (inline or group reference) |
+| `foreach.schema.json` | `for-each` field (inline or group reference) |
 | `iterations.schema.json` | Named iteration groups |
 | `if.schema.json` | `if` condition field |
 | `module.schema.json` | Module declaration + parameters + outputs |
@@ -831,7 +890,7 @@ Host applications compose these into their domain schema via `$ref`:
     "nodes": {
       "additionalProperties": {
         "properties": {
-          "forEach": { "$ref": "classpath:schema/foreach.schema.json" },
+          "for-each": { "$ref": "classpath:schema/foreach.schema.json" },
           "if": { "$ref": "classpath:schema/if.schema.json" },
           "spec": { "type": "object" }
         }

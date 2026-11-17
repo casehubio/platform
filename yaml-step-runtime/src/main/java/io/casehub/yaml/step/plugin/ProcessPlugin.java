@@ -15,7 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Plugin(value = "process", description = "Executes a system process via ProcessExecutor")
+@Plugin(value = "process", description = "Executes a system process via ProcessExecutor",
+        capability = "process-execution")
 public record ProcessPlugin(
         @Required String command,
         @Optional List<String> args,

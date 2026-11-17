@@ -232,4 +232,25 @@ class PluginScannerTest {
     }
 
 
+    @Test
+    void processPlugin_hasProcessExecutionCapability() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.plugin.ProcessPlugin.class, registry);
+
+        var def = registry.resolve("process");
+        assertThat(def).isPresent();
+        assertThat(def.get().capability()).isEqualTo("process-execution");
+    }
+
+    @Test
+    void restCallPlugin_hasRawHttpCapability() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.plugin.RestCallPlugin.class, registry);
+
+        var def = registry.resolve("rest-call");
+        assertThat(def).isPresent();
+        assertThat(def.get().capability()).isEqualTo("raw-http");
+    }
 }

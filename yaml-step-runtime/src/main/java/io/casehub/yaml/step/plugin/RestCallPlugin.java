@@ -13,7 +13,8 @@ import java.net.http.HttpResponse;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@Plugin(value = "rest-call", description = "Makes an HTTP request")
+@Plugin(value = "rest-call", description = "Makes an HTTP request",
+        capability = "raw-http")
 public record RestCallPlugin(
         @Required String url,
         @Optional String method,

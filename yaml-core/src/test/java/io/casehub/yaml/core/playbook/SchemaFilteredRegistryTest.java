@@ -76,6 +76,54 @@ class SchemaFilteredRegistryTest {
         assertThat(clientFiltered.resolve("correlate")).isEmpty();
     }
 
+    @Test
+    void assisted_excludesRiskCapabilities() {
+        delegate.register(Definition.of("process")
+                                    .capability("process-execution").execute(NOOP).build());
+        delegate.register(Definition.of("raw-rest")
+                                    .capability("raw-http").execute(NOOP).build());
+        delegate.register(Definition.of("safe-step")
+                                    .capability("steps").execute(NOOP).build());
+
+        var assistedFiltered = SchemaFilteredRegistry.forSchema(
+                delegate, schemas, "assisted");
+
+        assertThat(assistedFiltered.resolve("process")).isEmpty();
+        assertThat(assistedFiltered.resolve("raw-rest")).isEmpty();
+        assertThat(assistedFiltered.resolve("safe-step")).isPresent();
+    }
+
+    @Test
+    void assisted_excludesMvelAndEnvCapabilities() {
+        delegate.register(Definition.of("mvel-eval")
+                                    .capability("expression-mvel").execute(NOOP).build());
+        delegate.register(Definition.of("env-read")
+                                    .capability("env-access").execute(NOOP).build());
+        delegate.register(Definition.of("jq-eval")
+                                    .capability("steps").execute(NOOP).build());
+
+        var assistedFiltered = SchemaFilteredRegistry.forSchema(
+                delegate, schemas, "assisted");
+
+        assertThat(assistedFiltered.resolve("mvel-eval")).isEmpty();
+        assertThat(assistedFiltered.resolve("env-read")).isEmpty();
+        assertThat(assistedFiltered.resolve("jq-eval")).isPresent();
+    }
+
+    @Test
+    void server_includesRiskCapabilities() {
+        delegate.register(Definition.of("process")
+                                    .capability("process-execution").execute(NOOP).build());
+        delegate.register(Definition.of("raw-rest")
+                                    .capability("raw-http").execute(NOOP).build());
+
+        var serverFiltered = SchemaFilteredRegistry.forSchema(
+                delegate, schemas, "server");
+
+        assertThat(serverFiltered.resolve("process")).isPresent();
+        assertThat(serverFiltered.resolve("raw-rest")).isPresent();
+    }
+
     static class SimplePluginRegistry implements PluginRegistry {
         private final ConcurrentHashMap<String, Definition> defs = new ConcurrentHashMap<>();
         @Override public void register(Definition d) { defs.put(d.name(), d); }

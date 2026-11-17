@@ -14,3 +14,4 @@
 | 0010 | [Remove ERASE_BY_ID from GraphitiCaseMemoryStore capabilities](0010-remove-erase-by-id-from-graphiti-capabilities.md) | Accepted | 2026-06-09 |
 | 0011 | [Three-layer evaluation model — keyword reservation](0011-three-layer-evaluation-model-keyword-reservation.md) | Accepted | 2026-09-27 |
 | 0012 | [Separate DomainReportProvider SPI from ModelEnricher](0012-separate-domain-report-provider-from-model-enricher.md) | Accepted | 2026-09-28 |
+| 0013 | [Trust model for playbook authoring](0013-trust-model-for-playbook-authoring.md) | Accepted | 2026-11-17 |

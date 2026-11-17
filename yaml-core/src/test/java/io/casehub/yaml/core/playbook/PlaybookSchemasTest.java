@@ -34,4 +34,15 @@ class PlaybookSchemasTest {
     void nullSchemaIsNotDomain() {
         assertThat(PlaybookSchemas.isDomainSchema(null)).isFalse();
     }
+
+    @Test
+    void assistedIsBuiltIn() {
+        assertThat(PlaybookSchemas.isBuiltIn("assisted")).isTrue();
+    }
+
+    @Test
+    void assistedIsNotDomainSchema() {
+        assertThat(PlaybookSchemas.isDomainSchema("assisted")).isFalse();
+    }
+
 }

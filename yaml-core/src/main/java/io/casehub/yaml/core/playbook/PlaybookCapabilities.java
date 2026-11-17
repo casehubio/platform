@@ -25,5 +25,11 @@ public final class PlaybookCapabilities {
     public static final String GRAPHQL_INVOKE = "graphql-invoke";
     public static final String CODEGEN = "codegen";
 
+    // Risk-bearing capabilities (excluded from assisted authoring context)
+    public static final String PROCESS_EXECUTION = "process-execution";
+    public static final String RAW_HTTP = "raw-http";
+    public static final String EXPRESSION_MVEL = "expression-mvel";
+    public static final String ENV_ACCESS = "env-access";
+
     private PlaybookCapabilities() {}
 }

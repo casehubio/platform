@@ -75,12 +75,12 @@ class PlaybookSchemaRegistryTest {
 
     @Test
     void all_returnsAllRegistered() {
-        assertThat(registry.all()).hasSize(2);
+        assertThat(registry.all()).hasSize(3);
 
         registry.register(PlaybookSchemaDescriptor.domain(
                 "aml-server", "server", Set.of()));
 
-        assertThat(registry.all()).hasSize(3);
+        assertThat(registry.all()).hasSize(4);
     }
 
     @Test

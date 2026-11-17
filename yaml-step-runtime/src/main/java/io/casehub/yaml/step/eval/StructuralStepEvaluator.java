@@ -30,6 +30,7 @@ public final class StructuralStepEvaluator {
     private final java.util.concurrent.ConcurrentHashMap<String, QuorumTracker> quorumTrackers                                            = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String, Object>                                           injectedBindings;
     private final StepExecutionListener                                        listener;
+    private final CaptureCollector                                             captureCollector;
 
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
@@ -44,9 +45,10 @@ public final class StructuralStepEvaluator {
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
         this.injectedBindings   = Map.of();
         this.listener           = null;
+        this.captureCollector   = null;
     }
 
-    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener) {
+    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener, CaptureCollector captureCollector) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
         this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
@@ -54,11 +56,15 @@ public final class StructuralStepEvaluator {
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
         this.injectedBindings   = Map.copyOf(injectedBindings);
         this.listener           = listener;
+        this.captureCollector   = captureCollector;
     }
 
-    public StructuralStepEvaluator withListener(StepExecutionListener listener) {
-        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, listener);
+    public StructuralStepEvaluator withListener(StepExecutionListener listener) {return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, listener, this.captureCollector);}
+
+    public StructuralStepEvaluator withCaptureCollector(CaptureCollector captureCollector) {
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, this.listener, captureCollector);
     }
+
 
     @SuppressWarnings("unchecked")
     public StructuralStepEvaluator withInjections(
@@ -74,7 +80,7 @@ public final class StructuralStepEvaluator {
             }
             injected.put(binding.variableName(), resolved);
         }
-        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected, this.listener);
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected, this.listener, this.captureCollector);
     }
 
 
@@ -105,6 +111,12 @@ public final class StructuralStepEvaluator {
         }
         if (listener != null) {
             listener.afterStep(step, result, Map.of());
+        }
+        if (result.isSuccess() && result.output() != null && captureCollector != null) {
+            Object captureVal = step.decorators().get("capture");
+            if (captureVal != null) {
+                captureCollector.capture(String.valueOf(captureVal), result.output());
+            }
         }
         boolean isPolicyParallel = step instanceof ResolvedStep.ParallelStep p
                                    && p.advanceAfter() < p.steps().size();
@@ -270,11 +282,21 @@ public final class StructuralStepEvaluator {
         if (block.steps().isEmpty()) {
             return Result.of(Map.of());
         }
-        Result last = Result.of(Map.of());
+        Result      last       = Result.of(Map.of());
+        StepContext currentCtx = ctx;
         for (ResolvedStep sub : block.steps()) {
-            last = evaluateInternal(sub, ctx, runner);
+            last = evaluateInternal(sub, currentCtx, runner);
             if (!last.isSuccess()) {
                 return last;
+            }
+            if (captureCollector != null && last.output() != null) {
+                Object captureVal = sub.decorators().get("capture");
+                if (captureVal != null) {
+                    String              captureName = String.valueOf(captureVal);
+                    Map<String, Object> output      = last.output();
+                    currentCtx = currentCtx.withResolver(
+                            currentCtx.resolver().withObjectScope(captureName, output::get));
+                }
             }
         }
         return last;

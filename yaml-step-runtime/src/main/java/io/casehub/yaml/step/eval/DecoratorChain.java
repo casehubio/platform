@@ -27,6 +27,7 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class DecoratorChain {
 
+    private final DecoratorConfig config;
     private final ConditionEvaluator conditionEvaluator;
     private final SpeedMultiplier    speedMultiplier;
     private final ExecutionScope     scope;
@@ -36,9 +37,14 @@ public final class DecoratorChain {
     }
 
     public DecoratorChain(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier, ExecutionScope scope) {
-        this.conditionEvaluator = conditionEvaluator;
-        this.speedMultiplier    = speedMultiplier;
-        this.scope              = scope;
+        this(new DecoratorConfig(conditionEvaluator, speedMultiplier, scope, null, null, null, null));
+    }
+
+    public DecoratorChain(DecoratorConfig config) {
+        this.config             = config;
+        this.conditionEvaluator = config.conditionEvaluator();
+        this.speedMultiplier    = config.speedMultiplier();
+        this.scope              = config.scope();
     }
 
     private static long computeDelay(Duration baseDelay, String backoff, int attempt) {
@@ -178,23 +184,37 @@ public final class DecoratorChain {
         Object onErrorVal = decorators.get("on-error");
         if (onErrorVal == null) {return inner;}
 
-        String fallbackStep = String.valueOf(onErrorVal);
+        String fallbackStepName = String.valueOf(onErrorVal);
         return ctx -> {
             Result result;
             try {
                 result = inner.execute(ctx);
             } catch (Exception e) {
-                return Result.of(Map.of(
-                                         "on-error.caught", e.getMessage(),
-                                         "on-error.fallback", fallbackStep),
-                                 Map.of("on-error.exception", e.getClass().getSimpleName()));
+                result = Result.failed(e.getMessage());
             }
             if (!result.isSuccess()) {
-                String message = result instanceof Result.Failure f ? f.message() : "unknown";
-                return Result.of(Map.of(
-                                         "on-error.caught", message,
-                                         "on-error.fallback", fallbackStep),
-                                 Map.of("on-error.handled", true));
+                if (config.stepLookup() == null) {
+                    return result;
+                }
+                io.casehub.yaml.step.catalog.ResolvedStep handler = config.stepLookup().resolve(fallbackStepName);
+                if (handler == null) {
+                    return result;
+                }
+                String errorMsg  = result instanceof Result.Failure f ? f.message() : "unknown";
+                String errorType = result instanceof Result.Failure f ? f.category() : "unknown";
+                io.casehub.yaml.core.resolver.VariableResolver errorResolver = ctx.resolver()
+                                                                                  .withObjectScope("error", name -> switch (name) {
+                                                                                      case "type" -> errorType;
+                                                                                      case "message" -> errorMsg;
+                                                                                      default -> null;
+                                                                                  });
+                if (config.handlerEvaluator() != null) {
+                    Result handlerResult = config.handlerEvaluator().evaluate(
+                            handler, ctx.withResolver(errorResolver), config.handlerRunner());
+                    if (!handlerResult.isSuccess()) {return result;}
+                    return handlerResult;
+                }
+                return result;
             }
             return result;
         };

@@ -165,23 +165,22 @@ class DecoratorChainTest {
         }
 
         @Test
-        void innerFailure_returnsSuccessWithFallbackInfo() {
+        void innerFailure_propagatesWhenNoStepLookup() {
             var decorators = Map.<String, Object>of("on-error", "fallback");
             var result = chain.apply(decorators, failure("boom"))
-                    .execute(new StepContext(resolver));
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
-            assertThat(result.output()).containsEntry("on-error.caught", "boom");
+                              .execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(((Result.Failure) result).message()).isEqualTo("boom");
         }
 
         @Test
-        void innerException_caughtWithFallbackInfo() {
+        void innerException_propagatesWhenNoStepLookup() {
             var decorators = Map.<String, Object>of("on-error", "fallback");
             var result = chain.apply(decorators, ctx -> {
                 throw new RuntimeException("unexpected");
             }).execute(new StepContext(resolver));
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(((Result.Failure) result).message()).isEqualTo("unexpected");
         }
     }
 
@@ -409,18 +408,18 @@ class DecoratorChainTest {
         }
 
         @Test
-        void onError_catchesTimeoutException() {
+        void onError_propagatesTimeoutWhenNoStepLookup() {
             var decorators = new LinkedHashMap<String, Object>();
             decorators.put("on-error", "fallback");
             decorators.put("timeout", "50ms");
             var result = chain.apply(decorators, ctx -> {
-                try { Thread.sleep(200); } catch (InterruptedException e) {
+                try {Thread.sleep(200);} catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 return Result.of(Map.of());
             }).execute(new StepContext(resolver));
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.output()).containsEntry("on-error.fallback", "fallback");
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(((Result.Failure) result).message()).contains("timeout");
         }
 
         @Test

@@ -37,8 +37,10 @@ public class CatalogStepRunner implements StepRunner {
             }
             return definition.action().execute(resolved, services);
         }
-        throw new IllegalArgumentException(
-                "Unsupported step type: " + step.getClass().getSimpleName());
+        if (step instanceof ResolvedStep.InvokeStep) {
+            return Result.failed("'invoke:' steps are not yet supported — use a plugin step instead");
+        }
+        return Result.failed("Unsupported step type: " + step.getClass().getSimpleName());
     }
 
     private static boolean hasExpressionParams(Definition definition) {

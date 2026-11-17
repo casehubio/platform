@@ -208,4 +208,109 @@ class AstInferenceIntegrationTest {
         assertThat(listPlugin).as("ListAccounts plugin should still be generated").isPresent();
     }
 
+    private static final String EXCLUDE_CONNECTOR_SOURCE = """
+                                                           package test.connector;
+                                                           
+                                                           import io.casehub.platform.api.mcp.McpDomain;
+                                                           import io.casehub.platform.api.mcp.PlatformQuery;
+                                                           import io.casehub.platform.api.mcp.GeneratePlugin;
+                                                           import jakarta.inject.Inject;
+                                                           
+                                                           @McpDomain("connectors/test-messaging")
+                                                           public class TestMessagingConnector {
+                                                           
+                                                               @Inject TestBankService connectorService;
+                                                           
+                                                               @PlatformQuery("Send message")
+                                                               @GeneratePlugin(exclude = true)
+                                                               public String send(String channel, String message) {
+                                                                   return connectorService.platform(channel).listAll();
+                                                               }
+                                                           
+                                                               @PlatformQuery("List channels")
+                                                               public String listChannels() {
+                                                                   return "channels";
+                                                               }
+                                                           }
+                                                           """;
+
+    @Test
+    void exclude_annotation_skips_plugin_generation() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=connectors/test-messaging")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestMessagingConnector", EXCLUDE_CONNECTOR_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestBankService", SERVICE_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
+
+        Optional<JavaFileObject> sendPlugin = compilation.generatedSourceFiles().stream()
+                                                         .filter(f -> f.getName().contains("SendPlugin") || f.getName().contains("TestMessagingSend"))
+                                                         .findFirst();
+        assertThat(sendPlugin).as("Send plugin should be excluded").isEmpty();
+
+        Optional<JavaFileObject> listPlugin = compilation.generatedSourceFiles().stream()
+                                                         .filter(f -> f.getName().contains("ListChannelsPlugin") || f.getName().contains("TestMessagingListChannels"))
+                                                         .findFirst();
+        assertThat(listPlugin).as("ListChannels plugin should still be generated").isPresent();
+    }
+
+
+    private static final String SPI_ANNOTATION_CONNECTOR_SOURCE = """
+                                                                  package test.connector;
+                                                                  
+                                                                  import io.casehub.platform.api.mcp.McpDomain;
+                                                                  import io.casehub.platform.api.mcp.PlatformQuery;
+                                                                  import io.casehub.platform.api.mcp.GeneratePlugin;
+                                                                  import jakarta.inject.Inject;
+                                                                  
+                                                                  @McpDomain("connectors/test-voice")
+                                                                  public class TestVoiceConnector {
+                                                                  
+                                                                      @Inject TestRoutingService routingService;
+                                                                  
+                                                                      @PlatformQuery("Synthesise speech")
+                                                                      @GeneratePlugin(spi = TestSpi.class)
+                                                                      public String synthesise(String text, String voice, String language) {
+                                                                          TestSpi resolved = routingService.resolve(voice, language);
+                                                                          return resolved.listAll();
+                                                                      }
+                                                                  }
+                                                                  """;
+
+    private static final String ROUTING_SERVICE_SOURCE = """
+                                                         package test.connector;
+                                                         
+                                                         public class TestRoutingService {
+                                                             public TestSpi resolve(String voice, String language) { return null; }
+                                                         }
+                                                         """;
+
+    @Test
+    void spi_annotation_bypasses_inference_and_counts_as_resolved() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new GraphQLResolverProcessor())
+                                          .withOptions("-AgeneratePlugins=true", "-AgenerateGraphQL=false", "-AgenerateRest=false",
+                                                       "-AdomainFilter=connectors/test-voice")
+                                          .compile(
+                                                  JavaFileObjects.forSourceString("test.connector.TestVoiceConnector", SPI_ANNOTATION_CONNECTOR_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestRoutingService", ROUTING_SERVICE_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestSpi", SPI_SOURCE),
+                                                  JavaFileObjects.forSourceString("test.connector.TestCapability", CAPABILITY_SOURCE));
+
+        Optional<JavaFileObject> plugin = compilation.generatedSourceFiles().stream()
+                                                     .filter(f -> f.getName().contains("TestVoiceSynthesise"))
+                                                     .findFirst();
+
+        assertThat(plugin).as("Synthesise plugin should be generated").isPresent();
+
+        String source = new String(plugin.get().openInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(source).contains("resolved via: @GeneratePlugin(spi) annotation");
+        assertThat(source).contains("TestVoiceConnector api");
+        assertThat(source).contains("api.synthesise(text, voice, language)");
+    }
+
+
 }

@@ -1,0 +1,14 @@
+name: Flow control category validation
+steps:
+  - validate-playbook:
+      directory: ../../../main/playbooks/flow-control
+    capture: result
+  - assertThat: result.validatedCount
+    equals: 12
+    message: "all 12 flow-control playbooks are discovered"
+  - assertThat: result.errors
+    hasSize: 0
+    message: "all flow-control playbooks compile without errors"
+  - assertThat: result.headerErrors
+    hasSize: 0
+    message: "all flow-control playbooks have tutorial headers"

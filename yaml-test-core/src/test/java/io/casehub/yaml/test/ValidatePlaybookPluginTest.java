@@ -148,6 +148,62 @@ class ValidatePlaybookPluginTest {
         assertThat(result.output().get("validatedCount")).isEqualTo(2);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void directoryMode_reportsPlaybooksMissingHeaders() throws Exception {
+        Path playbooksDir = tempDir.resolve("playbooks");
+        Files.createDirectories(playbooksDir);
+
+        // Playbook WITH headers
+        Files.writeString(playbooksDir.resolve("with-headers.playbook.yaml"), """
+                                                                              playbook: "1.0"
+                                                                              schema: client
+                                                                              ---
+                                                                              meta:
+                                                                                title: "With Headers"
+                                                                                description: "Has tutorial headers"
+                                                                                tags: [test]
+                                                                                level: 1
+                                                                                layer: test
+                                                                                teaches: "having headers"
+                                                                              steps:
+                                                                                - log: "hello"
+                                                                              """);
+
+        // Playbook WITHOUT headers
+        Files.writeString(playbooksDir.resolve("no-headers.playbook.yaml"), """
+                                                                            playbook: "1.0"
+                                                                            schema: client
+                                                                            ---
+                                                                            meta:
+                                                                              title: "No Headers"
+                                                                              description: "Missing tutorial headers"
+                                                                              tags: [test]
+                                                                            steps:
+                                                                              - log: "hello"
+                                                                            """);
+
+        var pluginRegistry = new CompositePluginRegistry();
+        pluginRegistry.register(Definition.of("log")
+                                          .execute((params, svc) -> Result.of(Map.of()))
+                                          .absorbSiblings(true)
+                                          .build());
+
+        var services = new MapServiceRegistry();
+        var ctx      = new TestExecutionContext(pluginRegistry, services, tempDir, null, null);
+        services.register(TestExecutionContext.class, ctx);
+
+        var    plugin = new ValidatePlaybookPlugin();
+        Result result = plugin.execute(Map.of("directory", "playbooks"), services);
+
+        assertThat(result.isSuccess()).isTrue();
+        var headerErrors = (List<Map<String, Object>>) result.output().get("headerErrors");
+        assertThat(headerErrors).isNotNull();
+        assertThat(headerErrors).hasSize(1);
+        assertThat(headerErrors.getFirst().get("file")).isEqualTo("no-headers.playbook.yaml");
+    }
+
+
     private static Path findExamplesDir() {
         for (String candidate : List.of(
                 "../playbooks/src/main/playbooks/agent-interaction-patterns",

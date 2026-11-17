@@ -192,10 +192,38 @@ public final class ValidatePlaybookPlugin implements Action {
                 validatedCount++;
             }
 
-            return Result.of(Map.of(
-                    "valid", errors.isEmpty(),
-                    "validatedCount", validatedCount,
-                    "errors", (Object) errors));
+            List<Map<String, Object>> headerErrors = new ArrayList<>();
+            for (Path yamlPath : yamlFiles) {
+                if (!yamlPath.getFileName().toString().endsWith(".playbook.yaml")) continue;
+                String relativePath = playbooksDir.relativize(yamlPath).toString();
+                try {
+                    String yaml = Files.readString(yamlPath);
+                    PlaybookDocument doc = PlaybookParser.parse(yaml);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> meta = (Map<String, Object>) doc.content().get("meta");
+                    if (meta == null) {
+                        headerErrors.add(Map.of("file", relativePath, "missing", "meta block"));
+                        continue;
+                    }
+                    List<String> missing = new ArrayList<>();
+                    if (!meta.containsKey("level")) missing.add("level");
+                    if (!meta.containsKey("layer")) missing.add("layer");
+                    if (!meta.containsKey("teaches")) missing.add("teaches");
+                    if (!missing.isEmpty()) {
+                        headerErrors.add(Map.of("file", relativePath,
+                                "missing", String.join(", ", missing)));
+                    }
+                } catch (Exception ignored) {
+                    // Already reported as compilation error
+                }
+            }
+
+            var resultMap = new LinkedHashMap<String, Object>();
+            resultMap.put("valid", errors.isEmpty());
+            resultMap.put("validatedCount", validatedCount);
+            resultMap.put("errors", errors);
+            resultMap.put("headerErrors", headerErrors);
+            return Result.of(resultMap);
 
         } catch (Exception e) {
             return Result.failed("Directory scan failed: " + e.getMessage());

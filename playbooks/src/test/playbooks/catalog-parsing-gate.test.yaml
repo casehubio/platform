@@ -8,3 +8,6 @@ steps:
   - assertThat: result.errors
     hasSize: 0
     message: "All shipped playbooks must pass validation"
+  - assertThat: result.headerErrors
+    hasSize: 0
+    message: "All playbooks must have level, layer, and teaches in meta"

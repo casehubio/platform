@@ -1017,6 +1017,58 @@ class DecoratorChainTest {
         }
     }
 
+    // ── cancel (position 4) ─────────────────────────────────────────
+
+    @Nested
+    class CancelTests {
+
+        @Test
+        void cancel_withoutScope_returnsFailure() {
+            var decorators = Map.<String, Object>of("cancel", "stop");
+            var result = chain.apply(decorators, success(Map.of())).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+        }
+
+        @Test
+        void cancel_preSignalled_returnsFailure() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                scope.signal("stop").signal();
+                var decorators = Map.<String, Object>of("cancel", "stop");
+                var result = scopedChain.apply(decorators, success(Map.of("ok", true)))
+                        .execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(((Result.Failure) result).message()).contains("Cancelled");
+            }
+        }
+
+        @Test
+        void cancel_doesNotSwallowExternalInterrupt() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var decorators = Map.<String, Object>of("cancel", "stop");
+                var interruptSurvived = new java.util.concurrent.atomic.AtomicBoolean(false);
+                var done = new java.util.concurrent.CountDownLatch(1);
+                Thread runner = Thread.ofVirtual().start(() -> {
+                    scopedChain.apply(decorators, ctx -> {
+                        try { Thread.sleep(500); } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return Result.of(Map.of());
+                    }).execute(new StepContext(resolver));
+                    interruptSurvived.set(Thread.currentThread().isInterrupted());
+                    done.countDown();
+                });
+                Thread.sleep(50);
+                runner.interrupt();
+                assertThat(done.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                assertThat(interruptSurvived.get()).isTrue();
+            }
+        }
+    }
+
     // ── transition (position 12) ───────────────────────────────────
 
     @Nested

@@ -150,9 +150,11 @@ public final class DecoratorChain {
             }
 
             Thread executionThread = Thread.currentThread();
+            var cancelFired = new java.util.concurrent.atomic.AtomicBoolean(false);
             Thread watcher = Thread.ofVirtual().start(() -> {
                 try {
                     signal.await();
+                    cancelFired.set(true);
                     executionThread.interrupt();
                 } catch (InterruptedException e) {
                     // watcher interrupted — step completed normally
@@ -163,7 +165,9 @@ public final class DecoratorChain {
                 return inner.execute(ctx);
             } finally {
                 watcher.interrupt();
-                Thread.interrupted(); // clear stale interrupt status from cancel signal
+                if (cancelFired.get()) {
+                    Thread.interrupted();
+                }
             }
         };
     }

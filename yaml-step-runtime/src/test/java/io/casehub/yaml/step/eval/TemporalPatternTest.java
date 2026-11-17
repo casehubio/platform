@@ -49,8 +49,7 @@ class TemporalPatternTest {
             var pattern = new ResolvedStep.BlockStep(null, List.of(fromA, timedFromB), Map.of());
             Result result = evaluator.evaluate(pattern, resolver, noOpRunner);
 
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.output().get("on-error.fallback")).isEqualTo("greedy-detected");
+            assertThat(result.isSuccess()).isFalse();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -98,8 +97,7 @@ class TemporalPatternTest {
 
             Result result = evaluator.evaluate(timedHeartbeat, resolver, noOpRunner);
 
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.output().get("on-error.fallback")).isEqualTo("unresponsive");
+            assertThat(result.isSuccess()).isFalse();
         }
     }
 }

@@ -1,5 +1,7 @@
 package io.casehub.yaml.test;
 
+import io.casehub.yaml.step.runner.StepOutcome;
+import io.casehub.yaml.step.runner.StepTraceCollector;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -81,7 +83,7 @@ class StepTraceCollectorTest {
         var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
         runtime.strategyFor("payment.process");
 
-        var collector = new StepTraceCollector(runtime);
+        var collector = new StepTraceCollector(action -> runtime.strategyFor(action).isPresent());
         var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
                 "submit-payment", "payment.process", Map.of(), Map.of());
 
@@ -107,7 +109,7 @@ class StepTraceCollectorTest {
         var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
         runtime.strategyFor("payment.process");
 
-        var collector = new StepTraceCollector(runtime);
+        var collector = new StepTraceCollector(action -> runtime.strategyFor(action).isPresent());
         var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
                 "submit-payment", "payment.process", Map.of(), Map.of());
 
@@ -133,7 +135,7 @@ class StepTraceCollectorTest {
         var runtime = new io.casehub.platform.simulation.SimulationRuntime(config, new io.casehub.platform.simulation.NoOpSimulationCorpus<>());
         runtime.strategyFor("spi.method");
 
-        var collector = new StepTraceCollector(runtime);
+        var collector = new StepTraceCollector(action -> runtime.strategyFor(action).isPresent());
         var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
                 null, "spi.method", Map.of(), Map.of());
 

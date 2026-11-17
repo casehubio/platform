@@ -8,6 +8,10 @@ import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.CompositePluginRegistry;
+import io.casehub.yaml.step.runner.FileSystemModuleLoader;
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunnerCore;
+import io.casehub.yaml.step.runner.StepOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,10 +52,11 @@ class PlaybookDryRunTest {
 
     @Test
     void dryRunDetectsSimulatedSteps() {
+        var activator = new SimulationRuntimeActivator(simulationRuntime, PLAYBOOK_ROOT);
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                PLAYBOOK_ROOT, simulationRuntime, new FileSystemModuleLoader());
+                                            PLAYBOOK_ROOT, activator, new FileSystemModuleLoader());
         var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
-                PlaybookRunConfig.forDryRun());
+                                PlaybookRunConfig.forDryRun());
 
         assertThat(result.success()).isTrue();
         assertThat(result.trace()).isNotNull();
@@ -64,8 +69,9 @@ class PlaybookDryRunTest {
 
     @Test
     void nonDryRunDoesNotMarkSimulated() {
+        var activator2 = new SimulationRuntimeActivator(simulationRuntime, PLAYBOOK_ROOT);
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                PLAYBOOK_ROOT, simulationRuntime, new FileSystemModuleLoader());
+                PLAYBOOK_ROOT, activator2, new FileSystemModuleLoader());
         var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
                 PlaybookRunConfig.defaults());
 

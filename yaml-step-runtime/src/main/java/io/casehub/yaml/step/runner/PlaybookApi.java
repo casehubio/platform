@@ -1,4 +1,4 @@
-package io.casehub.yaml.test;
+package io.casehub.yaml.step.runner;
 
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PlatformMutation;

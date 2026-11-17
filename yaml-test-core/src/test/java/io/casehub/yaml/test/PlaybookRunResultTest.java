@@ -1,5 +1,10 @@
 package io.casehub.yaml.test;
 
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunResult;
+import io.casehub.yaml.step.runner.PlaybookValidationResult;
+import io.casehub.yaml.step.runner.StepOutcome;
+import io.casehub.yaml.step.runner.StepTraceNode;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,7 +33,7 @@ class PlaybookRunResultTest {
     @Test
     void validationResultReportsErrors() {
         var result = new PlaybookValidationResult(false,
-                List.of("Unknown key 'foo'"), null);
+                                                  List.of("Unknown key 'foo'"), null);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).containsExactly("Unknown key 'foo'");
     }
@@ -36,9 +41,9 @@ class PlaybookRunResultTest {
     @Test
     void successfulRunResult() {
         var trace = StepTraceNode.leaf(0, "s", "plugin", "act",
-                StepOutcome.EXECUTED, 5, Map.of());
+                                       StepOutcome.EXECUTED, 5, Map.of());
         var result = new PlaybookRunResult(true, "test-playbook",
-                "test.yaml", 10, trace, List.of(), Map.of("key", "val"), null);
+                                           "test.yaml", 10, trace, List.of(), Map.of("key", "val"), null);
         assertThat(result.success()).isTrue();
         assertThat(result.trace().stepCount()).isEqualTo(1);
         assertThat(result.output()).containsEntry("key", "val");

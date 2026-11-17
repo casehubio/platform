@@ -6,6 +6,11 @@ import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
+import io.casehub.yaml.step.runner.FileSystemModuleLoader;
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunResult;
+import io.casehub.yaml.step.runner.PlaybookRunnerCore;
+import io.casehub.yaml.step.runner.StepOutcome;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,8 +57,9 @@ public final class RunPlaybookPlugin implements Action {
         boolean           dryRun     = simRuntime != null;
 
         var config = new PlaybookRunConfig(dryRun, callerVars, null, null);
+        var activator = simRuntime != null ? new SimulationRuntimeActivator(simRuntime, ctx.resourceRoot()) : null;
         var runner = new PlaybookRunnerCore(ctx.pluginRegistry(), ctx.serviceRegistry(),
-                                            ctx.resourceRoot(), simRuntime, new FileSystemModuleLoader());
+                                            ctx.resourceRoot(), activator, new FileSystemModuleLoader());
 
         PlaybookRunResult runResult = runner.run(playbookPath, config);
 

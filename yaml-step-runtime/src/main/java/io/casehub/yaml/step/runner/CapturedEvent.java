@@ -1,4 +1,4 @@
-package io.casehub.yaml.test;
+package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;

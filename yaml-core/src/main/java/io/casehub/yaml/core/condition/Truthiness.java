@@ -14,4 +14,15 @@ public final class Truthiness {
                     + "Expected: true/false. Use an expression engine for complex conditions.");
         };
     }
+
+    public static boolean isYamlTruthy(String value) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "true", "yes", "on", "y", "1" -> true;
+            case "false", "no", "off", "n", "0" -> false;
+            default -> throw new IllegalArgumentException(
+                    "'" + value + "' is not a YAML boolean value. "
+                    + "Expected: true/false/yes/no/on/off/y/n/1/0");
+        };
+    }
+
 }

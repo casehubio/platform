@@ -13,6 +13,7 @@ import io.casehub.yaml.step.eval.CatalogStepRunner;
 import io.casehub.yaml.step.eval.StructuralStepEvaluator;
 import io.casehub.yaml.step.plugin.EventSink;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
+import io.casehub.yaml.step.runner.EventCapture;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

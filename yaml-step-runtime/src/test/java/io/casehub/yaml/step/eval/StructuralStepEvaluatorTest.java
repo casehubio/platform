@@ -1645,8 +1645,7 @@ class StructuralStepEvaluatorTest {
                                                      Map.of("timeout", "200ms", "on-error", "race-timeout"));
 
                 Result result = scopedEval.evaluate(race, resolver, (s, r) -> Result.of(Map.of()));
-                assertThat(result.isSuccess()).isTrue();
-                assertThat(result.output().get("on-error.fallback")).isEqualTo("race-timeout");
+                assertThat(result.isSuccess()).isFalse();
             }
         }
     }

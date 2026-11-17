@@ -11,7 +11,7 @@ public enum ValueType {
         return switch (this) {
             case STRING  -> value;
             case INTEGER -> Integer.parseInt(value);
-            case BOOLEAN -> Truthiness.isTruthy(value);
+            case BOOLEAN -> Truthiness.isYamlTruthy(value);
             case NUMBER  -> Double.parseDouble(value);
         };
     }

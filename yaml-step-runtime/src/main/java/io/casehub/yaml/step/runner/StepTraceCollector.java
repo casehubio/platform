@@ -1,6 +1,5 @@
-package io.casehub.yaml.test;
+package io.casehub.yaml.step.runner;
 
-import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.ResolvedStep;
 import io.casehub.yaml.step.eval.StepExecutionListener;
@@ -14,16 +13,16 @@ import java.util.Map;
 
 public final class StepTraceCollector implements StepExecutionListener {
 
-    private final Deque<Frame> stack = new LinkedList<>();
+    private final Deque<Frame>        stack        = new LinkedList<>();
     private final List<StepTraceNode> rootChildren = new ArrayList<>();
-    private final SimulationRuntime simulationRuntime;
+    private final java.util.function.Predicate<String> simulationChecker;
 
     public StepTraceCollector() {
         this(null);
     }
 
-    public StepTraceCollector(SimulationRuntime simulationRuntime) {
-        this.simulationRuntime = simulationRuntime;
+    public StepTraceCollector(java.util.function.Predicate<String> simulationChecker) {
+        this.simulationChecker = simulationChecker;
     }
 
     private record Frame(int index, String name, String type, long startNanos,
@@ -41,18 +40,10 @@ public final class StepTraceCollector implements StepExecutionListener {
         Map<String, Object> enrichedDetail = detail;
 
         if (result.isSuccess() && step instanceof ResolvedStep.PluginStep ps
-            && simulationRuntime != null) {
-            var strategy = simulationRuntime.strategyFor(ps.actionName());
-            if (strategy.isPresent()) {
-                outcome        = StepOutcome.SIMULATED;
-                enrichedDetail = new LinkedHashMap<>(detail);
-                enrichedDetail.put("strategy", strategy.get().getClass().getSimpleName()
-                                                       .replace("Strategy", "").toLowerCase());
-            }
-        }
-
-        if (result.isSuccess() && step.name() != null && simulationRuntime != null) {
-            simulationRuntime.advanceStateMachines(step.name());
+            && simulationChecker != null && simulationChecker.test(ps.actionName())) {
+            outcome        = StepOutcome.SIMULATED;
+            enrichedDetail = new LinkedHashMap<>(detail);
+            enrichedDetail.put("simulated", true);
         }
 
         exitStep(action, outcome, enrichedDetail);

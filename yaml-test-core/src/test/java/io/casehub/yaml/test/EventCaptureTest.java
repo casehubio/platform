@@ -1,6 +1,7 @@
 package io.casehub.yaml.test;
 
 import io.casehub.platform.simulation.event.CloudEventFixtureBuilder;
+import io.casehub.yaml.step.runner.EventCapture;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

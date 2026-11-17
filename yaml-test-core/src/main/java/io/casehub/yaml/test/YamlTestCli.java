@@ -8,6 +8,11 @@ import io.casehub.yaml.step.catalog.CompositePluginRegistry;
 import io.casehub.yaml.step.plugin.AssertThatPlugin;
 import io.casehub.yaml.step.plugin.EmitEventPlugin;
 import io.casehub.yaml.step.plugin.VerifySimulationPlugin;
+import io.casehub.yaml.step.runner.FileSystemModuleLoader;
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunResult;
+import io.casehub.yaml.step.runner.PlaybookRunnerCore;
+import io.casehub.yaml.step.runner.StepOutcome;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -151,9 +156,10 @@ public final class YamlTestCli {
                                         MapServiceRegistry serviceRegistry,
                                         SimulationRuntime simulationRuntime) {
         var config = new PlaybookRunConfig(parsed.dryRun(), parsed.vars(),
-                parsed.corpusPath(), parsed.profile());
+                                           parsed.corpusPath(), parsed.profile());
+        var activator = simulationRuntime != null ? new SimulationRuntimeActivator(simulationRuntime, playbookPath.getParent()) : null;
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                playbookPath.getParent(), simulationRuntime, new FileSystemModuleLoader());
+                playbookPath.getParent(), activator, new FileSystemModuleLoader());
 
         PlaybookRunResult result = runner.run(playbookPath, config);
         printPlaybookResult(result);

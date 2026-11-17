@@ -10,6 +10,10 @@ import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.CompositePluginRegistry;
+import io.casehub.yaml.step.runner.FileSystemModuleLoader;
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunnerCore;
+import io.casehub.yaml.step.runner.StepOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,9 +44,9 @@ class PlaybookRunnerCoreTest {
     @Test
     void runSimplePlaybookSucceeds() {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                PLAYBOOK_ROOT, null);
+                                            PLAYBOOK_ROOT, null);
         var result = runner.run(PLAYBOOK_ROOT.resolve("simple.yaml"),
-                PlaybookRunConfig.defaults());
+                                PlaybookRunConfig.defaults());
 
         assertThat(result.error()).as("run error").isNull();
         assertThat(result.success()).isTrue();
@@ -272,8 +276,9 @@ class PlaybookRunnerCoreTest {
                           "methods:\n  agent-provider.invoke:\n    strategy: sequential\n");
 
         var runtime = new RecordingSimulationRuntime();
+        var activator = new SimulationRuntimeActivator(runtime, tempDir);
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                            tempDir, runtime);
+                                            tempDir, activator);
         var result = runner.run(tempDir.resolve("playbook.yaml"),
                                 PlaybookRunConfig.forDryRun());
 
@@ -295,8 +300,9 @@ class PlaybookRunnerCoreTest {
                           "methods:\n  agent-provider.invoke:\n    strategy: key\n");
 
         var runtime = new RecordingSimulationRuntime();
+        var activator = new SimulationRuntimeActivator(runtime, subdir);
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                            subdir, runtime);
+                                            subdir, activator);
         var result = runner.run(subdir.resolve("playbook.yaml"),
                                 PlaybookRunConfig.forDryRun());
 
@@ -314,8 +320,9 @@ class PlaybookRunnerCoreTest {
                           "name: No sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
 
         var runtime = new RecordingSimulationRuntime();
+        var activator = new SimulationRuntimeActivator(runtime, tempDir);
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                            tempDir, runtime);
+                                            tempDir, activator);
         var result = runner.run(tempDir.resolve("playbook.yaml"),
                                 PlaybookRunConfig.forDryRun());
 

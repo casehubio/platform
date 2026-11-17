@@ -1,4 +1,4 @@
-package io.casehub.yaml.test;
+package io.casehub.yaml.step.runner;
 
 import io.casehub.yaml.core.module.ModuleBridge;
 
@@ -10,7 +10,7 @@ import java.util.Set;
 
 public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Object>> {
 
-    static final String EXPANDED_STEP_SECTIONS_KEY = "\0__expanded_step_sections__";
+    public static final String EXPANDED_STEP_SECTIONS_KEY = "\0__expanded_step_sections__";
 
     private Map<String, Object> originalContent;
 

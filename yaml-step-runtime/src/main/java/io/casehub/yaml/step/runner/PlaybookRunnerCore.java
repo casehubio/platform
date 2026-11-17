@@ -1,12 +1,6 @@
-package io.casehub.yaml.test;
+package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.casehub.platform.simulation.MapSimulationConfig;
-import io.casehub.platform.simulation.SimulationOverlay;
-import io.casehub.platform.simulation.SimulationRuntime;
-import io.casehub.platform.simulation.config.YamlSimulationConfig;
-import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
 import io.casehub.yaml.core.module.ModuleExpander;
 import io.casehub.yaml.core.module.TypedExpandedModule;
 import io.casehub.yaml.core.module.YamlImport;
@@ -42,32 +36,32 @@ public final class PlaybookRunnerCore {
     private final PluginRegistry pluginRegistry;
     private final ServiceRegistry serviceRegistry;
     private final Path resourceRoot;
-    private final SimulationRuntime simulationRuntime;
+    private final SimulationActivator simulationActivator;
     private final ModuleLoader moduleLoader;
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
-                              SimulationRuntime simulationRuntime) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationRuntime, null);
+                              SimulationActivator simulationActivator) {
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null);
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
-                              SimulationRuntime simulationRuntime,
+                              SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader) {
         this.pluginRegistry = pluginRegistry;
         this.serviceRegistry = serviceRegistry;
         this.resourceRoot = resourceRoot;
-        this.simulationRuntime = simulationRuntime;
+        this.simulationActivator = simulationActivator;
         this.moduleLoader = moduleLoader;
     }
 
     @SuppressWarnings("unchecked")
     public PlaybookRunResult run(Path playbookPath, PlaybookRunConfig config) {
         long start = System.nanoTime();
-        SimulationOverlay overlay = null;
+        AutoCloseable simulationHandle = null;
         EventCapture eventCapture = new EventCapture();
 
         try {
@@ -81,8 +75,8 @@ public final class PlaybookRunnerCore {
 
             String playbookName = extractName(doc, content, playbookPath);
 
-            if (config.dryRun() && simulationRuntime != null) {
-                overlay = activateSimulation(config, playbookPath);
+            if (config.dryRun() && simulationActivator != null) {
+                simulationHandle = simulationActivator.activate(config, playbookPath);
             }
 
             var parsed = PlaybookVariableParser.parse(content);
@@ -113,53 +107,52 @@ public final class PlaybookRunnerCore {
             runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
 
             List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);
-            var runner = new CatalogStepRunner(pluginRegistry, runServices);
-            var traceCollector = new StepTraceCollector(
-                    config.dryRun() ? simulationRuntime : null);
-            var evaluator = new StructuralStepEvaluator(
-                    new io.casehub.yaml.core.condition.ConditionEvaluator(null))
-                    .withListener(traceCollector);
+            var stepRunner = new CatalogStepRunner(pluginRegistry, runServices);
+            var traceCollector = new StepTraceCollector();
+            var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
 
-            VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource, moduleScopes);
+            try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
+                var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
+                Map<String, io.casehub.yaml.step.catalog.ResolvedStep> stepIndex =
+                        io.casehub.yaml.step.eval.StepIndexBuilder.build(resolved);
+                io.casehub.yaml.step.eval.StepLookup stepLookup = stepIndex::get;
 
-            Map<String, Object> outputVars = new LinkedHashMap<>();
-            Map<String, Map<String, Object>> captures = new LinkedHashMap<>();
-            boolean allPassed = true;
-            String errorMsg = null;
+                var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
+                        .withListener(traceCollector)
+                        .withCaptureCollector(captureCollector);
 
-            for (int i = 0; i < resolved.size(); i++) {
-                var step = resolved.get(i);
-                Result result = evaluator.evaluate(step, resolver, runner);
+                VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource, moduleScopes);
 
-                if (!result.isSuccess()) {
-                    allPassed = false;
-                    errorMsg = result instanceof Result.Failure f ? f.message() : "Step failed";
-                    break;
-                }
+                evaluator.preRegisterLatches(resolved);
 
-                if (result.output() != null) {
-                    outputVars.putAll(result.output());
-                }
+                Map<String, Object> outputVars = new LinkedHashMap<>();
+                boolean allPassed = true;
+                String errorMsg = null;
 
-                if (step instanceof ResolvedStep.PluginStep ps) {
-                    var capture = ps.decorators().get("capture");
-                    if (capture != null && result.output() != null) {
-                        Map<String, Object> capturedOutput = result.output();
-                        captures.put(String.valueOf(capture), capturedOutput);
-                        resolver = resolver.withObjectScope(
-                                String.valueOf(capture), capturedOutput::get);
+                for (int i = 0; i < resolved.size(); i++) {
+                    var step = resolved.get(i);
+                    Result result = evaluator.evaluate(step, resolver, stepRunner);
+
+                    if (!result.isSuccess()) {
+                        allPassed = false;
+                        errorMsg = result instanceof Result.Failure f ? f.message() : "Step failed";
+                        break;
+                    }
+
+                    if (result.output() != null) {
+                        outputVars.putAll(result.output());
                     }
                 }
+
+                long durationMs = (System.nanoTime() - start) / 1_000_000;
+                var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
+                        allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
+                        durationMs, Map.of(), traceCollector.rootChildren());
+
+                return new PlaybookRunResult(allPassed, playbookName,
+                        playbookPath.toString(), durationMs, rootTrace,
+                        eventCapture.all(), outputVars, captureCollector.all(), errorMsg);
             }
-
-            long durationMs = (System.nanoTime() - start) / 1_000_000;
-            var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
-                    allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
-                    durationMs, Map.of(), traceCollector.rootChildren());
-
-            return new PlaybookRunResult(allPassed, playbookName,
-                    playbookPath.toString(), durationMs, rootTrace,
-                    eventCapture.all(), outputVars, captures, errorMsg);
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -172,8 +165,8 @@ public final class PlaybookRunnerCore {
                     playbookPath.toString(), durationMs, null, List.of(), Map.of(),
                     e.getMessage());
         } finally {
-            if (overlay != null && simulationRuntime != null) {
-                simulationRuntime.popOverlay(overlay);
+            if (simulationHandle != null) {
+                try { simulationHandle.close(); } catch (Exception ignored) {}
             }
         }
     }
@@ -199,28 +192,7 @@ public final class PlaybookRunnerCore {
         }
     }
 
-    private SimulationOverlay activateSimulation(PlaybookRunConfig config, Path playbookPath) {
-        if (config.corpusPath() != null) {
-            Path corpusFile = resourceRoot.resolve(config.corpusPath());
-            var  parsed     = SimulateBlockParser.parse(loadYamlMap(corpusFile), resourceRoot);
-            return simulationRuntime.pushOverlay(parsed.config(), parsed.corpus());
-        }
-        Path discovered = discoverSimulationYaml(playbookPath);
-        if (discovered != null) {
-            try (var is = Files.newInputStream(discovered)) {
-                var yamlConfig = new YamlSimulationConfig(is);
-                var corpus     = new InMemorySimulationCorpus<>();
-                var allCorpus  = yamlConfig.loadAllCorpus();
-                allCorpus.forEach(corpus::seed);
-                return simulationRuntime.pushOverlay(yamlConfig, corpus);
-            } catch (IOException e) {
-                throw new UncheckedIOException("Failed to load discovered simulation.yaml: " + discovered, e);
-            }
-        }
-        return simulationRuntime.pushOverlay(MapSimulationConfig.builder().build());
-    }
-
-    static Path discoverSimulationYaml(Path playbookPath) {
+    public static Path discoverSimulationYaml(Path playbookPath) {
         String fileName = playbookPath.getFileName().toString();
         String base = fileName.endsWith(".playbook.yaml") ? fileName.substring(0, fileName.length() - ".playbook.yaml".length())
                                                           : fileName.endsWith(".playbook.yml") ? fileName.substring(0, fileName.length() - ".playbook.yml".length())
@@ -328,16 +300,6 @@ public final class PlaybookRunnerCore {
             resolver = resolver.withScope("module", moduleOutputSource);
         }
         return resolver;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> loadYamlMap(Path path) {
-        try (var is = Files.newInputStream(path)) {
-            var mapper = new ObjectMapper(new YAMLFactory());
-            return mapper.readValue(is, Map.class);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to load: " + path, e);
-        }
     }
 
     static String resolveStepType(ResolvedStep step) {

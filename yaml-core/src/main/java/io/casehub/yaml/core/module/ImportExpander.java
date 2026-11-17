@@ -77,7 +77,7 @@ public final class ImportExpander {
 
             if (imp.condition() != null) {
                 String resolved = eachResolver.resolveString(imp.condition(), stampedAlias);
-                if (!Truthiness.isTruthy(resolved)) continue;
+                if (!Truthiness.isYamlTruthy(resolved)) continue;
             }
 
             Map<String, String> resolvedParams = resolveParams(
@@ -107,7 +107,7 @@ public final class ImportExpander {
 
             if (imp.condition() != null) {
                 String resolved = eachResolver.resolveString(imp.condition(), stampedAlias);
-                if (!Truthiness.isTruthy(resolved)) continue;
+                if (!Truthiness.isYamlTruthy(resolved)) continue;
             }
 
             Map<String, String> resolvedParams = resolveParams(

@@ -1,5 +1,7 @@
 package io.casehub.yaml.test;
 
+import io.casehub.yaml.step.runner.StepOutcome;
+import io.casehub.yaml.step.runner.StepTraceNode;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,7 +14,7 @@ class StepTraceNodeTest {
     @Test
     void flattenProducesDepthFirstList() {
         var child1 = StepTraceNode.leaf(0, "step-a", "plugin", "agent-invoke",
-                StepOutcome.SIMULATED, 5, Map.of("strategy", "key-lookup"));
+                                        StepOutcome.SIMULATED, 5, Map.of("strategy", "key-lookup"));
         var child2 = StepTraceNode.leaf(1, "step-b", "plugin", "assertThat",
                 StepOutcome.EXECUTED, 2, Map.of());
         var root = new StepTraceNode(0, "block", "block", null,

@@ -16,7 +16,7 @@ public final class ModuleParameterParser {
                     Arrays.stream(value.split(",")).map(String::trim).toList());
             case INTEGER -> new ParsedValue.IntegerValue(Integer.parseInt(value));
             case NUMBER  -> new ParsedValue.NumberValue(Double.parseDouble(value));
-            case BOOLEAN -> new ParsedValue.BooleanValue(Truthiness.isTruthy(value));
+            case BOOLEAN -> new ParsedValue.BooleanValue(Truthiness.isYamlTruthy(value));
             case OBJECT, EXPRESSION -> throw new IllegalArgumentException(
                     "Module parameters do not support " + type + " type");
         };

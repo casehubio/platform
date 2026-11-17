@@ -73,12 +73,13 @@ class CatalogStepRunnerTest {
     }
 
     @Test
-    void nonPluginStep_throwsIllegalArgument() {
+    void nonPluginStep_returnsFailureResult() {
         var invoke = new ResolvedStep.InvokeStep(null, Map.of("mcp", "tool"), Map.of());
         var runner = new CatalogStepRunner(registry, services);
 
-        assertThatThrownBy(() -> runner.run(invoke, resolver))
-                .isInstanceOf(IllegalArgumentException.class);
+        Result result = runner.run(invoke, resolver);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(((Result.Failure) result).message()).contains("not yet supported");
     }
 
     @Test

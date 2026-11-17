@@ -1,5 +1,7 @@
 package io.casehub.yaml.test;
 
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -21,7 +23,7 @@ class PlaybookApiContractTest {
         var request = new PlaybookRunRequest("test.yaml", true,
                 Map.of("key", "val"), "corpus.yaml", "dev");
         var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
-                request.corpusPath(), request.simulationProfile());
+                                           request.corpusPath(), request.simulationProfile());
         assertThat(config.dryRun()).isTrue();
         assertThat(config.vars()).containsEntry("key", "val");
         assertThat(config.corpusPath()).isEqualTo("corpus.yaml");

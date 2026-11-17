@@ -90,7 +90,7 @@ public final class ForEachExpander {
                 String condition = adapter.getCondition(element);
                 if (condition != null) {
                     String resolved = resolver.resolveString(condition, elementId);
-                    if (!Truthiness.isTruthy(resolved)) {
+                    if (!Truthiness.isYamlTruthy(resolved)) {
                         excludedIds.add(elementId);
                         continue;
                     }
@@ -109,7 +109,7 @@ public final class ForEachExpander {
                 String condition = adapter.getCondition(element);
                 if (condition != null) {
                     String resolved = eachResolver.resolveString(condition, stampedId);
-                    if (!Truthiness.isTruthy(resolved)) {
+                    if (!Truthiness.isYamlTruthy(resolved)) {
                         excludedIds.add(stampedId);
                         continue;
                     }
@@ -239,7 +239,7 @@ public final class ForEachExpander {
                 String condition = adapter.getCondition(element);
                 if (condition != null) {
                     String resolved = resolver.resolveString(condition, elementId);
-                    if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
+                    if (!io.casehub.yaml.core.condition.Truthiness.isYamlTruthy(resolved)) {
                         excludedIds.add(elementId);
                         continue;
                     }
@@ -269,7 +269,7 @@ public final class ForEachExpander {
                     String condition = adapter.getCondition(element);
                     if (condition != null) {
                         String resolved = rowResolver.resolveString(condition, stampedId);
-                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
+                        if (!io.casehub.yaml.core.condition.Truthiness.isYamlTruthy(resolved)) {
                             excludedIds.add(stampedId);
                             continue;
                         }
@@ -289,7 +289,7 @@ public final class ForEachExpander {
                     String condition = adapter.getCondition(element);
                     if (condition != null) {
                         String resolved = eachResolver.resolveString(condition, stampedId);
-                        if (!io.casehub.yaml.core.condition.Truthiness.isTruthy(resolved)) {
+                        if (!io.casehub.yaml.core.condition.Truthiness.isYamlTruthy(resolved)) {
                             excludedIds.add(stampedId);
                             continue;
                         }

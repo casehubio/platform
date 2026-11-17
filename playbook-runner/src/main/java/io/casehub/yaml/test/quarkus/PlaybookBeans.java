@@ -6,13 +6,15 @@ import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
-import io.casehub.yaml.test.FileSystemModuleLoader;
-import io.casehub.yaml.test.PlaybookApi;
-import io.casehub.yaml.test.PlaybookRunConfig;
-import io.casehub.yaml.test.PlaybookRunRequest;
-import io.casehub.yaml.test.PlaybookRunResult;
-import io.casehub.yaml.test.PlaybookRunnerCore;
-import io.casehub.yaml.test.PlaybookValidationResult;
+import io.casehub.yaml.step.runner.FileSystemModuleLoader;
+import io.casehub.yaml.step.runner.PlaybookApi;
+import io.casehub.yaml.step.runner.PlaybookRunConfig;
+import io.casehub.yaml.step.runner.PlaybookRunRequest;
+import io.casehub.yaml.step.runner.PlaybookRunResult;
+import io.casehub.yaml.step.runner.PlaybookRunnerCore;
+import io.casehub.yaml.step.runner.PlaybookValidationResult;
+import io.casehub.yaml.step.runner.SimulationActivator;
+import io.casehub.yaml.test.SimulationRuntimeActivator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -25,7 +27,7 @@ public class PlaybookBeans implements PlaybookApi {
 
     private final PluginRegistry pluginRegistry;
     private final ServiceRegistry serviceRegistry;
-    private final SimulationRuntime simulationRuntime;
+    private final SimulationActivator simulationActivator;
     private final FileSystemModuleLoader moduleLoader = new FileSystemModuleLoader();
 
     @Inject
@@ -34,8 +36,10 @@ public class PlaybookBeans implements PlaybookApi {
                          Instance<SimulationRuntime> simulationRuntimeInstance) {
         this.pluginRegistry = pluginRegistry;
         this.serviceRegistry = serviceRegistry;
-        this.simulationRuntime = simulationRuntimeInstance.isResolvable()
+        SimulationRuntime runtime = simulationRuntimeInstance.isResolvable()
                 ? simulationRuntimeInstance.get() : null;
+        this.simulationActivator = runtime != null
+                ? new SimulationRuntimeActivator(runtime, Path.of(".")) : null;
     }
 
     @Override
@@ -48,7 +52,7 @@ public class PlaybookBeans implements PlaybookApi {
             resourceRoot = Path.of(".");
         }
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                            resourceRoot, simulationRuntime, moduleLoader);
+                                            resourceRoot, simulationActivator, moduleLoader);
         return runner.run(Path.of(request.playbookPath()), config);
     }
 

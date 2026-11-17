@@ -9,6 +9,10 @@ meta:
     - else
     - conditional
     - step-workflows
+  level: 2
+  layer: step-workflows
+  teaches: "conditional branching with then/else"
+  builds-on: sequential
 steps:
   - if: true
     then:

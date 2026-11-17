@@ -9,6 +9,10 @@ meta:
     - boolean
     - toggle
     - coordination-primitives
+  level: 2
+  layer: coordination-primitives
+  teaches: "boolean flag set/check/toggle"
+  builds-on: sequential
 steps:
   - flag-check: "ready"
   - flag-set: "ready"

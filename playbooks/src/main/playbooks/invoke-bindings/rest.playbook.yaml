@@ -9,6 +9,10 @@ meta:
     - http
     - request
     - invoke-bindings
+  level: 3
+  layer: invoke-bindings
+  teaches: "calling REST APIs from playbook steps"
+  builds-on: sequential
 steps:
   - rest-request:GET: /api/users
     headers: { Accept: application/json }

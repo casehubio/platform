@@ -9,6 +9,10 @@ meta:
     - first-to-complete
     - cancellation
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "running branches concurrently where first wins"
+  builds-on: parallel
 steps:
   - race:
     - block:

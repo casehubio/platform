@@ -10,6 +10,10 @@ meta:
     - finally
     - error handling
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "structured error handling"
+  builds-on: block-sequential
 steps:
   - try:
       - log: "Attempting risky operation"

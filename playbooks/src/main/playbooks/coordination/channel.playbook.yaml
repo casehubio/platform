@@ -11,6 +11,10 @@ meta:
     - orchestration block
     - concurrent
     - coordination
+  level: 3
+  layer: coordination
+  teaches: "message passing via coordination channels"
+  builds-on: sequential
 orchestration:
   signals: [data-ready, ack]
 steps:

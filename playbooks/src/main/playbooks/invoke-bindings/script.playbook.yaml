@@ -9,6 +9,10 @@ meta:
     - inline
     - runtime
     - invoke-bindings
+  level: 3
+  layer: invoke-bindings
+  teaches: "running inline scripts"
+  builds-on: sequential
 steps:
   - script-run:python3: "import json; print(json.dumps({'status': 'ok'}))"
     timeout: 30s

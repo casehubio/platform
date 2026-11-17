@@ -9,6 +9,10 @@ meta:
     - loop
     - decorator
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "repeating until a condition is met"
+  builds-on: loop
 steps:
   - click: "A"
     loop: { count: 3 }

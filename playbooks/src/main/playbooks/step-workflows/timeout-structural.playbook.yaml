@@ -10,6 +10,10 @@ meta:
     - structural
     - block
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "timing out a block"
+  builds-on: timeout
 steps:
   # ── structural form: timeout scopes a group ──
   # "timeout 10s" is the YAML key; the steps array is its value.

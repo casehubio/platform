@@ -8,6 +8,10 @@ meta:
   tags:
     - concurrent
     - flow-control
+  level: 3
+  layer: flow-control
+  teaches: "interleaving steps from parallel branches"
+  builds-on: sequential
 steps:
   - concurrent:
       branch-a:

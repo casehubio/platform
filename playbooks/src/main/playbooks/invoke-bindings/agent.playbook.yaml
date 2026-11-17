@@ -9,6 +9,10 @@ meta:
     - delegation
     - llm
     - invoke-bindings
+  level: 3
+  layer: invoke-bindings
+  teaches: "invoking an agent backend"
+  builds-on: sequential
 steps:
   - agent-delegate summarizer:
       model: claude-sonnet-5

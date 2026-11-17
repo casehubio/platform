@@ -9,6 +9,10 @@ meta:
     - n-of-m
     - partial completion
     - step-workflows
+  level: 4
+  layer: step-workflows
+  teaches: "waiting for N-of-M branches"
+  builds-on: barrier
 steps:
   - name: primary
     log: "Primary completed"

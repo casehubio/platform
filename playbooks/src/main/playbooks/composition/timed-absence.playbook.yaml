@@ -10,6 +10,10 @@ meta:
     - timeout
     - from
     - composition
+  level: 5
+  layer: composition
+  teaches: "detecting when an expected event does not arrive"
+  builds-on: [timeout, concurrent]
 steps:
   - log: "Event A detected — watching for B within 5s"
 

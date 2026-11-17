@@ -5,6 +5,10 @@ meta:
   title: "Structured Output"
   description: "08 — Structured Output and Priority Queries Builds on 05: demonstrates response format for JSON output and priority queries that bypass normal admission queuing."
   tags: []
+  level: 3
+  layer: agent-interaction-patterns
+  teaches: "JSON structured output from agents"
+  builds-on: 01-direct-invoke
 pools:
   extractors:
     agent-id: data-extractor

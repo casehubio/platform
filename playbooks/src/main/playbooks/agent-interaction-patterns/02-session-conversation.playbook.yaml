@@ -5,6 +5,10 @@ meta:
   title: "Session Conversation"
   description: "02 — Session Conversation Builds on 01: multiple queries to the same session. The session preserves context between turns, so the agent remembers what was discussed earlier."
   tags: []
+  level: 3
+  layer: agent-interaction-patterns
+  teaches: "multi-turn agent conversation"
+  builds-on: 01-direct-invoke
 steps:
   - agent-session-open analyst:
       system: >

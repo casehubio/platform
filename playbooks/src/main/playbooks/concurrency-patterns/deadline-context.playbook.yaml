@@ -9,6 +9,10 @@ meta:
     - timeout
     - cancellation
     - concurrency-patterns
+  level: 4
+  layer: concurrency-patterns
+  teaches: "propagating deadlines through nested scopes"
+  builds-on: timeout
 steps:
   - deadline-create batch: { deadlineMs: 600 }
   - deadline-check: "batch"

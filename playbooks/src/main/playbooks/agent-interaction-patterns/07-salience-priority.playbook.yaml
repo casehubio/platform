@@ -5,6 +5,10 @@ meta:
   title: "Salience Priority"
   description: "07 — Salience-Based Priority Builds on 06: pools have salience levels for capacity scheduling. Voice (salience=2) monopolizes capacity while active — calls can't wait. Chat (salience=1) gets priority over email (salience=0). Email runs in leftover capacity but is guaranteed a minimum allocation."
   tags: []
+  level: 4
+  layer: agent-interaction-patterns
+  teaches: "priority-based agent pool routing"
+  builds-on: 05-pool-backed
 pools:
   voice:
     agent-id: voice-agent

@@ -10,6 +10,10 @@ meta:
     - time
     - delay
     - composition
+  level: 3
+  layer: composition
+  teaches: "scheduling work at specific times"
+  builds-on: delay
 steps:
   - click: "A"
   - trigger:

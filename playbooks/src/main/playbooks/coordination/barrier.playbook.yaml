@@ -12,6 +12,10 @@ meta:
     - orchestration block
     - concurrent
     - coordination
+  level: 4
+  layer: coordination
+  teaches: "synchronising parallel work at a point"
+  builds-on: parallel
 orchestration:
   barriers:
     all-ready: { count: 3 }

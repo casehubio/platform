@@ -5,6 +5,10 @@ meta:
   title: "Multi Channel"
   description: "06 — Multi-Channel with Separate Pools Builds on 05: multiple pools for different communication channels. Each channel has its own pool configuration — voice gets more capacity, email gets larger context windows."
   tags: []
+  level: 4
+  layer: agent-interaction-patterns
+  teaches: "separate agent pools per channel"
+  builds-on: 05-pool-backed
 pools:
   voice:
     agent-id: voice-agent

@@ -8,6 +8,9 @@ meta:
     - block
     - sequential
     - step-workflows
+  level: 1
+  layer: step-workflows
+  teaches: "grouping steps into a named block"
 steps:
   - block:
     - log: "Step 1: initialize"

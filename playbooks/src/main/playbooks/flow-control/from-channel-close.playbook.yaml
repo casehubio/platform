@@ -9,6 +9,10 @@ meta:
     - channel
     - close
     - flow-control
+  level: 3
+  layer: flow-control
+  teaches: "consuming from a channel until it closes"
+  builds-on: [loop, channel]
 steps:
   - concurrent:
       producer:

@@ -5,6 +5,10 @@ meta:
   title: "Parallel Queries"
   description: "04 — Parallel Queries Builds on 02: multiple independent sessions queried concurrently. Each session gets its own system prompt and runs in parallel. Results are collected after all complete."
   tags: []
+  level: 3
+  layer: agent-interaction-patterns
+  teaches: "parallel agent invocations"
+  builds-on: [01-direct-invoke, parallel]
 steps:
   - agent-session-open legal-reviewer:
       system: "You are a legal reviewer. Identify contract risks. Be brief."

@@ -11,6 +11,10 @@ meta:
     - loop
     - block
     - composition
+  level: 4
+  layer: composition
+  teaches: "recursive step composition"
+  builds-on: [modules, foreach]
 steps:
   - race pattern:
       - block:

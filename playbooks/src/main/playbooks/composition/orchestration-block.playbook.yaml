@@ -13,6 +13,10 @@ meta:
     - delay
     - concurrent
     - composition
+  level: 4
+  layer: composition
+  teaches: "coordination primitives inside a block"
+  builds-on: [block-sequential, counter]
 orchestration:
   barriers:
     sync: { count: 2 }

@@ -9,6 +9,10 @@ meta:
     - atomic
     - concurrent
     - concurrency-patterns
+  level: 4
+  layer: concurrency-patterns
+  teaches: "parallel map/reduce over a collection"
+  builds-on: [parallel, foreach]
 steps:
   - parallel:
     - map-writer registry: { op: "put", key: "svc-a", value: "running" }

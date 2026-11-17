@@ -10,6 +10,10 @@ meta:
     - structural
     - block
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "retrying a block on failure"
+  builds-on: try-catch-finally
 steps:
   # ── structural form: retry wraps child steps ──
   # "retry 3" is the YAML key; the steps array is its value.

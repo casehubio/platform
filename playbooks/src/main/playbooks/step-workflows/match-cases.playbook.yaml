@@ -9,6 +9,10 @@ meta:
     - pattern matching
     - cases
     - step-workflows
+  level: 2
+  layer: step-workflows
+  teaches: "multi-branch pattern matching"
+  builds-on: if-else
 steps:
   - match: "warning"
     cases:

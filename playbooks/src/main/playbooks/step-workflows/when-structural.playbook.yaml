@@ -10,6 +10,10 @@ meta:
     - structural
     - conditional
     - step-workflows
+  level: 2
+  layer: step-workflows
+  teaches: "conditional block execution"
+  builds-on: when-guard
 steps:
   # ── structural form: when guards a group of steps ──
   # "when ${params.enabled}" is the YAML key; the steps array is its value.

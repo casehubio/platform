@@ -9,6 +9,10 @@ meta:
     - delay
     - decorator
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "adding delay as a step decorator"
+  builds-on: delay
 steps:
   - click: "A"
     delay: 1000ms

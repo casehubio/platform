@@ -9,6 +9,10 @@ meta:
     - rate-limit
     - permits
     - concurrency-patterns
+  level: 4
+  layer: concurrency-patterns
+  teaches: "limiting concurrent access to a resource"
+  builds-on: concurrent
 steps:
   - parallel:
     - sem-worker pool: { permits: 2, worker: "A", duration: 400 }

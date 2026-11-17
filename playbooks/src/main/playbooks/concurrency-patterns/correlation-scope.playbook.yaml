@@ -9,6 +9,10 @@ meta:
     - request-reply
     - async
     - concurrency-patterns
+  level: 4
+  layer: concurrency-patterns
+  teaches: "async request/response correlation by key"
+  builds-on: channel
 steps:
   - corr-expect order-42: { timeout: 1000 }
   - corr-expect order-99: { timeout: 1000 }

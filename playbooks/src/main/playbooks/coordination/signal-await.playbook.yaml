@@ -10,6 +10,10 @@ meta:
     - await
     - concurrent
     - coordination
+  level: 3
+  layer: coordination
+  teaches: "signalling between steps"
+  builds-on: sequential
 steps:
   - concurrent:
       sender:

@@ -9,6 +9,10 @@ meta:
     - signal
     - multiplexing
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "choosing a branch based on value"
+  builds-on: match-cases
 steps:
   - select:
     - wait: fast-signal

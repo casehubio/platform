@@ -9,6 +9,10 @@ meta:
     - until
     - channel
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "iterating with a counter until a condition"
+  builds-on: loop
 steps:
   - name: producer
     log: "Sending 3 items"

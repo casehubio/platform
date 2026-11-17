@@ -11,6 +11,10 @@ meta:
     - concurrent
     - mixed
     - data-delivery
+  level: 4
+  layer: data-delivery
+  teaches: "combining multiple data sources"
+  builds-on: [simulated-data, graphql-operation]
 steps:
   - concurrent:
       data-pump:

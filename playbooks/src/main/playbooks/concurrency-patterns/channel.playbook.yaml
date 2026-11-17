@@ -9,6 +9,10 @@ meta:
     - producer
     - consumer
     - concurrency-patterns
+  level: 3
+  layer: concurrency-patterns
+  teaches: "typed message passing between producers and consumers"
+  builds-on: concurrent
 steps:
   - parallel:
     - chan-produce work: { capacity: 2, items: 4, interval: 200 }

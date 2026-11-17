@@ -10,6 +10,10 @@ meta:
     - data channel
     - concurrent
     - composition
+  level: 3
+  layer: composition
+  teaches: "starting work in response to data events"
+  builds-on: sequential
 steps:
   - click: "A"
   - click: "B"

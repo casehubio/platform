@@ -9,6 +9,10 @@ meta:
     - transitions
     - guards
     - coordination-primitives
+  level: 3
+  layer: coordination-primitives
+  teaches: "named states with guarded transitions"
+  builds-on: flag
 steps:
   - sm-create order: { states: [draft, submitted, approved, rejected], initial: draft }
   - sm-state: "order"

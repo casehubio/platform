@@ -10,6 +10,10 @@ meta:
     - structural
     - block
     - step-workflows
+  level: 3
+  layer: step-workflows
+  teaches: "iterating a block per list item"
+  builds-on: block-sequential
 steps:
   # ── structural form: for-each directly contains steps ──
   # "for-each item in items" is the YAML key; the steps array is its value.

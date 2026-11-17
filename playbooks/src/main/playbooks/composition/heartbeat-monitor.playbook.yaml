@@ -12,6 +12,10 @@ meta:
     - from
     - timeout
     - composition
+  level: 5
+  layer: composition
+  teaches: "detecting missed heartbeats via timed absence"
+  builds-on: [timeout, concurrent]
 steps:
   - block monitor:
       - name: heartbeat

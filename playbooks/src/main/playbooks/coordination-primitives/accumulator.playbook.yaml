@@ -9,6 +9,10 @@ meta:
     - reduce
     - aggregate
     - coordination-primitives
+  level: 2
+  layer: coordination-primitives
+  teaches: "collecting values into a list"
+  builds-on: sequential
 steps:
   - accumulate total: { op: "sum", value: 10 }
   - accumulate total: { op: "sum", value: 25 }

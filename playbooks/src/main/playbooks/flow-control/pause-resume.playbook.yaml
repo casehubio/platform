@@ -11,6 +11,10 @@ meta:
     - resume
     - lifecycle
     - flow-control
+  level: 3
+  layer: flow-control
+  teaches: "pausing and resuming playbook execution"
+  builds-on: sequential
 steps:
   - concurrent:
       producer:

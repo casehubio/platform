@@ -10,6 +10,10 @@ meta:
     - delay
     - from
     - composition
+  level: 3
+  layer: composition
+  teaches: "steps with inter-step delays"
+  builds-on: delay
 steps:
   - name: read-a
     log: "Read trigger: ${from.type}"

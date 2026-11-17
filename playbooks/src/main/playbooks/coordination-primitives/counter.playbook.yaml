@@ -9,6 +9,10 @@ meta:
     - atomic
     - increment
     - coordination-primitives
+  level: 2
+  layer: coordination-primitives
+  teaches: "atomic increment/decrement/read"
+  builds-on: sequential
 steps:
   - counter-add requests: { delta: 1 }
   - counter-add requests: { delta: 1 }

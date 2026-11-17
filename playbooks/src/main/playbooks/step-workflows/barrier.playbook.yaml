@@ -9,6 +9,10 @@ meta:
     - await
     - dependency
     - step-workflows
+  level: 4
+  layer: step-workflows
+  teaches: "synchronisation point across branches"
+  builds-on: parallel
 steps:
   - name: fetch-data
     log: "Fetching data"

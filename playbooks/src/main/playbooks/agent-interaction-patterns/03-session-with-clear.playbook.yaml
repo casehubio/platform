@@ -5,6 +5,10 @@ meta:
   title: "Session With Clear"
   description: "03 — Session with Context Clear Builds on 02: explicit context clearing between unrelated queries. The session stays open (no pool checkout overhead) but the agent forgets the previous conversation, starting fresh for the next topic."
   tags: []
+  level: 3
+  layer: agent-interaction-patterns
+  teaches: "clearing agent session context"
+  builds-on: 02-session-conversation
 steps:
   - agent-session-open support:
       system: >

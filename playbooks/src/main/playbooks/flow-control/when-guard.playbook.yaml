@@ -9,6 +9,10 @@ meta:
     - when
     - decorator
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "conditional step execution via decorator"
+  builds-on: sequential
 steps:
   - click: "A"
   - click: "B"

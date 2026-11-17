@@ -9,6 +9,10 @@ meta:
     - countdown
     - barrier
     - coordination-primitives
+  level: 3
+  layer: coordination-primitives
+  teaches: "countdown latch for waiting on N events"
+  builds-on: counter
 steps:
   - latch-create init-gate: { count: 3 }
   - latch-countdown: "init-gate"

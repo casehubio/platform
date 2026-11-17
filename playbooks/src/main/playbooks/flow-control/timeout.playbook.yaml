@@ -9,6 +9,10 @@ meta:
     - timeout
     - decorator
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "failing a step if it exceeds a time limit"
+  builds-on: sequential
 steps:
   - click: "A"
     timeout: 5s

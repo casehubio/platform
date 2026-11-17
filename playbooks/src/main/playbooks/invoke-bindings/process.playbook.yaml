@@ -9,6 +9,10 @@ meta:
     - os
     - command
     - invoke-bindings
+  level: 3
+  layer: invoke-bindings
+  teaches: "executing shell processes"
+  builds-on: sequential
 steps:
   - process-exec ls: [-la, src/]
     capture: stdout

@@ -9,6 +9,10 @@ meta:
     - pipeline
     - multi-primitive
     - concurrency-patterns
+  level: 5
+  layer: concurrency-patterns
+  teaches: "multi-stage pipeline with backpressure"
+  builds-on: [channel, semaphore]
 steps:
   - deadline-create pipeline: { deadlineMs: 3000 }
   - spawn-task monitor: { duration: 2500 }

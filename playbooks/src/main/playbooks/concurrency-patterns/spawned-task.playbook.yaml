@@ -9,6 +9,10 @@ meta:
     - background
     - async
     - concurrency-patterns
+  level: 4
+  layer: concurrency-patterns
+  teaches: "background task lifecycle with join"
+  builds-on: concurrent
 steps:
   - spawn-task indexer: { duration: 800 }
   - task-poll: "indexer"

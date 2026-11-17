@@ -9,6 +9,10 @@ meta:
     - retry
     - decorator
     - flow-control
+  level: 2
+  layer: flow-control
+  teaches: "retrying failed steps with configurable limits"
+  builds-on: sequential
 steps:
   - click: "A"
     retry: 3

@@ -9,6 +9,10 @@ meta:
     - expansion
     - variables
     - composition
+  level: 3
+  layer: composition
+  teaches: "template stamping with scoped variables"
+  builds-on: block-sequential
 # ── forEach expansion ─────────────────
 # Stamp a template once per item in a
 # list. Each stamp gets a scoped variable.

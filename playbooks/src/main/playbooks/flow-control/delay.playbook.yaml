@@ -8,6 +8,10 @@ meta:
   tags:
     - delay
     - flow-control
+  level: 1
+  layer: flow-control
+  teaches: "inserting a timed pause between steps"
+  builds-on: sequential
 steps:
   - click: "A"
   - delay: 1000ms

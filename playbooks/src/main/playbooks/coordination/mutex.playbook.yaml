@@ -10,6 +10,10 @@ meta:
     - decorator
     - concurrent
     - coordination
+  level: 4
+  layer: coordination
+  teaches: "mutual exclusion for shared resources"
+  builds-on: semaphore
 steps:
   - concurrent:
       branch-a:

@@ -9,6 +9,10 @@ meta:
     - tool-call
     - model-context
     - invoke-bindings
+  level: 3
+  layer: invoke-bindings
+  teaches: "invoking MCP tools"
+  builds-on: sequential
 steps:
   - mcp-call file_search:
       params: { query: "authentication handler", limit: 5 }

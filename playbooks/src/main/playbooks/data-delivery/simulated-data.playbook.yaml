@@ -9,6 +9,10 @@ meta:
     - simulated
     - data injection
     - data-delivery
+  level: 3
+  layer: data-delivery
+  teaches: "using simulation corpus for test data"
+  builds-on: sequential
 steps:
   - simulated:
       dataset: orders

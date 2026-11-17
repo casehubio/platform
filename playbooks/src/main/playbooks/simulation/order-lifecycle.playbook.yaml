@@ -5,6 +5,10 @@ meta:
   title: "Order Lifecycle"
   description: "Order lifecycle — three named steps drive a state machine through: pending → checked → paid → shipped"
   tags: []
+  level: 4
+  layer: simulation
+  teaches: "state machine-driven simulation with corpus selection"
+  builds-on: [state-machine, simulated-data]
 steps:
   - agent-session-open order-agent:
       system: You are an order processing assistant.

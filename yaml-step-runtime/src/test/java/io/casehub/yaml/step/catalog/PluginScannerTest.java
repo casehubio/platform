@@ -5,6 +5,8 @@ import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.step.catalog.scannertest.CamelCasePlugin;
+import io.casehub.yaml.step.catalog.scannertest.EnumPlugin;
+import io.casehub.yaml.step.catalog.scannertest.FloatPlugin;
 import io.casehub.yaml.step.catalog.scannertest.TestPlugin;
 import io.casehub.yaml.step.catalog.scannertest.UniversalPlugin;
 import org.junit.jupiter.api.Test;
@@ -133,6 +135,89 @@ class PluginScannerTest {
         assertThat(result.output()).containsEntry("text", "hello world");
         assertThat(result.output()).containsEntry("detected-language", "fr");
         assertThat(result.output()).containsEntry("confidence", 0.95);
+    }
+
+    @Test
+    void stringToInt_coercion() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(TestPlugin.class, registry);
+
+        var def = registry.resolve("test-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("name", "World", "count", "3"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("greeting", "Hello World");
+    }
+
+    @Test
+    void doubleFromString_coercion() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(FloatPlugin.class, registry);
+
+        var def = registry.resolve("float-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("value", "3.14"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("value", 3.14);
+    }
+
+    @Test
+    void floatFromDouble_coercion() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(FloatPlugin.class, registry);
+
+        var def = registry.resolve("float-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("value", 3.14),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    void missingRequiredField_returnsFailure() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(TestPlugin.class, registry);
+
+        var def = registry.resolve("test-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("count", 3),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(((Result.Failure) result).message()).contains("name");
+    }
+
+    @Test
+    void enumFromString_caseInsensitive() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(EnumPlugin.class, registry);
+
+        var def = registry.resolve("enum-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("priority", "high"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("priority", "HIGH");
+    }
+
+    @Test
+    void enumFromString_coercion() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(EnumPlugin.class, registry);
+
+        var def = registry.resolve("enum-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("priority", "HIGH"),
+                new MapServiceRegistry());
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.output()).containsEntry("priority", "HIGH");
     }
 
     @Test

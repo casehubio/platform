@@ -1,7 +1,9 @@
 package io.casehub.yaml.step.catalog;
 
+import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
+import io.casehub.yaml.step.ValidatingAction;
 import io.casehub.yaml.plugin.api.Execute;
 import io.casehub.yaml.plugin.api.Optional;
 import io.casehub.yaml.plugin.api.Parameter;
@@ -47,7 +49,16 @@ public class PluginScanner {
                 streamingInputKey = "_value";
             }
         }
-        Action action = createAction(pluginClass, executeMethod, inputs, streamingInputKey);
+        Action rawAction = createAction(pluginClass, executeMethod, inputs, streamingInputKey);
+
+        Declaration declaration = new Declaration(name, description, inputs, Map.of(), null);
+        ValidatingAction validatingAction = new ValidatingAction(declaration, rawAction, event -> {});
+        Map<String, Parameter> inputsCopy = Map.copyOf(inputs);
+        Action action = (params, services) -> {
+            Map<String, Object> coerced = coerceParams(params, inputsCopy);
+            return validatingAction.execute(coerced, services);
+        };
+
         java.util.Optional<StreamingTypeInfo> streamingType = java.util.Optional.empty();
         if (annotation.streaming()) {
             streamingType = buildStreamingTypeInfo(pluginClass, executeMethod);
@@ -192,25 +203,66 @@ public class PluginScanner {
     }
 
 
-    private Object extractParam(Map<String, Object> params, String key, Class<?> type) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object extractParam(Map<String, Object> params, String key, Class<?> type) {
         Object value = params.get(key);
         if (value == null) {
             if (type == int.class) return 0;
             if (type == long.class) return 0L;
             if (type == double.class) return 0.0;
+            if (type == float.class) return 0.0f;
             if (type == boolean.class) return false;
             return null;
         }
         if (type == int.class || type == Integer.class) {
-            return ((Number) value).intValue();
+            if (value instanceof Number n) return n.intValue();
+            return Integer.parseInt(value.toString());
         }
         if (type == long.class || type == Long.class) {
-            return ((Number) value).longValue();
+            if (value instanceof Number n) return n.longValue();
+            return Long.parseLong(value.toString());
         }
         if (type == double.class || type == Double.class) {
-            return ((Number) value).doubleValue();
+            if (value instanceof Number n) return n.doubleValue();
+            return Double.parseDouble(value.toString());
+        }
+        if (type == float.class || type == Float.class) {
+            if (value instanceof Number n) return n.floatValue();
+            return Float.parseFloat(value.toString());
+        }
+        if (type == boolean.class || type == Boolean.class) {
+            if (value instanceof Boolean b) return b;
+            return Boolean.parseBoolean(value.toString());
+        }
+        if (type.isEnum()) {
+            String name = value.toString();
+            try {
+                return Enum.valueOf((Class<Enum>) type, name);
+            } catch (IllegalArgumentException e) {
+                return Enum.valueOf((Class<Enum>) type, name.toUpperCase(java.util.Locale.ROOT));
+            }
         }
         return value;
+    }
+
+    private static Map<String, Object> coerceParams(Map<String, Object> params, Map<String, Parameter> inputs) {
+        Map<String, Object> coerced = new LinkedHashMap<>(params);
+        for (var entry : inputs.entrySet()) {
+            Object val = coerced.get(entry.getKey());
+            if (val instanceof String s && entry.getValue().type().isScalar()
+                    && entry.getValue().type() != ParameterType.STRING
+                    && entry.getValue().type() != ParameterType.EXPRESSION) {
+                try {
+                    coerced.put(entry.getKey(), entry.getValue().type().parseScalar(s));
+                } catch (IllegalArgumentException e) {
+                    java.util.logging.Logger.getLogger(PluginScanner.class.getName())
+                            .log(java.util.logging.Level.WARNING,
+                                    "Cannot coerce ''{0}'' to {1} for parameter ''{2}'': {3}",
+                                    new Object[]{s, entry.getValue().type(), entry.getKey(), e.getMessage()});
+                }
+            }
+        }
+        return coerced;
     }
 
     static ParameterType mapType(Class<?> type) {
@@ -220,6 +272,7 @@ public class PluginScanner {
         if (type == double.class || type == Double.class
                 || type == float.class || type == Float.class) return ParameterType.NUMBER;
         if (type == boolean.class || type == Boolean.class) return ParameterType.BOOLEAN;
+        if (type.isEnum()) return ParameterType.STRING;
         if (java.util.List.class.isAssignableFrom(type)) return ParameterType.ARRAY;
         if (java.util.Map.class.isAssignableFrom(type)) return ParameterType.OBJECT;
         return ParameterType.OBJECT;

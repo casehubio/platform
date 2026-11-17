@@ -108,7 +108,15 @@ public final class PlaybookRunnerCore {
 
             List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);
             var stepRunner = new CatalogStepRunner(pluginRegistry, runServices);
-            var traceCollector = new StepTraceCollector();
+            java.util.function.Predicate<String> simChecker = null;
+            java.util.function.Consumer<String> stepNotifier = null;
+            if (simulationActivator != null) {
+                stepNotifier = simulationActivator.stepCompletionNotifier();
+                if (config.dryRun()) {
+                    simChecker = simulationActivator.simulationChecker();
+                }
+            }
+            var traceCollector = new StepTraceCollector(simChecker, stepNotifier);
             var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
 
             try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {

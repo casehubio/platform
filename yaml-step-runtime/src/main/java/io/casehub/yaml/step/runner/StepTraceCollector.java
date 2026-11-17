@@ -16,13 +16,20 @@ public final class StepTraceCollector implements StepExecutionListener {
     private final Deque<Frame>        stack        = new LinkedList<>();
     private final List<StepTraceNode> rootChildren = new ArrayList<>();
     private final java.util.function.Predicate<String> simulationChecker;
+    private final java.util.function.Consumer<String> stepCompletionNotifier;
 
     public StepTraceCollector() {
-        this(null);
+        this(null, null);
     }
 
     public StepTraceCollector(java.util.function.Predicate<String> simulationChecker) {
+        this(simulationChecker, null);
+    }
+
+    public StepTraceCollector(java.util.function.Predicate<String> simulationChecker,
+                              java.util.function.Consumer<String> stepCompletionNotifier) {
         this.simulationChecker = simulationChecker;
+        this.stepCompletionNotifier = stepCompletionNotifier;
     }
 
     private record Frame(int index, String name, String type, long startNanos,
@@ -45,6 +52,11 @@ public final class StepTraceCollector implements StepExecutionListener {
             outcome        = StepOutcome.SIMULATED;
             enrichedDetail = new LinkedHashMap<>(detail);
             enrichedDetail.put("simulated", true);
+            enrichedDetail.put("strategy", "simulated");
+        }
+
+        if (result.isSuccess() && step.name() != null && stepCompletionNotifier != null) {
+            stepCompletionNotifier.accept(step.name());
         }
 
         exitStep(action, outcome, enrichedDetail);

@@ -25,6 +25,16 @@ public final class SimulationRuntimeActivator implements SimulationActivator {
     }
 
     @Override
+    public java.util.function.Predicate<String> simulationChecker() {
+        return action -> runtime.strategyFor(action).isPresent();
+    }
+
+    @Override
+    public java.util.function.Consumer<String> stepCompletionNotifier() {
+        return runtime::advanceStateMachines;
+    }
+
+    @Override
     public AutoCloseable activate(PlaybookRunConfig config, Path playbookPath) {
         SimulationOverlay overlay;
         if (config.corpusPath() != null) {

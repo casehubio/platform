@@ -343,6 +343,45 @@ class DecoratorChainTest {
         }
 
         @Test
+        void retryWithOnFilter_doesNotRetryUncategorisedFailure() {
+            var count = new AtomicInteger(0);
+            var decorators = Map.<String, Object>of("retry",
+                    Map.of("max", 3, "on", List.of("transient")));
+            var result = chain.apply(decorators, ctx -> {
+                count.incrementAndGet();
+                return Result.failed("validation error");
+            }).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(count.get()).isEqualTo(1);
+        }
+
+        @Test
+        void retryWithOnFilter_retriesCategorisedMatch() {
+            var count = new AtomicInteger(0);
+            var decorators = Map.<String, Object>of("retry",
+                    Map.of("max", 3, "on", List.of("transient")));
+            var result = chain.apply(decorators, ctx -> {
+                if (count.incrementAndGet() < 3) return Result.failed("temporary", "transient");
+                return Result.of(Map.of("ok", true));
+            }).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(count.get()).isEqualTo(3);
+        }
+
+        @Test
+        void retryWithOnFilter_doesNotRetryNonMatchingCategory() {
+            var count = new AtomicInteger(0);
+            var decorators = Map.<String, Object>of("retry",
+                    Map.of("max", 3, "on", List.of("transient")));
+            var result = chain.apply(decorators, ctx -> {
+                count.incrementAndGet();
+                return Result.failed("bad input", "validation");
+            }).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(count.get()).isEqualTo(1);
+        }
+
+        @Test
         void retryWithException_catchesAndRetries() {
             var count = new AtomicInteger(0);
             var decorators = Map.<String, Object>of("retry", 3);

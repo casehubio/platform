@@ -290,7 +290,7 @@ public final class DecoratorChain {
 
                 if (!onCategories.isEmpty() && last instanceof Result.Failure f) {
                     String failCat = f.category();
-                    if (failCat != null && !onCategories.contains(failCat)) {
+                    if (failCat == null || !onCategories.contains(failCat)) {
                         return last;
                     }
                 }

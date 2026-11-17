@@ -6,8 +6,9 @@ tests:
         capture: result
       - assertThat: result.valid
         equals: true
-      - assertThat: result.stepCount
-        equals: 3
+      - assertThat: result.stepNames
+        hasSize: 3
+        message: "invoke + two queries = 3 compiled tasks"
 
   - name: "02-session-conversation compiles with 5 steps"
     steps:
@@ -15,8 +16,9 @@ tests:
         capture: result
       - assertThat: result.valid
         equals: true
-      - assertThat: result.stepCount
-        equals: 5
+      - assertThat: result.stepNames
+        hasSize: 5
+        message: "open + 3 queries + close = 5 compiled tasks"
 
   - name: "03-session-with-clear includes clear step"
     steps:
@@ -55,8 +57,9 @@ tests:
         capture: result
       - assertThat: result.valid
         equals: true
-      - assertThat: result.stepCount
-        greaterThan: 0
+      - assertThat: result.poolDeclarations
+        hasSize: 2
+        message: "support and sales channels each have a pool"
 
   - name: "07-salience-priority parses three pools"
     steps:
@@ -77,5 +80,6 @@ tests:
         capture: result
       - assertThat: result.valid
         equals: true
-      - assertThat: result.stepCount
-        greaterThan: 0
+      - assertThat: result.poolDeclarations
+        hasSize: 1
+        message: "extractors pool declared for data extraction"

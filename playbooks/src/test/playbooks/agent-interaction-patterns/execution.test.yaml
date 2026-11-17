@@ -41,8 +41,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
-      - assertThat: result.stepCount
-        greaterThan: 0
+      - assertThat: result.stepEvents
+        hasSize: 3
+        message: "invoke + two queries = 3 executed steps"
 
   - name: "ex02 conversation multi-turn responses"
     steps:
@@ -50,6 +51,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
+      - assertThat: result.stepEvents
+        hasSize: 5
+        message: "open + 3 queries + close = 5 executed steps"
 
   - name: "ex03 clear gives second customer clean context"
     steps:
@@ -57,6 +61,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
+      - assertThat: result.stepEvents
+        hasSize: 6
+        message: "session lifecycle steps for two customers with context clear"
 
   - name: "ex05 pool-backed infrastructure"
     steps:
@@ -64,6 +71,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
+      - assertThat: result.stepEvents
+        hasSize: 4
+        message: "pool-backed session lifecycle steps"
 
   - name: "ex06 multi-channel separate pools"
     steps:
@@ -71,6 +81,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
+      - assertThat: result.stepEvents
+        hasSize: 6
+        message: "multi-channel session steps across support and sales"
 
   - name: "ex07 salience pools priority levels"
     steps:
@@ -78,6 +91,9 @@ tests:
         capture: result
       - assertThat: result.succeeded
         equals: true
+      - assertThat: result.stepEvents
+        hasSize: 9
+        message: "three priority pools with agent queries"
 
   - name: "ex08 structured output returns corpus JSON"
     steps:

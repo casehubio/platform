@@ -144,6 +144,8 @@ public final class PlaybookRunnerCore {
                     }
                 }
 
+                var primitiveSnapshot = scope.snapshotPrimitives();
+
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
                 var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
                         allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
@@ -151,7 +153,8 @@ public final class PlaybookRunnerCore {
 
                 return new PlaybookRunResult(allPassed, playbookName,
                         playbookPath.toString(), durationMs, rootTrace,
-                        eventCapture.all(), outputVars, captureCollector.all(), errorMsg);
+                        eventCapture.all(), outputVars, captureCollector.all(),
+                        primitiveSnapshot, errorMsg);
             }
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {

@@ -85,6 +85,11 @@ public final class RunPlaybookPlugin implements Action {
         resultMap.put("duration", runResult.durationMs());
         resultMap.put("stepEvents", stepEvents);
         resultMap.put("error", runResult.error() != null ? runResult.error() : "");
+        if (runResult.primitiveStates() != null) {
+            for (var entry : runResult.primitiveStates().entrySet()) {
+                resultMap.put(entry.getKey(), entry.getValue());
+            }
+        }
         if (simRuntime != null) {
             var smStates = simRuntime.stateMachineStates();
             var sanitized = new java.util.LinkedHashMap<String, Object>();

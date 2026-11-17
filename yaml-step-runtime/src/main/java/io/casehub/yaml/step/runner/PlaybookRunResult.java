@@ -15,6 +15,7 @@ public record PlaybookRunResult(
         List<CapturedEvent> events,
         Map<String, Object> output,
         Map<String, Map<String, Object>> captures,
+        Map<String, Map<String, Object>> primitiveStates,
         String error) {
 
     public PlaybookRunResult {
@@ -22,11 +23,19 @@ public record PlaybookRunResult(
         output   = output != null ? Collections.unmodifiableMap(new LinkedHashMap<>(output)) : Map.of();
         output.keySet().forEach(Objects::requireNonNull);
         captures = captures != null ? Map.copyOf(captures) : Map.of();
+        primitiveStates = primitiveStates != null ? Map.copyOf(primitiveStates) : Map.of();
     }
 
     public PlaybookRunResult(boolean success, String playbookName, String playbookPath,
                              long durationMs, StepTraceNode trace, List<CapturedEvent> events,
                              Map<String, Object> output, String error) {
-        this(success, playbookName, playbookPath, durationMs, trace, events, output, Map.of(), error);
+        this(success, playbookName, playbookPath, durationMs, trace, events, output, Map.of(), Map.of(), error);
+    }
+
+    public PlaybookRunResult(boolean success, String playbookName, String playbookPath,
+                             long durationMs, StepTraceNode trace, List<CapturedEvent> events,
+                             Map<String, Object> output, Map<String, Map<String, Object>> captures,
+                             String error) {
+        this(success, playbookName, playbookPath, durationMs, trace, events, output, captures, Map.of(), error);
     }
 }

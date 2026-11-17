@@ -167,6 +167,24 @@ public class DefaultExecutionScope implements ExecutionScope {
         return child;
     }
 
+
+    public java.util.Map<String, java.util.Map<String, Object>> snapshotPrimitives() {
+        var counters = new java.util.LinkedHashMap<String, Object>();
+        var flags    = new java.util.LinkedHashMap<String, Object>();
+        var gauges   = new java.util.LinkedHashMap<String, Object>();
+        for (var entry : primitives.entrySet()) {
+            Object val = entry.getValue();
+            if (val instanceof OrcCounter c) {
+                counters.put(entry.getKey(), c.get());
+            } else if (val instanceof OrcFlag f) {
+                flags.put(entry.getKey(), f.get());
+            } else if (val instanceof OrcGauge<?> g) {
+                gauges.put(entry.getKey(), g.get());
+            }
+        }
+        return java.util.Map.of("counters", counters, "flags", flags, "gauges", gauges);
+    }
+
     @Override
     public void close() {
         if (closed) {return;}

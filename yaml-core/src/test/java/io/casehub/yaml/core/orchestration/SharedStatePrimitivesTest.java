@@ -148,4 +148,44 @@ class SharedStatePrimitivesTest {
         assertThat(map.containsKey("AAPL")).isFalse();
         assertThat(map.size()).isEqualTo(0);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void snapshotPrimitives_capturesCountersFlagsGauges() {
+        var scope = new DefaultExecutionScope();
+        scope.counter("requests").add(5);
+        scope.counter("errors").increment();
+        scope.flag("ready").set();
+        scope.flag("done");
+        scope.gauge("temperature").set(72.5);
+
+        // Semaphore and latch should not appear in snapshot
+        scope.semaphore("lock", 1);
+
+        var snapshot = scope.snapshotPrimitives();
+
+        assertThat(snapshot).containsKeys("counters", "flags", "gauges");
+
+        var counters = (java.util.Map<String, Object>) snapshot.get("counters");
+        assertThat(counters).containsEntry("requests", 5L);
+        assertThat(counters).containsEntry("errors", 1L);
+
+        var flags = (java.util.Map<String, Object>) snapshot.get("flags");
+        assertThat(flags).containsEntry("ready", true);
+        assertThat(flags).containsEntry("done", false);
+
+        var gauges = (java.util.Map<String, Object>) snapshot.get("gauges");
+        assertThat(gauges).containsEntry("temperature", 72.5);
+    }
+
+    @Test
+    void snapshotPrimitives_emptyWhenNoPrimitives() {
+        var scope    = new DefaultExecutionScope();
+        var snapshot = scope.snapshotPrimitives();
+
+        assertThat(snapshot).containsKeys("counters", "flags", "gauges");
+        assertThat((java.util.Map<?, ?>) snapshot.get("counters")).isEmpty();
+        assertThat((java.util.Map<?, ?>) snapshot.get("flags")).isEmpty();
+        assertThat((java.util.Map<?, ?>) snapshot.get("gauges")).isEmpty();
+    }
 }

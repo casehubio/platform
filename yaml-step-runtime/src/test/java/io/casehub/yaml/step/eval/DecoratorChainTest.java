@@ -559,6 +559,53 @@ class DecoratorChainTest {
         }
 
         @Test
+        void parallel_failFast_cancelsRemaining() throws Exception {
+            var items = List.of("a", "b", "c", "d", "e");
+            var listResolver = resolver.withObjectScope("var",
+                    name -> "items".equals(name) ? items : null);
+            var decorators = Map.<String, Object>of("forEach",
+                    Map.of("in", "${var.items}", "as", "item", "parallel", true));
+            var completed = new AtomicInteger(0);
+            var result = chain.apply(decorators, ctx -> {
+                int idx = (int) ctx.resolver().resolve("${each.index}");
+                if (idx == 0) {
+                    return Result.failed("first fails");
+                }
+                try { Thread.sleep(2000); } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return Result.failed("interrupted");
+                }
+                completed.incrementAndGet();
+                return Result.of(Map.of());
+            }).execute(new StepContext(listResolver));
+            assertThat(result.isSuccess()).isFalse();
+            Thread.sleep(100);
+            assertThat(completed.get()).isLessThan(4);
+        }
+
+        @Test
+        void parallel_concurrencyBound_limitsParallelism() {
+            var items = List.of("a", "b", "c", "d");
+            var listResolver = resolver.withObjectScope("var",
+                    name -> "items".equals(name) ? items : null);
+            var decorators = Map.<String, Object>of("forEach",
+                    Map.of("in", "${var.items}", "as", "item", "parallel", true, "concurrency", 2));
+            var maxConcurrent = new AtomicInteger(0);
+            var currentConcurrent = new AtomicInteger(0);
+            var result = chain.apply(decorators, ctx -> {
+                int c = currentConcurrent.incrementAndGet();
+                maxConcurrent.updateAndGet(prev -> Math.max(prev, c));
+                try { Thread.sleep(50); } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                currentConcurrent.decrementAndGet();
+                return Result.of(Map.of());
+            }).execute(new StepContext(listResolver));
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(maxConcurrent.get()).isLessThanOrEqualTo(2);
+        }
+
+        @Test
         void failureInOneIteration_stopsSequential() {
             var items = List.of("a", "b", "c");
             var listResolver = resolver.withObjectScope("var",

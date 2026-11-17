@@ -365,9 +365,11 @@ public final class DecoratorChain {
         String inExpr = String.valueOf(forEachMap.get("in"));
         String as     = (String) forEachMap.get("as");
         if (as == null) {as = "item";}
-        boolean parallel = Boolean.TRUE.equals(forEachMap.get("parallel"));
-        boolean collect  = "all".equals(forEachMap.get("collect"));
-        String  asName   = as;
+        boolean parallel    = Boolean.TRUE.equals(forEachMap.get("parallel"));
+        boolean collect     = "all".equals(forEachMap.get("collect"));
+        int     concurrency = forEachMap.containsKey("concurrency")
+                              ? ((Number) forEachMap.get("concurrency")).intValue() : 0;
+        String  asName      = as;
 
         return ctx -> {
             Object resolved = ctx.resolver().resolve(inExpr);
@@ -377,7 +379,7 @@ public final class DecoratorChain {
             if (items.isEmpty()) {return Result.of(Map.of());}
 
             if (parallel) {
-                return executeForEachParallel(items, asName, inner, ctx, collect);
+                return executeForEachParallel(items, asName, inner, ctx, collect, concurrency);
             }
             return executeForEachSequential(items, asName, inner, ctx, collect);
         };
@@ -400,28 +402,50 @@ public final class DecoratorChain {
     }
 
     private Result executeForEachParallel(List<?> items, String as,
-                                          DecoratedExecution inner, StepContext ctx, boolean collect) {
+                                          DecoratedExecution inner, StepContext ctx,
+                                          boolean collect, int concurrency) {
         var futures = new ArrayList<Future<Result>>();
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        java.util.concurrent.Semaphore gate = concurrency > 0
+                ? new java.util.concurrent.Semaphore(concurrency) : null;
+        var failed = new java.util.concurrent.atomic.AtomicReference<Result>();
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        try {
             for (int i = 0; i < items.size(); i++) {
                 int    idx  = i;
                 Object item = items.get(i);
                 futures.add(executor.submit(() -> {
-                    VariableResolver scoped = pushEachContext(ctx.resolver(), as, item, idx);
-                    return inner.execute(ctx.withResolver(scoped));
+                    if (failed.get() != null) {return Result.failed("cancelled");}
+                    if (gate != null) {gate.acquire();}
+                    try {
+                        if (failed.get() != null) {return Result.failed("cancelled");}
+                        Result r = inner.execute(ctx.withResolver(
+                                pushEachContext(ctx.resolver(), as, item, idx)));
+                        if (!r.isSuccess()) {failed.compareAndSet(null, r);}
+                        return r;
+                    } finally {
+                        if (gate != null) {gate.release();}
+                    }
                 }));
             }
             var results = new ArrayList<Result>(futures.size());
             for (var f : futures) {
                 try {
-                    results.add(f.get());
+                    Result r = f.get();
+                    results.add(r);
+                    if (!r.isSuccess() && failed.get() != null) {
+                        for (var remaining : futures) {remaining.cancel(true);}
+                    }
                 } catch (java.util.concurrent.ExecutionException e) {
-                    results.add(Result.failed(e.getCause().getMessage()));
+                    Result r = Result.failed(e.getCause().getMessage());
+                    results.add(r);
+                    failed.compareAndSet(null, r);
+                    for (var remaining : futures) {remaining.cancel(true);}
+                } catch (java.util.concurrent.CancellationException e) {
+                    results.add(Result.failed("cancelled"));
                 }
             }
-            for (Result r : results) {
-                if (!r.isSuccess()) {return r;}
-            }
+            Result firstFailure = failed.get();
+            if (firstFailure != null) {return firstFailure;}
             if (collect) {
                 var collected = new ArrayList<Map<String, Object>>();
                 for (Result r : results) { collected.add(r.output()); }
@@ -429,8 +453,11 @@ public final class DecoratorChain {
             }
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {
+            for (var f : futures) {f.cancel(true);}
             Thread.currentThread().interrupt();
             return Result.failed("forEach parallel interrupted");
+        } finally {
+            executor.shutdownNow();
         }
     }
 

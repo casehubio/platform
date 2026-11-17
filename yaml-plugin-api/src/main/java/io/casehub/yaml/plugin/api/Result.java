@@ -53,7 +53,9 @@ public sealed interface Result permits Result.Success, Result.Failure, Result.Sk
         public Map<String, Object> output() {return Map.of();}
     }
 
-    static Result skipped() {return new Skipped();}
+    Skipped SKIPPED = new Skipped();
+
+    static Result skipped() {return SKIPPED;}
 
     static Result of(Map<String, Object> output) {return new Success(output, Map.of());}
 

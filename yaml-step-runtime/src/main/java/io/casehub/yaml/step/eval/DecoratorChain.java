@@ -243,7 +243,9 @@ public final class DecoratorChain {
             var executor = Executors.newVirtualThreadPerTaskExecutor();
             Future<Result> future = executor.submit(() -> inner.execute(deadlineCtx));
             try {
-                return future.get(adjustedMs, TimeUnit.MILLISECONDS);
+                Result result = future.get(adjustedMs, TimeUnit.MILLISECONDS);
+                executor.shutdown();
+                return result;
             } catch (TimeoutException e) {
                 future.cancel(true);
                 executor.shutdownNow();

@@ -232,17 +232,20 @@ public final class DecoratorChain {
 
             StepContext deadlineCtx = ctx.withDeadline(adjusted);
 
-            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                Future<Result> future = executor.submit(() -> inner.execute(deadlineCtx));
-                try {
-                    return future.get(adjustedMs, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException e) {
-                    future.cancel(true);
-                    return Result.failed("Step timeout after " + timeout);
-                } catch (java.util.concurrent.ExecutionException e) {
-                    return Result.failed("Step execution failed: " + e.getCause().getMessage());
-                }
+            var executor = Executors.newVirtualThreadPerTaskExecutor();
+            Future<Result> future = executor.submit(() -> inner.execute(deadlineCtx));
+            try {
+                return future.get(adjustedMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                executor.shutdownNow();
+                return Result.failed("Step timeout after " + timeout);
+            } catch (java.util.concurrent.ExecutionException e) {
+                executor.shutdownNow();
+                return Result.failed("Step execution failed: " + e.getCause().getMessage());
             } catch (InterruptedException e) {
+                future.cancel(true);
+                executor.shutdownNow();
                 Thread.currentThread().interrupt();
                 return Result.failed("Step interrupted during timeout");
             }

@@ -258,6 +258,23 @@ class DecoratorChainTest {
         }
 
         @Test
+        void timeout_returnsEvenWhenStepIgnoresInterrupt() {
+            var decorators = Map.<String, Object>of("timeout", "50ms");
+            long start = System.nanoTime();
+            var result = chain.apply(decorators, ctx -> {
+                // step that ignores interrupts
+                long deadline = System.nanoTime() + 2_000_000_000L; // 2s busy loop
+                while (System.nanoTime() < deadline) {
+                    Thread.onSpinWait();
+                }
+                return Result.of(Map.of());
+            }).execute(new StepContext(resolver));
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(elapsed).isLessThan(500);
+        }
+
+        @Test
         void noTimeout_deadlineIsNone() {
             var captured = new java.util.concurrent.atomic.AtomicReference<DeadlineContext>();
             chain.apply(Map.of(), ctx -> {

@@ -49,7 +49,7 @@ public final class ImportExpander {
                     IterationGroup group = iterationGroups.get(ref.groupName());
                     if (group == null) {
                         throw new IllegalArgumentException(
-                                "Import '" + imp.as() + "' forEach references unknown group '"
+                                "Import '" + imp.as() + "' for-each references unknown group '"
                                 + ref.groupName() + "'.");
                     }
                     expandList(imp, resolveValues(group.inAsList(), resolver),
@@ -133,7 +133,7 @@ public final class ImportExpander {
         for (Object item : in) {
             String s = item.toString();
             if (s.contains("${")) {
-                s = resolver.resolveString(s, "forEach.import");
+                s = resolver.resolveString(s, "for-each.import");
             }
             values.add(s);
         }
@@ -155,7 +155,7 @@ public final class ImportExpander {
     private static void validateValue(String value, String importAlias) {
         if (value.contains(".")) {
             throw new IllegalArgumentException(
-                    "Import '" + importAlias + "' forEach value '" + value
+                    "Import '" + importAlias + "' for-each value '" + value
                     + "' contains '.', which is reserved as the ID separator.");
         }
     }
@@ -164,7 +164,7 @@ public final class ImportExpander {
         if (!seen.add(alias)) {
             throw new IllegalArgumentException(
                     "Duplicate stamped import alias '" + alias
-                    + "'. forEach values must be unique.");
+                    + "'. for-each values must be unique.");
         }
     }
 }

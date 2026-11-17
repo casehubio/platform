@@ -358,10 +358,10 @@ public final class DecoratorChain {
 
     @SuppressWarnings("unchecked")
     private DecoratedExecution wrapForEach(DecoratedExecution inner, Map<String, Object> decorators) {
-        Object forEachVal = decorators.get("forEach");
+        Object forEachVal = decorators.get("for-each");
         if (forEachVal == null) {return inner;}
         if (!(forEachVal instanceof Map<?, ?> forEachMap)) {
-            return ctx -> Result.failed("forEach must be a map with 'in' and 'as' keys");
+            return ctx -> Result.failed("for-each must be a map with 'in' and 'as' keys");
         }
 
         String inExpr = String.valueOf(forEachMap.get("in"));
@@ -376,7 +376,7 @@ public final class DecoratorChain {
         return ctx -> {
             Object resolved = ctx.resolver().resolve(inExpr);
             if (!(resolved instanceof List<?> items)) {
-                return Result.failed("forEach 'in' did not resolve to a list");
+                return Result.failed("for-each 'in' did not resolve to a list");
             }
             if (items.isEmpty()) {return Result.of(Map.of());}
 
@@ -457,7 +457,7 @@ public final class DecoratorChain {
         } catch (InterruptedException e) {
             for (var f : futures) {f.cancel(true);}
             Thread.currentThread().interrupt();
-            return Result.failed("forEach parallel interrupted");
+            return Result.failed("for-each parallel interrupted");
         } finally {
             executor.shutdownNow();
         }

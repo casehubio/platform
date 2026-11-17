@@ -9,10 +9,10 @@ meta:
     - atomic
     - increment
     - coordination-primitives
----
-- counter-add requests: { delta: 1 }
-- counter-add requests: { delta: 1 }
-- counter-add requests: { delta: 3 }
-- counter-get: "requests"
-- counter-add requests: { delta: -2 }
-- counter-get: "requests"
+steps:
+  - counter-add requests: { delta: 1 }
+  - counter-add requests: { delta: 1 }
+  - counter-add requests: { delta: 3 }
+  - counter-get: "requests"
+  - counter-add requests: { delta: -2 }
+  - counter-get: "requests"

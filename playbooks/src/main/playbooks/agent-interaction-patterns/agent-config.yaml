@@ -1,12 +1,3 @@
-# Manifest for running examples against real LLMs.
-# Pools reference backends configured here. For simulation tests,
-# the test harness substitutes SimulatedAgentBackend.
-#
-# To run with a real backend, set the appropriate environment variable:
-#   ANTHROPIC_API_KEY for claude
-#   OPENAI_API_KEY for openai
-#   OLLAMA_HOST for ollama (default: localhost:11434)
-
 pools:
   analysts:
     agent-id: financial-analyst

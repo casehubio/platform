@@ -923,7 +923,7 @@ class WalkerTest {
     @Test
     void resolvesForEachWithObjectValueAsStructuralBlock() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach", Map.of("member in members",
+        step.put("for-each", Map.of("member in members",
                 List.of(Map.of("process", Map.of("command", "a.sh")),
                         Map.of("assert", Map.of()))));
         var resolved = Walker.resolve(List.of(step), registry);
@@ -931,7 +931,7 @@ class WalkerTest {
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
         var block = (ResolvedStep.BlockStep) resolved.get(0);
         assertThat(block.steps()).hasSize(2);
-        assertThat(block.decorators()).containsEntry("forEach", "member in members");
+        assertThat(block.decorators()).containsEntry("for-each", "member in members");
     }
 
     @Test
@@ -959,13 +959,13 @@ class WalkerTest {
     @Test
     void combinesStructuralDecoratorWithScalarDecorators() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach", Map.of("item in items",
+        step.put("for-each", Map.of("item in items",
                 List.of(Map.of("process", Map.of("command", "a.sh")))));
         step.put("retry", 3);
         step.put("timeout", "30s");
         var resolved = Walker.resolve(List.of(step), registry);
         var block = (ResolvedStep.BlockStep) resolved.get(0);
-        assertThat(block.decorators()).containsEntry("forEach", "item in items");
+        assertThat(block.decorators()).containsEntry("for-each", "item in items");
         assertThat(block.decorators()).containsEntry("retry", 3);
         assertThat(block.decorators()).containsEntry("timeout", "30s");
     }
@@ -983,7 +983,7 @@ class WalkerTest {
     @Test
     void throwsWhenTwoPromotableDecoratorsHaveNonScalarValues() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach", Map.of("a in b",
+        step.put("for-each", Map.of("a in b",
                 List.of(Map.of("process", Map.of("command", "a.sh")))));
         step.put("retry", Map.of("3",
                 List.of(Map.of("process", Map.of("command", "b.sh")))));
@@ -999,20 +999,20 @@ class WalkerTest {
         innerMap.put("c in d", List.of(Map.of("process", Map.of("command", "b.sh"))));
         var step = new LinkedHashMap<String, Object>();
         step.put("process", Map.of("command", "test.sh"));
-        step.put("forEach", innerMap);
+        step.put("for-each", innerMap);
         var resolved = Walker.resolve(List.of(step), registry);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
-        assertThat(resolved.get(0).decorators()).containsKey("forEach");
+        assertThat(resolved.get(0).decorators()).containsKey("for-each");
     }
 
     @Test
     void treatsObjectWithNonArrayValueAsDecorator() {
         var step = new LinkedHashMap<String, Object>();
         step.put("process", Map.of("command", "test.sh"));
-        step.put("forEach", Map.of("a in b", "not-an-array"));
+        step.put("for-each", Map.of("a in b", "not-an-array"));
         var resolved = Walker.resolve(List.of(step), registry);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
-        assertThat(resolved.get(0).decorators()).containsKey("forEach");
+        assertThat(resolved.get(0).decorators()).containsKey("for-each");
     }
 
     @Test
@@ -1080,7 +1080,7 @@ class WalkerTest {
     void throwsWhenStructuralDecoratorConflictsWithBlock() {
         var step = new LinkedHashMap<String, Object>();
         step.put("block", List.of(Map.of("process", Map.of("command", "a.sh"))));
-        step.put("forEach", Map.of("a in b",
+        step.put("for-each", Map.of("a in b",
                 List.of(Map.of("process", Map.of("command", "b.sh")))));
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1091,25 +1091,25 @@ class WalkerTest {
     void throwsWhenStructuralDecoratorConflictsWithActionKey() {
         var step = new LinkedHashMap<String, Object>();
         step.put("process", Map.of("command", "a.sh"));
-        step.put("forEach", Map.of("a in b",
+        step.put("for-each", Map.of("a in b",
                 List.of(Map.of("process", Map.of("command", "b.sh")))));
         assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    // --- combined-key form: "forEach member in members" as key ---
+    // --- combined-key form: "for-each member in members" as key ---
 
     @Test
     void combinedKey_forEach() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach member in members",
+        step.put("for-each member in members",
                 List.of(Map.of("process", Map.of("command", "a.sh")),
                         Map.of("assert", Map.of())));
         var resolved = Walker.resolve(List.of(step), registry);
         assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.BlockStep.class);
         var block = (ResolvedStep.BlockStep) resolved.get(0);
         assertThat(block.steps()).hasSize(2);
-        assertThat(block.decorators()).containsEntry("forEach", "member in members");
+        assertThat(block.decorators()).containsEntry("for-each", "member in members");
     }
 
     @Test
@@ -1163,13 +1163,13 @@ class WalkerTest {
     @Test
     void combinedKey_withScalarDecorators() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach item in items",
+        step.put("for-each item in items",
                 List.of(Map.of("process", Map.of("command", "a.sh"))));
         step.put("retry", 3);
         step.put("timeout", "30s");
         var resolved = Walker.resolve(List.of(step), registry);
         var block = (ResolvedStep.BlockStep) resolved.get(0);
-        assertThat(block.decorators()).containsEntry("forEach", "item in items");
+        assertThat(block.decorators()).containsEntry("for-each", "item in items");
         assertThat(block.decorators()).containsEntry("retry", 3);
         assertThat(block.decorators()).containsEntry("timeout", "30s");
     }

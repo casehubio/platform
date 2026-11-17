@@ -50,7 +50,7 @@ public final class PlaybookCompiler {
         register("if", new IfElseCompiler());
         register("match", new MatchCompiler());
         register("try", new TryCatchCompiler());
-        register("forEach", new ForEachCompiler());
+        register("for-each", new ForEachCompiler());
         register("parallel", new ParallelCompiler());
         register("concurrent", new ConcurrentCompiler());
         register("race", new RaceCompiler());

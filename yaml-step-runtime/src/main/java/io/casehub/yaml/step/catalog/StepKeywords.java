@@ -6,7 +6,7 @@ import java.util.Set;
 public final class StepKeywords {
 
     public static final Set<String> DECORATOR_KEYS = Set.of(
-            "if", "on-success", "on-failure", "forEach", "loop",
+            "if", "on-success", "on-failure", "for-each", "loop",
             "retry", "timeout", "delay", "on-error", "trigger",
             "transform", "signal", "publish", "transition",
             "semaphore", "barrier", "quorum",

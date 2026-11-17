@@ -55,7 +55,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex01_directInvoke_classifiesDocument() throws IOException {
-        var env = buildFromExample("01-direct-invoke.yaml");
+        var env = buildFromExample("01-direct-invoke.playbook.yaml");
         var results = env.executeAll();
 
         assertThat(results).hasSize(3).allSatisfy(r -> assertThat(r).isInstanceOf(Result.Success.class));
@@ -73,7 +73,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex02_conversation_multiTurnResponsesReflectPrompts() throws IOException {
-        var env = buildFromExample("02-session-conversation.yaml");
+        var env = buildFromExample("02-session-conversation.playbook.yaml");
         var results = env.executeAll();
 
         assertThat(results).hasSize(5).allSatisfy(r -> assertThat(r).isInstanceOf(Result.Success.class));
@@ -91,7 +91,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex03_clear_secondCustomerGetsCleanContext() throws IOException {
-        var env = buildFromExample("03-session-with-clear.yaml");
+        var env = buildFromExample("03-session-with-clear.playbook.yaml");
         var results = env.executeAll();
         assertThat(results).allSatisfy(r -> assertThat(r).isInstanceOf(Result.Success.class));
 
@@ -114,7 +114,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex05_poolBacked_infrastructureFromInlineDeclaration() throws IOException {
-        var env = buildFromExample("05-pool-backed.yaml");
+        var env = buildFromExample("05-pool-backed.playbook.yaml");
 
         assertThat(env.poolDeclarations).hasSize(1);
         var pool = env.poolDeclarations.getFirst();
@@ -136,7 +136,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex06_multiChannel_separatePoolsYieldIsolatedSessions() throws IOException {
-        var env = buildFromExample("06-multi-channel.yaml");
+        var env = buildFromExample("06-multi-channel.playbook.yaml");
 
         assertThat(env.poolDeclarations).hasSize(2);
         var voicePool = env.poolDeclarations.stream().filter(p -> "voice".equals(p.name())).findFirst().orElseThrow();
@@ -157,7 +157,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex07_salience_poolsHaveCorrectSalienceLevels() throws IOException {
-        var env = buildFromExample("07-salience-priority.yaml");
+        var env = buildFromExample("07-salience-priority.playbook.yaml");
 
         assertThat(env.poolDeclarations).hasSize(3);
         var byName = new LinkedHashMap<String, PoolDeclaration>();
@@ -181,7 +181,7 @@ class AgentExampleExecutionTest {
 
     @Test
     void ex08_structuredOutput_returnsCorpusJson() throws IOException {
-        var env = buildFromExample("08-structured-output.yaml");
+        var env = buildFromExample("08-structured-output.playbook.yaml");
         var results = env.executeAll();
         assertThat(results).allSatisfy(r -> assertThat(r).isInstanceOf(Result.Success.class));
 

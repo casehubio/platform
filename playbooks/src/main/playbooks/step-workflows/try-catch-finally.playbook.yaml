@@ -10,11 +10,11 @@ meta:
     - finally
     - error handling
     - step-workflows
----
-- try:
-    - log: "Attempting risky operation"
-    - fail: { message: "Something went wrong" }
-  catch:
-    - log: "Caught error — recovering"
-  finally:
-    - log: "Cleanup — always runs"
+steps:
+  - try:
+      - log: "Attempting risky operation"
+      - fail: { message: "Something went wrong" }
+    catch:
+      - log: "Caught error — recovering"
+    finally:
+      - log: "Cleanup — always runs"

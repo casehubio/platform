@@ -12,7 +12,7 @@ public sealed interface ForEachDirective permits ForEachDirective.GroupRef, ForE
 
     record InlineIteration(String as, List<?> in) implements ForEachDirective {
         public InlineIteration {
-            Objects.requireNonNull(as, "Inline forEach 'as' variable name is required");
+            Objects.requireNonNull(as, "Inline for-each 'as' variable name is required");
             if (in == null) {in = List.of();}
         }
     }
@@ -30,6 +30,6 @@ public sealed interface ForEachDirective permits ForEachDirective.GroupRef, ForE
             if (as != null) {return new GroupRef(as);}
         }
         throw new IllegalArgumentException(
-                "Invalid forEach value: expected string, {as, in} map, or ForEachDirective — got " + raw.getClass().getSimpleName());
+                "Invalid for-each value: expected string, {as, in} map, or ForEachDirective — got " + raw.getClass().getSimpleName());
     }
 }

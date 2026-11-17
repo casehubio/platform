@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 playbook: retry-demo
 meta:
   title: "Retry"
@@ -10,9 +9,9 @@ meta:
     - retry
     - decorator
     - flow-control
----
-- click: "A"
-  retry: 3
-- click: "B"
-  retry: { max: 2 }
-- click: "C"
+steps:
+  - click: "A"
+    retry: 3
+  - click: "B"
+    retry: { max: 2 }
+  - click: "C"

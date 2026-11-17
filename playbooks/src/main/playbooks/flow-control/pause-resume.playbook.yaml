@@ -11,28 +11,28 @@ meta:
     - resume
     - lifecycle
     - flow-control
----
-- concurrent:
-    producer:
-      - log: "Sending batch 1"
-        publish: { channel: events, data: { batch: 1 } }
-        loop: 3
-      - delay: 500ms
-      - log: "Sending batch 2"
-        publish: { channel: events, data: { batch: 2 } }
-        loop: 3
+steps:
+  - concurrent:
+      producer:
+        - log: "Sending batch 1"
+          publish: { channel: events, data: { batch: 1 } }
+          loop: 3
+        - delay: 500ms
+        - log: "Sending batch 2"
+          publish: { channel: events, data: { batch: 2 } }
+          loop: 3
 
-    consumer:
-      - name: reader
-        log: "Reading ${from.batch}"
-        from: { channel: events, name: primary-reader }
-        loop: continuous
-        cancel: shutdown
+      consumer:
+        - name: reader
+          log: "Reading ${from.batch}"
+          from: { channel: events, name: primary-reader }
+          loop: continuous
+          cancel: shutdown
 
-    controller:
-      - delay: 200ms
-      - pause: primary-reader
-      - log: "Consumer paused — items buffer"
-      - delay: 300ms
-      - resume: primary-reader
-      - log: "Consumer resumed — buffered items drain"
+      controller:
+        - delay: 200ms
+        - pause: primary-reader
+        - log: "Consumer paused — items buffer"
+        - delay: 300ms
+        - resume: primary-reader
+        - log: "Consumer resumed — buffered items drain"

@@ -1,8 +1,10 @@
-# 03 — Session with Context Clear
-# Builds on 02: explicit context clearing between unrelated queries.
-# The session stays open (no pool checkout overhead) but the agent forgets
-# the previous conversation, starting fresh for the next topic.
-
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Session With Clear"
+  description: "03 — Session with Context Clear Builds on 02: explicit context clearing between unrelated queries. The session stays open (no pool checkout overhead) but the agent forgets the previous conversation, starting fresh for the next topic."
+  tags: []
 steps:
   - agent-session-open support:
       system: >

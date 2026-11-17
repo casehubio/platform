@@ -9,14 +9,14 @@ meta:
     - else
     - conditional
     - step-workflows
----
-- if: true
-  then:
-    - log: "Condition was true"
-  else:
-    - log: "Condition was false"
-- if: false
-  then:
-    - log: "This is skipped"
-  else:
-    - log: "False branch taken"
+steps:
+  - if: true
+    then:
+      - log: "Condition was true"
+    else:
+      - log: "Condition was false"
+  - if: false
+    then:
+      - log: "This is skipped"
+    else:
+      - log: "False branch taken"

@@ -37,7 +37,7 @@ simulate:
 tests:
   - name: "ex01 direct invoke classifies document"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
@@ -46,42 +46,42 @@ tests:
 
   - name: "ex02 conversation multi-turn responses"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
 
   - name: "ex03 clear gives second customer clean context"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
 
   - name: "ex05 pool-backed infrastructure"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
 
   - name: "ex06 multi-channel separate pools"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
 
   - name: "ex07 salience pools priority levels"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.playbook.yaml
         capture: result
       - assertThat: result.succeeded
         equals: true
 
   - name: "ex08 structured output returns corpus JSON"
     steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.yaml
+      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.playbook.yaml
         capture: result
       - assertThat: result.error
         contains: "response-format"

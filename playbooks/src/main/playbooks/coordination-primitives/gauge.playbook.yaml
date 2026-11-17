@@ -9,10 +9,10 @@ meta:
     - value
     - compare-and-set
     - coordination-primitives
----
-- gauge-set temp: 20
-- gauge-get: "temp"
-- gauge-set temp: 35
-- gauge-get: "temp"
-- gauge-cas temp: { expect: 35, update: 42 }
-- gauge-get: "temp"
+steps:
+  - gauge-set temp: 20
+  - gauge-get: "temp"
+  - gauge-set temp: 35
+  - gauge-get: "temp"
+  - gauge-cas temp: { expect: 35, update: 42 }
+  - gauge-get: "temp"

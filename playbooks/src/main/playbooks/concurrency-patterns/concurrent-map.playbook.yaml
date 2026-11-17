@@ -9,10 +9,10 @@ meta:
     - atomic
     - concurrent
     - concurrency-patterns
----
-- parallel:
-  - map-writer registry: { op: "put", key: "svc-a", value: "running" }
-  - map-writer registry: { op: "put", key: "svc-b", value: "starting" }
-  - map-writer registry: { op: "putIfAbsent", key: "svc-a", value: "duplicate" }
-  - map-writer registry: { op: "merge", key: "svc-b", value: "running" }
-- map-reader: "registry"
+steps:
+  - parallel:
+    - map-writer registry: { op: "put", key: "svc-a", value: "running" }
+    - map-writer registry: { op: "put", key: "svc-b", value: "starting" }
+    - map-writer registry: { op: "putIfAbsent", key: "svc-a", value: "duplicate" }
+    - map-writer registry: { op: "merge", key: "svc-b", value: "running" }
+  - map-reader: "registry"

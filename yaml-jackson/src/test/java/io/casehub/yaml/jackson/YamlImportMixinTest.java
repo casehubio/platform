@@ -51,4 +51,25 @@ class YamlImportMixinTest {
         assertThat(file.imports()).hasSize(1);
         assertThat(file.imports().get(0).condition()).isNull();
     }
+
+    @Test
+    void forEachKebabKeyDeserializesToForEachField() throws Exception {
+        String yaml = """
+                      module:
+                        name: test
+                      imports:
+                        - module: other
+                          as: o
+                          for-each:
+                            as: region
+                            in: [us, eu]
+                      nodes:
+                        a:
+                          type: sensor
+                      """;
+        YamlModuleFile file = mapper.readValue(yaml, YamlModuleFile.class);
+        assertThat(file.imports()).hasSize(1);
+        assertThat(file.imports().get(0).forEach()).isNotNull();
+    }
+
 }

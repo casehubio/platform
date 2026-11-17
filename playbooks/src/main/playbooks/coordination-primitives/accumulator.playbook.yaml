@@ -9,12 +9,12 @@ meta:
     - reduce
     - aggregate
     - coordination-primitives
----
-- accumulate total: { op: "sum", value: 10 }
-- accumulate total: { op: "sum", value: 25 }
-- accumulate total: { op: "sum", value: 7 }
-- accumulate-get: "total"
-- accumulate max-seen: { op: "max", value: 42 }
-- accumulate max-seen: { op: "max", value: 17 }
-- accumulate max-seen: { op: "max", value: 99 }
-- accumulate-get: "max-seen"
+steps:
+  - accumulate total: { op: "sum", value: 10 }
+  - accumulate total: { op: "sum", value: 25 }
+  - accumulate total: { op: "sum", value: 7 }
+  - accumulate-get: "total"
+  - accumulate max-seen: { op: "max", value: 42 }
+  - accumulate max-seen: { op: "max", value: 17 }
+  - accumulate max-seen: { op: "max", value: 99 }
+  - accumulate-get: "max-seen"

@@ -34,7 +34,7 @@ class ValidatePlaybookPluginTest {
         services.register(TestExecutionContext.class, ctx);
 
         var plugin = new ValidatePlaybookPlugin();
-        Result result = plugin.execute(Map.of("_subject", "01-direct-invoke.yaml"), services);
+        Result result = plugin.execute(Map.of("_subject", "01-direct-invoke.playbook.yaml"), services);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output().get("valid")).isEqualTo(true);
@@ -72,7 +72,7 @@ class ValidatePlaybookPluginTest {
 
         var plugin = new ValidatePlaybookPlugin();
         Result result = plugin.execute(
-                Map.of("_subject", "05-pool-backed.yaml"), services);
+                Map.of("_subject", "05-pool-backed.playbook.yaml"), services);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output().get("valid")).isEqualTo(true);
@@ -103,7 +103,7 @@ class ValidatePlaybookPluginTest {
 
         var plugin = new ValidatePlaybookPlugin();
         Result result = plugin.execute(
-                Map.of("_subject", "04-parallel-queries.yaml"), services);
+                Map.of("_subject", "04-parallel-queries.playbook.yaml"), services);
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output().get("hasFork")).isEqualTo(true);

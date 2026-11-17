@@ -9,9 +9,9 @@ meta:
     - boolean
     - toggle
     - coordination-primitives
----
-- flag-check: "ready"
-- flag-set: "ready"
-- flag-check: "ready"
-- flag-toggle: "ready"
-- flag-check: "ready"
+steps:
+  - flag-check: "ready"
+  - flag-set: "ready"
+  - flag-check: "ready"
+  - flag-toggle: "ready"
+  - flag-check: "ready"

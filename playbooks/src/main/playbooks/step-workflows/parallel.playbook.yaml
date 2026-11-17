@@ -8,8 +8,8 @@ meta:
     - parallel
     - concurrent
     - step-workflows
----
-- parallel:
-  - log: "Branch A: fetching data"
-  - log: "Branch B: loading config"
-  - log: "Branch C: warming cache"
+steps:
+  - parallel:
+    - log: "Branch A: fetching data"
+    - log: "Branch B: loading config"
+    - log: "Branch C: warming cache"

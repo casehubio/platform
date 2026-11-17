@@ -120,7 +120,7 @@ class PlaybookSchemaValidationTest {
         patternProps.fieldNames().forEachRemaining(patterns::add);
 
         Set<String> prefixes = Set.of(
-                "forEach", "retry", "timeout", "when", "mutex", "loop",
+                "for-each", "retry", "timeout", "when", "mutex", "loop",
                 "block", "parallel", "try", "select", "race",
                 "if", "match", "barrier", "quorum");
         for (String prefix : prefixes) {

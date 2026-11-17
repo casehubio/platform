@@ -9,12 +9,12 @@ meta:
     - pattern matching
     - cases
     - step-workflows
----
-- match: "warning"
-  cases:
-    - pattern: "error"
-      log: "Matched: error"
-    - pattern: "warning"
-      log: "Matched: warning"
-    - default:
-        - log: "No match — default"
+steps:
+  - match: "warning"
+    cases:
+      - pattern: "error"
+        log: "Matched: error"
+      - pattern: "warning"
+        log: "Matched: warning"
+      - default:
+          - log: "No match — default"

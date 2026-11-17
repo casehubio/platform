@@ -2,7 +2,7 @@
   "$id": "https://casehub.io/yaml-core/foreach.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ForEach Expansion",
-  "description": "A forEach directive stamps multiple copies of an element. Can be a string referencing a named iteration group, or an inline map with 'as' (variable name) and 'in' (list of values). Stamped copies get IDs in the format 'originalId.value'. Use ${each.<as>} to reference the iteration variable.",
+  "description": "A for-each directive stamps multiple copies of an element. Can be a string referencing a named iteration group, or an inline map with 'as' (variable name) and 'in' (list of values). Stamped copies get IDs in the format 'originalId.value'. Use ${each.<as>} to reference the iteration variable.",
   "oneOf": [
     {
       "type": "string",

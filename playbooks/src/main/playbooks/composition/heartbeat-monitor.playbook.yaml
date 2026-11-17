@@ -12,12 +12,12 @@ meta:
     - from
     - timeout
     - composition
----
-- block monitor:
-    - name: heartbeat
-      log: "Heartbeat: ${from.ts}"
-      from: heartbeats
-      timeout: 5s
-    - delay: 1s
-  loop: continuous
-  cancel: shutdown
+steps:
+  - block monitor:
+      - name: heartbeat
+        log: "Heartbeat: ${from.ts}"
+        from: heartbeats
+        timeout: 5s
+      - delay: 1s
+    loop: continuous
+    cancel: shutdown

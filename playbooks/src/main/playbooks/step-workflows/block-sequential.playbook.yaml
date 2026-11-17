@@ -8,8 +8,8 @@ meta:
     - block
     - sequential
     - step-workflows
----
-- block:
-  - log: "Step 1: initialize"
-  - log: "Step 2: process"
-  - log: "Step 3: finalize"
+steps:
+  - block:
+    - log: "Step 1: initialize"
+    - log: "Step 2: process"
+    - log: "Step 3: finalize"

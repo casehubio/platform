@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 meta:
   title: "Combined Pipeline"
   description: "Rate-limited pipeline with deadline — composes semaphore, channel, spawned task, concurrent map, and deadline into a single workflow. A producer feeds items through a bounded channel, rate-limited workers process them under a semaphore gate, results accumulate in a concurrent map, and a deadline scopes the entire pipeline."
@@ -10,19 +9,19 @@ meta:
     - pipeline
     - multi-primitive
     - concurrency-patterns
----
-- deadline-create pipeline: { deadlineMs: 3000 }
-- spawn-task monitor: { duration: 2500 }
-- deadline-check: "pipeline"
-- parallel:
-  - chan-produce jobs: { capacity: 2, items: 4, interval: 150 }
-  - pipeline-consume jobs:
-      semaphore: gate
-      permits: 2
-      map: results
-      expect: 4
-      processingMs: 300
-- map-reader: "results"
-- deadline-check: "pipeline"
-- task-join monitor: { timeout: 2000 }
-- task-poll: "monitor"
+steps:
+  - deadline-create pipeline: { deadlineMs: 3000 }
+  - spawn-task monitor: { duration: 2500 }
+  - deadline-check: "pipeline"
+  - parallel:
+    - chan-produce jobs: { capacity: 2, items: 4, interval: 150 }
+    - pipeline-consume jobs:
+        semaphore: gate
+        permits: 2
+        map: results
+        expect: 4
+        processingMs: 300
+  - map-reader: "results"
+  - deadline-check: "pipeline"
+  - task-join monitor: { timeout: 2000 }
+  - task-poll: "monitor"

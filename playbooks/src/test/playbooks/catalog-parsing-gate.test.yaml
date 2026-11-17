@@ -7,4 +7,4 @@ steps:
     greaterThan: 60
   - assertThat: result.errors
     hasSize: 3
-    message: "Expected failures: modules.playbook.yaml (import deser), rest.playbook.yaml (headers sibling key), 08-structured-output.yaml (response-format sibling key)"
+    message: "Expected failures: modules.playbook.yaml (import deser), rest.playbook.yaml (headers sibling key), 08-structured-output.playbook.yaml (response-format sibling key)"

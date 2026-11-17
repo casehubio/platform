@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 meta:
   title: "Correlation Scope"
   description: "Async request/response correlation — register expected responses by key on a channel, send messages to the channel, then await correlated responses. The scope routes incoming messages by extracted key."
@@ -10,11 +9,11 @@ meta:
     - request-reply
     - async
     - concurrency-patterns
----
-- corr-expect order-42: { timeout: 1000 }
-- corr-expect order-99: { timeout: 1000 }
-- log: "Expectations registered"
-- corr-send order-99: { status: "shipped" }
-- corr-send order-42: { status: "confirmed" }
-- corr-await: "order-42"
-- corr-await: "order-99"
+steps:
+  - corr-expect order-42: { timeout: 1000 }
+  - corr-expect order-99: { timeout: 1000 }
+  - log: "Expectations registered"
+  - corr-send order-99: { status: "shipped" }
+  - corr-send order-42: { status: "confirmed" }
+  - corr-await: "order-42"
+  - corr-await: "order-99"

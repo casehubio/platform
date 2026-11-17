@@ -18,7 +18,7 @@ public final class FusionPass {
 
     private static final Set<String> CHAIN_BREAKING_DECORATORS = Set.of(
         "from", "background", "when", "on-error", "wait", "at",
-        "forEach", "cancel", "loop", "transition", "signal", "publish",
+        "for-each", "cancel", "loop", "transition", "signal", "publish",
         "semaphore", "mutex", "transform");
 
     private static final Pattern RESULT_REF = Pattern.compile(

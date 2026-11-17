@@ -9,9 +9,9 @@ meta:
     - signal
     - multiplexing
     - step-workflows
----
-- select:
-  - wait: fast-signal
-    log: "Fast branch won the race"
-  - wait: slow-signal
-    log: "Slow branch won the race"
+steps:
+  - select:
+    - wait: fast-signal
+      log: "Fast branch won the race"
+    - wait: slow-signal
+      log: "Slow branch won the race"

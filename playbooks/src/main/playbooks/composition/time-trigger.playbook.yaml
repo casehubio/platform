@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 playbook: time-trigger-demo
 meta:
   title: "Time Trigger"
@@ -11,12 +10,12 @@ meta:
     - time
     - delay
     - composition
----
-- click: "A"
-- trigger:
-    type: time
-    delay: 2s
-  block:
-    - click: "C"
-    - click: "D"
-- click: "B"
+steps:
+  - click: "A"
+  - trigger:
+      type: time
+      delay: 2s
+    block:
+      - click: "C"
+      - click: "D"
+  - click: "B"

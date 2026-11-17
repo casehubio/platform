@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 playbook: when-guard-demo
 meta:
   title: "When Guard"
@@ -10,10 +9,10 @@ meta:
     - when
     - decorator
     - flow-control
----
-- click: "A"
-- click: "B"
-  when: true
-- click: "C"
-  when: false
-- click: "D"
+steps:
+  - click: "A"
+  - click: "B"
+    when: true
+  - click: "C"
+    when: false
+  - click: "D"

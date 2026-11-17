@@ -10,13 +10,13 @@ meta:
     - timeout
     - from
     - composition
----
-- log: "Event A detected — watching for B within 5s"
+steps:
+  - log: "Event A detected — watching for B within 5s"
 
-- block:
-  - name: watch-for-b
-    log: "Event B arrived: ${from.type}"
-    from: events
-    timeout: 5s
+  - block:
+    - name: watch-for-b
+      log: "Event B arrived: ${from.type}"
+      from: events
+      timeout: 5s
 
-- log: "Window closed — absence check complete"
+  - log: "Window closed — absence check complete"

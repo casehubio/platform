@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 playbook: mutex-demo
 meta:
   title: "Mutex"
@@ -11,15 +10,15 @@ meta:
     - decorator
     - concurrent
     - coordination
----
-- concurrent:
-    branch-a:
-      - click: "A"
-        mutex: db-write
-      - click: "B"
-        mutex: db-write
-    branch-b:
-      - click: "C"
-        mutex: db-write
-      - click: "D"
-        mutex: db-write
+steps:
+  - concurrent:
+      branch-a:
+        - click: "A"
+          mutex: db-write
+        - click: "B"
+          mutex: db-write
+      branch-b:
+        - click: "C"
+          mutex: db-write
+        - click: "D"
+          mutex: db-write

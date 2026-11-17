@@ -150,7 +150,7 @@ class EndToEndCompilationTest {
                         Map.of("rest-request:GET", "https://api.example.com/a"),
                         Map.of("rest-request:GET", "https://api.example.com/b"))),
                 tryStep,
-                Map.of("forEach", Map.of("in", "items", "as", "item")),
+                Map.of("for-each", Map.of("in", "items", "as", "item")),
                 Map.of("delay", "1s"),
                 Map.of("log", Map.of("message", "done"))));
 

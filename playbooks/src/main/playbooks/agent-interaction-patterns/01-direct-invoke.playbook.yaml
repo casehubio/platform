@@ -1,7 +1,10 @@
-# 01 — Direct Invoke
-# Simplest pattern: a single-shot agent call with no session or pool.
-# The agent receives a system prompt and user prompt, returns a response.
-
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Direct Invoke"
+  description: "01 — Direct Invoke Simplest pattern: a single-shot agent call with no session or pool. The agent receives a system prompt and user prompt, returns a response."
+  tags: []
 steps:
   - agent-session-open classifier:
       system: >

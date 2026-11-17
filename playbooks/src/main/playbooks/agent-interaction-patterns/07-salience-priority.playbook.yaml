@@ -1,9 +1,10 @@
-# 07 — Salience-Based Priority
-# Builds on 06: pools have salience levels for capacity scheduling.
-# Voice (salience=2) monopolizes capacity while active — calls can't wait.
-# Chat (salience=1) gets priority over email (salience=0).
-# Email runs in leftover capacity but is guaranteed a minimum allocation.
-
+playbook: "1.0"
+schema: client
+---
+meta:
+  title: "Salience Priority"
+  description: "07 — Salience-Based Priority Builds on 06: pools have salience levels for capacity scheduling. Voice (salience=2) monopolizes capacity while active — calls can't wait. Chat (salience=1) gets priority over email (salience=0). Email runs in leftover capacity but is guaranteed a minimum allocation."
+  tags: []
 pools:
   voice:
     agent-id: voice-agent
@@ -28,7 +29,6 @@ pools:
     clearing:
       policy: size-aware
       threshold: 16000
-
 steps:
   # Voice call arrives — gets immediate capacity
   - agent-session-open call-7721:

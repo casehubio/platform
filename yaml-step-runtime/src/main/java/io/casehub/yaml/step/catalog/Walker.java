@@ -18,7 +18,7 @@ public final class Walker {
 
     private static final Set<String> STRUCTURAL_COMPANIONS = Set.of("then", "else", "cases", "catch", "finally");
     private static final Set<String> PROMOTABLE_DECORATORS = Set.of(
-            "forEach", "retry", "timeout", "when", "mutex", "loop");
+            "for-each", "retry", "timeout", "when", "mutex", "loop");
 
     private static final Set<String> REMOVED_KEYS = Set.of("steps", "do");
     static final         int         MAX_DEPTH             = 32;

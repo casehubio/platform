@@ -57,7 +57,7 @@ public final class ForEachExpander {
                     IterationGroup group = iterationGroups.get(ref.groupName());
                     if (group == null) {
                         throw new IllegalArgumentException(
-                                "forEach on '" + elementId
+                                "for-each on '" + elementId
                                 + "' references unknown iteration group '" + ref.groupName() + "'.");
                     }
                     values = resolveValues(group.inAsList(), resolver, ref.groupName(), valueExpander);
@@ -76,7 +76,7 @@ public final class ForEachExpander {
 
             if (values.size() > maxExpansion) {
                 throw new IllegalStateException(
-                        "forEach template '" + elementId + "' would expand to "
+                        "for-each template '" + elementId + "' would expand to "
                         + values.size() + " elements (limit: " + maxExpansion + ").");
             }
         }
@@ -117,7 +117,7 @@ public final class ForEachExpander {
 
                 if (allElements.containsKey(stampedId)) {
                     throw new IllegalStateException("Duplicate stamped ID '" + stampedId
-                            + "' — forEach values must be unique within each template.");
+                            + "' — for-each values must be unique within each template.");
                 }
                 allElements.put(stampedId, adapter.stamp(element, stampedId, eachResolver));
             }
@@ -146,7 +146,7 @@ public final class ForEachExpander {
                     // skip optional cross-group ref
                 } else {
                     throw new IllegalStateException("Element '" + stampedId
-                            + "' references forEach element '" + ref.targetId()
+                            + "' references for-each element '" + ref.targetId()
                             + "' in a different group.");
                 }
             }
@@ -205,7 +205,7 @@ public final class ForEachExpander {
                         IterationGroup group = iterationGroups.get(groupKey);
                         if (group == null) {
                             throw new IllegalArgumentException(
-                                    "forEach on '" + elementId
+                                    "for-each on '" + elementId
                                     + "' references unknown group or data source '" + groupKey + "'.");
                         }
                         List<String> values = resolveValuesStatic(group.inAsList(), resolver, groupKey);
@@ -225,7 +225,7 @@ public final class ForEachExpander {
             List<String> values = groupValues.get(groupKey);
             if (values.size() > maxExpansion) {
                 throw new IllegalStateException(
-                        "forEach template '" + elementId + "' would expand to "
+                        "for-each template '" + elementId + "' would expand to "
                         + values.size() + " elements (limit: " + maxExpansion + ").");
             }
         }
@@ -277,7 +277,7 @@ public final class ForEachExpander {
 
                     if (allElements.containsKey(stampedId)) {
                         throw new IllegalStateException("Duplicate stamped ID '" + stampedId
-                                                        + "' — forEach values must be unique within each template.");
+                                                        + "' — for-each values must be unique within each template.");
                     }
                     allElements.put(stampedId, adapter.stamp(element, stampedId, rowResolver));
                 }
@@ -297,7 +297,7 @@ public final class ForEachExpander {
 
                     if (allElements.containsKey(stampedId)) {
                         throw new IllegalStateException("Duplicate stamped ID '" + stampedId
-                                                        + "' — forEach values must be unique within each template.");
+                                                        + "' — for-each values must be unique within each template.");
                     }
                     allElements.put(stampedId, adapter.stamp(element, stampedId, eachResolver));
                 }
@@ -327,7 +327,7 @@ public final class ForEachExpander {
                     // skip optional cross-group ref
                 } else {
                     throw new IllegalStateException("Element '" + stampedId
-                                                    + "' references forEach element '" + ref.targetId()
+                                                    + "' references for-each element '" + ref.targetId()
                                                     + "' in a different group.");
                 }
             }
@@ -353,7 +353,7 @@ public final class ForEachExpander {
         for (Object item : in) {
             String s = item.toString();
             if (s.contains("${")) {
-                s = resolver.resolveString(s, "forEach." + context);
+                s = resolver.resolveString(s, "for-each." + context);
             }
             values.add(s);
         }
@@ -390,7 +390,7 @@ public final class ForEachExpander {
         for (Object item : in) {
             String s = item.toString();
             if (s.contains("${")) {
-                s = resolver.resolveString(s, "forEach." + context);
+                s = resolver.resolveString(s, "for-each." + context);
             }
             if (valueExpander != null) {
                 try {

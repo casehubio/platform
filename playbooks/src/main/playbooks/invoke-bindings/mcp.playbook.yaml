@@ -9,10 +9,10 @@ meta:
     - tool-call
     - model-context
     - invoke-bindings
----
-- mcp-call file_search:
-    params: { query: "authentication handler", limit: 5 }
-- log: "Search complete"
-- mcp-call code_review:
-    params: { file: "src/auth.ts", focus: "security" }
-- log: "Review complete"
+steps:
+  - mcp-call file_search:
+      params: { query: "authentication handler", limit: 5 }
+  - log: "Search complete"
+  - mcp-call code_review:
+      params: { file: "src/auth.ts", focus: "security" }
+  - log: "Review complete"

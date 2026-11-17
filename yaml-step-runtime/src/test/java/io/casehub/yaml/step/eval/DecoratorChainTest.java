@@ -519,7 +519,7 @@ class DecoratorChainTest {
                     Map.of("name", "c"));
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? items : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item"));
             var seen = new ArrayList<String>();
             chain.apply(decorators, ctx -> {
@@ -534,7 +534,7 @@ class DecoratorChainTest {
         void emptyCollection_skips() {
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? List.of() : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item"));
             var count = new AtomicInteger(0);
             var result = chain.apply(decorators, counting(count)).execute(new StepContext(listResolver));
@@ -547,7 +547,7 @@ class DecoratorChainTest {
             var items = List.of("a", "b", "c");
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? items : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item", "parallel", true));
             var count = new AtomicInteger(0);
             var result = chain.apply(decorators, ctx -> {
@@ -563,7 +563,7 @@ class DecoratorChainTest {
             var items = List.of("a", "b", "c", "d", "e");
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? items : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item", "parallel", true));
             var completed = new AtomicInteger(0);
             var result = chain.apply(decorators, ctx -> {
@@ -588,7 +588,7 @@ class DecoratorChainTest {
             var items = List.of("a", "b", "c", "d");
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? items : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item", "parallel", true, "concurrency", 2));
             var maxConcurrent = new AtomicInteger(0);
             var currentConcurrent = new AtomicInteger(0);
@@ -610,7 +610,7 @@ class DecoratorChainTest {
             var items = List.of("a", "b", "c");
             var listResolver = resolver.withObjectScope("var",
                     name -> "items".equals(name) ? items : null);
-            var decorators = Map.<String, Object>of("forEach",
+            var decorators = Map.<String, Object>of("for-each",
                     Map.of("in", "${var.items}", "as", "item"));
             var count = new AtomicInteger(0);
             var result = chain.apply(decorators, ctx -> {

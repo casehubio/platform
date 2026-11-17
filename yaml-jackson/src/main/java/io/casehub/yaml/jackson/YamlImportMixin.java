@@ -6,4 +6,7 @@ abstract class YamlImportMixin {
 
     @JsonProperty("if")
     String condition;
+    @JsonProperty("for-each")
+    Object forEach;
+
 }

@@ -9,9 +9,9 @@ meta:
     - first-to-complete
     - cancellation
     - step-workflows
----
-- race:
-  - block:
-    - delay: 200ms
-    - log: "Slow branch finished"
-  - log: "Fast branch finished"
+steps:
+  - race:
+    - block:
+      - delay: 200ms
+      - log: "Slow branch finished"
+    - log: "Fast branch finished"

@@ -2,7 +2,7 @@
   "$id": "https://casehub.io/yaml-core/iterations.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Iteration Groups",
-  "description": "Named iteration groups shared across multiple forEach elements. Each group defines an iteration variable ('as') and a list of values ('in'). Multiple elements referencing the same group expand in parallel — aligned by value.",
+  "description": "Named iteration groups shared across multiple for-each elements. Each group defines an iteration variable ('as') and a list of values ('in'). Multiple elements referencing the same group expand in parallel — aligned by value.",
   "type": "object",
   "additionalProperties": {
     "type": "object",

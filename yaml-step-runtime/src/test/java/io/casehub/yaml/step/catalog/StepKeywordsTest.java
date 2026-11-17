@@ -31,7 +31,7 @@ class StepKeywordsTest {
     @Test
     void decoratorKeys_includesAllDecoratorChainHandledKeys() {
         Set<String> decoratorChainKeys = Set.of(
-                "when", "forEach", "background", "cancel", "loop",
+                "when", "for-each", "background", "cancel", "loop",
                 "on-error", "from", "timeout", "at", "wait",
                 "retry", "semaphore", "mutex", "resource", "priority",
                 "delay", "signal", "publish", "transition", "transform");

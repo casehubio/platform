@@ -11,23 +11,23 @@ meta:
     - loop
     - block
     - composition
----
-- race pattern:
-    - block:
-      - name: read-a1
-        log: "Path 1: read A"
-        from: events
-      - name: read-b
-        log: "Path 1: read B after A"
-        from: events
-        timeout: 5s
-    - block:
-      - name: read-a2
-        log: "Path 2: read A"
-        from: events
-      - name: read-c
-        log: "Path 2: read C after A"
-        from: events
-        timeout: 5s
-  loop: continuous
-  cancel: shutdown
+steps:
+  - race pattern:
+      - block:
+        - name: read-a1
+          log: "Path 1: read A"
+          from: events
+        - name: read-b
+          log: "Path 1: read B after A"
+          from: events
+          timeout: 5s
+      - block:
+        - name: read-a2
+          log: "Path 2: read A"
+          from: events
+        - name: read-c
+          log: "Path 2: read C after A"
+          from: events
+          timeout: 5s
+    loop: continuous
+    cancel: shutdown

@@ -10,14 +10,14 @@ meta:
     - delay
     - from
     - composition
----
-- name: read-a
-  log: "Read trigger: ${from.type}"
-  from: triggers
+steps:
+  - name: read-a
+    log: "Read trigger: ${from.type}"
+    from: triggers
 
-- delay: 2s
+  - delay: 2s
 
-- name: read-b
-  log: "Read consequence: ${from.type}"
-  from: consequences
-  timeout: 10s
+  - name: read-b
+    log: "Read consequence: ${from.type}"
+    from: consequences
+    timeout: 10s

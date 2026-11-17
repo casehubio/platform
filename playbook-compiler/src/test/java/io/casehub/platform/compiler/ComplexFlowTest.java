@@ -46,7 +46,7 @@ class ComplexFlowTest {
     @Test
     void forEach_compilesToForTask() {
         var step = new LinkedHashMap<String, Object>();
-        step.put("forEach", Map.of("in", "items", "as", "item"));
+        step.put("for-each", Map.of("in", "items", "as", "item"));
 
         var content = Map.<String, Object>of("steps", List.of(step));
         var outcome = compiler.compile("test", content);

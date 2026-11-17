@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 playbook: signal-await-demo
 meta:
   title: "Signal / Await"
@@ -11,11 +10,11 @@ meta:
     - await
     - concurrent
     - coordination
----
-- concurrent:
-    sender:
-      - click: "A"
-      - signal: go
-    receiver:
-      - await:signal: go
-      - click: "B"
+steps:
+  - concurrent:
+      sender:
+        - click: "A"
+        - signal: go
+      receiver:
+        - await:signal: go
+        - click: "B"

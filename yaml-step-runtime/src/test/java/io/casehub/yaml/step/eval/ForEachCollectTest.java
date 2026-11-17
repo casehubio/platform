@@ -30,7 +30,7 @@ class ForEachCollectTest {
                 Result.of(Map.of("value", ctx.resolver().resolveString("${each.item}", "test")));
 
         var decorated = chain.apply(
-                Map.of("forEach", Map.of("in", "${var.items}", "as", "item", "collect", "all")),
+                Map.of("for-each", Map.of("in", "${var.items}", "as", "item", "collect", "all")),
                 inner);
         Result result = decorated.execute(new StepContext(resolver));
 
@@ -51,7 +51,7 @@ class ForEachCollectTest {
                 Result.of(Map.of("value", ctx.resolver().resolveString("${each.item}", "test")));
 
         var decorated = chain.apply(
-                Map.of("forEach", Map.of("in", "${var.items}", "as", "item")),
+                Map.of("for-each", Map.of("in", "${var.items}", "as", "item")),
                 inner);
         Result result = decorated.execute(new StepContext(resolver));
 
@@ -69,7 +69,7 @@ class ForEachCollectTest {
                 Result.of(Map.of("value", ctx.resolver().resolveString("${each.item}", "test")));
 
         var decorated = chain.apply(
-                Map.of("forEach", Map.of("in", "${var.items}", "as", "item",
+                Map.of("for-each", Map.of("in", "${var.items}", "as", "item",
                         "collect", "all", "parallel", true)),
                 inner);
         Result result = decorated.execute(new StepContext(resolver));
@@ -91,7 +91,7 @@ class ForEachCollectTest {
         };
 
         var decorated = chain.apply(
-                Map.of("forEach", Map.of("in", "${var.items}", "as", "item", "collect", "all")),
+                Map.of("for-each", Map.of("in", "${var.items}", "as", "item", "collect", "all")),
                 inner);
         Result result = decorated.execute(new StepContext(resolver));
 

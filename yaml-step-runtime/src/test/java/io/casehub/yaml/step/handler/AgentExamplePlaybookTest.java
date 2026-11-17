@@ -38,14 +38,14 @@ class AgentExamplePlaybookTest {
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {
-            "01-direct-invoke.yaml",
-            "02-session-conversation.yaml",
-            "03-session-with-clear.yaml",
-            "04-parallel-queries.yaml",
-            "05-pool-backed.yaml",
-            "06-multi-channel.yaml",
-            "07-salience-priority.yaml",
-            "08-structured-output.yaml"
+            "01-direct-invoke.playbook.yaml",
+            "02-session-conversation.playbook.yaml",
+            "03-session-with-clear.playbook.yaml",
+            "04-parallel-queries.playbook.yaml",
+            "05-pool-backed.playbook.yaml",
+            "06-multi-channel.playbook.yaml",
+            "07-salience-priority.playbook.yaml",
+            "08-structured-output.playbook.yaml"
     })
     void example_compilesSuccessfully(String filename) throws IOException {
         String yaml = Files.readString(EXAMPLES_DIR.resolve(filename));
@@ -64,19 +64,19 @@ class AgentExamplePlaybookTest {
 
     @Test
     void example01_producesThreeSteps() throws IOException {
-        var result = compileExample("01-direct-invoke.yaml");
+        var result = compileExample("01-direct-invoke.playbook.yaml");
         assertThat(result.workflow().getDo()).hasSize(3);
     }
 
     @Test
     void example02_producesFiveSteps() throws IOException {
-        var result = compileExample("02-session-conversation.yaml");
+        var result = compileExample("02-session-conversation.playbook.yaml");
         assertThat(result.workflow().getDo()).hasSize(5);
     }
 
     @Test
     void example03_includesClearStep() throws IOException {
-        var result = compileExample("03-session-with-clear.yaml");
+        var result = compileExample("03-session-with-clear.playbook.yaml");
         boolean hasClear = result.workflow().getDo().stream()
                 .anyMatch(item -> item.getName().startsWith("agent-session-clear"));
         assertThat(hasClear).as("Should contain an agent-session-clear step").isTrue();
@@ -84,7 +84,7 @@ class AgentExamplePlaybookTest {
 
     @Test
     void example04_includesParallelBlock() throws IOException {
-        var result = compileExample("04-parallel-queries.yaml");
+        var result = compileExample("04-parallel-queries.playbook.yaml");
         boolean hasParallel = result.workflow().getDo().stream()
                 .anyMatch(item -> item.getTask().getForkTask() != null);
         assertThat(hasParallel).as("Should contain a parallel (fork) task").isTrue();
@@ -92,13 +92,13 @@ class AgentExamplePlaybookTest {
 
     @Test
     void example08_includesPriorityQuery() throws IOException {
-        String yaml = Files.readString(EXAMPLES_DIR.resolve("08-structured-output.yaml"));
+        String yaml = Files.readString(EXAMPLES_DIR.resolve("08-structured-output.playbook.yaml"));
         assertThat(yaml).contains("priority: true");
     }
 
     @Test
     void example05_parsesInlinePool() throws IOException {
-        var result = compileExample("05-pool-backed.yaml");
+        var result = compileExample("05-pool-backed.playbook.yaml");
         assertThat(result.poolDeclarations()).hasSize(1);
         assertThat(result.poolDeclarations().getFirst().name()).isEqualTo("analysts");
         assertThat(result.poolDeclarations().getFirst().clearing())
@@ -107,7 +107,7 @@ class AgentExamplePlaybookTest {
 
     @Test
     void example07_parsesThreePoolsWithSalience() throws IOException {
-        var result = compileExample("07-salience-priority.yaml");
+        var result = compileExample("07-salience-priority.playbook.yaml");
         assertThat(result.poolDeclarations()).hasSize(3);
         var voice = result.poolDeclarations().stream()
                           .filter(p -> "voice".equals(p.name())).findFirst().orElseThrow();

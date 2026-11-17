@@ -9,7 +9,7 @@ meta:
     - producer
     - consumer
     - concurrency-patterns
----
-- parallel:
-  - chan-produce work: { capacity: 2, items: 4, interval: 200 }
-  - chan-consume work: { expect: 4, interval: 300 }
+steps:
+  - parallel:
+    - chan-produce work: { capacity: 2, items: 4, interval: 200 }
+    - chan-consume work: { expect: 4, interval: 300 }

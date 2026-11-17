@@ -9,9 +9,9 @@ meta:
     - rate-limit
     - permits
     - concurrency-patterns
----
-- parallel:
-  - sem-worker pool: { permits: 2, worker: "A", duration: 400 }
-  - sem-worker pool: { permits: 2, worker: "B", duration: 300 }
-  - sem-worker pool: { permits: 2, worker: "C", duration: 500 }
-  - sem-worker pool: { permits: 2, worker: "D", duration: 200 }
+steps:
+  - parallel:
+    - sem-worker pool: { permits: 2, worker: "A", duration: 400 }
+    - sem-worker pool: { permits: 2, worker: "B", duration: 300 }
+    - sem-worker pool: { permits: 2, worker: "C", duration: 500 }
+    - sem-worker pool: { permits: 2, worker: "D", duration: 200 }

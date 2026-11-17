@@ -86,7 +86,7 @@
     },
     "iterations": {
       "type": "object",
-      "description": "Named iteration groups shared across forEach elements.",
+      "description": "Named iteration groups shared across for-each elements.",
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -132,7 +132,7 @@
         "try": { "$ref": "#/$defs/stepList" },
         "catch": { "$ref": "#/$defs/stepList" },
         "finally": { "$ref": "#/$defs/stepList" },
-        "if": { "type": "string", "description": "Condition expression (structural or decorator)." },
+        "if": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "Condition expression (structural or decorator)." },
         "then": { "$ref": "#/$defs/stepList" },
         "else": { "$ref": "#/$defs/stepList" },
         "match": { "type": "string", "description": "Value to match against." },
@@ -149,7 +149,8 @@
               },
               "required": ["await"]
             },
-            { "description": "Barrier decorator." }
+            { "type": "string", "description": "Barrier decorator." },
+            { "type": "boolean", "description": "Barrier decorator (true)." }
           ]
         },
         "quorum": {
@@ -163,14 +164,17 @@
               },
               "required": ["required", "of"]
             },
-            { "description": "Quorum decorator." }
+            { "type": "string", "description": "Quorum decorator." },
+            { "type": "boolean", "description": "Quorum decorator (true)." }
           ]
         },
         "pause": { "type": "string" },
         "resume": { "type": "string" },
         "log": {
-          "type": "object",
-          "properties": { "message": { "type": "string" } }
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "properties": { "message": { "type": "string" } } }
+          ]
         },
         "delay": { "type": "string", "description": "Duration (e.g. 1000ms, 5s)." },
         "signal": { "type": "string", "description": "Send a signal (structural or decorator)." },
@@ -295,7 +299,7 @@
             "exhaustive": { "type": "boolean" }
           }
         },
-        "when": { "type": "string", "description": "Conditional guard expression." },
+        "when": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "Conditional guard expression." },
         "timeout": { "type": "string", "description": "Max execution time (e.g. 5s, 200ms)." },
         "retry": {
           "oneOf": [
@@ -310,10 +314,10 @@
           ],
           "description": "Retry count or policy."
         },
-        "loop": { "type": "integer", "description": "Repeat N times." },
+        "loop": { "oneOf": [{ "type": "integer" }, { "type": "string" }, { "type": "boolean" }, { "type": "object" }], "description": "Repeat N times, loop until condition, or loop config object." },
         "mutex": { "type": "string", "description": "Mutual exclusion group." },
         "capture": { "type": "string", "description": "Capture step output to named variable." },
-        "forEach": {
+        "for-each": {
           "oneOf": [
             { "type": "string", "description": "Named iteration group reference." },
             {
@@ -374,7 +378,7 @@
         "^timeout .+$": { "$ref": "#/$defs/stepList" },
         "^retry \\d+$": { "$ref": "#/$defs/stepList" },
         "^when .+$": { "$ref": "#/$defs/stepList" },
-        "^forEach .+$": { "$ref": "#/$defs/stepList" },
+        "^for-each .+$": { "$ref": "#/$defs/stepList" },
         "^mutex .+$": { "$ref": "#/$defs/stepList" },
         "^loop \\d+$": { "$ref": "#/$defs/stepList" },
         "^block .+$": { "$ref": "#/$defs/stepList" },

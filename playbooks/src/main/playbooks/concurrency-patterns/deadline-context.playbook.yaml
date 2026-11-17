@@ -1,7 +1,6 @@
 playbook: "1.0"
 schema: client
 ---
-
 meta:
   title: "Deadline Context"
   description: "Scoped deadline with cancellation — create a child scope with a deadline, run steps within it, and observe deadline expiry. The deadline fires a callback and marks remaining time as expired."
@@ -10,10 +9,10 @@ meta:
     - timeout
     - cancellation
     - concurrency-patterns
----
-- deadline-create batch: { deadlineMs: 600 }
-- deadline-check: "batch"
-- deadline-work batch: { duration: 300, label: "phase-1" }
-- deadline-check: "batch"
-- deadline-work batch: { duration: 400, label: "phase-2" }
-- deadline-check: "batch"
+steps:
+  - deadline-create batch: { deadlineMs: 600 }
+  - deadline-check: "batch"
+  - deadline-work batch: { duration: 300, label: "phase-1" }
+  - deadline-check: "batch"
+  - deadline-work batch: { duration: 400, label: "phase-2" }
+  - deadline-check: "batch"

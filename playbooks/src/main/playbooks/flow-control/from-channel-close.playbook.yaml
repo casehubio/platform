@@ -9,18 +9,18 @@ meta:
     - channel
     - close
     - flow-control
----
-- concurrent:
-    producer:
-      - log: "Sending item 1"
-        publish: { channel: data, data: { id: 1 } }
-      - log: "Sending item 2"
-        publish: { channel: data, data: { id: 2 } }
-      - log: "Closing channel"
+steps:
+  - concurrent:
+      producer:
+        - log: "Sending item 1"
+          publish: { channel: data, data: { id: 1 } }
+        - log: "Sending item 2"
+          publish: { channel: data, data: { id: 2 } }
+        - log: "Closing channel"
 
-    consumer:
-      - name: read
-        log: "Received ${from.id}"
-        from: data
-        loop: continuous
-        cancel: shutdown
+      consumer:
+        - name: read
+          log: "Received ${from.id}"
+          from: data
+          loop: continuous
+          cancel: shutdown

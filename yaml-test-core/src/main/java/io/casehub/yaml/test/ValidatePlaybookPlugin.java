@@ -206,7 +206,8 @@ public final class ValidatePlaybookPlugin implements Action {
         var registry = new CompositePluginRegistry();
         for (String action : CATALOG_STUB_ACTIONS) {
             registry.register(new Definition(action, null, Map.of(), Map.of(),
-                                             Portability.BOTH, (p, s) -> Result.of(Map.of()), null));
+                                             Portability.BOTH, (p, s) -> Result.of(Map.of()), null,
+                                             java.util.Optional.empty(), true));
         }
         return registry;
     }

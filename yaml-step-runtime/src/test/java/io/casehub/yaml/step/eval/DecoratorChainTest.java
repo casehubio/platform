@@ -1120,6 +1120,52 @@ class DecoratorChainTest {
         }
     }
 
+    // ── background (position 3) ─────────────────────────────────────
+
+    @Nested
+    class BackgroundTests {
+
+        @Test
+        void background_returnsImmediateSuccess() {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var decorators = Map.<String, Object>of("background", true);
+                var result = scopedChain.apply(decorators, ctx -> {
+                    try { Thread.sleep(500); } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return Result.of(Map.of("inner", "value"));
+                }).execute(new StepContext(resolver));
+                assertThat(result.isSuccess()).isTrue();
+                assertThat(result.output()).isEmpty();
+            }
+        }
+
+        @Test
+        void background_innerFailureDoesNotPropagateToResult() throws Exception {
+            try (var scope = new DefaultExecutionScope()) {
+                var scopedChain = new DecoratorChain(
+                        new ConditionEvaluator(null), SpeedMultiplier.identity(), scope);
+                var decorators = Map.<String, Object>of("background", true);
+                var ran = new java.util.concurrent.CountDownLatch(1);
+                var result = scopedChain.apply(decorators, ctx -> {
+                    ran.countDown();
+                    return Result.failed("background error");
+                }).execute(new StepContext(resolver));
+                assertThat(ran.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                assertThat(result.isSuccess()).isTrue();
+            }
+        }
+
+        @Test
+        void background_withoutScope_returnsFailure() {
+            var decorators = Map.<String, Object>of("background", true);
+            var result = chain.apply(decorators, success(Map.of())).execute(new StepContext(resolver));
+            assertThat(result.isSuccess()).isFalse();
+        }
+    }
+
     // ── cancel (position 4) ─────────────────────────────────────────
 
     @Nested

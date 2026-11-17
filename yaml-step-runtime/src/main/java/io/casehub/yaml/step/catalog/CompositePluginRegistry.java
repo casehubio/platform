@@ -19,7 +19,7 @@ public class CompositePluginRegistry implements PluginRegistry {
     public void register(Definition definition) {
         Definition existing = definitions.put(definition.name(), definition);
         if (existing != null) {
-            LOG.log(Level.INFO, "Plugin registration overridden: ''{0}''", definition.name());
+            LOG.log(Level.WARNING, "Plugin registration collision: ''{0}'' — previous registration overridden", definition.name());
         }
     }
 

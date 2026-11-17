@@ -169,6 +169,32 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                                                      "GraphQL generator: REST resource generation disabled (generateRest=false)");
         }
 
+        Set<String> pluginNameCollisions = Set.of();
+        if (generatePlugins) {
+            Map<String, List<String>> nameTodomains = new HashMap<>();
+            for (var e : allDomains.entrySet()) {
+                if (allowedDomains != null && !allowedDomains.contains(e.getKey())) continue;
+                for (ResolvedOperation op : e.getValue().operations) {
+                    if (op.type() == OperationType.WEBHOOK || op.type() == OperationType.STREAM) continue;
+                    if (isReactiveReturn(op.returnTypeStr())) continue;
+                    PluginMeta pm = resolvePluginMeta(op);
+                    if (pm.exclude || !pm.name.isEmpty()) continue;
+                    String shortName = derivePluginName(e.getKey(), op.methodName());
+                    nameTodomains.computeIfAbsent(shortName, k -> new ArrayList<>()).add(e.getKey());
+                }
+            }
+            Set<String> collisions = new HashSet<>();
+            for (var ne : nameTodomains.entrySet()) {
+                if (ne.getValue().size() > 1) {
+                    collisions.add(ne.getKey());
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                            "Plugin name collision '" + ne.getKey() + "' across domains: "
+                            + ne.getValue() + " — using full domain paths");
+                }
+            }
+            if (!collisions.isEmpty()) pluginNameCollisions = collisions;
+        }
+
         for (var entry : allDomains.entrySet()) {
             if (allowedDomains != null && !allowedDomains.contains(entry.getKey())) {
                 processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
@@ -183,7 +209,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 generateRestResourceSource(entry.getKey(), entry.getValue(), restSkipMethods);
             }
             if (generatePlugins) {
-                generatePluginSource(entry.getKey(), entry.getValue(), pluginSkipNames);
+                generatePluginSource(entry.getKey(), entry.getValue(), pluginSkipNames, pluginNameCollisions);
             }
         }
 
@@ -1814,7 +1840,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
         return null;
     }
 
-    private void generatePluginSource(String domain, DomainOperations ops, Set<String> pluginSkipNames) {
+    private void generatePluginSource(String domain, DomainOperations ops, Set<String> pluginSkipNames, Set<String> pluginNameCollisions) {
 
         String pluginPkgOverride = processingEnv.getOptions().get("pluginPackage");
         String packageName = pluginPkgOverride != null
@@ -1837,7 +1863,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
             if (meta.exclude) continue;
 
             String pluginName = meta.name.isEmpty()
-                    ? derivePluginName(domain, op.methodName())
+                    ? derivePluginName(domain, op.methodName(), pluginNameCollisions)
                     : meta.name;
 
             if (pluginSkipNames.contains(pluginName)) {
@@ -1982,11 +2008,15 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     }
 
                     // @Execute method
+                    boolean hasNonHttpContextParams = op.params().stream()
+                            .anyMatch(p -> p.isContextParam() && !isHttpOnlyContextParam(p.contextParamKey()));
                     out.println("    @Execute");
                     if (isStreaming && !meta.subject.isEmpty()) {
                         String subjectType = findParamType(op, meta.subject);
                         out.println("    public " + op.returnTypeStr() + " process("
                                 + subjectType + " " + meta.subject + ", " + executeParamType + " api) {");
+                    } else if (hasNonHttpContextParams) {
+                        out.println("    public Result execute(" + executeParamType + " api, io.casehub.platform.api.identity.CurrentPrincipal __principal) {");
                     } else {
                         out.println("    public Result execute(" + executeParamType + " api) {");
                     }
@@ -1994,8 +2024,16 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     // Delegate call — always api.methodName(params)
                     StringBuilder methodArgs = new StringBuilder();
                     for (ResolvedParam p : op.params()) {
-                        if (p.isContextParam()) continue;
                         if (isStreaming && !meta.subject.isEmpty() && p.name().equals(meta.subject)) continue;
+                        if (p.isContextParam()) {
+                            if (!methodArgs.isEmpty()) methodArgs.append(", ");
+                            if (isHttpOnlyContextParam(p.contextParamKey())) {
+                                methodArgs.append("null");
+                            } else {
+                                methodArgs.append(pluginContextParamResolution(p.contextParamKey()));
+                            }
+                            continue;
+                        }
                         if (!methodArgs.isEmpty()) methodArgs.append(", ");
                         methodArgs.append(p.name());
                     }
@@ -2028,6 +2066,26 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                 ? domain.substring(domain.lastIndexOf('/') + 1)
                 : domain;
         return domainSuffix + "-" + toKebabCase(methodName);
+    }
+
+    static String derivePluginName(String domain, String methodName, Set<String> collisions) {
+        String shortName = derivePluginName(domain, methodName);
+        if (collisions.contains(shortName)) {
+            return domain.replace('/', '-') + "-" + toKebabCase(methodName);
+        }
+        return shortName;
+    }
+
+    private static String pluginContextParamResolution(String key) {
+        return switch (key) {
+            case "tenancyId" -> "__principal.tenancyId()";
+            case "actorId" -> "__principal.actorId()";
+            default -> "__principal." + key + "()";
+        };
+    }
+
+    private static boolean isHttpOnlyContextParam(String key) {
+        return "httpHeaders".equals(key) || "queryParams".equals(key) || "requestUrl".equals(key);
     }
 
     private record PluginField(String name, String typeStr, boolean required, String defaultValue) {

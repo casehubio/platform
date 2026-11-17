@@ -2,6 +2,8 @@ package io.casehub.platform.graphql.generator;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PluginGenerationTest {
@@ -128,5 +130,95 @@ class PluginGenerationTest {
         assertThat(GraphQLResolverProcessor.formatDefaultLiteral("boolean", "false")).isEqualTo("false");
     }
 
+    @Test
+    void pluginWithContextParam_injectsServiceRegistryLookup() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.TenantApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import java.util.List;
+
+                @McpDomain("tenant-query")
+                public interface TenantApi {
+                    @PlatformQuery("List tenant items")
+                    List<String> listItems(@ContextParam("tenancyId") String tenancyId, String filter);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=tenant-query", "-AgeneratePlugins=true",
+                        "-AgenerateGraphQL=false", "-AgenerateRest=false")
+                .compile(spi);
+
+        var pluginSource = compilation.generatedSourceFile(
+                "test.plugin.TenantQueryListItemsPlugin");
+        assertThat(pluginSource).as("Plugin source should be generated").isPresent();
+
+        String content = pluginSource.get().getCharContent(true).toString();
+        assertThat(content).contains("io.casehub.platform.api.identity.CurrentPrincipal __principal");
+        assertThat(content).contains("__principal.tenancyId()");
+    }
+
+    @Test
+    void pluginWithHttpOnlyContextParam_skipsParam() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.HeaderApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                import java.util.Map;
+                import java.util.List;
+
+                @McpDomain("header-query")
+                public interface HeaderApi {
+                    @PlatformQuery("Query with headers")
+                    String query(@ContextParam("httpHeaders") Map<String, List<String>> headers, String filter);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                .withProcessors(new GraphQLResolverProcessor())
+                .withOptions("-AdomainFilter=header-query", "-AgeneratePlugins=true",
+                        "-AgenerateGraphQL=false", "-AgenerateRest=false")
+                .compile(spi);
+
+        var pluginSource = compilation.generatedSourceFile(
+                "test.plugin.HeaderQueryQueryPlugin");
+        assertThat(pluginSource).as("Plugin source should be generated").isPresent();
+
+        String content = pluginSource.get().getCharContent(true).toString();
+        assertThat(content).doesNotContain("CurrentPrincipal");
+        assertThat(content).contains("null");
+    }
+
+    @Test
+    void derivePluginName_no_collision_uses_short_name() {
+        Set<String> collisions = Set.of();
+        assertThat(GraphQLResolverProcessor.derivePluginName("connectors/voice", "speak", collisions))
+                .isEqualTo("voice-speak");
+    }
+
+    @Test
+    void derivePluginName_collision_uses_full_domain_path() {
+        Set<String> collisions = Set.of("voice-speak");
+        assertThat(GraphQLResolverProcessor.derivePluginName("connectors/voice", "speak", collisions))
+                .isEqualTo("connectors-voice-speak");
+    }
+
+    @Test
+    void derivePluginName_deep_nested_collision_uses_full_path() {
+        Set<String> collisions = Set.of("lifecycle-claim");
+        assertThat(GraphQLResolverProcessor.derivePluginName("work/case/lifecycle", "claim", collisions))
+                .isEqualTo("work-case-lifecycle-claim");
+    }
+
+    @Test
+    void derivePluginName_simple_domain_unaffected_by_collision() {
+        Set<String> collisions = Set.of("voice-speak");
+        assertThat(GraphQLResolverProcessor.derivePluginName("labels", "children", collisions))
+                .isEqualTo("labels-children");
+    }
 
 }

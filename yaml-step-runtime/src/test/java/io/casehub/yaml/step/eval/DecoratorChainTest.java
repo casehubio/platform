@@ -61,11 +61,12 @@ class DecoratorChainTest {
         }
 
         @Test
-        void whenFalse_skipsInner() {
+        void whenFalse_returnsSkipped() {
             var count = new AtomicInteger(0);
             var decorators = Map.<String, Object>of("when", "false");
             var result = chain.apply(decorators, counting(count)).execute(new StepContext(resolver));
-            assertThat(result.isSuccess()).isTrue();
+            assertThat(result).isInstanceOf(Result.Skipped.class);
+            assertThat(result.isSkipped()).isTrue();
             assertThat(count.get()).isZero();
         }
 
@@ -388,7 +389,8 @@ class DecoratorChainTest {
             decorators.put("when", "false");
             decorators.put("retry", 3);
             var result = chain.apply(decorators, counting(count)).execute(new StepContext(resolver));
-            assertThat(result.isSuccess()).isTrue();
+            assertThat(result).isInstanceOf(Result.Skipped.class);
+            assertThat(result.isSkipped()).isTrue();
             assertThat(count.get()).isZero();
         }
 

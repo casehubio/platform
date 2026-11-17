@@ -762,7 +762,7 @@ class StructuralStepEvaluatorTest {
                 count.incrementAndGet();
                 return Result.of(Map.of());
             });
-            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.isSkipped()).isTrue();
             assertThat(count.get()).isZero();
         }
 
@@ -807,7 +807,7 @@ class StructuralStepEvaluatorTest {
                 count.incrementAndGet();
                 return Result.of(Map.of());
             });
-            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.isSkipped()).isTrue();
             assertThat(count.get()).isZero();
         }
     }

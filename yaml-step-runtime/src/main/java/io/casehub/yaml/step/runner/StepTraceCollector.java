@@ -36,7 +36,8 @@ public final class StepTraceCollector implements StepExecutionListener {
     @Override
     public void afterStep(ResolvedStep step, Result result, Map<String, Object> detail) {
         String              action         = step instanceof ResolvedStep.PluginStep ps ? ps.actionName() : null;
-        StepOutcome         outcome        = result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
+        StepOutcome         outcome        = result.isSkipped() ? StepOutcome.SKIPPED
+                                             : result.isSuccess() ? StepOutcome.EXECUTED : StepOutcome.FAILED;
         Map<String, Object> enrichedDetail = detail;
 
         if (result.isSuccess() && step instanceof ResolvedStep.PluginStep ps

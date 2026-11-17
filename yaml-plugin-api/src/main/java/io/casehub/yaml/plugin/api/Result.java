@@ -5,9 +5,11 @@ import java.util.LinkedHashMap;
 import java.util.Collections;
 import java.util.Objects;
 
-public sealed interface Result permits Result.Success, Result.Failure {
+public sealed interface Result permits Result.Success, Result.Failure, Result.Skipped {
 
     boolean isSuccess();
+
+    default boolean isSkipped() {return false;}
 
     Map<String, Object> output();
 
@@ -39,6 +41,19 @@ public sealed interface Result permits Result.Success, Result.Failure {
         @Override
         public Map<String, Object> output() {return Map.of();}
     }
+
+    record Skipped() implements Result {
+        @Override
+        public boolean isSuccess()          {return true;}
+
+        @Override
+        public boolean isSkipped()          {return true;}
+
+        @Override
+        public Map<String, Object> output() {return Map.of();}
+    }
+
+    static Result skipped() {return new Skipped();}
 
     static Result of(Map<String, Object> output) {return new Success(output, Map.of());}
 

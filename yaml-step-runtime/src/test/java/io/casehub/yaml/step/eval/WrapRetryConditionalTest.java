@@ -57,23 +57,21 @@ class WrapRetryConditionalTest {
     }
 
     @Test
-    void nullCategoryAlwaysRetried() {
+    void nullCategoryNotRetriedWhenOnFilterActive() {
         var chain = new DecoratorChain(new ConditionEvaluator(null), SpeedMultiplier.identity());
         var counter = new AtomicInteger(0);
 
         DecoratedExecution inner = ctx -> {
-            if (counter.incrementAndGet() < 2) {
-                return Result.failed("generic error");
-            }
-            return Result.of(Map.of("done", true));
+            counter.incrementAndGet();
+            return Result.failed("generic error");
         };
 
         var decorated = chain.apply(Map.of("retry",
                 Map.of("max", 5, "on", List.of("timeout"))), inner);
         Result result = decorated.execute(new StepContext(resolver));
 
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(counter.get()).isEqualTo(2);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(counter.get()).isEqualTo(1);
     }
 
     @Test

@@ -87,7 +87,7 @@ public final class DecoratorChain {
         return ctx -> {
             try {
                 if (!resolveCondition(condition, ctx.resolver(), "when-guard")) {
-                    return Result.of(Map.of());
+                    return Result.skipped();
                 }
             } catch (Exception e) {
                 return Result.failed("when guard failed: " + e.getMessage());

@@ -132,6 +132,10 @@ public final class DecoratorChain {
                     }
                 }
             }
+            if (untilCondition != null) {
+                return Result.failed("Loop exhausted " + maxIterations
+                        + " iterations without until condition being met");
+            }
             return last;
         };
     }

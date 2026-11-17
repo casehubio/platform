@@ -140,6 +140,23 @@ class DecoratorChainTest {
         }
 
         @Test
+        void untilLoop_exhaustsMaxIterations_returnsFailure() {
+            var count = new AtomicInteger(0);
+            var decorators = Map.<String, Object>of("loop",
+                    Map.of("until", "${var.done}", "count", 5));
+            var result = chain.apply(decorators, ctx -> {
+                count.incrementAndGet();
+                return Result.of(Map.of());
+            }).execute(new StepContext(new VariableResolver(
+                    Map.of("var", (VariableSource) name ->
+                            "done".equals(name) ? "false" : null),
+                    Set.of())));
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(((Result.Failure) result).message()).contains("until");
+            assertThat(count.get()).isEqualTo(5);
+        }
+
+        @Test
         void loop_returnsLastIterationOutput() {
             var count = new AtomicInteger(0);
             var decorators = Map.<String, Object>of("loop", 3);

@@ -2,8 +2,6 @@ package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
 import io.casehub.yaml.core.orchestration.DefaultExecutionScope;
-import io.casehub.yaml.core.orchestration.DefaultPrimitiveFactory;
-import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.step.MatchPattern;
 import io.casehub.yaml.plugin.api.Result;
@@ -24,7 +22,7 @@ class RecursiveCompositionTest {
     private final StepRunner noOpRunner = (step, r) -> Result.of(Map.of());
 
     private ConditionEvaluator conditionEvaluator() {
-        return new ConditionEvaluator(expr -> {
+        return new ConditionEvaluator((expr, bindings) -> {
             if (expr.contains("==")) {
                 String[] parts = expr.split("==");
                 return parts.length == 2 && parts[0].trim().equals(parts[1].trim());

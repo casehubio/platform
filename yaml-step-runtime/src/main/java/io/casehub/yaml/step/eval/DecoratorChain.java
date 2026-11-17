@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.eval;
 
 import io.casehub.yaml.core.condition.ConditionEvaluator;
+import io.casehub.yaml.core.orchestration.ChannelClosedException;
 import io.casehub.yaml.core.orchestration.DurationParser;
 import io.casehub.yaml.core.orchestration.ExecutionScope;
 import io.casehub.yaml.core.orchestration.LoopDirective;
@@ -9,7 +10,6 @@ import io.casehub.yaml.core.orchestration.OrcSemaphore;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.orchestration.OrcStateMachine;
 import io.casehub.yaml.core.orchestration.RetryDirective;
-import io.casehub.yaml.core.orchestration.ChannelClosedException;
 import io.casehub.yaml.core.resolver.ObjectVariableSource;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.runtime.SpeedMultiplier;
@@ -17,13 +17,13 @@ import io.casehub.yaml.plugin.api.Result;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.concurrent.locks.LockSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.LockSupport;
 
 public final class DecoratorChain {
 
@@ -71,10 +71,7 @@ public final class DecoratorChain {
         return current;
     }
 
-    private boolean resolveCondition(String condition, VariableResolver resolver, String context) {
-        String resolved = resolver.resolveString(condition, context);
-        return conditionEvaluator.evaluate(resolved);
-    }
+    private boolean resolveCondition(String condition, VariableResolver resolver, String context) {return conditionEvaluator.evaluate(condition, resolver, context);}
 
     private DecoratedExecution wrapWhen(DecoratedExecution inner, Map<String, Object> decorators) {
         Object whenVal = decorators.get("when");

@@ -132,7 +132,7 @@ public class VariableResolver {
         return value;
     }
 
-    private static boolean isSoleReference(String s) {
+    public static boolean isSoleReference(String s) {
         return s.startsWith("${") && s.endsWith("}") && s.indexOf('}') == s.length() - 1;
     }
 

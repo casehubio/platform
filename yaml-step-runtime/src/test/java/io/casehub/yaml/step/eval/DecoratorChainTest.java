@@ -73,7 +73,7 @@ class DecoratorChainTest {
         void whenWithVariableResolution() {
             var flagResolver = new VariableResolver(
                     Map.of("var", (VariableSource) name ->
-                            "flag".equals(name) ? "yes" : null),
+                            "flag".equals(name) ? "true" : null),
                     Set.of());
             var decorators = Map.<String, Object>of("when", "${var.flag}");
             var result = chain.apply(decorators, success(Map.of("ran", true)))
@@ -754,7 +754,7 @@ class DecoratorChainTest {
                 var decorators = Map.<String, Object>of("from",
                         Map.of("channel", "data", "as", "item",
                                 "filter", "${item.severity} == WARNING"));
-                var condEval = new ConditionEvaluator(expr -> {
+                var condEval = new ConditionEvaluator((expr, bindings) -> {
                     String[] parts = expr.split(" == ");
                     return parts.length == 2 && parts[0].trim().equals(parts[1].trim());
                 });
@@ -856,7 +856,7 @@ class DecoratorChainTest {
 
         @Test
         void from_untilConditionExitsGracefully() {
-            var condEval = new ConditionEvaluator(expr -> "true".equals(expr));
+            var condEval = new ConditionEvaluator((expr, bindings) -> "true".equals(expr));
             try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
 
@@ -939,7 +939,7 @@ class DecoratorChainTest {
 
         @Test
         void from_fanIn_untilConditionExits() {
-            var condEval = new ConditionEvaluator(expr -> "true".equals(expr));
+            var condEval = new ConditionEvaluator((expr, bindings) -> "true".equals(expr));
             try (var scope = new DefaultExecutionScope()) {
                 var scopedChain = new DecoratorChain(condEval, SpeedMultiplier.identity(), scope);
 
@@ -977,7 +977,7 @@ class DecoratorChainTest {
         @Test
         void publish_listForm_sendsToMatchingChannels() throws InterruptedException {
             try (var scope = new DefaultExecutionScope()) {
-                var condEval = new ConditionEvaluator(expr -> {
+                var condEval = new ConditionEvaluator((expr, bindings) -> {
                     String[] parts = expr.split(" == ");
                     return parts.length == 2 && parts[0].trim().equals(parts[1].trim());
                 });

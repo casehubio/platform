@@ -2,71 +2,95 @@ package io.casehub.yaml.core.condition;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.function.Function;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ConditionEvaluatorTest {
 
+    private static final io.casehub.yaml.core.resolver.VariableResolver EMPTY_RESOLVER =
+            new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of());
+
     @Test
-    void simpleTruthyValue_returnsTrue() {
-        ConditionEvaluator evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("true")).isTrue();
+    void literal_true_evaluates_without_delegate() {
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("true", EMPTY_RESOLVER, "test")).isTrue();
     }
 
     @Test
-    void simpleFalsyValue_returnsFalse() {
-        ConditionEvaluator evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("false")).isFalse();
+    void literal_false_evaluates_without_delegate() {
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("false", EMPTY_RESOLVER, "test")).isFalse();
     }
 
     @Test
-    void yesValue_returnsTrue() {
-        ConditionEvaluator evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("yes")).isTrue();
+    void sole_variable_reference_resolved_to_boolean() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? Boolean.TRUE : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isTrue();
     }
 
     @Test
-    void noValue_returnsFalse() {
-        ConditionEvaluator evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("no")).isFalse();
+    void sole_variable_reference_resolved_to_string_true() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "true" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isTrue();
     }
 
     @Test
-    void equalityExpression_delegatesToExpressionFunction() {
-        Function<String, Boolean> exprDelegate = expr -> expr.trim().equals("HIGH == 'HIGH'");
-        ConditionEvaluator evaluator = new ConditionEvaluator(exprDelegate);
-        assertThat(evaluator.evaluate("HIGH == 'HIGH'")).isTrue();
+    void sole_variable_reference_resolved_to_string_false() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "false" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isFalse();
     }
 
     @Test
-    void nonBooleanWithoutDelegate_throwsConditionEvaluationException() {
-        ConditionEvaluator evaluator = new ConditionEvaluator(null);
-        assertThatThrownBy(() -> evaluator.evaluate("MEAN_REVERTING"))
+    void expression_delegates_with_bindings() {
+        ConditionDelegate delegate = (expr, bindings) -> {
+            return "x > 5".equals(expr) && bindings.containsKey("var");
+        };
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "x".equals(name) ? 10 : null)
+                               .withExpressionContext("var", java.util.Map.of("x", 10));
+        var evaluator = new ConditionEvaluator(delegate);
+        assertThat(evaluator.evaluate("x > 5", resolver, "test")).isTrue();
+    }
+
+    @Test
+    void no_delegate_throws_for_non_literal() {
+        var evaluator = new ConditionEvaluator(null);
+        assertThatThrownBy(() -> evaluator.evaluate("x > 5", EMPTY_RESOLVER, "test"))
                 .isInstanceOf(ConditionEvaluationException.class)
                 .hasMessageContaining("no expression engine configured");
     }
 
     @Test
-    void expressionDelegate_receivesFullString() {
-        String[] captured = {null};
-        Function<String, Boolean> exprDelegate = expr -> {
-            captured[0] = expr;
+    void expression_delegate_receives_resolved_text_plus_bindings() {
+        String[]                        captured         = {null};
+        java.util.Map<String, Object>[] capturedBindings = new java.util.Map[]{null};
+        ConditionDelegate delegate = (expr, bindings) -> {
+            captured[0]         = expr;
+            capturedBindings[0] = bindings;
             return true;
         };
-        ConditionEvaluator evaluator = new ConditionEvaluator(exprDelegate);
-        evaluator.evaluate("${regime} == 'MEAN_REVERTING'");
-        assertThat(captured[0]).isEqualTo("${regime} == 'MEAN_REVERTING'");
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "regime".equals(name) ? "MEAN_REVERTING" : null)
+                               .withExpressionContext("var", java.util.Map.of("regime", "MEAN_REVERTING"));
+        var evaluator = new ConditionEvaluator(delegate);
+        evaluator.evaluate("${var.regime} == 'MEAN_REVERTING'", resolver, "test");
+        assertThat(captured[0]).isEqualTo("MEAN_REVERTING == 'MEAN_REVERTING'");
+        assertThat(capturedBindings[0]).containsKey("var");
     }
 
     @Test
-    void expressionDelegate_throwsException_propagates() {
-        Function<String, Boolean> exprDelegate = expr -> {
+    void expression_delegate_throws_propagates() {
+        ConditionDelegate delegate = (expr, bindings) -> {
             throw new RuntimeException("eval failed");
         };
-        ConditionEvaluator evaluator = new ConditionEvaluator(exprDelegate);
-        assertThatThrownBy(() -> evaluator.evaluate("bad expression"))
+        var evaluator = new ConditionEvaluator(delegate);
+        assertThatThrownBy(() -> evaluator.evaluate("bad expression", EMPTY_RESOLVER, "test"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("eval failed");
     }

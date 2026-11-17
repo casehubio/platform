@@ -284,8 +284,7 @@ public final class StructuralStepEvaluator {
                                   StepContext ctx, StepRunner runner) {
         boolean condition;
         try {
-            String resolved = ctx.resolver().resolveString(ifElse.condition(), "if-condition");
-            condition = conditionEvaluator.evaluate(resolved);
+            condition = conditionEvaluator.evaluate(ifElse.condition(), ctx.resolver(), "if-condition");
         } catch (Exception e) {
             return Result.failed("Condition evaluation failed: " + e.getMessage());
         }
@@ -307,8 +306,7 @@ public final class StructuralStepEvaluator {
             }
             if (mc.guard() != null) {
                 try {
-                    String resolvedGuard = ctx.resolver().resolveString(mc.guard(), "match-guard");
-                    if (!conditionEvaluator.evaluate(resolvedGuard)) {
+                    if (!conditionEvaluator.evaluate(mc.guard(), ctx.resolver(), "match-guard")) {
                         continue;
                     }
                 } catch (Exception e) {

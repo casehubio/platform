@@ -6,20 +6,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TruthinessTest {
 
-    @ParameterizedTest
-    @ValueSource(strings = {"true", "True", "TRUE", "yes", "Yes", "on", "ON", "y", "Y", "1"})
-    void truthy_values(String value) {
-        assertThat(Truthiness.isTruthy(value)).isTrue();
+    @Test
+    void strict_true_returns_true() {
+        assertThat(Truthiness.isTruthy("true")).isTrue();
+    }
+
+    @Test
+    void strict_false_returns_false() {
+        assertThat(Truthiness.isTruthy("false")).isFalse();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"false", "False", "FALSE", "no", "No", "off", "OFF", "n", "N", "0"})
-    void falsy_values(String value) {
-        assertThat(Truthiness.isTruthy(value)).isFalse();
+    @ValueSource(strings = {"True", "TRUE", "yes", "Yes", "on", "ON", "y", "Y", "1", "no", "No", "off", "OFF", "n", "N", "0", "False", "FALSE"})
+    void norway_and_case_variants_throw(String value) {
+        assertThatThrownBy(() -> Truthiness.isTruthy(value))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not a boolean literal");
     }
 
     @Test
@@ -27,49 +32,12 @@ class TruthinessTest {
         assertThatThrownBy(() -> Truthiness.isTruthy("production"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("production")
-                .hasMessageContaining("not a boolean");
+                .hasMessageContaining("not a boolean literal");
     }
 
     @Test
     void empty_string_throws() {
         assertThatThrownBy(() -> Truthiness.isTruthy(""))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-// --- Runtime: ConditionEvaluator integration with Truthiness ---
-
-    @Test
-    void conditionEvaluator_delegatesToTruthiness_forBooleanStrings() {
-        var evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("true")).isTrue();
-        assertThat(evaluator.evaluate("false")).isFalse();
-        assertThat(evaluator.evaluate("yes")).isTrue();
-        assertThat(evaluator.evaluate("no")).isFalse();
-        assertThat(evaluator.evaluate("on")).isTrue();
-        assertThat(evaluator.evaluate("off")).isFalse();
-        assertThat(evaluator.evaluate("1")).isTrue();
-        assertThat(evaluator.evaluate("0")).isFalse();
-    }
-
-    @Test
-    void conditionEvaluator_caseInsensitive_viaTruthiness() {
-        var evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("TRUE")).isTrue();
-        assertThat(evaluator.evaluate("False")).isFalse();
-        assertThat(evaluator.evaluate("YES")).isTrue();
-    }
-
-    @Test
-    void conditionEvaluator_nonBoolean_delegatesToExpression() {
-        var evaluator = new ConditionEvaluator(expr -> expr.contains("HIGH"));
-        assertThat(evaluator.evaluate("risk == 'HIGH'")).isTrue();
-        assertThat(evaluator.evaluate("risk == 'LOW'")).isFalse();
-    }
-
-    @Test
-    void conditionEvaluator_resolvedVariable_evaluatesAsTruthiness() {
-        // Simulates: when: ${enabled} where ${enabled} resolved to "yes"
-        var evaluator = new ConditionEvaluator(null);
-        assertThat(evaluator.evaluate("yes")).isTrue();
     }
 }

@@ -325,11 +325,21 @@ public final class DecoratorChain {
     private DecoratedExecution wrapTransform(DecoratedExecution inner, Map<String, Object> decorators) {
         Object transformVal = decorators.get("transform");
         if (transformVal == null) {return inner;}
+        if (config.transformDelegate() == null) {
+            return ctx -> Result.failed("'transform' requires an expression engine");
+        }
 
+        String expression = String.valueOf(transformVal);
         return ctx -> {
             Result result = inner.execute(ctx);
             if (!result.isSuccess()) {return result;}
-            return result;
+            try {
+                Map<String, Object> transformed = config.transformDelegate().transform(
+                        expression, result.output());
+                return Result.of(transformed);
+            } catch (Exception e) {
+                return Result.failed("Transform failed: " + e.getMessage());
+            }
         };
     }
 

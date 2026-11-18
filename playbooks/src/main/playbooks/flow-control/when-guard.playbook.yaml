@@ -13,10 +13,10 @@ meta:
   layer: flow-control
   teaches: "conditional step execution via decorator"
   builds-on: sequential
-steps:
-  - click: "A"
-  - click: "B"
-    when: true
-  - click: "C"
-    when: false
-  - click: "D"
+---
+- click: "A"
+- click: "B"
+  when: true
+- click: "C"
+  when: false
+- click: "D"

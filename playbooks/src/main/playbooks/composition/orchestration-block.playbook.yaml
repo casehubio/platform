@@ -21,16 +21,16 @@ orchestration:
   barriers:
     sync: { count: 2 }
   signals: [ready]
-steps:
-  - concurrent:
-      init:
-        - click: "A"
-        - delay: 1500ms
-        - signal: ready
-        - await:barrier: sync
-        - click: "C"
-      worker:
-        - await:signal: ready
-        - click: "B"
-        - await:barrier: sync
-        - click: "D"
+---
+- concurrent:
+    init:
+      - click: "A"
+      - delay: 1500ms
+      - signal: ready
+      - await:barrier: sync
+      - click: "C"
+    worker:
+      - await:signal: ready
+      - click: "B"
+      - await:barrier: sync
+      - click: "D"

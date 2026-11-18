@@ -9,13 +9,13 @@ meta:
   layer: agent-interaction-patterns
   teaches: "single-shot agent invocation"
   builds-on: sequential
-steps:
-  - agent-session-open classifier:
-      system: >
-        You are a document classifier. Respond with exactly one word:
-        INVOICE, CONTRACT, RECEIPT, or UNKNOWN.
+---
+- agent-session-open classifier:
+    system: >
+      You are a document classifier. Respond with exactly one word:
+      INVOICE, CONTRACT, RECEIPT, or UNKNOWN.
 
-  - agent-query classifier: "Classify this document: 'Payment of $5,000 due by March 15'"
-    capture: classification
+- agent-query classifier: "Classify this document: 'Payment of $5,000 due by March 15'"
+  capture: classification
 
-  - agent-session-close: classifier
+- agent-session-close: classifier

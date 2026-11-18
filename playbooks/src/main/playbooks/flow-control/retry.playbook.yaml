@@ -13,9 +13,9 @@ meta:
   layer: flow-control
   teaches: "retrying failed steps with configurable limits"
   builds-on: sequential
-steps:
-  - click: "A"
-    retry: 3
-  - click: "B"
-    retry: { max: 2 }
-  - click: "C"
+---
+- click: "A"
+  retry: 3
+- click: "B"
+  retry: { max: 2 }
+- click: "C"

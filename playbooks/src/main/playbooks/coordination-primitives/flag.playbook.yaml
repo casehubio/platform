@@ -13,9 +13,9 @@ meta:
   layer: coordination-primitives
   teaches: "boolean flag set/check/toggle"
   builds-on: sequential
-steps:
-  - flag-check: "ready"
-  - flag-set: "ready"
-  - flag-check: "ready"
-  - flag-toggle: "ready"
-  - flag-check: "ready"
+---
+- flag-check: "ready"
+- flag-set: "ready"
+- flag-check: "ready"
+- flag-toggle: "ready"
+- flag-check: "ready"

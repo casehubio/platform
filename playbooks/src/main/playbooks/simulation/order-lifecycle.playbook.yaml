@@ -9,17 +9,17 @@ meta:
   layer: simulation
   teaches: "state machine-driven simulation with corpus selection"
   builds-on: [state-machine, simulated-data]
-steps:
-  - agent-session-open order-agent:
-      system: You are an order processing assistant.
+---
+- agent-session-open order-agent:
+    system: You are an order processing assistant.
 
-  - name: check-order
-    agent-query order-agent: "Check order status for ORD-5501"
+- name: check-order
+  agent-query order-agent: "Check order status for ORD-5501"
 
-  - name: process-payment
-    agent-query order-agent: "Process payment for ORD-5501"
+- name: process-payment
+  agent-query order-agent: "Process payment for ORD-5501"
 
-  - name: ship-order
-    agent-query order-agent: "Ship order ORD-5501"
+- name: ship-order
+  agent-query order-agent: "Ship order ORD-5501"
 
-  - agent-session-close: order-agent
+- agent-session-close: order-agent

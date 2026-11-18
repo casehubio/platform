@@ -326,7 +326,7 @@ class AgentExampleExecutionTest {
         var outcome = new PlaybookCompiler().compile(doc);
         assertThat(outcome).isInstanceOf(CompilationOutcome.Success.class);
         var poolDecls = ((CompilationOutcome.Success) outcome).result().poolDeclarations();
-        var steps = extractSteps(yaml);
+        var steps = extractSteps(doc);
 
         if (poolDecls.isEmpty()) {
             poolDecls = List.of(new PoolDeclaration("default", "agent", "stub",
@@ -353,15 +353,8 @@ class AgentExampleExecutionTest {
     }
 
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> extractSteps(String yaml) {
-        var loader = new org.yaml.snakeyaml.Yaml();
-        var docs = new ArrayList<Object>();
-        for (Object doc : loader.loadAll(yaml)) docs.add(doc);
-        Map<String, Object> content = docs.size() == 1
-                ? (Map<String, Object>) docs.getFirst()
-                : new LinkedHashMap<>((Map<String, Object>) docs.getFirst());
-        if (docs.size() > 1) content.putAll((Map<String, Object>) docs.get(1));
-        var steps = (List<Map<String, Object>>) content.get("steps");
+    private List<Map<String, Object>> extractSteps(io.casehub.yaml.core.playbook.PlaybookDocument doc) {
+        var steps = (List<Map<String, Object>>) doc.content().get("steps");
         return steps != null ? steps : List.of();
     }
 

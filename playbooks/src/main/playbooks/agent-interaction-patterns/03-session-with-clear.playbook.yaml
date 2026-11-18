@@ -9,24 +9,24 @@ meta:
   layer: agent-interaction-patterns
   teaches: "clearing agent session context"
   builds-on: 02-session-conversation
-steps:
-  - agent-session-open support:
-      system: >
-        You are a customer support agent. Help with one issue at a time.
-        Be empathetic and solution-oriented.
+---
+- agent-session-open support:
+    system: >
+      You are a customer support agent. Help with one issue at a time.
+      Be empathetic and solution-oriented.
 
-  # First customer issue
-  - agent-query support: "My order #4521 hasn't arrived. It's been 10 days."
-    capture: shipping_response
+# First customer issue
+- agent-query support: "My order #4521 hasn't arrived. It's been 10 days."
+  capture: shipping_response
 
-  - agent-query support: "Can you expedite replacement shipping?"
-    capture: expedite_response
+- agent-query support: "Can you expedite replacement shipping?"
+  capture: expedite_response
 
-  # Clear context — next customer, different issue
-  - agent-session-clear: support
+# Clear context — next customer, different issue
+- agent-session-clear: support
 
-  # Second customer issue (agent has no memory of the first)
-  - agent-query support: "I was charged twice for subscription renewal."
-    capture: billing_response
+# Second customer issue (agent has no memory of the first)
+- agent-query support: "I was charged twice for subscription renewal."
+  capture: billing_response
 
-  - agent-session-close: support
+- agent-session-close: support

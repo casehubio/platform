@@ -13,10 +13,10 @@ meta:
   layer: coordination-primitives
   teaches: "numeric gauge set/get/compare-and-swap"
   builds-on: sequential
-steps:
-  - gauge-set temp: 20
-  - gauge-get: "temp"
-  - gauge-set temp: 35
-  - gauge-get: "temp"
-  - gauge-cas temp: { expect: 35, update: 42 }
-  - gauge-get: "temp"
+---
+- gauge-set temp: 20
+- gauge-get: "temp"
+- gauge-set temp: 35
+- gauge-get: "temp"
+- gauge-cas temp: { expect: 35, update: 42 }
+- gauge-get: "temp"

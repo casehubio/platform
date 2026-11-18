@@ -17,15 +17,15 @@ meta:
   builds-on: sequential
 orchestration:
   signals: [data-ready, ack]
-steps:
-  - concurrent:
-      producer:
-        - click: "A"
-        - signal: data-ready
-        - await:signal: ack
-        - click: "C"
-      consumer:
-        - await:signal: data-ready
-        - click: "B"
-        - signal: ack
-        - click: "D"
+---
+- concurrent:
+    producer:
+      - click: "A"
+      - signal: data-ready
+      - await:signal: ack
+      - click: "C"
+    consumer:
+      - await:signal: data-ready
+      - click: "B"
+      - signal: ack
+      - click: "D"

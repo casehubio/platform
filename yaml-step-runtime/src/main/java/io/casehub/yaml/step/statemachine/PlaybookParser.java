@@ -13,6 +13,7 @@ public final class PlaybookParser {
     private static final String PLAYBOOK_KEY = "playbook";
     private static final String SCHEMA_KEY = "schema";
     private static final String NAME_KEY = "name";
+    private static final String STEPS_KEY = "steps";
 
     private PlaybookParser() {}
 
@@ -50,6 +51,7 @@ public final class PlaybookParser {
 
         if (documents.size() >= 3) {
             var metadata = new LinkedHashMap<>(asMap(documents.get(1)));
+            rejectStepsWrapper(metadata);
 
             String playbookName = null;
             if (metadata.containsKey(PLAYBOOK_KEY)) {
@@ -74,7 +76,17 @@ public final class PlaybookParser {
         }
 
         var content = asMap(documents.get(1));
+        rejectStepsWrapper(content);
         return new PlaybookDocument(frontMatter, content);
+    }
+
+
+    private static void rejectStepsWrapper(Map<String, Object> content) {
+        if (content.containsKey(STEPS_KEY) && content.get(STEPS_KEY) instanceof List<?>) {
+            throw new IllegalArgumentException(
+                    "The 'steps:' wrapper key is not allowed in versioned playbooks. "
+                    + "Use bare-list format: add '---' before the step list and remove the 'steps:' line.");
+        }
     }
 
     private static PlaybookFrontMatter extractFrontMatter(Map<String, Object> doc) {

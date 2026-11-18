@@ -9,26 +9,26 @@ meta:
   layer: agent-interaction-patterns
   teaches: "parallel agent invocations"
   builds-on: [01-direct-invoke, parallel]
-steps:
-  - agent-session-open legal-reviewer:
-      system: "You are a legal reviewer. Identify contract risks. Be brief."
+---
+- agent-session-open legal-reviewer:
+    system: "You are a legal reviewer. Identify contract risks. Be brief."
 
-  - agent-session-open financial-reviewer:
-      system: "You are a financial reviewer. Assess payment terms. Be brief."
+- agent-session-open financial-reviewer:
+    system: "You are a financial reviewer. Assess payment terms. Be brief."
 
-  - agent-session-open compliance-reviewer:
-      system: "You are a compliance reviewer. Check regulatory adherence. Be brief."
+- agent-session-open compliance-reviewer:
+    system: "You are a compliance reviewer. Check regulatory adherence. Be brief."
 
-  - parallel:
-      - agent-query legal-reviewer: "Review this clause: 'Termination for convenience with 30-day notice.'"
-        capture: legal_review
+- parallel:
+    - agent-query legal-reviewer: "Review this clause: 'Termination for convenience with 30-day notice.'"
+      capture: legal_review
 
-      - agent-query financial-reviewer: "Review: 'Net-90 payment terms with 2% early payment discount.'"
-        capture: financial_review
+    - agent-query financial-reviewer: "Review: 'Net-90 payment terms with 2% early payment discount.'"
+      capture: financial_review
 
-      - agent-query compliance-reviewer: "Review: 'Data stored in EU region only, GDPR article 28 processor agreement.'"
-        capture: compliance_review
+    - agent-query compliance-reviewer: "Review: 'Data stored in EU region only, GDPR article 28 processor agreement.'"
+      capture: compliance_review
 
-  - agent-session-close: legal-reviewer
-  - agent-session-close: financial-reviewer
-  - agent-session-close: compliance-reviewer
+- agent-session-close: legal-reviewer
+- agent-session-close: financial-reviewer
+- agent-session-close: compliance-reviewer

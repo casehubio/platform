@@ -14,12 +14,12 @@ meta:
   layer: composition
   teaches: "starting work in response to data events"
   builds-on: sequential
-steps:
-  - click: "A"
-  - click: "B"
-  - trigger:
-      type: data
-      channel: trades
-    block:
-      - click: "C"
-      - click: "D"
+---
+- click: "A"
+- click: "B"
+- trigger:
+    type: data
+    channel: trades
+  block:
+    - click: "C"
+    - click: "D"

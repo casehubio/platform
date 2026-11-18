@@ -13,14 +13,14 @@ meta:
   layer: invoke-bindings
   teaches: "invoking an agent backend"
   builds-on: sequential
-steps:
-  - agent-delegate summarizer:
-      model: claude-sonnet-5
-      structuredOutput: true
-      params: { text: "Long document content...", maxLength: 100 }
-  - log: "Summary generated"
-  - agent-delegate code-gen:
-      model: claude-opus-5
-      structuredOutput: true
-      params: { spec: "REST endpoint for user CRUD" }
-  - log: "Code generated"
+---
+- agent-delegate summarizer:
+    model: claude-sonnet-5
+    structuredOutput: true
+    params: { text: "Long document content...", maxLength: 100 }
+- log: "Summary generated"
+- agent-delegate code-gen:
+    model: claude-opus-5
+    structuredOutput: true
+    params: { spec: "REST endpoint for user CRUD" }
+- log: "Code generated"

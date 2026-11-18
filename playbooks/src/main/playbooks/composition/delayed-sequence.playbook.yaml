@@ -14,14 +14,14 @@ meta:
   layer: composition
   teaches: "steps with inter-step delays"
   builds-on: delay
-steps:
-  - name: read-a
-    log: "Read trigger: ${from.type}"
-    from: triggers
+---
+- name: read-a
+  log: "Read trigger: ${from.type}"
+  from: triggers
 
-  - delay: 2s
+- delay: 2s
 
-  - name: read-b
-    log: "Read consequence: ${from.type}"
-    from: consequences
-    timeout: 10s
+- name: read-b
+  log: "Read consequence: ${from.type}"
+  from: consequences
+  timeout: 10s

@@ -16,12 +16,12 @@ meta:
   layer: composition
   teaches: "detecting missed heartbeats via timed absence"
   builds-on: [timeout, concurrent]
-steps:
-  - block monitor:
-      - name: heartbeat
-        log: "Heartbeat: ${from.ts}"
-        from: heartbeats
-        timeout: 5s
-      - delay: 1s
-    loop: continuous
-    cancel: shutdown
+---
+- block monitor:
+    - name: heartbeat
+      log: "Heartbeat: ${from.ts}"
+      from: heartbeats
+      timeout: 5s
+    - delay: 1s
+  loop: continuous
+  cancel: shutdown

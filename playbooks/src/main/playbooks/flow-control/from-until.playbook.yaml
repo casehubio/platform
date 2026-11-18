@@ -13,14 +13,14 @@ meta:
   layer: flow-control
   teaches: "iterating with a counter until a condition"
   builds-on: loop
-steps:
-  - name: producer
-    log: "Sending 3 items"
-    publish: { channel: events, data: { value: 1 } }
-    loop: 3
+---
+- name: producer
+  log: "Sending 3 items"
+  publish: { channel: events, data: { value: 1 } }
+  loop: 3
 
-  - name: consumer
-    log: "Processing ${from.value}"
-    from: { channel: events, until: "${flag.done}" }
-    loop: continuous
-    cancel: shutdown
+- name: consumer
+  log: "Processing ${from.value}"
+  from: { channel: events, until: "${flag.done}" }
+  loop: continuous
+  cancel: shutdown

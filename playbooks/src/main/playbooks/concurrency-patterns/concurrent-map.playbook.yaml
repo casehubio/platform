@@ -13,10 +13,10 @@ meta:
   layer: concurrency-patterns
   teaches: "parallel map/reduce over a collection"
   builds-on: [parallel, foreach]
-steps:
-  - parallel:
-    - map-writer registry: { op: "put", key: "svc-a", value: "running" }
-    - map-writer registry: { op: "put", key: "svc-b", value: "starting" }
-    - map-writer registry: { op: "putIfAbsent", key: "svc-a", value: "duplicate" }
-    - map-writer registry: { op: "merge", key: "svc-b", value: "running" }
-  - map-reader: "registry"
+---
+- parallel:
+  - map-writer registry: { op: "put", key: "svc-a", value: "running" }
+  - map-writer registry: { op: "put", key: "svc-b", value: "starting" }
+  - map-writer registry: { op: "putIfAbsent", key: "svc-a", value: "duplicate" }
+  - map-writer registry: { op: "merge", key: "svc-b", value: "running" }
+- map-reader: "registry"

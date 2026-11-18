@@ -12,9 +12,9 @@ meta:
   layer: flow-control
   teaches: "inserting a timed pause between steps"
   builds-on: sequential
-steps:
-  - click: "A"
-  - delay: 1000ms
-  - click: "B"
-  - delay: 500ms
-  - click: "C"
+---
+- click: "A"
+- delay: 1000ms
+- click: "B"
+- delay: 500ms
+- click: "C"

@@ -13,10 +13,10 @@ meta:
   layer: coordination-primitives
   teaches: "countdown latch for waiting on N events"
   builds-on: counter
-steps:
-  - latch-create init-gate: { count: 3 }
-  - latch-countdown: "init-gate"
-  - latch-status: "init-gate"
-  - latch-countdown: "init-gate"
-  - latch-countdown: "init-gate"
-  - latch-status: "init-gate"
+---
+- latch-create init-gate: { count: 3 }
+- latch-countdown: "init-gate"
+- latch-status: "init-gate"
+- latch-countdown: "init-gate"
+- latch-countdown: "init-gate"
+- latch-status: "init-gate"

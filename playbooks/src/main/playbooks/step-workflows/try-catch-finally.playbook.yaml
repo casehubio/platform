@@ -14,11 +14,11 @@ meta:
   layer: step-workflows
   teaches: "structured error handling"
   builds-on: block-sequential
-steps:
-  - try:
-      - log: "Attempting risky operation"
-      - fail: { message: "Something went wrong" }
-    catch:
-      - log: "Caught error — recovering"
-    finally:
-      - log: "Cleanup — always runs"
+---
+- try:
+    - log: "Attempting risky operation"
+    - fail: { message: "Something went wrong" }
+  catch:
+    - log: "Caught error — recovering"
+  finally:
+    - log: "Cleanup — always runs"

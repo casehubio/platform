@@ -13,14 +13,14 @@ meta:
   layer: step-workflows
   teaches: "waiting for N-of-M branches"
   builds-on: barrier
-steps:
-  - name: primary
-    log: "Primary completed"
-  - name: secondary
-    log: "Secondary completed"
-  - name: tertiary
-    log: "Tertiary completed"
-  - quorum:
-      required: 2
-      of: [primary, secondary, tertiary]
-  - log: "Quorum met — 2 of 3 done"
+---
+- name: primary
+  log: "Primary completed"
+- name: secondary
+  log: "Secondary completed"
+- name: tertiary
+  log: "Tertiary completed"
+- quorum:
+    required: 2
+    of: [primary, secondary, tertiary]
+- log: "Quorum met — 2 of 3 done"

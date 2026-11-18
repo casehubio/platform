@@ -9,19 +9,19 @@ meta:
   layer: agent-interaction-patterns
   teaches: "multi-turn agent conversation"
   builds-on: 01-direct-invoke
-steps:
-  - agent-session-open analyst:
-      system: >
-        You are a financial analyst. Answer questions about the portfolio
-        provided. Be concise.
+---
+- agent-session-open analyst:
+    system: >
+      You are a financial analyst. Answer questions about the portfolio
+      provided. Be concise.
 
-  - agent-query analyst: "The portfolio has 60% equities, 30% bonds, 10% cash. What's the risk profile?"
-    capture: risk_assessment
+- agent-query analyst: "The portfolio has 60% equities, 30% bonds, 10% cash. What's the risk profile?"
+  capture: risk_assessment
 
-  - agent-query analyst: "Given that risk profile, what rebalancing would you suggest for a downturn?"
-    capture: rebalancing_advice
+- agent-query analyst: "Given that risk profile, what rebalancing would you suggest for a downturn?"
+  capture: rebalancing_advice
 
-  - agent-query analyst: "Summarize your recommendations in three bullet points."
-    capture: summary
+- agent-query analyst: "Summarize your recommendations in three bullet points."
+  capture: summary
 
-  - agent-session-close: analyst
+- agent-session-close: analyst

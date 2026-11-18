@@ -14,11 +14,11 @@ meta:
   layer: coordination
   teaches: "signalling between steps"
   builds-on: sequential
-steps:
-  - concurrent:
-      sender:
-        - click: "A"
-        - signal: go
-      receiver:
-        - await:signal: go
-        - click: "B"
+---
+- concurrent:
+    sender:
+      - click: "A"
+      - signal: go
+    receiver:
+      - await:signal: go
+      - click: "B"

@@ -13,10 +13,10 @@ meta:
   layer: invoke-bindings
   teaches: "running inline scripts"
   builds-on: sequential
-steps:
-  - script-run:python3: "import json; print(json.dumps({'status': 'ok'}))"
-    timeout: 30s
-  - log: "Python script done"
-  - script-run:node: "console.log(JSON.stringify({ valid: true }))"
-    timeout: 10s
-  - log: "Node script done"
+---
+- script-run:python3: "import json; print(json.dumps({'status': 'ok'}))"
+  timeout: 30s
+- log: "Python script done"
+- script-run:node: "console.log(JSON.stringify({ valid: true }))"
+  timeout: 10s
+- log: "Node script done"

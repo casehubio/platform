@@ -15,7 +15,7 @@ meta:
   layer: composition
   teaches: "reusable module definitions and imports"
   builds-on: block-sequential
-steps:
-  - log: "Import sales: Sales Overview, dataset=sales-daily, threshold=90"
-  - log: "Import ops: Operations, dataset=ops-metrics, threshold=80 (default)"
-  - log: "Import combined: Combined View, dataset chained from ops output"
+---
+- log: "Import sales: Sales Overview, dataset=sales-daily, threshold=90"
+- log: "Import ops: Operations, dataset=ops-metrics, threshold=80 (default)"
+- log: "Import combined: Combined View, dataset chained from ops output"

@@ -13,9 +13,9 @@ meta:
   layer: flow-control
   teaches: "failing a step if it exceeds a time limit"
   builds-on: sequential
-steps:
-  - click: "A"
-    timeout: 5s
-  - click: "B"
-    timeout: 2s
-  - click: "C"
+---
+- click: "A"
+  timeout: 5s
+- click: "B"
+  timeout: 2s
+- click: "C"

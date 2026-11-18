@@ -13,14 +13,14 @@ meta:
   layer: step-workflows
   teaches: "conditional branching with then/else"
   builds-on: sequential
-steps:
-  - if: true
-    then:
-      - log: "Condition was true"
-    else:
-      - log: "Condition was false"
-  - if: false
-    then:
-      - log: "This is skipped"
-    else:
-      - log: "False branch taken"
+---
+- if: true
+  then:
+    - log: "Condition was true"
+  else:
+    - log: "Condition was false"
+- if: false
+  then:
+    - log: "This is skipped"
+  else:
+    - log: "False branch taken"

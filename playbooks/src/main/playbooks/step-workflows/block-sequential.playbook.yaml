@@ -11,8 +11,8 @@ meta:
   level: 1
   layer: step-workflows
   teaches: "grouping steps into a named block"
-steps:
-  - block:
-    - log: "Step 1: initialize"
-    - log: "Step 2: process"
-    - log: "Step 3: finalize"
+---
+- block:
+  - log: "Step 1: initialize"
+  - log: "Step 2: process"
+  - log: "Step 3: finalize"

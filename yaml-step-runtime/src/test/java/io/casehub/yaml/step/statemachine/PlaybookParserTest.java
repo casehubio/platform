@@ -39,8 +39,8 @@ class PlaybookParserTest {
                 name: helpdesk-intake
                 ---
                 scenario: helpdesk-intake
-                steps:
-                  - navigate: "#intake"
+                ---
+                - navigate: "#intake"
                 """;
 
         PlaybookDocument doc = PlaybookParser.parse(yaml);
@@ -126,6 +126,51 @@ class PlaybookParserTest {
     void parseEmptyYaml_throws() {
         assertThatThrownBy(() -> PlaybookParser.parse(""))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void parseVersionedPlaybook_rejectsStepsWrapper_twoDocFormat() {
+        String yaml = """
+                playbook: "1.0"
+                schema: client
+                ---
+                steps:
+                  - navigate: "#intake"
+                """;
+
+        assertThatThrownBy(() -> PlaybookParser.parse(yaml))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'steps:' wrapper key is not allowed");
+    }
+
+    @Test
+    void parseVersionedPlaybook_rejectsStepsWrapper_threeDocFormat() {
+        String yaml = """
+                playbook: "1.0"
+                schema: client
+                ---
+                meta:
+                  title: "test"
+                steps:
+                  - navigate: "#intake"
+                ---
+                - unreachable: step
+                """;
+
+        assertThatThrownBy(() -> PlaybookParser.parse(yaml))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'steps:' wrapper key is not allowed");
+    }
+
+    @Test
+    void parseLegacySingleDoc_allowsStepsKey() {
+        String yaml = """
+                steps:
+                  - log: hello
+                """;
+
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+        assertThat(doc.content()).containsKey("steps");
     }
 
     @Test

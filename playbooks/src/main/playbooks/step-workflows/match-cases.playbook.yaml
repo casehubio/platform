@@ -13,12 +13,12 @@ meta:
   layer: step-workflows
   teaches: "multi-branch pattern matching"
   builds-on: if-else
-steps:
-  - match: "warning"
-    cases:
-      - pattern: "error"
-        log: "Matched: error"
-      - pattern: "warning"
-        log: "Matched: warning"
-      - default:
-          - log: "No match — default"
+---
+- match: "warning"
+  cases:
+    - pattern: "error"
+      log: "Matched: error"
+    - pattern: "warning"
+      log: "Matched: warning"
+    - default:
+        - log: "No match — default"

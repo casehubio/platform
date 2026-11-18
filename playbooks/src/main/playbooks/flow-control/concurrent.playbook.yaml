@@ -12,11 +12,11 @@ meta:
   layer: flow-control
   teaches: "interleaving steps from parallel branches"
   builds-on: sequential
-steps:
-  - concurrent:
-      branch-a:
-        - click: "A"
-        - click: "C"
-      branch-b:
-        - click: "B"
-        - click: "D"
+---
+- concurrent:
+    branch-a:
+      - click: "A"
+      - click: "C"
+    branch-b:
+      - click: "B"
+      - click: "D"

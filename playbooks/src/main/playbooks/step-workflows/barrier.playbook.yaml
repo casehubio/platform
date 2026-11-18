@@ -13,11 +13,11 @@ meta:
   layer: step-workflows
   teaches: "synchronisation point across branches"
   builds-on: parallel
-steps:
-  - name: fetch-data
-    log: "Fetching data"
-  - name: load-config
-    log: "Loading config"
-  - barrier:
-      await: [fetch-data, load-config]
-  - log: "Both done — proceeding"
+---
+- name: fetch-data
+  log: "Fetching data"
+- name: load-config
+  log: "Loading config"
+- barrier:
+    await: [fetch-data, load-config]
+- log: "Both done — proceeding"

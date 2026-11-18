@@ -13,9 +13,9 @@ meta:
   layer: step-workflows
   teaches: "running branches concurrently where first wins"
   builds-on: parallel
-steps:
-  - race:
-    - block:
-      - delay: 200ms
-      - log: "Slow branch finished"
-    - log: "Fast branch finished"
+---
+- race:
+  - block:
+    - delay: 200ms
+    - log: "Slow branch finished"
+  - log: "Fast branch finished"

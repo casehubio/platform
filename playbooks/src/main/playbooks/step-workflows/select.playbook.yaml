@@ -13,9 +13,9 @@ meta:
   layer: step-workflows
   teaches: "choosing a branch based on value"
   builds-on: match-cases
-steps:
-  - select:
-    - wait: fast-signal
-      log: "Fast branch won the race"
-    - wait: slow-signal
-      log: "Slow branch won the race"
+---
+- select:
+  - wait: fast-signal
+    log: "Fast branch won the race"
+  - wait: slow-signal
+    log: "Slow branch won the race"

@@ -13,19 +13,19 @@ meta:
   layer: concurrency-patterns
   teaches: "multi-stage pipeline with backpressure"
   builds-on: [channel, semaphore]
-steps:
-  - deadline-create pipeline: { deadlineMs: 3000 }
-  - spawn-task monitor: { duration: 2500 }
-  - deadline-check: "pipeline"
-  - parallel:
-    - chan-produce jobs: { capacity: 2, items: 4, interval: 150 }
-    - pipeline-consume jobs:
-        semaphore: gate
-        permits: 2
-        map: results
-        expect: 4
-        processingMs: 300
-  - map-reader: "results"
-  - deadline-check: "pipeline"
-  - task-join monitor: { timeout: 2000 }
-  - task-poll: "monitor"
+---
+- deadline-create pipeline: { deadlineMs: 3000 }
+- spawn-task monitor: { duration: 2500 }
+- deadline-check: "pipeline"
+- parallel:
+  - chan-produce jobs: { capacity: 2, items: 4, interval: 150 }
+  - pipeline-consume jobs:
+      semaphore: gate
+      permits: 2
+      map: results
+      expect: 4
+      processingMs: 300
+- map-reader: "results"
+- deadline-check: "pipeline"
+- task-join monitor: { timeout: 2000 }
+- task-poll: "monitor"

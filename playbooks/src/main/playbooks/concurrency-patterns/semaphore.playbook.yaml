@@ -13,9 +13,9 @@ meta:
   layer: concurrency-patterns
   teaches: "limiting concurrent access to a resource"
   builds-on: concurrent
-steps:
-  - parallel:
-    - sem-worker pool: { permits: 2, worker: "A", duration: 400 }
-    - sem-worker pool: { permits: 2, worker: "B", duration: 300 }
-    - sem-worker pool: { permits: 2, worker: "C", duration: 500 }
-    - sem-worker pool: { permits: 2, worker: "D", duration: 200 }
+---
+- parallel:
+  - sem-worker pool: { permits: 2, worker: "A", duration: 400 }
+  - sem-worker pool: { permits: 2, worker: "B", duration: 300 }
+  - sem-worker pool: { permits: 2, worker: "C", duration: 500 }
+  - sem-worker pool: { permits: 2, worker: "D", duration: 200 }

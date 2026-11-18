@@ -15,22 +15,22 @@ meta:
   layer: data-delivery
   teaches: "combining multiple data sources"
   builds-on: [simulated-data, graphql-operation]
-steps:
-  - concurrent:
-      data-pump:
-        - simulated:
-            dataset: events
-            data:
-              type: login
-              user: alice
-        - delay: 500ms
-        - simulated:
-            dataset: events
-            data:
-              type: purchase
-              user: alice
-              amount: 49.99
-      ui-flow:
-        - click: "Submit"
-        - delay: 800ms
-        - click: "Reset"
+---
+- concurrent:
+    data-pump:
+      - simulated:
+          dataset: events
+          data:
+            type: login
+            user: alice
+      - delay: 500ms
+      - simulated:
+          dataset: events
+          data:
+            type: purchase
+            user: alice
+            amount: 49.99
+    ui-flow:
+      - click: "Submit"
+      - delay: 800ms
+      - click: "Reset"

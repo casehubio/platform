@@ -14,18 +14,18 @@ meta:
   layer: data-delivery
   teaches: "GraphQL data delivery in playbooks"
   builds-on: graphql
-steps:
-  - graphql:
-      name: create-order
-      domain: orders
-      operation: createOrder
-      params:
-        product: "Widget Pro"
-        quantity: 5
-  - graphql:
-      name: update-status
-      domain: orders
-      operation: updateOrderStatus
-      params:
-        orderId: "1001"
-        status: shipped
+---
+- graphql:
+    name: create-order
+    domain: orders
+    operation: createOrder
+    params:
+      product: "Widget Pro"
+      quantity: 5
+- graphql:
+    name: update-status
+    domain: orders
+    operation: updateOrderStatus
+    params:
+      orderId: "1001"
+      status: shipped

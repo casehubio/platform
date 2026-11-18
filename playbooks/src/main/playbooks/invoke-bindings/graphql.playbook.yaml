@@ -13,8 +13,8 @@ meta:
   layer: invoke-bindings
   teaches: "executing GraphQL operations"
   builds-on: rest
-steps:
-  - graphql-exec: "{ users { id name email } }"
-  - log: "Query executed"
-  - graphql-exec: "mutation { createUser(name: \"Alice\") { id } }"
-  - log: "Mutation executed"
+---
+- graphql-exec: "{ users { id name email } }"
+- log: "Query executed"
+- graphql-exec: "mutation { createUser(name: \"Alice\") { id } }"
+- log: "Mutation executed"

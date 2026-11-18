@@ -13,10 +13,10 @@ meta:
   layer: coordination-primitives
   teaches: "atomic increment/decrement/read"
   builds-on: sequential
-steps:
-  - counter-add requests: { delta: 1 }
-  - counter-add requests: { delta: 1 }
-  - counter-add requests: { delta: 3 }
-  - counter-get: "requests"
-  - counter-add requests: { delta: -2 }
-  - counter-get: "requests"
+---
+- counter-add requests: { delta: 1 }
+- counter-add requests: { delta: 1 }
+- counter-add requests: { delta: 3 }
+- counter-get: "requests"
+- counter-add requests: { delta: -2 }
+- counter-get: "requests"

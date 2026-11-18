@@ -13,10 +13,10 @@ meta:
   layer: concurrency-patterns
   teaches: "propagating deadlines through nested scopes"
   builds-on: timeout
-steps:
-  - deadline-create batch: { deadlineMs: 600 }
-  - deadline-check: "batch"
-  - deadline-work batch: { duration: 300, label: "phase-1" }
-  - deadline-check: "batch"
-  - deadline-work batch: { duration: 400, label: "phase-2" }
-  - deadline-check: "batch"
+---
+- deadline-create batch: { deadlineMs: 600 }
+- deadline-check: "batch"
+- deadline-work batch: { duration: 300, label: "phase-1" }
+- deadline-check: "batch"
+- deadline-work batch: { duration: 400, label: "phase-2" }
+- deadline-check: "batch"

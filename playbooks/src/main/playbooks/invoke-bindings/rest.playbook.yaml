@@ -13,11 +13,11 @@ meta:
   layer: invoke-bindings
   teaches: "calling REST APIs from playbook steps"
   builds-on: sequential
-steps:
-  - rest-request:GET: /api/users
-    headers: { Accept: application/json }
-  - log: "Fetched user list"
-  - rest-request:POST: /api/orders
-    headers: { Content-Type: application/json }
-    body: { item: "widget", qty: 5 }
-  - log: "Order created"
+---
+- rest-request:GET: /api/users
+  headers: { Accept: application/json }
+- log: "Fetched user list"
+- rest-request:POST: /api/orders
+  headers: { Content-Type: application/json }
+  body: { item: "widget", qty: 5 }
+- log: "Order created"

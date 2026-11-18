@@ -14,15 +14,15 @@ meta:
   layer: coordination
   teaches: "mutual exclusion for shared resources"
   builds-on: semaphore
-steps:
-  - concurrent:
-      branch-a:
-        - click: "A"
-          mutex: db-write
-        - click: "B"
-          mutex: db-write
-      branch-b:
-        - click: "C"
-          mutex: db-write
-        - click: "D"
-          mutex: db-write
+---
+- concurrent:
+    branch-a:
+      - click: "A"
+        mutex: db-write
+      - click: "B"
+        mutex: db-write
+    branch-b:
+      - click: "C"
+        mutex: db-write
+      - click: "D"
+        mutex: db-write

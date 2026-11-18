@@ -14,10 +14,10 @@ meta:
   layer: step-workflows
   teaches: "iterating a block per list item"
   builds-on: block-sequential
-steps:
-  # ── structural form: for-each directly contains steps ──
-  # "for-each item in items" is the YAML key; the steps array is its value.
-  # Equivalent to: block: [...] + for-each: "item in items"
-  - for-each item in items:
-      - click: "${item.name}"
-      - assert: { expression: "${item.valid}" }
+---
+# ── structural form: for-each directly contains steps ──
+# "for-each item in items" is the YAML key; the steps array is its value.
+# Equivalent to: block: [...] + for-each: "item in items"
+- for-each item in items:
+    - click: "${item.name}"
+    - assert: { expression: "${item.valid}" }

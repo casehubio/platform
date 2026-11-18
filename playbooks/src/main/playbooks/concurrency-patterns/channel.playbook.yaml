@@ -13,7 +13,7 @@ meta:
   layer: concurrency-patterns
   teaches: "typed message passing between producers and consumers"
   builds-on: concurrent
-steps:
-  - parallel:
-    - chan-produce work: { capacity: 2, items: 4, interval: 200 }
-    - chan-consume work: { expect: 4, interval: 300 }
+---
+- parallel:
+  - chan-produce work: { capacity: 2, items: 4, interval: 200 }
+  - chan-consume work: { expect: 4, interval: 300 }

@@ -166,8 +166,8 @@ class ValidatePlaybookPluginTest {
                                                                                 level: 1
                                                                                 layer: test
                                                                                 teaches: "having headers"
-                                                                              steps:
-                                                                                - log: "hello"
+                                                                              ---
+                                                                              - log: "hello"
                                                                               """);
 
         // Playbook WITHOUT headers
@@ -179,8 +179,8 @@ class ValidatePlaybookPluginTest {
                                                                               title: "No Headers"
                                                                               description: "Missing tutorial headers"
                                                                               tags: [test]
-                                                                            steps:
-                                                                              - log: "hello"
+                                                                            ---
+                                                                            - log: "hello"
                                                                             """);
 
         var pluginRegistry = new CompositePluginRegistry();

@@ -13,9 +13,9 @@ meta:
   layer: flow-control
   teaches: "repeating until a condition is met"
   builds-on: loop
-steps:
-  - click: "A"
-    loop: { count: 3 }
-  - click: "B"
-    loop: { count: 5, until: true }
-  - click: "C"
+---
+- click: "A"
+  loop: { count: 3 }
+- click: "B"
+  loop: { count: 5, until: true }
+- click: "C"

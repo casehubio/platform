@@ -11,8 +11,8 @@ meta:
   level: 1
   layer: flow-control
   teaches: "steps execute in declaration order"
-steps:
-  - click: "A"
-  - click: "B"
-  - click: "C"
-  - click: "D"
+---
+- click: "A"
+- click: "B"
+- click: "C"
+- click: "D"

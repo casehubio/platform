@@ -13,7 +13,7 @@ meta:
   layer: flow-control
   teaches: "repeating a step N times"
   builds-on: sequential
-steps:
-  - click: "A"
-    loop: 3
-  - click: "B"
+---
+- click: "A"
+  loop: 3
+- click: "B"

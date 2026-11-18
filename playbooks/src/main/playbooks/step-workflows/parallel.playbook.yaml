@@ -12,8 +12,8 @@ meta:
   layer: step-workflows
   teaches: "running branches concurrently and joining all"
   builds-on: sequential
-steps:
-  - parallel:
-    - log: "Branch A: fetching data"
-    - log: "Branch B: loading config"
-    - log: "Branch C: warming cache"
+---
+- parallel:
+  - log: "Branch A: fetching data"
+  - log: "Branch B: loading config"
+  - log: "Branch C: warming cache"

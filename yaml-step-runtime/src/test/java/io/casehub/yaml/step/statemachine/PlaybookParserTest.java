@@ -419,5 +419,37 @@ class PlaybookParserTest {
             assertThat(result.locations().locationOf(doWork.get(1)).line()).isEqualTo(6);
         }
 
+        @Test
+        void resolvesYaml11BooleanScalars() {
+            String yaml = """
+                          a: yes
+                          b: no
+                          c: on
+                          d: off
+                          e: "yes"
+                          """;
+            var result = PlaybookParser.parseWithLocations(yaml, null);
+            var content = result.document().content();
+            assertThat(content.get("a")).isEqualTo(true);
+            assertThat(content.get("b")).isEqualTo(false);
+            assertThat(content.get("c")).isEqualTo(true);
+            assertThat(content.get("d")).isEqualTo(false);
+            assertThat(content.get("e")).isEqualTo("yes");
+        }
+
+        @Test
+        void resolvesNullVariants() {
+            String yaml = """
+                          a: null
+                          b: ~
+                          c:
+                          """;
+            var result = PlaybookParser.parseWithLocations(yaml, null);
+            var content = result.document().content();
+            assertThat(content.get("a")).isNull();
+            assertThat(content.get("b")).isNull();
+            assertThat(content.get("c")).isNull();
+        }
+
     }
 }

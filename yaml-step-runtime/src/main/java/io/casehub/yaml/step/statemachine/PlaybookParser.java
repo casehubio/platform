@@ -1,10 +1,16 @@
 package io.casehub.yaml.step.statemachine;
 
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.casehub.yaml.core.error.LocationIndex;
-import io.casehub.yaml.core.error.SourceLocation;
 import io.casehub.yaml.core.playbook.PlaybookDocument;
 import io.casehub.yaml.core.playbook.PlaybookFrontMatter;
+import io.casehub.yaml.jackson.LocationTrackingModule;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +23,10 @@ public final class PlaybookParser {
     private static final String NAME_KEY = "name";
     private static final String STEPS_KEY = "steps";
 
+    private static final ObjectMapper MAPPER = new ObjectMapper(new YAMLFactory())
+            .registerModule(new LocationTrackingModule())
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
+
     public record ParseResult(PlaybookDocument document, LocationIndex locations) {}
 
     public record RawParseResult(Object root, LocationIndex locations) {}
@@ -25,14 +35,16 @@ public final class PlaybookParser {
         if (yaml == null || yaml.isBlank()) {
             return new RawParseResult(null, new LocationIndex());
         }
-        var    index  = new LocationIndex();
-        var    loader = new org.yaml.snakeyaml.Yaml();
-        Object root   = null;
-        for (var node : loader.composeAll(new java.io.StringReader(yaml))) {
-            root = convertNode(node, index, filePath);
-            break;
+        var index = new LocationIndex();
+        try {
+            ObjectReader reader = MAPPER.readerFor(Object.class)
+                    .withAttribute(LocationTrackingModule.LOCATION_INDEX_KEY, index)
+                    .withAttribute(LocationTrackingModule.FILE_PATH_KEY, filePath);
+            Object root = reader.readValue(yaml);
+            return new RawParseResult(root, index);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse YAML", e);
         }
-        return new RawParseResult(root, index);
     }
 
 
@@ -48,28 +60,26 @@ public final class PlaybookParser {
             throw new IllegalArgumentException("YAML content must not be empty");
         }
 
-        var index  = new LocationIndex();
-        var loader = new org.yaml.snakeyaml.Yaml();
-        var nodes  = new ArrayList<org.yaml.snakeyaml.nodes.Node>();
-        for (var node : loader.composeAll(new java.io.StringReader(yaml))) {
-            nodes.add(node);
-        }
+        var index = new LocationIndex();
+        try {
+            ObjectReader reader = MAPPER.readerFor(Object.class)
+                    .withAttribute(LocationTrackingModule.LOCATION_INDEX_KEY, index)
+                    .withAttribute(LocationTrackingModule.FILE_PATH_KEY, filePath);
+            var documents = new ArrayList<Object>();
+            MappingIterator<Object> iter = reader.readValues(yaml);
+            while (iter.hasNext()) {
+                documents.add(iter.next());
+            }
 
-        if (nodes.isEmpty()) {
-            throw new IllegalArgumentException("YAML content must not be empty");
-        }
+            if (documents.isEmpty() || documents.get(0) == null) {
+                throw new IllegalArgumentException("YAML content must not be empty");
+            }
 
-        var documents = new ArrayList<Object>(nodes.size());
-        for (var node : nodes) {
-            documents.add(convertNode(node, index, filePath));
+            PlaybookDocument doc = assembleDocument(documents);
+            return new ParseResult(doc, index);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse YAML", e);
         }
-
-        if (documents.get(0) == null) {
-            throw new IllegalArgumentException("YAML content must not be empty");
-        }
-
-        PlaybookDocument doc = assembleDocument(documents);
-        return new ParseResult(doc, index);
     }
 
     @SuppressWarnings("unchecked")
@@ -131,67 +141,6 @@ public final class PlaybookParser {
                     "The 'steps:' wrapper key is not allowed in versioned playbooks. "
                     + "Use bare-list format: add '---' before the step list and remove the 'steps:' line.");
         }
-    }
-
-    private static Object convertNode(org.yaml.snakeyaml.nodes.Node node,
-                                      LocationIndex index, String filePath) {
-        if (node instanceof org.yaml.snakeyaml.nodes.MappingNode mapping) {
-            var map  = new LinkedHashMap<String, Object>();
-            var mark = mapping.getStartMark();
-            if (mark != null) {
-                index.put(map, new SourceLocation(filePath, mark.getLine() + 1, mark.getColumn() + 1));
-            }
-            for (var tuple : mapping.getValue()) {
-                String key = ((org.yaml.snakeyaml.nodes.ScalarNode) tuple.getKeyNode()).getValue();
-                map.put(key, convertNode(tuple.getValueNode(), index, filePath));
-            }
-            return map;
-        }
-        if (node instanceof org.yaml.snakeyaml.nodes.SequenceNode sequence) {
-            var list = new ArrayList<Object>();
-            var mark = sequence.getStartMark();
-            if (mark != null) {
-                index.put(list, new SourceLocation(filePath, mark.getLine() + 1, mark.getColumn() + 1));
-            }
-            for (var item : sequence.getValue()) {
-                list.add(convertNode(item, index, filePath));
-            }
-            return list;
-        }
-        if (node instanceof org.yaml.snakeyaml.nodes.ScalarNode scalar) {
-            return resolveScalar(scalar);
-        }
-        throw new IllegalArgumentException("Unknown YAML node type: " + node.getClass().getSimpleName());
-    }
-
-    private static Object resolveScalar(org.yaml.snakeyaml.nodes.ScalarNode scalar) {
-        String value = scalar.getValue();
-        if (!scalar.isPlain()) {
-            return value;
-        }
-        if (value.isEmpty() || "null".equals(value) || "~".equals(value)) {
-            return null;
-        }
-        if ("true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value)
-            || "on".equalsIgnoreCase(value)) {
-            return Boolean.TRUE;
-        }
-        if ("false".equalsIgnoreCase(value) || "no".equalsIgnoreCase(value)
-            || "off".equalsIgnoreCase(value)) {
-            return Boolean.FALSE;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {}
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException ignored) {}
-        try {
-            if (value.contains(".") || value.contains("e") || value.contains("E")) {
-                return Double.parseDouble(value);
-            }
-        } catch (NumberFormatException ignored) {}
-        return value;
     }
 
     private static PlaybookFrontMatter extractFrontMatter(Map<String, Object> doc) {

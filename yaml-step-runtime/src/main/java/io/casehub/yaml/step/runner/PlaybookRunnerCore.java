@@ -152,17 +152,9 @@ public final class PlaybookRunnerCore {
                     }
 
                     if (result.output() != null) {
-                        Object captureVal = step.decorators().get("capture");
-                        if (captureVal != null) {
-                            String captureName = String.valueOf(captureVal);
-                            Map<String, Object> captured = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(result.output()));
-                            resolver = resolver.withObjectScope(captureName, captured::get);
-                        }
                         outputVars.putAll(result.output());
                     }
 
-                    // Expose this step's capture to the top-level steps that follow.
-                    // Nested captures are scoped by StructuralStepEvaluator.evaluateBlock.
                     Object captureVal = step.decorators().get("capture");
                     if (captureVal != null) {
                         String captureName = String.valueOf(captureVal);

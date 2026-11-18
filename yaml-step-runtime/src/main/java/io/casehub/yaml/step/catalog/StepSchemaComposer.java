@@ -17,6 +17,12 @@ public final class StepSchemaComposer {
     private StepSchemaComposer() {}
 
     public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper) {
+        return compose(registry, mapper, Set.of(
+                "control-flow", "concurrency", "modules", "orchestration", "decorators"));
+    }
+
+    public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper,
+                                     Set<String> capabilities) {
         ObjectNode root  = mapper.createObjectNode();
         ArrayNode  oneOf = root.putArray("oneOf");
 
@@ -48,10 +54,12 @@ public final class StepSchemaComposer {
             });
         }
 
-        ObjectNode invokeVariant = mapper.createObjectNode();
-        invokeVariant.putObject("properties").putObject("invoke").put("type", "object");
-        invokeVariant.putArray("required").add("invoke");
-        oneOf.add(invokeVariant);
+        if (capabilities.contains("modules")) {
+            ObjectNode invokeVariant = mapper.createObjectNode();
+            invokeVariant.putObject("properties").putObject("invoke").put("type", "object");
+            invokeVariant.putArray("required").add("invoke");
+            oneOf.add(invokeVariant);
+        }
 
         ObjectNode blockVariant = mapper.createObjectNode();
         ObjectNode blockProps   = blockVariant.putObject("properties");
@@ -60,90 +68,100 @@ public final class StepSchemaComposer {
         blockVariant.putArray("required").add("block");
         oneOf.add(blockVariant);
 
-        ObjectNode ifThenElseVariant = mapper.createObjectNode();
-        ObjectNode ifProps           = ifThenElseVariant.putObject("properties");
-        ifProps.putObject("if").put("type", "string");
-        ObjectNode thenSchema = ifProps.putObject("then");
-        thenSchema.put("type", "array");
-        ifProps.putObject("else").put("type", "array");
-        ifThenElseVariant.putArray("required").add("if").add("then");
-        oneOf.add(ifThenElseVariant);
+        if (capabilities.contains("control-flow")) {
+            ObjectNode ifThenElseVariant = mapper.createObjectNode();
+            ObjectNode ifProps           = ifThenElseVariant.putObject("properties");
+            ifProps.putObject("if").put("type", "string");
+            ObjectNode thenSchema = ifProps.putObject("then");
+            thenSchema.put("type", "array");
+            ifProps.putObject("else").put("type", "array");
+            ifThenElseVariant.putArray("required").add("if").add("then");
+            oneOf.add(ifThenElseVariant);
 
-        ObjectNode matchVariant = mapper.createObjectNode();
-        ObjectNode matchProps   = matchVariant.putObject("properties");
-        matchProps.putObject("match").put("type", "string");
-        matchProps.putObject("cases").put("type", "array");
-        matchVariant.putArray("required").add("match").add("cases");
-        oneOf.add(matchVariant);
+            ObjectNode matchVariant = mapper.createObjectNode();
+            ObjectNode matchProps   = matchVariant.putObject("properties");
+            matchProps.putObject("match").put("type", "string");
+            matchProps.putObject("cases").put("type", "array");
+            matchVariant.putArray("required").add("match").add("cases");
+            oneOf.add(matchVariant);
+        }
 
-        ObjectNode parallelVariant = mapper.createObjectNode();
-        ObjectNode parallelProps   = parallelVariant.putObject("properties");
-        ObjectNode parallelSchema  = parallelProps.putObject("parallel");
-        ArrayNode  parallelOneOf   = parallelSchema.putArray("oneOf");
-        parallelOneOf.addObject().put("type", "array");
-        ObjectNode mapForm = parallelOneOf.addObject();
-        mapForm.put("type", "object");
-        ObjectNode mapFormProps = mapForm.putObject("properties");
-        mapFormProps.putObject("steps").put("type", "array");
-        ObjectNode advanceAfter = mapFormProps.putObject("advance-after");
-        ArrayNode advanceOneOf = advanceAfter.putArray("oneOf");
-        advanceOneOf.addObject().put("type", "integer");
-        advanceOneOf.addObject().put("type", "string").putArray("enum").add("all");
-        mapFormProps.putObject("cancel-remaining").put("type", "boolean");
-        mapFormProps.putObject("collection-timeout").put("type", "string");
-        mapForm.putArray("required").add("steps");
-        parallelVariant.putArray("required").add("parallel");
-        oneOf.add(parallelVariant);
+        if (capabilities.contains("concurrency")) {
+            ObjectNode parallelVariant = mapper.createObjectNode();
+            ObjectNode parallelProps   = parallelVariant.putObject("properties");
+            ObjectNode parallelSchema  = parallelProps.putObject("parallel");
+            ArrayNode  parallelOneOf   = parallelSchema.putArray("oneOf");
+            parallelOneOf.addObject().put("type", "array");
+            ObjectNode mapForm = parallelOneOf.addObject();
+            mapForm.put("type", "object");
+            ObjectNode mapFormProps = mapForm.putObject("properties");
+            mapFormProps.putObject("steps").put("type", "array");
+            ObjectNode advanceAfter = mapFormProps.putObject("advance-after");
+            ArrayNode  advanceOneOf = advanceAfter.putArray("oneOf");
+            advanceOneOf.addObject().put("type", "integer");
+            advanceOneOf.addObject().put("type", "string").putArray("enum").add("all");
+            mapFormProps.putObject("cancel-remaining").put("type", "boolean");
+            mapFormProps.putObject("collection-timeout").put("type", "string");
+            mapForm.putArray("required").add("steps");
+            parallelVariant.putArray("required").add("parallel");
+            oneOf.add(parallelVariant);
 
-        ObjectNode raceVariant = mapper.createObjectNode();
-        ObjectNode raceProps   = raceVariant.putObject("properties");
-        raceProps.putObject("race").put("type", "array");
-        raceVariant.putArray("required").add("race");
-        oneOf.add(raceVariant);
+            ObjectNode raceVariant = mapper.createObjectNode();
+            ObjectNode raceProps   = raceVariant.putObject("properties");
+            raceProps.putObject("race").put("type", "array");
+            raceVariant.putArray("required").add("race");
+            oneOf.add(raceVariant);
+        }
 
-        ObjectNode pauseVariant = mapper.createObjectNode();
-        pauseVariant.putObject("properties").putObject("pause").put("type", "string");
-        pauseVariant.putArray("required").add("pause");
-        oneOf.add(pauseVariant);
+        if (capabilities.contains("orchestration")) {
+            ObjectNode pauseVariant = mapper.createObjectNode();
+            pauseVariant.putObject("properties").putObject("pause").put("type", "string");
+            pauseVariant.putArray("required").add("pause");
+            oneOf.add(pauseVariant);
 
-        ObjectNode resumeVariant = mapper.createObjectNode();
-        resumeVariant.putObject("properties").putObject("resume").put("type", "string");
-        resumeVariant.putArray("required").add("resume");
-        oneOf.add(resumeVariant);
+            ObjectNode resumeVariant = mapper.createObjectNode();
+            resumeVariant.putObject("properties").putObject("resume").put("type", "string");
+            resumeVariant.putArray("required").add("resume");
+            oneOf.add(resumeVariant);
+        }
 
         ObjectNode sharedProps = root.putObject("properties");
         sharedProps.putObject("step").put("type", "string");
-        for (String key : DECORATOR_KEYS) {
-            sharedProps.putObject(key);
+
+        if (capabilities.contains("decorators")) {
+            for (String key : DECORATOR_KEYS) {
+                sharedProps.putObject(key);
+            }
+
+            ObjectNode atSchema = sharedProps.putObject("at");
+            ArrayNode  atOneOf  = atSchema.putArray("oneOf");
+            atOneOf.addObject().put("type", "string");
+            ObjectNode atArray = atOneOf.addObject();
+            atArray.put("type", "array");
+            atArray.putObject("items").put("type", "string");
+            ObjectNode atObject = atOneOf.addObject();
+            atObject.put("type", "object");
+            ObjectNode atObjProps = atObject.putObject("properties");
+            atObjProps.putObject("metric").put("type", "string");
+            atObjProps.putObject("mode").putArray("enum").add("wait").add("guard");
+            atObject.putArray("required").add("metric");
+
+            ObjectNode onCompleteSchema = sharedProps.putObject("on-complete");
+            onCompleteSchema.put("type", "array");
+            onCompleteSchema.putObject("items").put("$ref", "#");
+
+            sharedProps.putObject("resource").put("type", "string");
+
+            sharedProps.putObject("priority").putArray("enum")
+                       .add("background").add("normal").add("high");
+
+            sharedProps.putObject("cancel").put("type", "string");
+            sharedProps.putObject("background").put("type", "boolean");
         }
-
-        ObjectNode atSchema = sharedProps.putObject("at");
-        ArrayNode atOneOf = atSchema.putArray("oneOf");
-        atOneOf.addObject().put("type", "string");
-        ObjectNode atArray = atOneOf.addObject();
-        atArray.put("type", "array");
-        atArray.putObject("items").put("type", "string");
-        ObjectNode atObject = atOneOf.addObject();
-        atObject.put("type", "object");
-        ObjectNode atObjProps = atObject.putObject("properties");
-        atObjProps.putObject("metric").put("type", "string");
-        atObjProps.putObject("mode").putArray("enum").add("wait").add("guard");
-        atObject.putArray("required").add("metric");
-
-        ObjectNode onCompleteSchema = sharedProps.putObject("on-complete");
-        onCompleteSchema.put("type", "array");
-        onCompleteSchema.putObject("items").put("$ref", "#");
-
-        sharedProps.putObject("resource").put("type", "string");
-
-        sharedProps.putObject("priority").putArray("enum")
-                .add("background").add("normal").add("high");
-
-        sharedProps.putObject("cancel").put("type", "string");
-        sharedProps.putObject("background").put("type", "boolean");
 
         return root;
     }
+
 
     private static String mapType(ParameterType type) {
         return switch (type) {

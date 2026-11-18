@@ -20,8 +20,6 @@ import io.casehub.yaml.step.eval.StructuralStepEvaluator;
 import io.casehub.yaml.step.plugin.EventSink;
 import io.casehub.yaml.step.statemachine.PlaybookParser;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -196,8 +194,8 @@ public final class PlaybookRunnerCore {
     @SuppressWarnings("unchecked")
     public PlaybookValidationResult validate(Path playbookPath) {
         try {
-            String yaml = Files.readString(playbookPath);
-            PlaybookDocument doc = PlaybookParser.parse(yaml);
+            String              yaml    = Files.readString(playbookPath);
+            PlaybookDocument    doc     = PlaybookParser.parse(yaml);
             Map<String, Object> content = new LinkedHashMap<>(doc.content());
             expandImports(content, playbookPath);
             PlaybookFrontMatter frontMatter = doc.frontMatter();
@@ -210,9 +208,51 @@ public final class PlaybookRunnerCore {
             Walker.resolve(steps, pluginRegistry);
             return new PlaybookValidationResult(true, List.of(), frontMatter);
         } catch (Exception e) {
-            return new PlaybookValidationResult(false, List.of(e.getMessage()), null);
+            var diag = new io.casehub.yaml.core.error.ParseError.StructureError(
+                    null, e.getMessage(), io.casehub.yaml.core.error.SourceLocation.UNKNOWN, e);
+            return new PlaybookValidationResult(false, List.of(diag), null);
         }
     }
+
+    @SuppressWarnings("unchecked")
+    public PlaybookValidationResult validate(Path playbookPath, ValidationContext ctx) {
+        try {
+            String              yaml    = Files.readString(playbookPath);
+            PlaybookDocument    doc     = PlaybookParser.parse(yaml);
+            Map<String, Object> content = new LinkedHashMap<>(doc.content());
+            expandImports(content, playbookPath);
+            PlaybookFrontMatter frontMatter = doc.frontMatter();
+
+            var    collector = new io.casehub.yaml.core.error.YamlErrorCollector();
+            String fileName  = playbookPath.toString();
+
+            if (content.containsKey("steps") && "assisted".equals(ctx.schema())) {
+                var loc = new io.casehub.yaml.core.error.SourceLocation(fileName, -1, -1);
+                collector.add(new io.casehub.yaml.core.error.ParseError.StructureError(
+                        null, "Remove the 'steps:' wrapper — use a bare YAML list instead", loc, null));
+            }
+
+            var steps = (List<Map<String, Object>>) content.get("steps");
+            if (steps == null || steps.isEmpty()) {
+                List<io.casehub.yaml.core.error.YamlError> diags = collector.errors();
+                return new PlaybookValidationResult(diags.isEmpty(), diags, frontMatter);
+            }
+
+            var annotations = io.casehub.yaml.core.annotation.AnnotationMap.empty();
+            Walker.resolve(steps, pluginRegistry, annotations, collector, fileName);
+
+            List<io.casehub.yaml.core.error.YamlError> diagnostics = collector.errors();
+            List<ValidationSuggestion>                 suggestions = ValidationSuggestionGenerator.generate(diagnostics, pluginRegistry);
+
+            return new PlaybookValidationResult(
+                    !collector.hasErrors(), diagnostics, frontMatter, suggestions, null);
+        } catch (Exception e) {
+            var diag = new io.casehub.yaml.core.error.ParseError.StructureError(
+                    null, e.getMessage(), io.casehub.yaml.core.error.SourceLocation.UNKNOWN, e);
+            return new PlaybookValidationResult(false, List.of(diag), null);
+        }
+    }
+
 
     public static Path discoverSimulationYaml(Path playbookPath) {
         String fileName = playbookPath.getFileName().toString();

@@ -4,6 +4,9 @@ import io.casehub.yaml.step.runner.PlaybookRunConfig;
 import io.casehub.yaml.step.runner.PlaybookRunResult;
 import io.casehub.yaml.step.runner.PlaybookValidationResult;
 import io.casehub.yaml.step.runner.StepOutcome;
+import io.casehub.yaml.core.error.ParseError;
+import io.casehub.yaml.core.error.SourceLocation;
+import io.casehub.yaml.core.error.YamlError;
 import io.casehub.yaml.step.runner.StepTraceNode;
 import org.junit.jupiter.api.Test;
 
@@ -32,10 +35,11 @@ class PlaybookRunResultTest {
 
     @Test
     void validationResultReportsErrors() {
-        var result = new PlaybookValidationResult(false,
-                                                  List.of("Unknown key 'foo'"), null);
+        YamlError diag = new ParseError.UnknownStepError(null, "foo", SourceLocation.UNKNOWN, null);
+        var result = new PlaybookValidationResult(false, List.of(diag), null);
         assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).containsExactly("Unknown key 'foo'");
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0)).contains("foo");
     }
 
     @Test
@@ -64,11 +68,11 @@ class PlaybookRunResultTest {
     }
 
     @Test
-    void validationResultDefensiveCopyOnErrors() {
-        var mutable = new java.util.ArrayList<String>();
-        mutable.add("err1");
+    void validationResultDefensiveCopyOnDiagnostics() {
+        var mutable = new java.util.ArrayList<YamlError>();
+        mutable.add(new ParseError.StructureError(null, "err1", SourceLocation.UNKNOWN, null));
         var result = new PlaybookValidationResult(false, mutable, null);
-        mutable.add("err2");
-        assertThat(result.errors()).hasSize(1);
+        mutable.add(new ParseError.StructureError(null, "err2", SourceLocation.UNKNOWN, null));
+        assertThat(result.diagnostics()).hasSize(1);
     }
 }

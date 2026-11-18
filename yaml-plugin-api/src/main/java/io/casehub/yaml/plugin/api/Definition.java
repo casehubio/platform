@@ -14,7 +14,8 @@ public record Definition(
         Action action,
         String capability,
         Optional<StreamingTypeInfo> streamingType,
-        boolean absorbSiblings) {
+        boolean absorbSiblings,
+        Map<String, Map<String, Parameter>> variants) {
 
     public Definition {
         if (name == null || name.isBlank()) {throw new IllegalArgumentException("Definition requires a name");}
@@ -24,19 +25,27 @@ public record Definition(
         if (action == null) {throw new IllegalArgumentException("Definition requires an action");}
         if (capability == null || capability.isBlank()) {capability = "steps";}
         if (streamingType == null) {streamingType = Optional.empty();}
+        if (variants == null) {variants = Map.of();}
     }
 
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability) {
-        this(name, description, inputs, outputs, portability, action, capability, Optional.empty(), false);
+        this(name, description, inputs, outputs, portability, action, capability, Optional.empty(), false, Map.of());
     }
 
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability,
                       Optional<StreamingTypeInfo> streamingType) {
-        this(name, description, inputs, outputs, portability, action, capability, streamingType, false);
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, false, Map.of());
+    }
+
+    public Definition(String name, String description,
+                      Map<String, Parameter> inputs, Map<String, Parameter> outputs,
+                      Portability portability, Action action, String capability,
+                      Optional<StreamingTypeInfo> streamingType, boolean absorbSiblings) {
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, absorbSiblings, Map.of());
     }
 
     public String primaryInput() {
@@ -51,15 +60,16 @@ public record Definition(
     public static Builder of(String name) {return new Builder(name);}
 
     public static final class Builder {
-        private final String                           name;
-        private       String                           description;
-        private final LinkedHashMap<String, Parameter> inputs         = new LinkedHashMap<>();
-        private final LinkedHashMap<String, Parameter> outputs        = new LinkedHashMap<>();
-        private       Portability                      portability    = Portability.JAVA;
-        private       Action                           action;
-        private       String                           capability;
-        private       Optional<StreamingTypeInfo>      streamingType  = Optional.empty();
-        private       boolean                          absorbSiblings = false;
+        private final String                                        name;
+        private       String                                        description;
+        private final LinkedHashMap<String, Parameter>              inputs         = new LinkedHashMap<>();
+        private final LinkedHashMap<String, Parameter>              outputs        = new LinkedHashMap<>();
+        private       Portability                                   portability    = Portability.JAVA;
+        private       Action                                        action;
+        private       String                                        capability;
+        private       Optional<StreamingTypeInfo>                   streamingType  = Optional.empty();
+        private       boolean                                       absorbSiblings = false;
+        private final LinkedHashMap<String, Map<String, Parameter>> variants       = new LinkedHashMap<>();
 
         private Builder(String name) {this.name = name;}
 
@@ -113,11 +123,17 @@ public record Definition(
             return this;
         }
 
+        public Builder variant(String operation, Map<String, Parameter> params) {
+            this.variants.put(operation, Collections.unmodifiableMap(new LinkedHashMap<>(params)));
+            return this;
+        }
+
         public Definition build() {
             return new Definition(name, description,
                                   Collections.unmodifiableMap(new LinkedHashMap<>(inputs)),
                                   Collections.unmodifiableMap(new LinkedHashMap<>(outputs)),
-                                  portability, action, capability, streamingType, absorbSiblings);
+                                  portability, action, capability, streamingType, absorbSiblings,
+                                  Collections.unmodifiableMap(new LinkedHashMap<>(variants)));
         }
     }
 }

@@ -126,16 +126,18 @@ class WrapBackgroundDecoratorTest {
     void backgroundFailureCallsListenerOnBackgroundFailure() throws Exception {
         var scope           = new DefaultExecutionScope();
         var failureReceived = new CompletableFuture<Result>();
+        var nameReceived    = new CompletableFuture<String>();
 
         StepExecutionListener listener = new StepExecutionListener() {
             @Override
-            public void beforeStep(io.casehub.yaml.step.catalog.ResolvedStep step)                                           {}
+            public void beforeStep(io.casehub.yaml.step.catalog.ResolvedStep step) {}
 
             @Override
             public void afterStep(io.casehub.yaml.step.catalog.ResolvedStep step, Result result, Map<String, Object> detail) {}
 
             @Override
             public void onBackgroundFailure(String stepName, Result result) {
+                nameReceived.complete(stepName);
                 failureReceived.complete(result);
             }
         };
@@ -151,7 +153,45 @@ class WrapBackgroundDecoratorTest {
 
         var result = failureReceived.get(2, TimeUnit.SECONDS);
         assertThat(result.isSuccess()).isFalse();
+        assertThat(nameReceived.get(2, TimeUnit.SECONDS)).isEqualTo("bg-step");
         scope.close();
     }
+
+    @Test
+    void backgroundUsesStepNameFromContext() throws Exception {
+        var                                           scope       = new DefaultExecutionScope();
+        var                                           failureName = new CompletableFuture<String>();
+        java.util.function.BiConsumer<String, Result> handler     = (name, result) -> failureName.complete(name);
+
+        var config = new DecoratorConfig(new ConditionEvaluator(null), SpeedMultiplier.identity(), scope,
+                                         null, null, null, null, handler);
+        var chain = new DecoratorChain(config);
+
+        DecoratedExecution inner     = ctx -> Result.failed("simulated failure");
+        var                decorated = chain.apply(Map.of("background", true), inner);
+        decorated.execute(new StepContext(resolver).withStepName("poll-queue"));
+
+        assertThat(failureName.get(2, TimeUnit.SECONDS)).isEqualTo("poll-queue");
+        scope.close();
+    }
+
+    @Test
+    void backgroundFallsBackToDefaultNameWhenNoStepName() throws Exception {
+        var                                           scope       = new DefaultExecutionScope();
+        var                                           failureName = new CompletableFuture<String>();
+        java.util.function.BiConsumer<String, Result> handler     = (name, result) -> failureName.complete(name);
+
+        var config = new DecoratorConfig(new ConditionEvaluator(null), SpeedMultiplier.identity(), scope,
+                                         null, null, null, null, handler);
+        var chain = new DecoratorChain(config);
+
+        DecoratedExecution inner     = ctx -> Result.failed("simulated failure");
+        var                decorated = chain.apply(Map.of("background", true), inner);
+        decorated.execute(new StepContext(resolver));
+
+        assertThat(failureName.get(2, TimeUnit.SECONDS)).isEqualTo("background");
+        scope.close();
+    }
+
 
 }

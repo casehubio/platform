@@ -103,13 +103,14 @@ public final class StructuralStepEvaluator {
         if (listener != null) {
             listener.beforeStep(step);
         }
+        StepContext         namedCtx   = ctx.withStepName(step.name());
         Map<String, Object> decorators = step.decorators();
         Result              result;
         if (decorators.isEmpty()) {
-            result = dispatchStep(step, ctx, runner);
+            result = dispatchStep(step, namedCtx, runner);
         } else {
             result = decoratorChain.apply(decorators, c -> dispatchStep(step, c, runner))
-                                   .execute(ctx);
+                                   .execute(namedCtx);
         }
         if (listener != null) {
             listener.afterStep(step, result, Map.of());

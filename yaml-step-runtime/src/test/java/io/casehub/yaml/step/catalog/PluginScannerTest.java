@@ -4,6 +4,7 @@ import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.step.catalog.scannertest.BinaryPlugin;
 import io.casehub.yaml.step.catalog.scannertest.CamelCasePlugin;
 import io.casehub.yaml.step.catalog.scannertest.EnumPlugin;
 import io.casehub.yaml.step.catalog.scannertest.FloatPlugin;
@@ -252,5 +253,48 @@ class PluginScannerTest {
         var def = registry.resolve("rest-call");
         assertThat(def).isPresent();
         assertThat(def.get().capability()).isEqualTo("raw-http");
+    }
+
+    @Test
+    void byteArrayInputIsAccepted() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(BinaryPlugin.class, registry);
+
+        var def = registry.resolve("binary-plugin").orElseThrow();
+        Result result = def.action().execute(
+                Map.of("data", new byte[]{1, 2, 3}, "extra", new byte[]{4}),
+                new MapServiceRegistry());
+
+        assertThat(result).as("result %s", result).matches(Result::isSuccess);
+        assertThat(result.output()).containsEntry("size", 4);
+    }
+
+    @Test
+    void missingRequiredByteArrayInputFailsValidation() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(BinaryPlugin.class, registry);
+
+        var def = registry.resolve("binary-plugin").orElseThrow();
+        Result result = def.action().execute(Map.of(), new MapServiceRegistry());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(((Result.Failure) result).message())
+                .contains("Input validation").contains("'data' is required but missing");
+    }
+
+    @Test
+    void wrongTypeForByteArrayInputFailsValidation() {
+        PluginScanner scanner = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(BinaryPlugin.class, registry);
+
+        var def = registry.resolve("binary-plugin").orElseThrow();
+        Result result = def.action().execute(Map.of("data", "not-bytes"), new MapServiceRegistry());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(((Result.Failure) result).message())
+                .contains("Input validation").contains("'data' expected type byte[] but got String");
     }
 }

@@ -21,6 +21,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class PluginScanner {
@@ -51,11 +52,22 @@ public class PluginScanner {
         }
         Action rawAction = createAction(pluginClass, executeMethod, inputs, streamingInputKey);
 
-        Declaration declaration = new Declaration(name, description, inputs, Map.of(), null);
+        // Components with a Java type that has no YAML shape (byte[], domain objects) are declared
+        // as OBJECT, but ParameterType.OBJECT only accepts a Map. Validate those against their
+        // Java type here and leave the rest to the declaration-based validator.
+        Map<String, Class<?>> javaTypedInputs = javaTypedInputs(pluginClass);
+        Map<String, Parameter> declaredInputs = new LinkedHashMap<>(inputs);
+        declaredInputs.keySet().removeAll(javaTypedInputs.keySet());
+
+        Declaration declaration = new Declaration(name, description, declaredInputs, Map.of(), null);
         ValidatingAction validatingAction = new ValidatingAction(declaration, rawAction, event -> {});
         Map<String, Parameter> inputsCopy = Map.copyOf(inputs);
         Action action = (params, services) -> {
             Map<String, Object> coerced = coerceParams(params, inputsCopy);
+            List<String> javaTypeErrors = validateJavaTypedInputs(name, coerced, inputsCopy, javaTypedInputs);
+            if (!javaTypeErrors.isEmpty()) {
+                return Result.failed("Input validation: " + String.join("; ", javaTypeErrors));
+            }
             return validatingAction.execute(coerced, services);
         };
 
@@ -263,6 +275,36 @@ public class PluginScanner {
             }
         }
         return coerced;
+    }
+
+    private static Map<String, Class<?>> javaTypedInputs(Class<?> pluginClass) {
+        Map<String, Class<?>> result = new LinkedHashMap<>();
+        for (RecordComponent rc : pluginClass.getRecordComponents()) {
+            Class<?> type = rc.getType();
+            if (mapType(type) == ParameterType.OBJECT && !java.util.Map.class.isAssignableFrom(type)) {
+                result.put(toKebabCase(rc.getName()), type);
+            }
+        }
+        return result;
+    }
+
+    private static List<String> validateJavaTypedInputs(String actionName, Map<String, Object> params,
+                                                        Map<String, Parameter> inputs,
+                                                        Map<String, Class<?>> javaTypedInputs) {
+        List<String> errors = new java.util.ArrayList<>();
+        for (var entry : javaTypedInputs.entrySet()) {
+            String key = entry.getKey();
+            Object value = params.get(key);
+            if (value == null) {
+                if (inputs.get(key).required()) {
+                    errors.add(actionName + ": input '" + key + "' is required but missing");
+                }
+            } else if (!entry.getValue().isInstance(value)) {
+                errors.add(actionName + ": input '" + key + "' expected type "
+                        + entry.getValue().getSimpleName() + " but got " + value.getClass().getSimpleName());
+            }
+        }
+        return errors;
     }
 
     static ParameterType mapType(Class<?> type) {

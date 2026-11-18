@@ -178,6 +178,7 @@ public final class StructuralStepEvaluator {
             case ResolvedStep.PluginStep ps -> runner.run(ps, ctx.resolver());
             case ResolvedStep.InvokeStep is -> runner.run(is, ctx.resolver());
             case ResolvedStep.FusedPipelineStep fps -> evaluateFusedPipeline(fps, ctx, runner);
+            case ResolvedStep.ErrorStep es -> new Result.Failure("Unresolvable step: " + es.error().summary());
         };
     }
 

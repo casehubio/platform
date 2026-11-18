@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.catalog;
 
 import io.casehub.yaml.core.annotation.Annotation;
+import io.casehub.yaml.core.error.ParseError;
 import io.casehub.yaml.plugin.api.StreamingStepFactory;
 import java.util.List;
 import java.util.Map;
@@ -18,11 +19,12 @@ public sealed interface ResolvedStep permits
                                      ResolvedStep.QuorumStep,
                                      ResolvedStep.ControlStep,
                                      ResolvedStep.RaceStep,
-                                     ResolvedStep.FusedPipelineStep {
+                                     ResolvedStep.FusedPipelineStep,
+                                     ResolvedStep.ErrorStep {
 
     Map<String, Object> decorators();
 
-    default String name() {return null;}
+    default String name()                  {return null;}
 
     default List<Annotation> annotations() {return List.of();}
 
@@ -310,6 +312,24 @@ public sealed interface ResolvedStep permits
         public FusedPipelineStep {
             stages     = List.copyOf(stages);
             decorators = Map.copyOf(decorators);
+        }
+    }
+
+    record ErrorStep(
+            String name,
+            Map<String, Object> originalYaml,
+            ParseError error,
+            Map<String, Object> decorators,
+            List<Annotation> annotations) implements ResolvedStep {
+
+        public ErrorStep {
+            originalYaml = originalYaml != null ? Map.copyOf(originalYaml) : Map.of();
+            decorators   = Map.copyOf(decorators);
+            annotations  = annotations != null ? List.copyOf(annotations) : List.of();
+        }
+
+        public ErrorStep(String name, Map<String, Object> originalYaml, ParseError error) {
+            this(name, originalYaml, error, Map.of(), List.of());
         }
     }
 }

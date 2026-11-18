@@ -339,6 +339,7 @@ public final class PlaybookRunnerCore {
             case ResolvedStep.ControlStep ignored -> "control";
             case ResolvedStep.RaceStep ignored -> "race";
             case ResolvedStep.FusedPipelineStep ignored -> "fused-pipeline";
+            case ResolvedStep.ErrorStep ignored -> "error";
         };
     }
 }

@@ -31,7 +31,6 @@ public final class LocationIndex {
     }
 
 
-    @SuppressWarnings("unchecked")
     public void transferFrom(LocationIndex sourceIndex, Object sourceObject, Object targetObject) {
         if (this == EMPTY) {
             throw new UnsupportedOperationException("Cannot modify the empty LocationIndex");

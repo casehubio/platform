@@ -121,4 +121,37 @@ class WrapBackgroundDecoratorTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.output().get("ran")).isEqualTo(true);
     }
+
+    @Test
+    void backgroundFailureCallsListenerOnBackgroundFailure() throws Exception {
+        var scope           = new DefaultExecutionScope();
+        var failureReceived = new CompletableFuture<Result>();
+
+        StepExecutionListener listener = new StepExecutionListener() {
+            @Override
+            public void beforeStep(io.casehub.yaml.step.catalog.ResolvedStep step)                                           {}
+
+            @Override
+            public void afterStep(io.casehub.yaml.step.catalog.ResolvedStep step, Result result, Map<String, Object> detail) {}
+
+            @Override
+            public void onBackgroundFailure(String stepName, Result result) {
+                failureReceived.complete(result);
+            }
+        };
+
+        var evaluator = new StructuralStepEvaluator(new ConditionEvaluator(null), scope)
+                                .withListener(listener);
+
+        var step = new io.casehub.yaml.step.catalog.ResolvedStep.PluginStep(
+                "bg-step", "test-action", Map.of(), Map.of("background", true));
+
+        evaluator.evaluate(step, resolver,
+                           (s, r) -> Result.failed("simulated failure"));
+
+        var result = failureReceived.get(2, TimeUnit.SECONDS);
+        assertThat(result.isSuccess()).isFalse();
+        scope.close();
+    }
+
 }

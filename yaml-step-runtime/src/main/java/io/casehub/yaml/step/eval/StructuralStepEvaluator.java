@@ -50,6 +50,9 @@ public final class StructuralStepEvaluator {
         java.util.function.BiConsumer<String, io.casehub.yaml.plugin.api.Result> bgHandler = (name, result) -> {
             String msg = result instanceof io.casehub.yaml.plugin.api.Result.Failure f ? f.message() : "unknown error";
             LOG.warning("Background step '" + name + "' failed: " + msg);
+            if (listener != null) {
+                listener.onBackgroundFailure(name, result);
+            }
         };
         this.decoratorChain     = new DecoratorChain(new DecoratorConfig(conditionEvaluator, speedMultiplier, scope, null, null, null, null, bgHandler));
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;

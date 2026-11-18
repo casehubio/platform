@@ -62,6 +62,16 @@ public final class StepTraceCollector implements StepExecutionListener {
         exitStep(action, outcome, enrichedDetail);
     }
 
+    @Override
+    public synchronized void onBackgroundFailure(String stepName, Result result) {
+        String error = result instanceof io.casehub.yaml.plugin.api.Result.Failure f
+                       ? f.message() : "unknown error";
+        var node = StepTraceNode.leaf(0, stepName, "background",
+                                      null, StepOutcome.FAILED, 0, Map.of("error", error));
+        rootChildren.add(node);
+    }
+
+
     public synchronized void enterStep(int index, String name, String type) {
         stack.push(new Frame(index, name, type, System.nanoTime(), new ArrayList<>()));
     }

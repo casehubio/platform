@@ -10,4 +10,7 @@ public interface StepExecutionListener {
     void beforeStep(ResolvedStep step);
 
     void afterStep(ResolvedStep step, Result result, Map<String, Object> detail);
+
+    default void onBackgroundFailure(String stepName, Result result) {}
+
 }

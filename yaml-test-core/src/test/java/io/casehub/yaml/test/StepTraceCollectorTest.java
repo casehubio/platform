@@ -69,6 +69,25 @@ class StepTraceCollectorTest {
     }
 
     @Test
+    void backgroundFailureAppearsInTrace() {
+        var collector = new StepTraceCollector();
+
+        collector.enterStep(0, "step-a", "plugin");
+        collector.exitStep("agent-invoke", StepOutcome.EXECUTED, Map.of());
+
+        collector.onBackgroundFailure("bg-task",
+                                      io.casehub.yaml.plugin.api.Result.failed("connection timed out"));
+
+        assertThat(collector.rootChildren()).hasSize(2);
+        var bgNode = collector.rootChildren().get(1);
+        assertThat(bgNode.name()).isEqualTo("bg-task");
+        assertThat(bgNode.type()).isEqualTo("background");
+        assertThat(bgNode.outcome()).isEqualTo(StepOutcome.FAILED);
+        assertThat(bgNode.detail()).containsEntry("error", "connection timed out");
+    }
+
+
+    @Test
     void afterStepAdvancesStateMachineSelectorsOnSuccess() {
         var phases = Map.<String, java.util.List<io.casehub.platform.simulation.InvocationRecord<Object, Object>>>of(
                 "pending", java.util.List.of(new io.casehub.platform.simulation.InvocationRecord<>("t1", null, (Object) "in", (Object) "pending-out", java.time.Instant.now())),

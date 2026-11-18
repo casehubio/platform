@@ -34,23 +34,7 @@ public final class FileSystemModuleLoader implements ModuleLoader {
 
     @Override
     public Map<String, YamlModule> loadModules(List<YamlImport> imports, Path playbookPath) {
-        List<YamlImport> moduleImports = imports.stream()
-                                                .filter(imp -> imp.steps() == null)
-                                                .toList();
-
-        if (moduleImports.isEmpty()) {
-            return Map.of();
-        }
-
-        Path                        moduleDir   = playbookPath.getParent().resolve("modules");
-        Map<String, YamlModuleFile> uniqueFiles = new LinkedHashMap<>();
-
-        for (YamlImport imp : moduleImports) {
-            uniqueFiles.computeIfAbsent(imp.module(),
-                                        name -> loadModuleFile(name, moduleDir));
-        }
-
-        return ModuleExpander.resolveExtensions(new ArrayList<>(uniqueFiles.values()));
+        return loadModules(imports, playbookPath, null);
     }
 
     @Override
@@ -115,7 +99,6 @@ public final class FileSystemModuleLoader implements ModuleLoader {
                 "classpath:" + classpathResource));
     }
 
-    @SuppressWarnings("unchecked")
     private YamlModuleFile parseModuleContent(String yaml, String filePath,
                                               LocationIndex locations) throws IOException {
         YamlModuleFile moduleFile = mapper.readValue(yaml, YamlModuleFile.class);
@@ -133,47 +116,5 @@ public final class FileSystemModuleLoader implements ModuleLoader {
         }
 
         return moduleFile;
-    }
-
-
-    private YamlModuleFile loadModuleFile(String moduleName, Path moduleDir) {
-        if (moduleName.contains("..") || moduleName.startsWith("/") || moduleName.startsWith("\\")) {
-            throw new IllegalArgumentException(
-                    "Module name '" + moduleName + "' contains path traversal characters");
-        }
-
-        Path relativePath = moduleDir.resolve(moduleName + ".yaml").normalize();
-        if (!relativePath.startsWith(moduleDir.normalize())) {
-            throw new IllegalArgumentException(
-                    "Module name '" + moduleName + "' resolves outside module directory");
-        }
-
-        if (Files.exists(relativePath)) {
-            return parseModuleFile(relativePath);
-        }
-
-        String classpathResource = CLASSPATH_PREFIX + moduleName + ".yaml";
-        InputStream is = Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream(classpathResource);
-        if (is != null) {
-            try (is) {
-                return mapper.readValue(is, YamlModuleFile.class);
-            } catch (IOException e) {
-                throw new IllegalArgumentException(
-                        "Failed to parse module from classpath: " + classpathResource, e);
-            }
-        }
-
-        throw new ModuleNotFoundException(moduleName, List.of(
-                relativePath.toString(),
-                "classpath:" + classpathResource));
-    }
-
-    private YamlModuleFile parseModuleFile(Path path) {
-        try (InputStream is = Files.newInputStream(path)) {
-            return mapper.readValue(is, YamlModuleFile.class);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to parse module: " + path, e);
-        }
     }
 }

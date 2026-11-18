@@ -12,13 +12,11 @@ permissions:
   packages: write
 
 jobs:
-  # ── PR path: parallel sliced build with tests ─────────────────────────
+  # ── PR path: single-reactor build with tests ──────────────────────────
   #
-  # Phase 0: base (3 modules, <1s)
-  # Phase 1: slices A/B/C in parallel (60+57+53 modules)
-  # Phase 2: convergence (39 modules, depends on all slices)
-  #
-  # Wall-clock: ~20 min vs ~46 min sequential.
+  # The slice aggregators (aggregator-base/slice-a..d/convergence.xml) that
+  # this job used to build were moved to casehub-all, so the PR build runs
+  # the whole reactor in one invocation, parallelised with -T 1C.
 
   test:
     if: github.event_name == 'pull_request'
@@ -42,41 +40,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Phase 0: Build base"
-        run: mvn install -T 1C -f aggregator-base.xml --batch-mode -ntp
+      - name: Build and test
+        run: mvn install -T 1C --batch-mode --fail-at-end -ntp
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Phase 1: Build slices A/B/C/D in parallel"
-        run: |
-          mvn install -T 1C -f aggregator-slice-a.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[A] /' &
-          PID_A=$!
-          mvn install -T 1C -f aggregator-slice-b.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[B] /' &
-          PID_B=$!
-          mvn install -T 1C -f aggregator-slice-c.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[C] /' &
-          PID_C=$!
-          mvn install -T 1C -f aggregator-slice-d.xml --batch-mode --fail-at-end -ntp 2>&1 | sed 's/^/[D] /' &
-          PID_D=$!
-
-          FAILED=0
-          wait $PID_A || FAILED=$((FAILED + 1))
-          wait $PID_B || FAILED=$((FAILED + 1))
-          wait $PID_C || FAILED=$((FAILED + 1))
-          wait $PID_D || FAILED=$((FAILED + 1))
-
-          if [ $FAILED -gt 0 ]; then
-            echo "::error::$FAILED slice(s) failed"
-            exit 1
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        timeout-minutes: 30
-
-      - name: "Phase 2: Build convergence"
-        run: mvn install -T 1C -f aggregator-convergence.xml --batch-mode --fail-at-end -ntp
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        timeout-minutes: 10
+        timeout-minutes: 60
 
   # ── Push path: single-reactor deploy (no tests) ───────────────────────
 

@@ -174,7 +174,7 @@ public final class PlaybookRunnerCore {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             return new PlaybookRunResult(false, playbookPath.getFileName().toString(),
                     playbookPath.toString(), durationMs, null, List.of(), Map.of(),
-                    e.getMessage());
+                    e.getMessage() != null ? e.getMessage() : e.toString());
         } finally {
             if (simulationHandle != null) {
                 try { simulationHandle.close(); } catch (Exception ignored) {}

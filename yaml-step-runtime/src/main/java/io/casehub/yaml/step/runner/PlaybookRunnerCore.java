@@ -64,18 +64,18 @@ public final class PlaybookRunnerCore {
 
     @SuppressWarnings("unchecked")
     public PlaybookRunResult run(Path playbookPath, PlaybookRunConfig config) {
-        long start = System.nanoTime();
+        long          start            = System.nanoTime();
         AutoCloseable simulationHandle = null;
-        EventCapture eventCapture = new EventCapture();
+        EventCapture  eventCapture     = new EventCapture();
 
         try {
-            String yaml = Files.readString(playbookPath);
-            PlaybookDocument doc = PlaybookParser.parse(yaml);
+            String              yaml    = Files.readString(playbookPath);
+            PlaybookDocument    doc     = PlaybookParser.parse(yaml);
             Map<String, Object> content = new LinkedHashMap<>(doc.content());
 
-            ImportExpansionResult importResult = expandImports(content, playbookPath);
-            VariableSource moduleOutputSource = importResult != null ? importResult.outputSource() : null;
-            Map<String, Map<String, String>> moduleScopes = importResult != null ? importResult.moduleScopes() : Map.of();
+            ImportExpansionResult            importResult       = expandImports(content, playbookPath);
+            VariableSource                   moduleOutputSource = importResult != null ? importResult.outputSource() : null;
+            Map<String, Map<String, String>> moduleScopes       = importResult != null ? importResult.moduleScopes() : Map.of();
 
             String playbookName = extractName(doc, content, playbookPath);
 
@@ -97,30 +97,42 @@ public final class PlaybookRunnerCore {
                         parsed.params(), callerParams);
             }
 
+            VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource, moduleScopes);
+
+            if (importResult != null && !importResult.expandedStepSections().isEmpty()) {
+                Set<String> inactiveAliases = evaluateDeferredConditions(
+                        importResult.importConditions(), resolver);
+                Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
+                        content, importResult.expandedStepSections(), null, inactiveAliases);
+                content.clear();
+                content.putAll(withInlinedSteps);
+            }
+
+            @SuppressWarnings("unchecked")
             var steps = (List<Map<String, Object>>) content.get("steps");
             if (steps == null || steps.isEmpty()) {
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
                 return new PlaybookRunResult(true, playbookName,
-                        playbookPath.toString(), durationMs,
-                        StepTraceNode.leaf(0, playbookName, "playbook", null,
-                                StepOutcome.EXECUTED, durationMs, Map.of()),
-                        eventCapture.all(), Map.of(), null);
+                                             playbookPath.toString(), durationMs,
+                                             StepTraceNode.leaf(0, playbookName, "playbook", null,
+                                                                StepOutcome.EXECUTED, durationMs, Map.of()),
+                                             eventCapture.all(), Map.of(), null);
             }
 
             var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
             runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
 
-            List<ResolvedStep> resolved = Walker.resolve(steps, pluginRegistry);
-            var stepRunner = new CatalogStepRunner(pluginRegistry, runServices);
-            java.util.function.Predicate<String> simChecker = null;
-            java.util.function.Consumer<String> stepNotifier = null;
+            List<ResolvedStep>                   resolved     = Walker.resolve(steps, pluginRegistry);
+            var                                  stepRunner   = new CatalogStepRunner(pluginRegistry, runServices);
+            java.util.function.Predicate<String> simChecker   = null;
+            java.util.function.Consumer<String>  stepNotifier = null;
             if (simulationActivator != null) {
                 stepNotifier = simulationActivator.stepCompletionNotifier();
                 if (config.dryRun()) {
                     simChecker = simulationActivator.simulationChecker();
                 }
             }
-            var traceCollector = new StepTraceCollector(simChecker, stepNotifier);
+            var traceCollector   = new StepTraceCollector(simChecker, stepNotifier);
             var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
 
             try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
@@ -130,24 +142,22 @@ public final class PlaybookRunnerCore {
                 io.casehub.yaml.step.eval.StepLookup stepLookup = stepIndex::get;
 
                 var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
-                        .withListener(traceCollector)
-                        .withCaptureCollector(captureCollector);
-
-                VariableResolver resolver = buildResolver(parsed, callerParams, moduleOutputSource, moduleScopes);
+                                        .withListener(traceCollector)
+                                        .withCaptureCollector(captureCollector);
 
                 evaluator.preRegisterLatches(resolved);
 
                 Map<String, Object> outputVars = new LinkedHashMap<>();
-                boolean allPassed = true;
-                String errorMsg = null;
+                boolean             allPassed  = true;
+                String              errorMsg   = null;
 
                 for (int i = 0; i < resolved.size(); i++) {
-                    var step = resolved.get(i);
+                    var    step   = resolved.get(i);
                     Result result = evaluator.evaluate(step, resolver, stepRunner);
 
                     if (!result.isSuccess()) {
                         allPassed = false;
-                        errorMsg = result instanceof Result.Failure f ? f.message() : "Step failed";
+                        errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
                         break;
                     }
 
@@ -157,8 +167,8 @@ public final class PlaybookRunnerCore {
 
                     Object captureVal = step.decorators().get("capture");
                     if (captureVal != null) {
-                        String captureName = String.valueOf(captureVal);
-                        Map<String, Object> captured = captureCollector.get(captureName);
+                        String              captureName = String.valueOf(captureVal);
+                        Map<String, Object> captured    = captureCollector.get(captureName);
                         if (captured != null) {
                             resolver = resolver.withObjectScope(captureName, captured::get);
                         }
@@ -169,28 +179,28 @@ public final class PlaybookRunnerCore {
 
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
                 var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
-                        allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
-                        durationMs, Map.of(), traceCollector.rootChildren());
+                                                  allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
+                                                  durationMs, Map.of(), traceCollector.rootChildren());
 
                 return new PlaybookRunResult(allPassed, playbookName,
-                        playbookPath.toString(), durationMs, rootTrace,
-                        eventCapture.all(), outputVars, captureCollector.all(),
-                        primitiveSnapshot, errorMsg);
+                                             playbookPath.toString(), durationMs, rootTrace,
+                                             eventCapture.all(), outputVars, captureCollector.all(),
+                                             primitiveSnapshot, errorMsg);
             }
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             return new PlaybookRunResult(false, playbookPath.getFileName().toString(),
-                    playbookPath.toString(), durationMs, null, List.of(), Map.of(),
-                    "Parameter validation failed: " + e.getMessage());
+                                         playbookPath.toString(), durationMs, null, List.of(), Map.of(),
+                                         "Parameter validation failed: " + e.getMessage());
         } catch (Exception e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             return new PlaybookRunResult(false, playbookPath.getFileName().toString(),
-                    playbookPath.toString(), durationMs, null, List.of(), Map.of(),
-                    e.getMessage() != null ? e.getMessage() : e.toString());
+                                         playbookPath.toString(), durationMs, null, List.of(), Map.of(),
+                                         e.getMessage() != null ? e.getMessage() : e.toString());
         } finally {
             if (simulationHandle != null) {
-                try { simulationHandle.close(); } catch (Exception ignored) {}
+                try {simulationHandle.close();} catch (Exception ignored) {}
             }
         }
     }
@@ -198,12 +208,19 @@ public final class PlaybookRunnerCore {
     @SuppressWarnings("unchecked")
     public PlaybookValidationResult validate(Path playbookPath) {
         try {
-            String              yaml    = Files.readString(playbookPath);
-            PlaybookDocument    doc     = PlaybookParser.parse(yaml);
-            Map<String, Object> content = new LinkedHashMap<>(doc.content());
-            expandImports(content, playbookPath);
+            String                yaml         = Files.readString(playbookPath);
+            PlaybookDocument      doc          = PlaybookParser.parse(yaml);
+            Map<String, Object>   content      = new LinkedHashMap<>(doc.content());
+            ImportExpansionResult importResult = expandImports(content, playbookPath);
+            if (importResult != null && !importResult.expandedStepSections().isEmpty()) {
+                Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
+                        content, importResult.expandedStepSections());
+                content.clear();
+                content.putAll(withInlinedSteps);
+            }
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
+            @SuppressWarnings("unchecked")
             var steps = (List<Map<String, Object>>) content.get("steps");
             if (steps == null || steps.isEmpty()) {
                 return new PlaybookValidationResult(true, List.of(), frontMatter);
@@ -221,13 +238,19 @@ public final class PlaybookRunnerCore {
     @SuppressWarnings("unchecked")
     public PlaybookValidationResult validate(Path playbookPath, ValidationContext ctx) {
         try {
-            String              yaml      = Files.readString(playbookPath);
-            String              fileName  = playbookPath.toString();
-            var                 parsed    = PlaybookParser.parseWithLocations(yaml, fileName);
-            PlaybookDocument    doc       = parsed.document();
-            var                 locations = parsed.locations();
-            Map<String, Object> content   = new LinkedHashMap<>(doc.content());
-            expandImports(content, playbookPath, locations);
+            String                yaml         = Files.readString(playbookPath);
+            String                fileName     = playbookPath.toString();
+            var                   parsed       = PlaybookParser.parseWithLocations(yaml, fileName);
+            PlaybookDocument      doc          = parsed.document();
+            var                   locations    = parsed.locations();
+            Map<String, Object>   content      = new LinkedHashMap<>(doc.content());
+            ImportExpansionResult importResult = expandImports(content, playbookPath, locations);
+            if (importResult != null && !importResult.expandedStepSections().isEmpty()) {
+                Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
+                        content, importResult.expandedStepSections(), locations);
+                content.clear();
+                content.putAll(withInlinedSteps);
+            }
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
             var collector = new YamlErrorCollector();
@@ -238,6 +261,7 @@ public final class PlaybookRunnerCore {
                         locations.locationOf(content, fileName), null));
             }
 
+            @SuppressWarnings("unchecked")
             var steps = (List<Map<String, Object>>) content.get("steps");
             if (steps == null || steps.isEmpty()) {
                 List<YamlError> diags = collector.errors();
@@ -247,8 +271,8 @@ public final class PlaybookRunnerCore {
             var annotations = AnnotationMap.empty();
             Walker.resolve(steps, pluginRegistry, annotations, collector, fileName, locations);
 
-            List<YamlError> diagnostics = collector.errors();
-            List<ValidationSuggestion>                 suggestions = ValidationSuggestionGenerator.generate(diagnostics, pluginRegistry);
+            List<YamlError>            diagnostics = collector.errors();
+            List<ValidationSuggestion> suggestions = ValidationSuggestionGenerator.generate(diagnostics, pluginRegistry);
 
             return new PlaybookValidationResult(
                     !collector.hasErrors(), diagnostics, frontMatter, suggestions, null);
@@ -306,7 +330,9 @@ public final class PlaybookRunnerCore {
 
     private record ImportExpansionResult(
             io.casehub.yaml.core.resolver.VariableSource outputSource,
-            Map<String, Map<String, String>> moduleScopes) {}
+            Map<String, Map<String, String>> moduleScopes,
+            Map<String, String> importConditions,
+            Map<String, Object> expandedStepSections) {}
 
     @SuppressWarnings("unchecked")
     private ImportExpansionResult expandImports(Map<String, Object> content, Path playbookPath) {
@@ -330,8 +356,8 @@ public final class PlaybookRunnerCore {
                                              .toList();
 
         Map<String, YamlModule> modules = locations != null
-                ? moduleLoader.loadModules(imports, playbookPath, locations)
-                : moduleLoader.loadModules(imports, playbookPath);
+                                          ? moduleLoader.loadModules(imports, playbookPath, locations)
+                                          : moduleLoader.loadModules(imports, playbookPath);
 
         var bridge = new PlaybookModuleBridge();
         TypedExpandedModule<Map<String, Object>> expanded =
@@ -343,17 +369,12 @@ public final class PlaybookRunnerCore {
         Map<String, Object> expandedStepSections =
                 (Map<String, Object>) expandedContent.remove(PlaybookModuleBridge.EXPANDED_STEP_SECTIONS_KEY);
 
-        if (expandedStepSections != null) {
-            Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
-                    expandedContent, expandedStepSections, locations);
-            content.clear();
-            content.putAll(withInlinedSteps);
-        } else {
-            content.clear();
-            content.putAll(expandedContent);
-        }
+        content.clear();
+        content.putAll(expandedContent);
 
-        return new ImportExpansionResult(expanded.outputSource(), expanded.moduleScopes());
+        return new ImportExpansionResult(expanded.outputSource(), expanded.moduleScopes(),
+                                         expanded.importConditions(),
+                                         expandedStepSections != null ? expandedStepSections : Map.of());
     }
 
     private static VariableResolver buildResolver(
@@ -377,6 +398,28 @@ public final class PlaybookRunnerCore {
         }
         return resolver;
     }
+
+    private static Set<String> evaluateDeferredConditions(
+            Map<String, String> importConditions, VariableResolver resolver) {
+        if (importConditions.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> inactive = new java.util.LinkedHashSet<>();
+        for (var entry : importConditions.entrySet()) {
+            String alias     = entry.getKey();
+            String condition = entry.getValue();
+            try {
+                String resolved = resolver.resolveString(condition, alias + ".condition");
+                if (!resolved.contains("${") && !ModuleExpander.isConditionMet(resolved)) {
+                    inactive.add(alias);
+                }
+            } catch (io.casehub.yaml.core.resolver.UnresolvedVariableException ignored) {
+                // still unresolvable at runtime — keep the module active
+            }
+        }
+        return inactive;
+    }
+
 
     static String resolveStepType(ResolvedStep step) {
         return switch (step) {

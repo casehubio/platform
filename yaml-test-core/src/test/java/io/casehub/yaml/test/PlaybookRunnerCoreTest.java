@@ -347,6 +347,58 @@ class PlaybookRunnerCoreTest {
         assertThat(result.trace().children()).hasSize(1);
     }
 
+    @Test
+    void deferredConditionTruthyIncludesModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-deferred-condition-truthy.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(2);
+    }
+
+    @Test
+    void deferredConditionFalsySkipsModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-deferred-condition-falsy.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(1);
+    }
+
+    @Test
+    void deferredConditionParamOverrideTruthyIncludesModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-deferred-condition-param.yaml"),
+                                new PlaybookRunConfig(false, Map.of("feature_enabled", "true"), null, null));
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(2);
+    }
+
+    @Test
+    void deferredConditionParamDefaultFalsySkipsModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-deferred-condition-param.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(1);
+    }
+
 
     @Test
     void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {

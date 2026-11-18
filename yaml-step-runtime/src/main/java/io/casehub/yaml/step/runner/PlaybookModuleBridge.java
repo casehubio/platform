@@ -37,12 +37,20 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
     public static Map<String, Object> expandUseSteps(Map<String, Object> content,
                                                      Map<String, Object> expandedStepSections,
                                                      io.casehub.yaml.core.error.LocationIndex locations) {
+        return expandUseSteps(content, expandedStepSections, locations, Set.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> expandUseSteps(Map<String, Object> content,
+                                                     Map<String, Object> expandedStepSections,
+                                                     io.casehub.yaml.core.error.LocationIndex locations,
+                                                     Set<String> inactiveAliases) {
         var steps = (List<Map<String, Object>>) content.get("steps");
         if (steps == null || steps.isEmpty()) {
             return content;
         }
 
-        List<Map<String, Object>> expandedSteps = expandStepList(steps, expandedStepSections, locations);
+        List<Map<String, Object>> expandedSteps = expandStepList(steps, expandedStepSections, locations, inactiveAliases);
 
         Map<String, Object> result = new LinkedHashMap<>(content);
         result.put("steps", expandedSteps);
@@ -50,13 +58,14 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
         return result;
     }
 
+
     private static final Set<String> BRANCH_KEYS = Set.of(
             "then", "else", "catch", "finally", "block", "parallel", "try", "race");
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> expandStepList(
             List<Map<String, Object>> steps, Map<String, Object> expandedStepSections,
-            io.casehub.yaml.core.error.LocationIndex locations) {
+            io.casehub.yaml.core.error.LocationIndex locations, Set<String> inactiveAliases) {
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (Map<String, Object> step : steps) {
@@ -68,9 +77,12 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
                             "Invalid use: reference '" + ref
                             + "' — expected format 'alias.step-name'");
                 }
+                String alias = ref.substring(0, dot);
+                if (inactiveAliases.contains(alias)) {
+                    continue;
+                }
                 Object sequence = expandedStepSections.get(ref);
                 if (sequence == null) {
-                    String alias    = ref.substring(0, dot);
                     String stepName = ref.substring(dot + 1);
                     Set<String> available = expandedStepSections.keySet().stream()
                                                                 .filter(k -> k.startsWith(alias + "."))
@@ -83,7 +95,7 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
                     }
                 }
             } else {
-                result.add(expandBranches(step, expandedStepSections, locations));
+                result.add(expandBranches(step, expandedStepSections, locations, inactiveAliases));
             }
         }
         return result;
@@ -92,7 +104,7 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
     @SuppressWarnings("unchecked")
     private static Map<String, Object> expandBranches(
             Map<String, Object> step, Map<String, Object> expandedStepSections,
-            io.casehub.yaml.core.error.LocationIndex locations) {
+            io.casehub.yaml.core.error.LocationIndex locations, Set<String> inactiveAliases) {
         boolean hasBranch = false;
         for (String key : step.keySet()) {
             if (BRANCH_KEYS.contains(key) && step.get(key) instanceof List) {
@@ -106,7 +118,7 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
         for (Map.Entry<String, Object> entry : step.entrySet()) {
             if (BRANCH_KEYS.contains(entry.getKey()) && entry.getValue() instanceof List<?> branch) {
                 expanded.put(entry.getKey(),
-                             expandStepList((List<Map<String, Object>>) branch, expandedStepSections, locations));
+                             expandStepList((List<Map<String, Object>>) branch, expandedStepSections, locations, inactiveAliases));
             } else {
                 expanded.put(entry.getKey(), entry.getValue());
             }

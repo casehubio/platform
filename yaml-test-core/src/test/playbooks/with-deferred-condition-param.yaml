@@ -1,0 +1,19 @@
+name: Deferred condition (param)
+
+params:
+  feature_enabled:
+    type: STRING
+    default: "false"
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "hi"
+  - module: conditional-dep
+    as: dep
+    condition: "${params.feature_enabled}"
+
+steps:
+  - use: g.say-hello
+  - use: dep.extra-work

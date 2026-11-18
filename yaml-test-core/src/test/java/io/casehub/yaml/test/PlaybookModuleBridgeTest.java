@@ -237,7 +237,7 @@ class PlaybookModuleBridgeTest {
         content.put("steps", new ArrayList<>(List.of(ifStep)));
 
         Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
-                content, Map.of(), locations);
+                content, new LinkedHashMap<>(), locations);
 
         var steps          = (List<Map<String, Object>>) result.get("steps");
         var expandedIfStep = steps.get(0);

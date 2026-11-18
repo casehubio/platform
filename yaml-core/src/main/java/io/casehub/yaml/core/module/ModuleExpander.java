@@ -336,7 +336,7 @@ public final class ModuleExpander {
     }
 
 
-    static boolean isConditionMet(String resolved) {
+    public static boolean isConditionMet(String resolved) {
         if (resolved == null || resolved.isBlank()) {return false;}
         if (resolved.contains("${")) {return false;}
         String lower = resolved.toLowerCase(java.util.Locale.ROOT);

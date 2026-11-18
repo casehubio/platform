@@ -1,0 +1,17 @@
+name: Deferred condition (truthy)
+
+vars:
+  enabled: true
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "hi"
+  - module: conditional-dep
+    as: dep
+    condition: "${var.enabled}"
+
+steps:
+  - use: g.say-hello
+  - use: dep.extra-work

@@ -5,6 +5,8 @@ import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CompositePluginRegistryTest {
@@ -59,5 +61,44 @@ class CompositePluginRegistryTest {
 
         registry.register(def("greet"));
         assertThat(registry.resolve("greet")).isPresent();
+    }
+
+    @Test
+    void availableDomains_returnsDistinctDomains() {
+        var registry = new CompositePluginRegistry();
+        registry.register(defnWithDomain("log", "observability"));
+        registry.register(defnWithDomain("trace", "observability"));
+        registry.register(defnWithDomain("invoke", "agent"));
+        registry.register(def("process"));
+
+        assertThat(registry.availableDomains()).containsExactlyInAnyOrder("observability", "agent");
+    }
+
+    @Test
+    void actionsInDomain_returnsFilteredActions() {
+        var registry = new CompositePluginRegistry();
+        registry.register(defnWithDomain("log", "observability"));
+        registry.register(defnWithDomain("trace", "observability"));
+        registry.register(defnWithDomain("invoke", "agent"));
+        registry.register(def("process"));
+
+        assertThat(registry.actionsInDomain("observability")).containsExactlyInAnyOrder("log", "trace");
+        assertThat(registry.actionsInDomain("agent")).containsExactlyInAnyOrder("invoke");
+    }
+
+    @Test
+    void actionsInDomain_nullDomain_returnsUngrouped() {
+        var registry = new CompositePluginRegistry();
+        registry.register(defnWithDomain("log", "observability"));
+        registry.register(def("process"));
+
+        assertThat(registry.actionsInDomain(null)).containsExactlyInAnyOrder("process");
+    }
+
+    private static Definition defnWithDomain(String name, String domain) {
+        return Definition.of(name)
+                         .execute((p, s) -> Result.of(Map.of()))
+                         .domain(domain)
+                         .build();
     }
 }

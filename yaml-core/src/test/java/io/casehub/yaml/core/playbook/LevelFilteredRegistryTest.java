@@ -66,6 +66,22 @@ class LevelFilteredRegistryTest {
         assertEquals(Set.of("a"), filtered.availableActions());
     }
 
+    @Test
+    void domainQueriesRespectLevelFiltering() {
+        var base = new SimplePluginRegistry();
+        base.register(Definition.of("log").execute((p, s) -> Result.of(Map.of())).capability("steps").domain("observability").build());
+        base.register(Definition.of("par").execute((p, s) -> Result.of(Map.of())).capability("concurrency").domain("orchestration").build());
+        base.register(Definition.of("trace").execute((p, s) -> Result.of(Map.of())).capability("steps").domain("observability").build());
+
+        var levels   = new MapPlaybookLevelRegistry();
+        var filtered = LevelFilteredRegistry.forLevel(base, levels, "foundational");
+
+        assertEquals(Set.of("observability"), filtered.availableDomains());
+        assertEquals(Set.of("log", "trace"), filtered.actionsInDomain("observability"));
+        assertEquals(Set.of(), filtered.actionsInDomain("orchestration"));
+    }
+
+
     private static class SimplePluginRegistry implements PluginRegistry {
         private final ConcurrentHashMap<String, Definition> defs = new ConcurrentHashMap<>();
 

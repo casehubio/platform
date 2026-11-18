@@ -15,7 +15,8 @@ public record Definition(
         String capability,
         Optional<StreamingTypeInfo> streamingType,
         boolean absorbSiblings,
-        Map<String, Map<String, Parameter>> variants) {
+        Map<String, Map<String, Parameter>> variants,
+        String domain) {
 
     public Definition {
         if (name == null || name.isBlank()) {throw new IllegalArgumentException("Definition requires a name");}
@@ -31,21 +32,29 @@ public record Definition(
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability) {
-        this(name, description, inputs, outputs, portability, action, capability, Optional.empty(), false, Map.of());
+        this(name, description, inputs, outputs, portability, action, capability, Optional.empty(), false, Map.of(), null);
     }
 
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability,
                       Optional<StreamingTypeInfo> streamingType) {
-        this(name, description, inputs, outputs, portability, action, capability, streamingType, false, Map.of());
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, false, Map.of(), null);
     }
 
     public Definition(String name, String description,
                       Map<String, Parameter> inputs, Map<String, Parameter> outputs,
                       Portability portability, Action action, String capability,
                       Optional<StreamingTypeInfo> streamingType, boolean absorbSiblings) {
-        this(name, description, inputs, outputs, portability, action, capability, streamingType, absorbSiblings, Map.of());
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, absorbSiblings, Map.of(), null);
+    }
+
+    public Definition(String name, String description,
+                      Map<String, Parameter> inputs, Map<String, Parameter> outputs,
+                      Portability portability, Action action, String capability,
+                      Optional<StreamingTypeInfo> streamingType, boolean absorbSiblings,
+                      Map<String, Map<String, Parameter>> variants) {
+        this(name, description, inputs, outputs, portability, action, capability, streamingType, absorbSiblings, variants, null);
     }
 
     public String primaryInput() {
@@ -70,6 +79,7 @@ public record Definition(
         private       Optional<StreamingTypeInfo>                   streamingType  = Optional.empty();
         private       boolean                                       absorbSiblings = false;
         private final LinkedHashMap<String, Map<String, Parameter>> variants       = new LinkedHashMap<>();
+        private       String                                        domain;
 
         private Builder(String name) {this.name = name;}
 
@@ -128,12 +138,18 @@ public record Definition(
             return this;
         }
 
+        public Builder domain(String domain) {
+            this.domain = domain;
+            return this;
+        }
+
         public Definition build() {
             return new Definition(name, description,
                                   Collections.unmodifiableMap(new LinkedHashMap<>(inputs)),
                                   Collections.unmodifiableMap(new LinkedHashMap<>(outputs)),
                                   portability, action, capability, streamingType, absorbSiblings,
-                                  Collections.unmodifiableMap(new LinkedHashMap<>(variants)));
+                                  Collections.unmodifiableMap(new LinkedHashMap<>(variants)),
+                                  domain);
         }
     }
 }

@@ -41,11 +41,13 @@ public class McpStepCatalogWiring {
         DomainModelRegistry registry = registryInstance.get();
 
         Map<String, Declaration> declarations = new LinkedHashMap<>();
+        Map<String, String> actionDomains = new LinkedHashMap<>();
         for (DomainModel domain : registry.getDomains()) {
             for (OperationDescriptor op : domain.operations()) {
                 if (op.type() == OperationDescriptor.OperationType.STREAM) continue;
                 String toolName = domain.name() + "_" + op.name();
                 declarations.put(toolName, buildDeclaration(toolName, op));
+                actionDomains.put(toolName, domain.name());
             }
         }
 
@@ -54,7 +56,7 @@ public class McpStepCatalogWiring {
         }
 
         io.casehub.platform.api.mcp.ToolDispatcher dispatcher = resolveDispatcher();
-        delegate = new McpToolSource(declarations, (toolName, params) -> {
+        delegate = new McpToolSource(declarations, actionDomains, (toolName, params) -> {
             if (dispatcher == null) {
                 return Map.of("error", "ToolDispatcher not available");
             }

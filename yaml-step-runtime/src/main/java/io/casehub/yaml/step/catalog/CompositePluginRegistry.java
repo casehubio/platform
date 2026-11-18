@@ -42,4 +42,25 @@ public class CompositePluginRegistry implements PluginRegistry {
     public Set<String> availableActions() {
         return Set.copyOf(definitions.keySet());
     }
+
+    @Override
+    public Set<String> availableDomains() {
+        Set<String> domains = new java.util.LinkedHashSet<>();
+        for (Definition d : definitions.values()) {
+            if (d.domain() != null) {domains.add(d.domain());}
+        }
+        return Set.copyOf(domains);
+    }
+
+    @Override
+    public Set<String> actionsInDomain(String domain) {
+        Set<String> result = new java.util.LinkedHashSet<>();
+        for (var e : definitions.entrySet()) {
+            String d = e.getValue().domain();
+            if (domain == null ? d == null : domain.equals(d)) {
+                result.add(e.getKey());
+            }
+        }
+        return Set.copyOf(result);
+    }
 }

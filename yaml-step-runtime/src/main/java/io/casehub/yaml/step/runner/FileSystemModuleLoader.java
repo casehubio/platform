@@ -8,8 +8,10 @@ import io.casehub.yaml.core.module.ModuleExpander;
 import io.casehub.yaml.core.module.YamlImport;
 import io.casehub.yaml.core.module.YamlModule;
 import io.casehub.yaml.core.module.YamlModuleFile;
+import io.casehub.yaml.jackson.LocationTrackingModule;
 import io.casehub.yaml.jackson.YamlCoreJacksonModule;
-import io.casehub.yaml.step.statemachine.PlaybookParser;
+
+import com.fasterxml.jackson.databind.ObjectReader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +31,8 @@ public final class FileSystemModuleLoader implements ModuleLoader {
     public FileSystemModuleLoader() {
         this.mapper = new ObjectMapper(new YAMLFactory())
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                .registerModule(new YamlCoreJacksonModule());
+                .registerModule(new YamlCoreJacksonModule())
+                .registerModule(new LocationTrackingModule());
     }
 
     @Override
@@ -101,20 +104,12 @@ public final class FileSystemModuleLoader implements ModuleLoader {
 
     private YamlModuleFile parseModuleContent(String yaml, String filePath,
                                               LocationIndex locations) throws IOException {
-        YamlModuleFile moduleFile = mapper.readValue(yaml, YamlModuleFile.class);
-
+        ObjectReader reader = mapper.readerFor(YamlModuleFile.class);
         if (locations != null) {
-            var raw = PlaybookParser.parseRawWithLocations(yaml, filePath);
-            if (raw.root() instanceof Map<?, ?> rawMap) {
-                for (var entry : moduleFile.sections().entrySet()) {
-                    Object rawSection = rawMap.get(entry.getKey());
-                    if (rawSection != null) {
-                        locations.transferFrom(raw.locations(), rawSection, entry.getValue());
-                    }
-                }
-            }
+            reader = reader
+                    .withAttribute(LocationTrackingModule.LOCATION_INDEX_KEY, locations)
+                    .withAttribute(LocationTrackingModule.FILE_PATH_KEY, filePath);
         }
-
-        return moduleFile;
+        return reader.readValue(yaml);
     }
 }

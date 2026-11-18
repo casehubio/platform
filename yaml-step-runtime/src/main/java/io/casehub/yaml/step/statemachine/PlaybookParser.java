@@ -31,7 +31,7 @@ public final class PlaybookParser {
 
     public record RawParseResult(Object root, LocationIndex locations) {}
 
-    public static RawParseResult parseRawWithLocations(String yaml, String filePath) {
+    static RawParseResult parseRawWithLocations(String yaml, String filePath) {
         if (yaml == null || yaml.isBlank()) {
             return new RawParseResult(null, new LocationIndex());
         }

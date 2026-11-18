@@ -2,6 +2,7 @@ package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.yaml.core.annotation.AnnotationMap;
+import io.casehub.yaml.core.error.LocationIndex;
 import io.casehub.yaml.core.error.ParseError;
 import io.casehub.yaml.core.error.SourceLocation;
 import io.casehub.yaml.core.error.YamlError;
@@ -228,19 +229,21 @@ public final class PlaybookRunnerCore {
     @SuppressWarnings("unchecked")
     public PlaybookValidationResult validate(Path playbookPath, ValidationContext ctx) {
         try {
-            String              yaml    = Files.readString(playbookPath);
-            PlaybookDocument    doc     = PlaybookParser.parse(yaml);
-            Map<String, Object> content = new LinkedHashMap<>(doc.content());
+            String              yaml      = Files.readString(playbookPath);
+            String              fileName  = playbookPath.toString();
+            var                 parsed    = PlaybookParser.parseWithLocations(yaml, fileName);
+            PlaybookDocument    doc       = parsed.document();
+            var                 locations = parsed.locations();
+            Map<String, Object> content   = new LinkedHashMap<>(doc.content());
             expandImports(content, playbookPath);
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
-            var    collector = new YamlErrorCollector();
-            String fileName  = playbookPath.toString();
+            var collector = new YamlErrorCollector();
 
             if (content.containsKey("steps") && "assisted".equals(ctx.schema())) {
-                var loc = new SourceLocation(fileName, -1, -1);
                 collector.add(new ParseError.StructureError(
-                        null, "Remove the 'steps:' wrapper — use a bare YAML list instead", loc, null));
+                        null, "Remove the 'steps:' wrapper — use a bare YAML list instead",
+                        locations.locationOf(content, fileName), null));
             }
 
             var steps = (List<Map<String, Object>>) content.get("steps");
@@ -250,7 +253,7 @@ public final class PlaybookRunnerCore {
             }
 
             var annotations = AnnotationMap.empty();
-            Walker.resolve(steps, pluginRegistry, annotations, collector, fileName);
+            Walker.resolve(steps, pluginRegistry, annotations, collector, fileName, locations);
 
             List<YamlError> diagnostics = collector.errors();
             List<ValidationSuggestion>                 suggestions = ValidationSuggestionGenerator.generate(diagnostics, pluginRegistry);

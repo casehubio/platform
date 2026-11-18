@@ -1,7 +1,12 @@
 package io.casehub.yaml.step.statemachine;
 
+import io.casehub.yaml.core.error.SourceLocation;
 import io.casehub.yaml.core.playbook.PlaybookDocument;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -289,5 +294,100 @@ class PlaybookParserTest {
         PlaybookDocument doc = PlaybookParser.parse(yaml);
 
         assertThat(doc.frontMatter().name()).isEqualTo("explicit-name");
+    }
+
+    @Nested
+    class LocationTracking {
+
+        @Test
+        void tracksStepListLocations() {
+            String yaml = """
+                          steps:
+                            - log: hello
+                            - process:
+                                command: run.sh
+                          """;
+            var result = PlaybookParser.parseWithLocations(yaml, "test.yaml");
+            assertThat(result.locations().isEmpty()).isFalse();
+
+            @SuppressWarnings("unchecked")
+            var steps = (List<Map<String, Object>>) result.document().content().get("steps");
+            assertThat(steps).hasSize(2);
+
+            SourceLocation loc0 = result.locations().locationOf(steps.get(0));
+            assertThat(loc0.file()).isEqualTo("test.yaml");
+            assertThat(loc0.line()).isEqualTo(2);
+            assertThat(loc0.isKnown()).isTrue();
+
+            SourceLocation loc1 = result.locations().locationOf(steps.get(1));
+            assertThat(loc1.file()).isEqualTo("test.yaml");
+            assertThat(loc1.line()).isEqualTo(3);
+        }
+
+        @Test
+        void tracksRootContentLocation() {
+            String yaml = """
+                          steps:
+                            - log: hello
+                          """;
+            var            result  = PlaybookParser.parseWithLocations(yaml, "test.yaml");
+            SourceLocation rootLoc = result.locations().locationOf(result.document().content());
+            assertThat(rootLoc.line()).isEqualTo(1);
+            assertThat(rootLoc.column()).isEqualTo(1);
+        }
+
+        @Test
+        void unknownObjectReturnsFallback() {
+            String yaml = """
+                          steps:
+                            - log: hello
+                          """;
+            var            result = PlaybookParser.parseWithLocations(yaml, "test.yaml");
+            SourceLocation loc    = result.locations().locationOf(Map.of("unrelated", "map"), "fallback.yaml");
+            assertThat(loc.file()).isEqualTo("fallback.yaml");
+            assertThat(loc.line()).isEqualTo(-1);
+        }
+
+        @Test
+        void resolvesScalarTypes() {
+            String yaml = """
+                          count: 42
+                          enabled: true
+                          ratio: 3.14
+                          label: hello
+                          """;
+            var result  = PlaybookParser.parseWithLocations(yaml, null);
+            var content = result.document().content();
+            assertThat(content.get("count")).isEqualTo(42);
+            assertThat(content.get("enabled")).isEqualTo(true);
+            assertThat(content.get("ratio")).isEqualTo(3.14);
+            assertThat(content.get("label")).isEqualTo("hello");
+        }
+
+        @Test
+        void quotedStringsRemainStrings() {
+            String yaml = """
+                          value: "true"
+                          number: "42"
+                          """;
+            var result  = PlaybookParser.parseWithLocations(yaml, null);
+            var content = result.document().content();
+            assertThat(content.get("value")).isEqualTo("true");
+            assertThat(content.get("number")).isEqualTo("42");
+        }
+
+        @Test
+        void nullFilePath_producesNullFileInLocation() {
+            String yaml = """
+                          steps:
+                            - log: hello
+                          """;
+            var result = PlaybookParser.parseWithLocations(yaml, null);
+            @SuppressWarnings("unchecked")
+            var steps = (List<Map<String, Object>>) result.document().content().get("steps");
+            SourceLocation loc = result.locations().locationOf(steps.get(0));
+            assertThat(loc.file()).isNull();
+            assertThat(loc.line()).isGreaterThan(0);
+        }
     }
 }

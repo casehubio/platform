@@ -6,6 +6,7 @@ import io.casehub.yaml.core.error.YamlErrorCollector;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.step.statemachine.PlaybookParser;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -168,6 +169,29 @@ class WalkerErrorCollectionTest {
         assertThat(block.steps()).hasSize(2);
         assertThat(block.steps().get(0)).isInstanceOf(ResolvedStep.PluginStep.class);
         assertThat(block.steps().get(1)).isInstanceOf(ResolvedStep.ErrorStep.class);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void errorLocationCarriesLineAndColumn_whenParsedWithLocations() {
+        String yaml = """
+                      steps:
+                        - log: hello
+                        - nonexistent: bad
+                        - process:
+                            command: run.sh
+                      """;
+        var parsed    = PlaybookParser.parseWithLocations(yaml, "playbook.yaml");
+        var steps     = (List<Map<String, Object>>) parsed.document().content().get("steps");
+        var collector = new YamlErrorCollector();
+        Walker.resolve(steps, registry, AnnotationMap.empty(), collector, "playbook.yaml", parsed.locations());
+
+        assertThat(collector.errors()).hasSize(1);
+        var error = collector.errors().get(0);
+        assertThat(error.location().file()).isEqualTo("playbook.yaml");
+        assertThat(error.location().line()).isEqualTo(3);
+        assertThat(error.location().isKnown()).isTrue();
     }
 
     private static Definition defn(String name) {

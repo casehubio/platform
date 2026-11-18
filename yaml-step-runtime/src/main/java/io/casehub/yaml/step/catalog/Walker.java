@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.catalog;
 
 import io.casehub.yaml.core.annotation.AnnotationMap;
+import io.casehub.yaml.core.error.LocationIndex;
 import io.casehub.yaml.core.error.ParseError;
 import io.casehub.yaml.core.error.SourceLocation;
 import io.casehub.yaml.core.error.YamlErrorCollector;
@@ -67,8 +68,8 @@ public final class Walker {
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, AnnotationMap annotations) {
         Set<String>        seenNames = new java.util.HashSet<>();
-        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations, "", 0, null, null);
-        validateBarrierQuorumReferences(result, seenNames, null, null);
+        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations, "", 0, null, null, LocationIndex.empty());
+        validateBarrierQuorumReferences(result, seenNames, null, null, LocationIndex.empty());
         result = io.casehub.yaml.step.eval.FusionPass.fuse(result, registry);
         return result;
     }
@@ -76,9 +77,16 @@ public final class Walker {
     public static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry,
             AnnotationMap annotations, YamlErrorCollector collector, String playbookFile) {
+        return resolve(steps, registry, annotations, collector, playbookFile, LocationIndex.empty());
+    }
+
+    public static List<ResolvedStep> resolve(
+            List<Map<String, Object>> steps, PluginRegistry registry,
+            AnnotationMap annotations, YamlErrorCollector collector, String playbookFile,
+            LocationIndex locations) {
         Set<String>        seenNames = new java.util.HashSet<>();
-        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations, "", 0, collector, playbookFile);
-        validateBarrierQuorumReferences(result, seenNames, collector, playbookFile);
+        List<ResolvedStep> result    = resolve(steps, registry, 0, "root", seenNames, annotations, "", 0, collector, playbookFile, locations);
+        validateBarrierQuorumReferences(result, seenNames, collector, playbookFile, locations);
         result = io.casehub.yaml.step.eval.FusionPass.fuse(result, registry);
         return result;
     }
@@ -86,17 +94,16 @@ public final class Walker {
 
     private static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path, Set<String> seenNames) {
-        return resolve(steps, registry, depth, path, seenNames, AnnotationMap.empty(), "", 0, null, null);
+        return resolve(steps, registry, depth, path, seenNames, AnnotationMap.empty(), "", 0, null, null, LocationIndex.empty());
     }
 
     private static List<ResolvedStep> resolve(
             List<Map<String, Object>> steps, PluginRegistry registry, int depth, String path,
             Set<String> seenNames, AnnotationMap annotations, String annPrefix, int annOffset,
-            YamlErrorCollector collector, String playbookFile) {
+            YamlErrorCollector collector, String playbookFile, LocationIndex locations) {
         if (depth > MAX_DEPTH) {
             if (collector != null) {
-                var loc = new SourceLocation(playbookFile, -1, -1);
-                collector.add(new ParseError.StructureError(null, "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path, loc, null));
+                collector.add(new ParseError.StructureError(null, "Maximum nesting depth (" + MAX_DEPTH + ") exceeded at: " + path, locations.locationOf(steps, playbookFile), null));
                 return List.of();
             }
             throw new IllegalArgumentException(
@@ -108,16 +115,15 @@ public final class Walker {
             ResolvedStep step;
             if (collector != null) {
                 try {
-                    step = resolveOne(steps.get(i), registry, i, depth, path, seenNames, annotations, stepKey, collector, playbookFile);
+                    step = resolveOne(steps.get(i), registry, i, depth, path, seenNames, annotations, stepKey, collector, playbookFile, locations);
                 } catch (IllegalArgumentException e) {
-                    var        loc   = new SourceLocation(playbookFile, -1, -1);
-                    ParseError error = new ParseError.StructureError(null, e.getMessage(), loc, e);
+                    ParseError error = new ParseError.StructureError(null, e.getMessage(), locations.locationOf(steps.get(i), playbookFile), e);
                     collector.add(error);
                     result.add(new ResolvedStep.ErrorStep(null, steps.get(i), error));
                     continue;
                 }
             } else {
-                step = resolveOne(steps.get(i), registry, i, depth, path, seenNames, annotations, stepKey, null, null);
+                step = resolveOne(steps.get(i), registry, i, depth, path, seenNames, annotations, stepKey, null, null, locations);
             }
             List<io.casehub.yaml.core.annotation.Annotation> stepAnns = annotations.forStep(stepKey);
             if (!stepAnns.isEmpty()) {
@@ -207,7 +213,7 @@ public final class Walker {
     private static ResolvedStep resolveOne(
             Map<String, Object> step, PluginRegistry registry, int index, int depth, String path,
             Set<String> seenNames, AnnotationMap annotations, String stepKey,
-            YamlErrorCollector collector, String playbookFile) {
+            YamlErrorCollector collector, String playbookFile, LocationIndex locations) {
         if (step.isEmpty()) {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": empty step map");
@@ -389,8 +395,7 @@ public final class Walker {
         if (!unknownKeys.isEmpty()) {
             var first = unknownKeys.get(0);
             if (collector != null) {
-                var loc   = new SourceLocation(playbookFile, -1, -1);
-                var error = new ParseError.UnknownStepError(null, first.getKey(), loc, null);
+                var error = new ParseError.UnknownStepError(null, first.getKey(), locations.locationOf(step, playbookFile), null);
                 collector.add(error);
                 return new ResolvedStep.ErrorStep(null, step, error);
             }
@@ -408,8 +413,7 @@ public final class Walker {
 
         if (stepName != null && !seenNames.add(stepName)) {
             if (collector != null) {
-                var loc = new SourceLocation(playbookFile, -1, -1);
-                collector.add(new ParseError.DuplicateStepError(stepName, loc, null));
+                collector.add(new ParseError.DuplicateStepError(stepName, locations.locationOf(step, playbookFile), null));
             } else {
                 throw new IllegalArgumentException(
                         path + " → Step " + index + ": duplicate step name '" + stepName + "'");
@@ -478,14 +482,14 @@ public final class Walker {
             return new ResolvedStep.IfElseStep(
                     stepName,
                     String.valueOf(ifValue),
-                    resolve(thenSteps, registry, depth + 1, stepPath + " → then", seenNames, annotations, childPrefix, 0, collector, playbookFile),
-                    elseSteps != null ? resolve(elseSteps, registry, depth + 1, stepPath + " → else", seenNames, annotations, childPrefix, thenSteps.size(), collector, playbookFile) : null,
+                    resolve(thenSteps, registry, depth + 1, stepPath + " → then", seenNames, annotations, childPrefix, 0, collector, playbookFile, locations),
+                    elseSteps != null ? resolve(elseSteps, registry, depth + 1, stepPath + " → else", seenNames, annotations, childPrefix, thenSteps.size(), collector, playbookFile, locations) : null,
                     decorators);
         }
         if ("block".equals(structuralType)) {
             return new ResolvedStep.BlockStep(
                     stepName,
-                    resolve((List<Map<String, Object>>) structuralValue, registry, depth + 1, stepPath + " → block", seenNames, annotations, stepKey + ".", 0, collector, playbookFile),
+                    resolve((List<Map<String, Object>>) structuralValue, registry, depth + 1, stepPath + " → block", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations),
                     decorators);
         }
         if ("match".equals(structuralType)) {
@@ -493,7 +497,7 @@ public final class Walker {
             return new ResolvedStep.MatchStep(
                     stepName,
                     (String) matchValue,
-                    resolveMatchCases(cases, registry, index, depth, stepPath, seenNames, annotations, stepKey, collector, playbookFile),
+                    resolveMatchCases(cases, registry, index, depth, stepPath, seenNames, annotations, stepKey, collector, playbookFile, locations),
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
@@ -502,7 +506,7 @@ public final class Walker {
                 var stepList = (List<Map<String, Object>>) structuralValue;
                 return new ResolvedStep.ParallelStep(
                         stepName,
-                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile),
+                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations),
                         decorators);
             }
             @SuppressWarnings("unchecked")
@@ -513,7 +517,7 @@ public final class Walker {
                 throw new IllegalArgumentException(
                         "parallel map form requires a non-empty 'steps' list at " + stepPath);
             }
-            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile);
+            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
             Object advanceAfterRaw = policyMap.get("advance-after");
             int    advanceAfter;
             if (advanceAfterRaw == null || "all".equals(advanceAfterRaw)) {
@@ -539,11 +543,11 @@ public final class Walker {
             var    finallySteps = (List<Map<String, Object>>) companions.get("finally");
             String childPrefix  = stepKey + ".";
             int    offset       = 0;
-            var    resolvedTry  = resolve(trySteps, registry, depth + 1, stepPath + " → try", seenNames, annotations, childPrefix, offset, collector, playbookFile);
+            var    resolvedTry  = resolve(trySteps, registry, depth + 1, stepPath + " → try", seenNames, annotations, childPrefix, offset, collector, playbookFile, locations);
             offset += trySteps.size();
-            var resolvedCatch = catchSteps != null ? resolve(catchSteps, registry, depth + 1, stepPath + " → catch", seenNames, annotations, childPrefix, offset, collector, playbookFile) : null;
+            var resolvedCatch = catchSteps != null ? resolve(catchSteps, registry, depth + 1, stepPath + " → catch", seenNames, annotations, childPrefix, offset, collector, playbookFile, locations) : null;
             offset += catchSteps != null ? catchSteps.size() : 0;
-            var resolvedFinally = finallySteps != null ? resolve(finallySteps, registry, depth + 1, stepPath + " → finally", seenNames, annotations, childPrefix, offset, collector, playbookFile) : null;
+            var resolvedFinally = finallySteps != null ? resolve(finallySteps, registry, depth + 1, stepPath + " → finally", seenNames, annotations, childPrefix, offset, collector, playbookFile, locations) : null;
             return new ResolvedStep.TryCatchFinallyStep(
                     stepName, resolvedTry, resolvedCatch, resolvedFinally, decorators);
         }
@@ -551,7 +555,7 @@ public final class Walker {
             var branchMaps = (List<Map<String, Object>>) structuralValue;
             return new ResolvedStep.SelectStep(
                     stepName,
-                    resolveSelectBranches(branchMaps, registry, depth, stepPath, seenNames, annotations, stepKey, collector, playbookFile),
+                    resolveSelectBranches(branchMaps, registry, depth, stepPath, seenNames, annotations, stepKey, collector, playbookFile, locations),
                     decorators);
         }
         if ("barrier".equals(structuralType)) {
@@ -584,7 +588,7 @@ public final class Walker {
         if ("race".equals(structuralType)) {
             @SuppressWarnings("unchecked")
             var branches = (List<Map<String, Object>>) structuralValue;
-            var resolvedBranches = resolve(branches, registry, depth + 1, stepPath + " → race", seenNames, annotations, stepKey + ".", 0, collector, playbookFile);
+            var resolvedBranches = resolve(branches, registry, depth + 1, stepPath + " → race", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
             return new ResolvedStep.RaceStep(stepName, resolvedBranches, decorators);
         }
         if ("pause".equals(structuralType)) {
@@ -598,7 +602,7 @@ public final class Walker {
                 @SuppressWarnings("unchecked")
                 var stepList = (List<Map<String, Object>>) structuralValue;
                 var resolved = resolve(stepList, registry, depth + 1,
-                                       stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0, collector, playbookFile);
+                                       stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
                 decorators.put(structuralType, true);
                 return new ResolvedStep.BlockStep(stepName, resolved, decorators);
             }
@@ -619,7 +623,7 @@ public final class Walker {
             @SuppressWarnings("unchecked")
             var stepList = (List<Map<String, Object>>) entry.getValue();
             var resolved = resolve(stepList, registry, depth + 1,
-                                   stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0, collector, playbookFile);
+                                   stepPath + " → " + structuralType, seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
             decorators.put(structuralType, param);
             return new ResolvedStep.BlockStep(stepName, resolved, decorators);
         }
@@ -642,7 +646,7 @@ public final class Walker {
     private static List<ResolvedMatchCase> resolveMatchCases(
             List<Map<String, Object>> cases, PluginRegistry registry, int stepIndex, int depth, String path,
             Set<String> seenNames, AnnotationMap annotations, String stepKey,
-            YamlErrorCollector collector, String playbookFile) {
+            YamlErrorCollector collector, String playbookFile, LocationIndex locations) {
         String                  childPrefix = stepKey + ".";
         List<ResolvedMatchCase> result      = new ArrayList<>(cases.size());
         for (int i = 0; i < cases.size(); i++) {
@@ -672,7 +676,7 @@ public final class Walker {
                 result.add(new ResolvedMatchCase(
                         new io.casehub.yaml.core.step.MatchPattern.DefaultPattern(),
                         null,
-                        resolve(steps, registry, depth + 1, casePath + " → default", seenNames, annotations, childPrefix, i, collector, playbookFile)));
+                        resolve(steps, registry, depth + 1, casePath + " → default", seenNames, annotations, childPrefix, i, collector, playbookFile, locations)));
             } else {
                 var                                    patternObj = caseMap.get("pattern");
                 io.casehub.yaml.core.step.MatchPattern pattern;
@@ -696,15 +700,14 @@ public final class Walker {
                     ResolvedStep caseStep;
                     if (collector != null) {
                         try {
-                            caseStep = resolveOne(rest, registry, i, depth + 1, casePath, seenNames, annotations, caseKey, collector, playbookFile);
+                            caseStep = resolveOne(rest, registry, i, depth + 1, casePath, seenNames, annotations, caseKey, collector, playbookFile, locations);
                         } catch (IllegalArgumentException e) {
-                            var        loc   = new SourceLocation(playbookFile, -1, -1);
-                            ParseError error = new ParseError.StructureError(null, e.getMessage(), loc, e);
+                            ParseError error = new ParseError.StructureError(null, e.getMessage(), locations.locationOf(rest, playbookFile), e);
                             collector.add(error);
                             caseStep = new ResolvedStep.ErrorStep(null, rest, error);
                         }
                     } else {
-                        caseStep = resolveOne(rest, registry, i, depth + 1, casePath, seenNames, annotations, caseKey, null, null);
+                        caseStep = resolveOne(rest, registry, i, depth + 1, casePath, seenNames, annotations, caseKey, null, null, locations);
                     }
                     List<io.casehub.yaml.core.annotation.Annotation> caseAnns = annotations.forStep(caseKey);
                     if (!caseAnns.isEmpty()) {
@@ -731,7 +734,7 @@ public final class Walker {
     private static List<ResolvedStep.SelectBranch> resolveSelectBranches(
             List<Map<String, Object>> branches, PluginRegistry registry, int depth, String path,
             Set<String> seenNames, AnnotationMap annotations, String stepKey,
-            YamlErrorCollector collector, String playbookFile) {
+            YamlErrorCollector collector, String playbookFile, LocationIndex locations) {
         String                          childPrefix = stepKey + ".";
         List<ResolvedStep.SelectBranch> result      = new ArrayList<>(branches.size());
         for (int i = 0; i < branches.size(); i++) {
@@ -763,15 +766,14 @@ public final class Walker {
                 ResolvedStep branchStep;
                 if (collector != null) {
                     try {
-                        branchStep = resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, annotations, branchKey, collector, playbookFile);
+                        branchStep = resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, annotations, branchKey, collector, playbookFile, locations);
                     } catch (IllegalArgumentException e) {
-                        var        loc   = new SourceLocation(playbookFile, -1, -1);
-                        ParseError error = new ParseError.StructureError(null, e.getMessage(), loc, e);
+                        ParseError error = new ParseError.StructureError(null, e.getMessage(), locations.locationOf(rest, playbookFile), e);
                         collector.add(error);
                         branchStep = new ResolvedStep.ErrorStep(null, rest, error);
                     }
                 } else {
-                    branchStep = resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, annotations, branchKey, null, null);
+                    branchStep = resolveOne(rest, registry, 0, depth + 1, branchPath, seenNames, annotations, branchKey, null, null, locations);
                 }
                 List<io.casehub.yaml.core.annotation.Annotation> branchAnns = annotations.forStep(branchKey);
                 if (!branchAnns.isEmpty()) {
@@ -787,16 +789,15 @@ public final class Walker {
 
     private static void validateBarrierQuorumReferences(
             List<ResolvedStep> steps, Set<String> knownNames,
-            YamlErrorCollector collector, String playbookFile) {
+            YamlErrorCollector collector, String playbookFile, LocationIndex locations) {
         for (ResolvedStep step : steps) {
             switch (step) {
                 case ResolvedStep.BarrierStep b -> {
                     for (String name : b.awaitSteps()) {
                         if (!knownNames.contains(name)) {
                             if (collector != null) {
-                                var loc = new SourceLocation(playbookFile, -1, -1);
                                 collector.add(new ParseError.StructureError(b.name(),
-                                                                            "barrier '" + b.name() + "' awaits unknown step '" + name + "'", loc, null));
+                                                                            "barrier '" + b.name() + "' awaits unknown step '" + name + "'", SourceLocation.UNKNOWN, null));
                             } else {
                                 throw new IllegalArgumentException(
                                         "barrier '" + b.name() + "' awaits unknown step '" + name + "'");
@@ -808,9 +809,8 @@ public final class Walker {
                     for (String name : q.ofSteps()) {
                         if (!knownNames.contains(name)) {
                             if (collector != null) {
-                                var loc = new SourceLocation(playbookFile, -1, -1);
                                 collector.add(new ParseError.StructureError(q.name(),
-                                                                            "quorum '" + q.name() + "' references unknown step '" + name + "'", loc, null));
+                                                                            "quorum '" + q.name() + "' references unknown step '" + name + "'", SourceLocation.UNKNOWN, null));
                             } else {
                                 throw new IllegalArgumentException(
                                         "quorum '" + q.name() + "' references unknown step '" + name + "'");
@@ -818,13 +818,13 @@ public final class Walker {
                         }
                     }
                 }
-                case ResolvedStep.BlockStep b -> validateBarrierQuorumReferences(b.steps(), knownNames, collector, playbookFile);
-                case ResolvedStep.ParallelStep p -> validateBarrierQuorumReferences(p.steps(), knownNames, collector, playbookFile);
-                case ResolvedStep.RaceStep r -> validateBarrierQuorumReferences(r.branches(), knownNames, collector, playbookFile);
+                case ResolvedStep.BlockStep b -> validateBarrierQuorumReferences(b.steps(), knownNames, collector, playbookFile, locations);
+                case ResolvedStep.ParallelStep p -> validateBarrierQuorumReferences(p.steps(), knownNames, collector, playbookFile, locations);
+                case ResolvedStep.RaceStep r -> validateBarrierQuorumReferences(r.branches(), knownNames, collector, playbookFile, locations);
                 case ResolvedStep.TryCatchFinallyStep t -> {
-                    validateBarrierQuorumReferences(t.trySteps(), knownNames, collector, playbookFile);
-                    validateBarrierQuorumReferences(t.catchSteps(), knownNames, collector, playbookFile);
-                    validateBarrierQuorumReferences(t.finallySteps(), knownNames, collector, playbookFile);
+                    validateBarrierQuorumReferences(t.trySteps(), knownNames, collector, playbookFile, locations);
+                    validateBarrierQuorumReferences(t.catchSteps(), knownNames, collector, playbookFile, locations);
+                    validateBarrierQuorumReferences(t.finallySteps(), knownNames, collector, playbookFile, locations);
                 }
                 default -> {}
             }

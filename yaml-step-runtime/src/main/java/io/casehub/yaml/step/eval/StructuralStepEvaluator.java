@@ -290,7 +290,7 @@ public final class StructuralStepEvaluator {
             if (!last.isSuccess()) {
                 return last;
             }
-            if (captureCollector != null && last.output() != null) {
+            if (last.output() != null) {
                 Object captureVal = sub.decorators().get("capture");
                 if (captureVal != null) {
                     String              captureName = String.valueOf(captureVal);

@@ -142,7 +142,7 @@ public final class Walker {
             case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), s.decorators(), anns);
             case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), s.decorators(), anns);
             case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), s.decorators(), anns);
-            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.decorators(), anns);
+            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.concurrency(), s.decorators(), anns);
             case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), s.decorators(), anns);
             case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), s.decorators(), anns);
             case ResolvedStep.BarrierStep s -> new ResolvedStep.BarrierStep(s.name(), s.awaitSteps(), s.timeout(), s.decorators(), anns);
@@ -196,7 +196,7 @@ public final class Walker {
             case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), decorators);
             case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), decorators);
             case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), decorators);
-            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), decorators);
+            case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.concurrency(), decorators);
             case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), decorators);
             case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), decorators);
             case ResolvedStep.BarrierStep s -> new ResolvedStep.BarrierStep(s.name(), s.awaitSteps(), s.timeout(), decorators);
@@ -534,8 +534,13 @@ public final class Walker {
             if (ctRaw != null) {
                 collectionTimeout = io.casehub.yaml.core.orchestration.DurationParser.parse(ctRaw.toString());
             }
+            int concurrency = 0;
+            Object concRaw = policyMap.get("concurrency");
+            if (concRaw instanceof Number n) {
+                concurrency = n.intValue();
+            }
             return new ResolvedStep.ParallelStep(
-                    stepName, resolved, advanceAfter, cancelRemaining, collectionTimeout, decorators);
+                    stepName, resolved, advanceAfter, cancelRemaining, collectionTimeout, concurrency, decorators);
         }
         if ("try".equals(structuralType)) {
             var    trySteps     = (List<Map<String, Object>>) structuralValue;

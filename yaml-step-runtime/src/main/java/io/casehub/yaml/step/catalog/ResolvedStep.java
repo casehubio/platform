@@ -125,6 +125,7 @@ public sealed interface ResolvedStep permits
             int advanceAfter,
             boolean cancelRemaining,
             java.time.Duration collectionTimeout,
+            int concurrency,
             Map<String, Object> decorators,
             List<Annotation> annotations) implements ResolvedStep {
 
@@ -141,14 +142,25 @@ public sealed interface ResolvedStep permits
                             "advance-after (" + advanceAfter + ") > steps (" + steps.size() + ")");
                 }
             }
+            if (concurrency < 0) {
+                throw new IllegalArgumentException("concurrency must be >= 0, got: " + concurrency);
+            }
         }
 
         public ParallelStep(String name, List<ResolvedStep> steps, Map<String, Object> decorators) {
-            this(name, steps, steps.isEmpty() ? 1 : steps.size(), false, null, decorators, List.of());
+            this(name, steps, steps.isEmpty() ? 1 : steps.size(), false, null, 0, decorators, List.of());
         }
 
         public ParallelStep(String name, List<ResolvedStep> steps, int advanceAfter, boolean cancelRemaining, java.time.Duration collectionTimeout, Map<String, Object> decorators) {
-            this(name, steps, advanceAfter, cancelRemaining, collectionTimeout, decorators, List.of());
+            this(name, steps, advanceAfter, cancelRemaining, collectionTimeout, 0, decorators, List.of());
+        }
+
+        public ParallelStep(String name, List<ResolvedStep> steps, int advanceAfter, boolean cancelRemaining, java.time.Duration collectionTimeout, Map<String, Object> decorators, List<Annotation> annotations) {
+            this(name, steps, advanceAfter, cancelRemaining, collectionTimeout, 0, decorators, annotations);
+        }
+
+        public ParallelStep(String name, List<ResolvedStep> steps, int advanceAfter, boolean cancelRemaining, java.time.Duration collectionTimeout, int concurrency, Map<String, Object> decorators) {
+            this(name, steps, advanceAfter, cancelRemaining, collectionTimeout, concurrency, decorators, List.of());
         }
     }
 

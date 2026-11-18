@@ -102,6 +102,7 @@ public final class StepSchemaComposer {
             advanceOneOf.addObject().put("type", "string").putArray("enum").add("all");
             mapFormProps.putObject("cancel-remaining").put("type", "boolean");
             mapFormProps.putObject("collection-timeout").put("type", "string");
+            mapFormProps.putObject("concurrency").put("type", "integer");
             mapForm.putArray("required").add("steps");
             parallelVariant.putArray("required").add("parallel");
             oneOf.add(parallelVariant);

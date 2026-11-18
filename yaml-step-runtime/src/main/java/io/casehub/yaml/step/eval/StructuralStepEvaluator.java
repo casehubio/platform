@@ -519,31 +519,55 @@ public final class StructuralStepEvaluator {
         int stepCount = parallel.steps().size();
         @SuppressWarnings("unchecked")
         Future<Result>[] futures = new Future[stepCount];
+        var failed = new java.util.concurrent.atomic.AtomicReference<Result>();
+        java.util.concurrent.Semaphore gate = parallel.concurrency() > 0
+                                              ? new java.util.concurrent.Semaphore(parallel.concurrency()) : null;
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
 
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        try {
             for (int i = 0; i < stepCount; i++) {
                 ResolvedStep sub = parallel.steps().get(i);
-                futures[i] = executor.submit(() -> evaluateInternal(sub, ctx, runner));
+                futures[i] = executor.submit(() -> {
+                    if (failed.get() != null) {return Result.failed("cancelled");}
+                    if (gate != null) {gate.acquire();}
+                    try {
+                        if (failed.get() != null) {return Result.failed("cancelled");}
+                        Result r = evaluateInternal(sub, ctx, runner);
+                        if (!r.isSuccess()) {failed.compareAndSet(null, r);}
+                        return r;
+                    } finally {
+                        if (gate != null) {gate.release();}
+                    }
+                });
             }
 
             var results = new ArrayList<Result>(stepCount);
             for (Future<Result> f : futures) {
                 try {
-                    results.add(f.get());
+                    Result r = f.get();
+                    results.add(r);
+                    if (!r.isSuccess() && failed.get() != null) {
+                        for (Future<Result> remaining : futures) {remaining.cancel(true);}
+                    }
                 } catch (ExecutionException e) {
-                    results.add(Result.failed(e.getCause().getMessage()));
+                    Result r = Result.failed(e.getCause().getMessage());
+                    results.add(r);
+                    failed.compareAndSet(null, r);
+                    for (Future<Result> remaining : futures) {remaining.cancel(true);}
+                } catch (java.util.concurrent.CancellationException e) {
+                    results.add(Result.failed("cancelled"));
                 }
             }
 
-            for (Result r : results) {
-                if (!r.isSuccess()) {
-                    return r;
-                }
-            }
+            Result firstFailure = failed.get();
+            if (firstFailure != null) {return firstFailure;}
             return results.get(results.size() - 1);
         } catch (InterruptedException e) {
+            for (Future<Result> f : futures) {f.cancel(true);}
             Thread.currentThread().interrupt();
             return Result.failed("Parallel execution interrupted");
+        } finally {
+            executor.shutdownNow();
         }
     }
 

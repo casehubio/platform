@@ -15,7 +15,26 @@ meta:
   layer: composition
   teaches: "reusable module definitions and imports"
   builds-on: block-sequential
+
+imports:
+  - module: status-panel
+    as: sales
+    parameters:
+      title: "Sales Overview"
+      dataset: sales-daily
+      threshold: "90"
+  - module: status-panel
+    as: ops
+    parameters:
+      title: "Operations"
+      dataset: ops-metrics
+  - module: status-panel
+    as: combined
+    condition: "${module.sales.panelId}"
+    parameters:
+      title: "Combined View"
+      dataset: "${module.ops.panelId}-feed"
 ---
-- log: "Import sales: Sales Overview, dataset=sales-daily, threshold=90"
-- log: "Import ops: Operations, dataset=ops-metrics, threshold=80 (default)"
-- log: "Import combined: Combined View, dataset chained from ops output"
+- log: "Sales panel: ${module.sales.panelId}"
+- log: "Ops panel: ${module.ops.panelId}"
+- log: "Combined panel: ${module.combined.panelId}"

@@ -1,0 +1,23 @@
+module:
+  name: status-panel
+  parameters:
+    title:
+      type: STRING
+      required: true
+    dataset:
+      type: STRING
+      required: true
+    threshold:
+      type: NUMBER
+      default: "80"
+  outputs:
+    panelId:
+      type: STRING
+      value: "${var.title}-panel"
+
+pages:
+  panel:
+    name: "${var.title}"
+    properties:
+      dataset: "${var.dataset}"
+      threshold: "${var.threshold}"

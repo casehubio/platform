@@ -4,8 +4,8 @@ steps:
       directory: ../../../main/playbooks/composition
     capture: result
   - assertThat: result.validatedCount
-    equals: 9
-    message: "all 9 composition playbooks are discovered"
+    equals: 10
+    message: "all 10 composition files are discovered"
   - assertThat: result.errors
     hasSize: 0
     message: "all composition playbooks compile without errors"

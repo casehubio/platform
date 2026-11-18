@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,22 +32,22 @@ public final class FileSystemModuleLoader implements ModuleLoader {
     @Override
     public Map<String, YamlModule> loadModules(List<YamlImport> imports, Path playbookPath) {
         List<YamlImport> moduleImports = imports.stream()
-                .filter(imp -> imp.steps() == null)
-                .toList();
+                                                .filter(imp -> imp.steps() == null)
+                                                .toList();
 
         if (moduleImports.isEmpty()) {
             return Map.of();
         }
 
-        Path moduleDir = playbookPath.getParent().resolve("modules");
-        List<YamlModuleFile> moduleFiles = new ArrayList<>();
+        Path                        moduleDir   = playbookPath.getParent().resolve("modules");
+        Map<String, YamlModuleFile> uniqueFiles = new LinkedHashMap<>();
 
         for (YamlImport imp : moduleImports) {
-            YamlModuleFile file = loadModuleFile(imp.module(), moduleDir);
-            moduleFiles.add(file);
+            uniqueFiles.computeIfAbsent(imp.module(),
+                                        name -> loadModuleFile(name, moduleDir));
         }
 
-        return ModuleExpander.resolveExtensions(moduleFiles);
+        return ModuleExpander.resolveExtensions(new ArrayList<>(uniqueFiles.values()));
     }
 
     private YamlModuleFile loadModuleFile(String moduleName, Path moduleDir) {

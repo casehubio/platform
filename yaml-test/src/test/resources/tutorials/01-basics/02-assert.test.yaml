@@ -2,9 +2,9 @@ name: Assertion matchers
 
 steps:
   - agent-invoke "portfolio":
-    capture: result
-  - assertThat: ${result.text}
+    capture: output
+  - assertThat: ${output.text}
     not-null: true
     not-empty: true
-  - assertThat: ${result.duration}
+  - assertThat: ${output.duration}
     greaterThanOrEqual: 0

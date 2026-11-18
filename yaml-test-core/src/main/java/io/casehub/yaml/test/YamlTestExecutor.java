@@ -23,7 +23,7 @@ import java.util.Set;
 
 public final class YamlTestExecutor {
 
-    private static final Set<String> RESERVED_CAPTURE_NAMES = Set.of("events");
+    private static final Set<String> RESERVED_CAPTURE_NAMES = io.casehub.yaml.step.catalog.StepKeywords.RESERVED_CAPTURE_NAMES;
     private static final io.casehub.yaml.core.condition.ConditionEvaluator CONDITION_EVALUATOR =
             new io.casehub.yaml.core.condition.ConditionEvaluator(null);
 

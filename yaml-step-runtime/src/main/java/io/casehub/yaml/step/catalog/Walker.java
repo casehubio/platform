@@ -24,7 +24,8 @@ public final class Walker {
     private static final Set<String> PROMOTABLE_DECORATORS = Set.of(
             "for-each", "retry", "timeout", "when", "mutex", "loop");
 
-    private static final Set<String> REMOVED_KEYS        = Set.of("steps", "do");
+    private static final Set<String> REMOVED_KEYS           = Set.of("steps", "do");
+    private static final Set<String> RESERVED_CAPTURE_NAMES = StepKeywords.RESERVED_CAPTURE_NAMES;
     static final         int         MAX_DEPTH           = 32;
     private static final Set<String> MIGRATED_DECORATORS = Set.of(
             "timeout", "retry", "delay", "priority", "resource", "background",
@@ -417,6 +418,17 @@ public final class Walker {
             } else {
                 throw new IllegalArgumentException(
                         path + " → Step " + index + ": duplicate step name '" + stepName + "'");
+            }
+        }
+
+        Object captureVal = decorators.get("capture");
+        if (captureVal != null && RESERVED_CAPTURE_NAMES.contains(String.valueOf(captureVal))) {
+            String msg = path + " → Step " + index + ": capture name '" + captureVal
+                         + "' is reserved — it collides with the built-in ${" + captureVal + ".*} scope";
+            if (collector != null) {
+                collector.add(new ParseError.StructureError(null, msg, locations.locationOf(step, playbookFile), null));
+            } else {
+                throw new IllegalArgumentException(msg);
             }
         }
 

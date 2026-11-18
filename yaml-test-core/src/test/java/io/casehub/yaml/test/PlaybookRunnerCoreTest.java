@@ -64,10 +64,10 @@ class PlaybookRunnerCoreTest {
                                 PlaybookRunConfig.defaults());
 
         assertThat(result.captures()).isNotEmpty();
-        assertThat(result.captures()).containsKey("result");
-        assertThat(result.captures()).containsKey("result2");
-        assertThat(result.captures().get("result")).containsEntry("text", "hello");
-        assertThat(result.captures().get("result2")).containsEntry("text", "world");
+        assertThat(result.captures()).containsKey("output");
+        assertThat(result.captures()).containsKey("output2");
+        assertThat(result.captures().get("output")).containsEntry("text", "hello");
+        assertThat(result.captures().get("output2")).containsEntry("text", "world");
     }
 
     @Test
@@ -296,7 +296,7 @@ class PlaybookRunnerCoreTest {
     @Test
     void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"),
-                          "name: Sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+                          "name: Sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
         Files.writeString(tempDir.resolve("simulation.yaml"),
                           "methods:\n  agent-provider.invoke:\n    strategy: sequential\n");
 
@@ -320,7 +320,7 @@ class PlaybookRunnerCoreTest {
         Path subdir = tempDir.resolve("nested/playbooks");
         Files.createDirectories(subdir);
         Files.writeString(subdir.resolve("playbook.yaml"),
-                          "name: Nested sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+                          "name: Nested sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
         Files.writeString(tempDir.resolve("simulation.yaml"),
                           "methods:\n  agent-provider.invoke:\n    strategy: key\n");
 
@@ -342,7 +342,7 @@ class PlaybookRunnerCoreTest {
     @Test
     void dryRunFallsThroughToEmptyOverlayWhenNoSimulationYaml(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"),
-                          "name: No sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: result\n");
+                          "name: No sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
 
         var runtime = new RecordingSimulationRuntime();
         var activator = new SimulationRuntimeActivator(runtime, tempDir);

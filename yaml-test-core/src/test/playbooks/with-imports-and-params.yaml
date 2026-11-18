@@ -11,4 +11,4 @@ steps:
   - use: g.say-hello
   - agent-invoke:
       prompt: ${params.custom-prompt}
-    capture: result
+    capture: output

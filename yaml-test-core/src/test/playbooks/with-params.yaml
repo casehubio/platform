@@ -4,4 +4,4 @@ params:
 steps:
   - agent-invoke:
       prompt: ${params.greeting}
-    capture: result
+    capture: output

@@ -2,7 +2,7 @@ name: Simple playbook
 steps:
   - agent-invoke:
       prompt: "hello"
-    capture: result
+    capture: output
   - agent-invoke:
       prompt: "world"
-    capture: result2
+    capture: output2

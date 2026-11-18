@@ -7,8 +7,8 @@ tests:
   - name: First test
     steps:
       - agent-invoke "risk":
-        capture: result
-      - assertThat: ${result.text}
+        capture: output
+      - assertThat: ${output.text}
         contains: 'risk'
 
   - name: Second test
@@ -16,8 +16,8 @@ tests:
       - emit-event: test.per-test-setup
     steps:
       - agent-invoke "rebalance":
-        capture: result
-      - assertThat: ${result.text}
+        capture: output
+      - assertThat: ${output.text}
         contains: 'rebalance'
     teardown:
       - emit-event: test.per-test-teardown

@@ -2,13 +2,13 @@ name: Concurrency patterns category validation
 steps:
   - validate-playbook:
       directory: ../../../main/playbooks/concurrency-patterns
-    capture: result
-  - assertThat: result.validatedCount
+    capture: output
+  - assertThat: output.validatedCount
     equals: 8
     message: "all 8 concurrency-patterns playbooks are discovered"
-  - assertThat: result.errors
+  - assertThat: output.errors
     hasSize: 0
     message: "all concurrency-patterns playbooks compile without errors"
-  - assertThat: result.headerErrors
+  - assertThat: output.headerErrors
     hasSize: 0
     message: "all concurrency-patterns playbooks have tutorial headers"

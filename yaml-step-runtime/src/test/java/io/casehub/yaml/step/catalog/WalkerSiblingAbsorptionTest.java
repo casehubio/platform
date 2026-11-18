@@ -91,12 +91,12 @@ class WalkerSiblingAbsorptionTest {
 
         var step = new LinkedHashMap<String, Object>();
         step.put("agent-invoke", Map.of("prompt", "hello"));
-        step.put("capture", "result");
+        step.put("capture", "output");
 
         var resolved = Walker.resolve(List.of(step), registry);
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
         assertThat(plugin.params()).doesNotContainKey("capture");
-        assertThat(plugin.decorators().get("capture")).isEqualTo("result");
+        assertThat(plugin.decorators().get("capture")).isEqualTo("output");
     }
 
     @Test
@@ -106,14 +106,14 @@ class WalkerSiblingAbsorptionTest {
         var step = new LinkedHashMap<String, Object>();
         step.put("emit-event", "capacity.pressure");
         step.put("data", Map.of("actorId", "agent-001"));
-        step.put("capture", "result");
+        step.put("capture", "output");
 
         var resolved = Walker.resolve(List.of(step), registry);
         var plugin = (ResolvedStep.PluginStep) resolved.get(0);
         assertThat(plugin.params().get("_subject")).isEqualTo("capacity.pressure");
         assertThat(plugin.params().get("data")).isEqualTo(Map.of("actorId", "agent-001"));
         assertThat(plugin.params()).doesNotContainKey("capture");
-        assertThat(plugin.decorators().get("capture")).isEqualTo("result");
+        assertThat(plugin.decorators().get("capture")).isEqualTo("output");
     }
 
     @Test
@@ -129,4 +129,18 @@ class WalkerSiblingAbsorptionTest {
         assertThat(plugin.params().get("_subject")).isEqualTo("examples/02.yaml");
         assertThat(plugin.decorators().get("capture")).isEqualTo("results");
     }
+
+    @Test
+    void captureWithReservedNameResult_isRejected() {
+        var registry = registryWith(regularPlugin("agent-invoke"));
+
+        var step = new LinkedHashMap<String, Object>();
+        step.put("agent-invoke", Map.of("prompt", "hello"));
+        step.put("capture", "result");
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+    }
+
 }

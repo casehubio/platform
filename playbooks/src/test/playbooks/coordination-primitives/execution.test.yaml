@@ -2,13 +2,13 @@ name: Coordination primitives category validation
 steps:
   - validate-playbook:
       directory: ../../../main/playbooks/coordination-primitives
-    capture: result
-  - assertThat: result.validatedCount
+    capture: output
+  - assertThat: output.validatedCount
     equals: 6
     message: "all 6 coordination-primitives playbooks are discovered"
-  - assertThat: result.errors
+  - assertThat: output.errors
     hasSize: 0
     message: "all coordination-primitives playbooks compile without errors"
-  - assertThat: result.headerErrors
+  - assertThat: output.headerErrors
     hasSize: 0
     message: "all coordination-primitives playbooks have tutorial headers"

@@ -13,7 +13,7 @@ steps:
   say-hello:
     - agent-invoke:
         prompt: "hello from module"
-      capture: result
+      capture: output
   say-goodbye:
     - agent-invoke:
         prompt: "goodbye from module"

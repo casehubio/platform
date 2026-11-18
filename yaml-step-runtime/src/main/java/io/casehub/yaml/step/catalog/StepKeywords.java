@@ -22,6 +22,9 @@ public final class StepKeywords {
             "pause", "resume");
 
     static final Set<String> RESERVED_KEYS;
+    public static final Set<String> RESERVED_CAPTURE_NAMES = Set.of(
+            "result", "error", "each", "var", "params", "module", "events");
+
     static {
         var combined = new LinkedHashSet<String>();
         combined.addAll(STRUCTURAL_KEYS);

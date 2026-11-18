@@ -2,6 +2,6 @@ name: Basic assertion test
 
 steps:
   - agent-invoke "hello":
-    capture: result
-  - assertThat: ${result.text}
+    capture: output
+  - assertThat: ${output.text}
     contains: 'hello'

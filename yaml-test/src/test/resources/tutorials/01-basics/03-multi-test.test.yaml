@@ -4,13 +4,13 @@ tests:
   - name: First invocation
     steps:
       - agent-invoke "hello":
-        capture: result
-      - assertThat: ${result.text}
+        capture: output
+      - assertThat: ${output.text}
         not-empty: true
 
   - name: Second invocation
     steps:
       - agent-invoke "world":
-        capture: result
-      - assertThat: ${result.text}
+        capture: output
+      - assertThat: ${output.text}
         contains: 'world'

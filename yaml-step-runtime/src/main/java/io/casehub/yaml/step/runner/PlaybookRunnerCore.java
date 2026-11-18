@@ -1,6 +1,11 @@
 package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.yaml.core.annotation.AnnotationMap;
+import io.casehub.yaml.core.error.ParseError;
+import io.casehub.yaml.core.error.SourceLocation;
+import io.casehub.yaml.core.error.YamlError;
+import io.casehub.yaml.core.error.YamlErrorCollector;
 import io.casehub.yaml.core.module.ModuleExpander;
 import io.casehub.yaml.core.module.TypedExpandedModule;
 import io.casehub.yaml.core.module.YamlImport;
@@ -146,6 +151,12 @@ public final class PlaybookRunnerCore {
                     }
 
                     if (result.output() != null) {
+                        Object captureVal = step.decorators().get("capture");
+                        if (captureVal != null) {
+                            String captureName = String.valueOf(captureVal);
+                            Map<String, Object> captured = Map.copyOf(result.output());
+                            resolver = resolver.withObjectScope(captureName, captured::get);
+                        }
                         outputVars.putAll(result.output());
                     }
 
@@ -208,8 +219,8 @@ public final class PlaybookRunnerCore {
             Walker.resolve(steps, pluginRegistry);
             return new PlaybookValidationResult(true, List.of(), frontMatter);
         } catch (Exception e) {
-            var diag = new io.casehub.yaml.core.error.ParseError.StructureError(
-                    null, e.getMessage(), io.casehub.yaml.core.error.SourceLocation.UNKNOWN, e);
+            var diag = new ParseError.StructureError(
+                    null, e.getMessage(), SourceLocation.UNKNOWN, e);
             return new PlaybookValidationResult(false, List.of(diag), null);
         }
     }
@@ -223,32 +234,32 @@ public final class PlaybookRunnerCore {
             expandImports(content, playbookPath);
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
-            var    collector = new io.casehub.yaml.core.error.YamlErrorCollector();
+            var    collector = new YamlErrorCollector();
             String fileName  = playbookPath.toString();
 
             if (content.containsKey("steps") && "assisted".equals(ctx.schema())) {
-                var loc = new io.casehub.yaml.core.error.SourceLocation(fileName, -1, -1);
-                collector.add(new io.casehub.yaml.core.error.ParseError.StructureError(
+                var loc = new SourceLocation(fileName, -1, -1);
+                collector.add(new ParseError.StructureError(
                         null, "Remove the 'steps:' wrapper — use a bare YAML list instead", loc, null));
             }
 
             var steps = (List<Map<String, Object>>) content.get("steps");
             if (steps == null || steps.isEmpty()) {
-                List<io.casehub.yaml.core.error.YamlError> diags = collector.errors();
+                List<YamlError> diags = collector.errors();
                 return new PlaybookValidationResult(diags.isEmpty(), diags, frontMatter);
             }
 
-            var annotations = io.casehub.yaml.core.annotation.AnnotationMap.empty();
+            var annotations = AnnotationMap.empty();
             Walker.resolve(steps, pluginRegistry, annotations, collector, fileName);
 
-            List<io.casehub.yaml.core.error.YamlError> diagnostics = collector.errors();
+            List<YamlError> diagnostics = collector.errors();
             List<ValidationSuggestion>                 suggestions = ValidationSuggestionGenerator.generate(diagnostics, pluginRegistry);
 
             return new PlaybookValidationResult(
                     !collector.hasErrors(), diagnostics, frontMatter, suggestions, null);
         } catch (Exception e) {
-            var diag = new io.casehub.yaml.core.error.ParseError.StructureError(
-                    null, e.getMessage(), io.casehub.yaml.core.error.SourceLocation.UNKNOWN, e);
+            var diag = new ParseError.StructureError(
+                    null, e.getMessage(), SourceLocation.UNKNOWN, e);
             return new PlaybookValidationResult(false, List.of(diag), null);
         }
     }

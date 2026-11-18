@@ -112,4 +112,33 @@ class NestedCaptureTest {
 
         assertThat(collector.all().get("data")).containsEntry("v", "second");
     }
+
+    @Test
+    void capture_across_top_level_steps_via_resolver_update() {
+        var step1 = new ResolvedStep.PluginStep("s1", "action",
+                                                Map.of("val", "hello"), Map.of("capture", "first"));
+        var step2 = new ResolvedStep.PluginStep("s2", "action",
+                                                Map.of("ref", "${first.val}"), Map.of());
+
+        var collector = new CaptureCollector();
+        var evaluator = new StructuralStepEvaluator(new ConditionEvaluator(null))
+                                .withCaptureCollector(collector);
+
+        VariableResolver resolver = new VariableResolver(Map.of(), Set.of());
+
+        Result r1 = evaluator.evaluate(step1, resolver, echoRunner());
+        assertThat(r1.isSuccess()).isTrue();
+
+        Object captureVal = step1.decorators().get("capture");
+        if (captureVal != null && r1.output() != null) {
+            String              name     = String.valueOf(captureVal);
+            Map<String, Object> captured = Map.copyOf(r1.output());
+            resolver = resolver.withObjectScope(name, captured::get);
+        }
+
+        Result r2 = evaluator.evaluate(step2, resolver, echoRunner());
+        assertThat(r2.isSuccess()).isTrue();
+        assertThat(r2.output()).containsEntry("ref", "hello");
+    }
+
 }

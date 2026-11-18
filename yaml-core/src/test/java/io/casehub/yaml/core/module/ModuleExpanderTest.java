@@ -97,6 +97,69 @@ class ModuleExpanderTest {
     }
 
     @Test
+    void conditional_import_with_truthy_module_output_includes_module() {
+        var provider = new YamlModule("provider", Map.of(),
+                                      Map.of("panelId", new YamlModuleOutput(io.casehub.yaml.plugin.api.ParameterType.STRING, "dashboard-1")),
+                                      Map.of("nodes", Map.of("src", Map.of())));
+        var consumer = new YamlModule("consumer", Map.of(), Map.of(),
+                                      Map.of("nodes", Map.of("sink", Map.of())));
+
+        var imp1 = new YamlImport("provider", "prov", null, Map.of());
+        var imp2 = new YamlImport("consumer", "cons", "${module.prov.panelId}", Map.of());
+
+        var result = ModuleExpander.expand(List.of(imp1, imp2),
+                                           Map.of("provider", provider, "consumer", consumer), Map.of());
+
+        assertThat(result.sections().get("nodes")).containsKey("cons.sink");
+    }
+
+    @Test
+    void conditional_import_with_falsy_module_output_skips_module() {
+        var provider = new YamlModule("provider", Map.of(),
+                                      Map.of("enabled", new YamlModuleOutput(io.casehub.yaml.plugin.api.ParameterType.STRING, "false")),
+                                      Map.of("nodes", Map.of("src", Map.of())));
+        var consumer = new YamlModule("consumer", Map.of(), Map.of(),
+                                      Map.of("nodes", Map.of("sink", Map.of())));
+
+        var imp1 = new YamlImport("provider", "prov", null, Map.of());
+        var imp2 = new YamlImport("consumer", "cons", "${module.prov.enabled}", Map.of());
+
+        var result = ModuleExpander.expand(List.of(imp1, imp2),
+                                           Map.of("provider", provider, "consumer", consumer), Map.of());
+
+        assertThat(result.sections().get("nodes")).doesNotContainKey("cons.sink");
+        assertThat(result.sections().get("nodes")).containsKey("prov.src");
+    }
+
+    @Test
+    void conditional_import_with_missing_output_skips_module() {
+        var provider = new YamlModule("provider", Map.of(), Map.of(),
+                                      Map.of("nodes", Map.of("src", Map.of())));
+        var consumer = new YamlModule("consumer", Map.of(), Map.of(),
+                                      Map.of("nodes", Map.of("sink", Map.of())));
+
+        var imp1 = new YamlImport("provider", "prov", null, Map.of());
+        var imp2 = new YamlImport("consumer", "cons", "${module.prov.missing}", Map.of());
+
+        var result = ModuleExpander.expand(List.of(imp1, imp2),
+                                           Map.of("provider", provider, "consumer", consumer), Map.of());
+
+        assertThat(result.sections().get("nodes")).doesNotContainKey("cons.sink");
+    }
+
+    @Test
+    void conditional_import_with_unresolvable_prefix_includes_module() {
+        var module = new YamlModule("m", Map.of(), Map.of(),
+                                    Map.of("nodes", Map.of("n", Map.of())));
+        var imp = new YamlImport("m", "a", "${var.enabled}", Map.of());
+        var result = ModuleExpander.expand(List.of(imp),
+                                           Map.of("m", module), Map.of());
+
+        assertThat(result.sections().get("nodes")).containsKey("a.n");
+    }
+
+
+    @Test
     void unknown_module_throws() {
         var imp = new YamlImport("nonexistent", "a", null, Map.of());
         assertThatThrownBy(() -> ModuleExpander.expand(

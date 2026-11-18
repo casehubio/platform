@@ -1,0 +1,13 @@
+name: Conditional import (falsy)
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "hi"
+  - module: conditional-dep
+    as: dep
+    condition: "false"
+
+steps:
+  - use: g.say-hello

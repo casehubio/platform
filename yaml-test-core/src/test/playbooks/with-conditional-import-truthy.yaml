@@ -1,0 +1,14 @@
+name: Conditional import (truthy)
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "hi"
+  - module: conditional-dep
+    as: dep
+    condition: "${module.g.full-greeting}"
+
+steps:
+  - use: g.say-hello
+  - use: dep.extra-work

@@ -321,6 +321,32 @@ class PlaybookRunnerCoreTest {
         assertThat(error.location().line()).isEqualTo(7);
     }
 
+    @Test
+    void conditionalImportWithTruthyOutputIncludesModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-conditional-import-truthy.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(2);
+    }
+
+    @Test
+    void conditionalImportWithFalsyConditionSkipsModule() {
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var result = runner.run(PLAYBOOK_ROOT.resolve("with-conditional-import-falsy.yaml"),
+                                PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.trace().children()).hasSize(1);
+    }
+
 
     @Test
     void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {

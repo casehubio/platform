@@ -1,0 +1,8 @@
+module:
+  name: conditional-dep
+
+steps:
+  extra-work:
+    - agent-invoke:
+        prompt: "conditional step executed"
+      capture: cond-output

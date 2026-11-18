@@ -51,14 +51,27 @@ public final class ModuleExpander {
         }
 
         for (YamlImport imp : moduleImports) {
+            if (imp.condition() != null) {
+                importConditions.put(imp.as(), imp.condition());
+                try {
+                    VariableSource moduleSource = buildConditionModuleSource(allOutputs);
+                    VariableResolver condResolver = new VariableResolver(
+                            Map.of("module", moduleSource), Set.of());
+                    String resolved = condResolver.resolveString(
+                            imp.condition(), imp.as() + ".condition");
+                    if (!resolved.contains("${") && !isConditionMet(resolved)) {
+                        continue;
+                    }
+                } catch (io.casehub.yaml.core.resolver.UnresolvedVariableException ignored) {
+                    // condition references variables unavailable at expansion time — include module
+                }
+            }
+
             YamlModule module = availableModules.get(imp.module());
             Map<String, String> resolvedParams = resolveModuleRefsInParams(
                     imp.parameters(), allOutputs, imp.as());
             Map<String, String> paramScope = resolveParameters(module, imp, resolvedParams);
             moduleScopes.put(imp.as(), paramScope);
-            if (imp.condition() != null) {
-                importConditions.put(imp.as(), imp.condition());
-            }
 
             Map<String, String> resolvedOutputs = resolveOutputs(module, paramScope);
             allOutputs.put(imp.as(), resolvedOutputs);
@@ -293,6 +306,21 @@ public final class ModuleExpander {
         };
     }
 
+    private static VariableSource buildConditionModuleSource(
+            Map<String, Map<String, String>> allOutputs) {
+        return name -> {
+            int dot = name.indexOf('.');
+            if (dot < 0) {return null;}
+            String              alias      = name.substring(0, dot);
+            String              outputName = name.substring(dot + 1);
+            Map<String, String> outputs    = allOutputs.get(alias);
+            if (outputs == null) {return null;}
+            String value = outputs.get(outputName);
+            return value != null ? value : "";
+        };
+    }
+
+
     private static void validateOutputNames(YamlModule module, List<String> errors) {
         for (String outputName : module.outputs().keySet()) {
             if (outputName == null || outputName.isBlank()) {
@@ -305,6 +333,14 @@ public final class ModuleExpander {
                         + "' contains '${', which is reserved for variable references.");
             }
         }
+    }
+
+
+    static boolean isConditionMet(String resolved) {
+        if (resolved == null || resolved.isBlank()) {return false;}
+        if (resolved.contains("${")) {return false;}
+        String lower = resolved.toLowerCase(java.util.Locale.ROOT);
+        return !"false".equals(lower) && !"no".equals(lower) && !"0".equals(lower);
     }
 
     private static boolean isWholeModuleRef(String value) {

@@ -75,7 +75,11 @@ public final class PlaybookParser {
             return new PlaybookDocument(frontMatter, metadata);
         }
 
-        var content = asMap(documents.get(1));
+        Object secondDoc = documents.get(1);
+        if (secondDoc instanceof List<?> stepList) {
+            return new PlaybookDocument(frontMatter, Map.of(STEPS_KEY, stepList));
+        }
+        var content = asMap(secondDoc);
         rejectStepsWrapper(content);
         return new PlaybookDocument(frontMatter, content);
     }

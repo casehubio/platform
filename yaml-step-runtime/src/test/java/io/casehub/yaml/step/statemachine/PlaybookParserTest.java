@@ -174,18 +174,23 @@ class PlaybookParserTest {
     }
 
     @Test
-    void parsePlaybook_contentMustBeMap() {
+    void parseTwoDocFormat_bareListAsSteps() {
         String yaml = """
                 playbook: "1.0"
                 schema: server
                 ---
-                - item1
-                - item2
+                - click: "A"
+                - click: "B"
                 """;
 
-        assertThatThrownBy(() -> PlaybookParser.parse(yaml))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("mapping");
+        PlaybookDocument doc = PlaybookParser.parse(yaml);
+
+        assertThat(doc.hasPlaybookHeader()).isTrue();
+        assertThat(doc.schema()).isEqualTo("server");
+        assertThat(doc.content()).containsKey("steps");
+        @SuppressWarnings("unchecked")
+        var steps = (java.util.List<java.util.Map<String, Object>>) doc.content().get("steps");
+        assertThat(steps).hasSize(2);
     }
 
     @Test

@@ -389,5 +389,35 @@ class PlaybookParserTest {
             assertThat(loc.file()).isNull();
             assertThat(loc.line()).isGreaterThan(0);
         }
+
+        @SuppressWarnings("unchecked")
+        @Test
+        void parseRawWithLocationsTracksMapAndListIdentities() {
+            String yaml = """
+                          module:
+                            name: test-module
+                          steps:
+                            do-work:
+                              - log: hello
+                              - process:
+                                  command: run.sh
+                          """;
+            var result = PlaybookParser.parseRawWithLocations(yaml, "module.yaml");
+            assertThat(result.root()).isInstanceOf(Map.class);
+
+            var            root    = (Map<String, Object>) result.root();
+            SourceLocation rootLoc = result.locations().locationOf(root);
+            assertThat(rootLoc.file()).isEqualTo("module.yaml");
+            assertThat(rootLoc.line()).isEqualTo(1);
+
+            var steps = (Map<String, Object>) root.get("steps");
+            assertThat(result.locations().locationOf(steps).line()).isEqualTo(4);
+
+            var doWork = (List<Map<String, Object>>) steps.get("do-work");
+            assertThat(result.locations().locationOf(doWork).line()).isEqualTo(5);
+            assertThat(result.locations().locationOf(doWork.get(0)).line()).isEqualTo(5);
+            assertThat(result.locations().locationOf(doWork.get(1)).line()).isEqualTo(6);
+        }
+
     }
 }

@@ -235,7 +235,7 @@ public final class PlaybookRunnerCore {
             PlaybookDocument    doc       = parsed.document();
             var                 locations = parsed.locations();
             Map<String, Object> content   = new LinkedHashMap<>(doc.content());
-            expandImports(content, playbookPath);
+            expandImports(content, playbookPath, locations);
             PlaybookFrontMatter frontMatter = doc.frontMatter();
 
             var collector = new YamlErrorCollector();
@@ -318,6 +318,12 @@ public final class PlaybookRunnerCore {
 
     @SuppressWarnings("unchecked")
     private ImportExpansionResult expandImports(Map<String, Object> content, Path playbookPath) {
+        return expandImports(content, playbookPath, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ImportExpansionResult expandImports(Map<String, Object> content, Path playbookPath,
+                                                LocationIndex locations) {
         var rawImports = (List<Map<String, Object>>) content.remove("imports");
         if (rawImports == null || rawImports.isEmpty()) {
             return null;
@@ -331,7 +337,9 @@ public final class PlaybookRunnerCore {
                                              .map(raw -> CONVERT_MAPPER.convertValue(raw, YamlImport.class))
                                              .toList();
 
-        Map<String, YamlModule> modules = moduleLoader.loadModules(imports, playbookPath);
+        Map<String, YamlModule> modules = locations != null
+                ? moduleLoader.loadModules(imports, playbookPath, locations)
+                : moduleLoader.loadModules(imports, playbookPath);
 
         var bridge = new PlaybookModuleBridge();
         TypedExpandedModule<Map<String, Object>> expanded =

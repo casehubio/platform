@@ -31,6 +31,33 @@ public final class LocationIndex {
     }
 
 
+    @SuppressWarnings("unchecked")
+    public void transferFrom(LocationIndex sourceIndex, Object sourceObject, Object targetObject) {
+        if (this == EMPTY) {
+            throw new UnsupportedOperationException("Cannot modify the empty LocationIndex");
+        }
+        SourceLocation loc = sourceIndex.locations.get(sourceObject);
+        if (loc != null) {
+            locations.put(targetObject, loc);
+        }
+        if (sourceObject instanceof java.util.Map<?, ?> sourceMap
+            && targetObject instanceof java.util.Map<?, ?> targetMap) {
+            for (var key : sourceMap.keySet()) {
+                Object sv = sourceMap.get(key);
+                Object tv = targetMap.get(key);
+                if (sv != null && tv != null) {
+                    transferFrom(sourceIndex, sv, tv);
+                }
+            }
+        } else if (sourceObject instanceof java.util.List<?> sourceList
+                   && targetObject instanceof java.util.List<?> targetList) {
+            int size = Math.min(sourceList.size(), targetList.size());
+            for (int i = 0; i < size; i++) {
+                transferFrom(sourceIndex, sourceList.get(i), targetList.get(i));
+            }
+        }
+    }
+
     public boolean isEmpty() {
         return locations.isEmpty();
     }

@@ -1,0 +1,7 @@
+module:
+  name: with-bad-step
+
+steps:
+  do-work:
+    - log: "valid step from module"
+    - nonexistent-action: "this step is invalid"

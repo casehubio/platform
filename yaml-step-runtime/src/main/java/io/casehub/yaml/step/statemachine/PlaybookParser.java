@@ -19,6 +19,23 @@ public final class PlaybookParser {
 
     public record ParseResult(PlaybookDocument document, LocationIndex locations) {}
 
+    public record RawParseResult(Object root, LocationIndex locations) {}
+
+    public static RawParseResult parseRawWithLocations(String yaml, String filePath) {
+        if (yaml == null || yaml.isBlank()) {
+            return new RawParseResult(null, new LocationIndex());
+        }
+        var    index  = new LocationIndex();
+        var    loader = new org.yaml.snakeyaml.Yaml();
+        Object root   = null;
+        for (var node : loader.composeAll(new java.io.StringReader(yaml))) {
+            root = convertNode(node, index, filePath);
+            break;
+        }
+        return new RawParseResult(root, index);
+    }
+
+
     private PlaybookParser() {}
 
     public static PlaybookDocument parse(String yaml) {

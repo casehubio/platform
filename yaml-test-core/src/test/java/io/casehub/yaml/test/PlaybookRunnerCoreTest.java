@@ -6,6 +6,7 @@ import io.casehub.platform.simulation.SimulationCorpus;
 import io.casehub.platform.simulation.SimulationOverlay;
 import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.platform.simulation.inmem.InMemorySimulationCorpus;
+import io.casehub.yaml.core.error.ParseError;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.Result;
@@ -14,6 +15,7 @@ import io.casehub.yaml.step.runner.FileSystemModuleLoader;
 import io.casehub.yaml.step.runner.PlaybookRunConfig;
 import io.casehub.yaml.step.runner.PlaybookRunnerCore;
 import io.casehub.yaml.step.runner.StepOutcome;
+import io.casehub.yaml.step.runner.ValidationContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -290,6 +292,33 @@ class PlaybookRunnerCoreTest {
 
         assertThat(result.error()).as("run error").isNull();
         assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void validateImportedStepErrorCarriesModuleFileLocation() {
+        pluginRegistry.register(Definition.of("log")
+                                          .execute((params, svc) -> Result.of(Map.of()))
+                                          .build());
+        var moduleLoader = new FileSystemModuleLoader();
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, moduleLoader);
+        var ctx    = new ValidationContext(null, null, false);
+        var result = runner.validate(PLAYBOOK_ROOT.resolve("with-invalid-import.yaml"), ctx);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.diagnostics()).isNotEmpty();
+
+        var unknownStepErrors = result.diagnostics().stream()
+                                      .filter(d -> d instanceof ParseError.UnknownStepError)
+                                      .map(d -> (ParseError.UnknownStepError) d)
+                                      .toList();
+        assertThat(unknownStepErrors).hasSize(1);
+
+        var error = unknownStepErrors.get(0);
+        assertThat(error.referencedAction()).isEqualTo("nonexistent-action");
+        assertThat(error.location().isKnown()).isTrue();
+        assertThat(error.location().file()).endsWith("with-bad-step.yaml");
+        assertThat(error.location().line()).isEqualTo(7);
     }
 
 

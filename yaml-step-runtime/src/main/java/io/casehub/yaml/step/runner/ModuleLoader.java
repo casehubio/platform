@@ -1,5 +1,6 @@
 package io.casehub.yaml.step.runner;
 
+import io.casehub.yaml.core.error.LocationIndex;
 import io.casehub.yaml.core.module.YamlImport;
 import io.casehub.yaml.core.module.YamlModule;
 
@@ -9,4 +10,9 @@ import java.util.Map;
 
 public interface ModuleLoader {
     Map<String, YamlModule> loadModules(List<YamlImport> imports, Path playbookPath);
+
+    default Map<String, YamlModule> loadModules(List<YamlImport> imports, Path playbookPath,
+                                                 LocationIndex locations) {
+        return loadModules(imports, playbookPath);
+    }
 }

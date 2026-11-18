@@ -182,7 +182,19 @@ public final class DecoratorChain {
         if (scope == null) {return ctx -> Result.failed("'background' requires an ExecutionScope");}
 
         return ctx -> {
-            scope.spawn("background", () -> inner.execute(ctx));
+            scope.spawn("background", () -> {
+                try {
+                    Result r = inner.execute(ctx);
+                    if (!r.isSuccess() && config.backgroundFailureHandler() != null) {
+                        config.backgroundFailureHandler().accept("background", r);
+                    }
+                } catch (Exception e) {
+                    if (config.backgroundFailureHandler() != null) {
+                        config.backgroundFailureHandler().accept("background",
+                                                                 Result.failed("background step threw: " + e.getMessage()));
+                    }
+                }
+            });
             return Result.of(Map.of());
         };
     }

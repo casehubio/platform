@@ -13,6 +13,9 @@ public final class LocationIndex {
     }
 
     public void put(Object yamlObject, SourceLocation location) {
+        if (this == EMPTY) {
+            throw new UnsupportedOperationException("Cannot modify the empty LocationIndex");
+        }
         locations.put(yamlObject, location);
     }
 

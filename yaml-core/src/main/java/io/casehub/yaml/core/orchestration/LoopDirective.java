@@ -33,6 +33,7 @@ public sealed interface LoopDirective permits LoopDirective.Count, LoopDirective
         if (raw instanceof Map<?, ?> m) {
             if (Boolean.TRUE.equals(m.get("continuous"))) return new Continuous();
             Object countObj = m.get("count");
+            if (countObj == null) countObj = m.get("max");
             String until = (String) m.get("until");
             if (countObj != null && until != null) {
                 return new CountUntil(((Number) countObj).intValue(), until);
@@ -43,7 +44,7 @@ public sealed interface LoopDirective permits LoopDirective.Count, LoopDirective
             if (until != null) {
                 return new Until(until);
             }
-            throw new IllegalArgumentException("Loop map must contain 'count' and/or 'until'");
+            throw new IllegalArgumentException("Loop map must contain 'count', 'max', and/or 'until'");
         }
         throw new IllegalArgumentException(
                 "Invalid loop value: expected number, {count, until} map, or LoopDirective — got " + raw.getClass().getSimpleName());

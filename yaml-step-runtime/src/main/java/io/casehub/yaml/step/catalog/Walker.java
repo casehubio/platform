@@ -802,7 +802,7 @@ public final class Walker {
                         if (!knownNames.contains(name)) {
                             if (collector != null) {
                                 collector.add(new ParseError.StructureError(b.name(),
-                                                                            "barrier '" + b.name() + "' awaits unknown step '" + name + "'", SourceLocation.UNKNOWN, null));
+                                                                            "barrier '" + b.name() + "' awaits unknown step '" + name + "'", new SourceLocation(playbookFile, -1, -1), null));
                             } else {
                                 throw new IllegalArgumentException(
                                         "barrier '" + b.name() + "' awaits unknown step '" + name + "'");
@@ -815,7 +815,7 @@ public final class Walker {
                         if (!knownNames.contains(name)) {
                             if (collector != null) {
                                 collector.add(new ParseError.StructureError(q.name(),
-                                                                            "quorum '" + q.name() + "' references unknown step '" + name + "'", SourceLocation.UNKNOWN, null));
+                                                                            "quorum '" + q.name() + "' references unknown step '" + name + "'", new SourceLocation(playbookFile, -1, -1), null));
                             } else {
                                 throw new IllegalArgumentException(
                                         "quorum '" + q.name() + "' references unknown step '" + name + "'");

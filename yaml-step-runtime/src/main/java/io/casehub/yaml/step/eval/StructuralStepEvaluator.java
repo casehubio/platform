@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class StructuralStepEvaluator {
 
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(StructuralStepEvaluator.class.getName());
+
     private final ConditionEvaluator conditionEvaluator;
     private final ExecutionScope     scope;
     private final DecoratorChain     decoratorChain;
@@ -38,21 +40,18 @@ public final class StructuralStepEvaluator {
     }
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope) {
-        this.conditionEvaluator = conditionEvaluator;
-        this.scope              = scope;
-        this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
-        this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
-        this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
-        this.injectedBindings   = Map.of();
-        this.listener           = null;
-        this.captureCollector   = null;
+        this(conditionEvaluator, scope, Map.of(), null, null);
     }
 
     private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener, CaptureCollector captureCollector) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
         this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
-        this.decoratorChain     = new DecoratorChain(conditionEvaluator, speedMultiplier, scope);
+        java.util.function.BiConsumer<String, io.casehub.yaml.plugin.api.Result> bgHandler = (name, result) -> {
+            String msg = result instanceof io.casehub.yaml.plugin.api.Result.Failure f ? f.message() : "unknown error";
+            LOG.warning("Background step '" + name + "' failed: " + msg);
+        };
+        this.decoratorChain     = new DecoratorChain(new DecoratorConfig(conditionEvaluator, speedMultiplier, scope, null, null, null, null, bgHandler));
         this.resultSource       = (scope != null) ? buildResultSource(scope.resultStore()) : null;
         this.injectedBindings   = Map.copyOf(injectedBindings);
         this.listener           = listener;

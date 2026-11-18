@@ -11,5 +11,14 @@ public record DecoratorConfig(
         StepLookup stepLookup,
         StepEvaluator handlerEvaluator,
         StepRunner handlerRunner,
-        TransformDelegate transformDelegate
-) {}
+        TransformDelegate transformDelegate,
+        java.util.function.BiConsumer<String, io.casehub.yaml.plugin.api.Result> backgroundFailureHandler
+) {
+    public DecoratorConfig(ConditionEvaluator conditionEvaluator, SpeedMultiplier speedMultiplier,
+                           ExecutionScope scope, StepLookup stepLookup,
+                           StepEvaluator handlerEvaluator, StepRunner handlerRunner,
+                           TransformDelegate transformDelegate) {
+        this(conditionEvaluator, speedMultiplier, scope, stepLookup,
+             handlerEvaluator, handlerRunner, transformDelegate, null);
+    }
+}

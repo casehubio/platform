@@ -3,6 +3,7 @@ package io.casehub.yaml.step.catalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.casehub.yaml.core.playbook.PlaybookCapabilities;
 import io.casehub.yaml.plugin.api.Parameter;
 import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.PluginRegistry;
@@ -18,7 +19,9 @@ public final class StepSchemaComposer {
 
     public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper) {
         return compose(registry, mapper, Set.of(
-                "control-flow", "concurrency", "modules", "orchestration", "decorators"));
+                PlaybookCapabilities.CONTROL_FLOW, PlaybookCapabilities.CONCURRENCY,
+                PlaybookCapabilities.MODULES, PlaybookCapabilities.ORCHESTRATION,
+                PlaybookCapabilities.DECORATORS));
     }
 
     public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper,
@@ -54,7 +57,7 @@ public final class StepSchemaComposer {
             });
         }
 
-        if (capabilities.contains("modules")) {
+        if (capabilities.contains(PlaybookCapabilities.MODULES)) {
             ObjectNode invokeVariant = mapper.createObjectNode();
             invokeVariant.putObject("properties").putObject("invoke").put("type", "object");
             invokeVariant.putArray("required").add("invoke");
@@ -68,7 +71,7 @@ public final class StepSchemaComposer {
         blockVariant.putArray("required").add("block");
         oneOf.add(blockVariant);
 
-        if (capabilities.contains("control-flow")) {
+        if (capabilities.contains(PlaybookCapabilities.CONTROL_FLOW)) {
             ObjectNode ifThenElseVariant = mapper.createObjectNode();
             ObjectNode ifProps           = ifThenElseVariant.putObject("properties");
             ifProps.putObject("if").put("type", "string");
@@ -86,7 +89,7 @@ public final class StepSchemaComposer {
             oneOf.add(matchVariant);
         }
 
-        if (capabilities.contains("concurrency")) {
+        if (capabilities.contains(PlaybookCapabilities.CONCURRENCY)) {
             ObjectNode parallelVariant = mapper.createObjectNode();
             ObjectNode parallelProps   = parallelVariant.putObject("properties");
             ObjectNode parallelSchema  = parallelProps.putObject("parallel");
@@ -114,7 +117,7 @@ public final class StepSchemaComposer {
             oneOf.add(raceVariant);
         }
 
-        if (capabilities.contains("orchestration")) {
+        if (capabilities.contains(PlaybookCapabilities.ORCHESTRATION)) {
             ObjectNode pauseVariant = mapper.createObjectNode();
             pauseVariant.putObject("properties").putObject("pause").put("type", "string");
             pauseVariant.putArray("required").add("pause");
@@ -129,7 +132,7 @@ public final class StepSchemaComposer {
         ObjectNode sharedProps = root.putObject("properties");
         sharedProps.putObject("step").put("type", "string");
 
-        if (capabilities.contains("decorators")) {
+        if (capabilities.contains(PlaybookCapabilities.DECORATORS)) {
             for (String key : DECORATOR_KEYS) {
                 sharedProps.putObject(key);
             }

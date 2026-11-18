@@ -150,6 +150,17 @@ public final class PlaybookRunnerCore {
                     if (result.output() != null) {
                         outputVars.putAll(result.output());
                     }
+
+                    // Expose this step's capture to the top-level steps that follow.
+                    // Nested captures are scoped by StructuralStepEvaluator.evaluateBlock.
+                    Object captureVal = step.decorators().get("capture");
+                    if (captureVal != null) {
+                        String captureName = String.valueOf(captureVal);
+                        Map<String, Object> captured = captureCollector.get(captureName);
+                        if (captured != null) {
+                            resolver = resolver.withObjectScope(captureName, captured::get);
+                        }
+                    }
                 }
 
                 var primitiveSnapshot = scope.snapshotPrimitives();

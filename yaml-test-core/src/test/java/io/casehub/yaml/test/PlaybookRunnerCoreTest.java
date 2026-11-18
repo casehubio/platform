@@ -70,6 +70,31 @@ class PlaybookRunnerCoreTest {
         assertThat(result.captures().get("result2")).containsEntry("text", "world");
     }
 
+    @Test
+    void topLevelCaptureIsVisibleToLaterTopLevelSteps(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("playbook.yaml"), """
+                name: Capture chain
+                steps:
+                  - agent-invoke:
+                      prompt: hello
+                    capture: first
+                  - agent-invoke:
+                      prompt: ${first.text} world
+                    capture: second
+                  - agent-invoke:
+                      prompt: ${second.text}!
+                    capture: third
+                """);
+
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry, tempDir, null);
+        var result = runner.run(tempDir.resolve("playbook.yaml"), PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.captures().get("second")).containsEntry("text", "hello world");
+        assertThat(result.captures().get("third")).containsEntry("text", "hello world!");
+    }
+
 
     @Test
     void runPlaybookWithParamsPassesVars() {

@@ -8,7 +8,8 @@ public final class CaptureCollector {
     private final ConcurrentHashMap<String, Map<String, Object>> captures = new ConcurrentHashMap<>();
 
     public void capture(String name, Map<String, Object> output) {
-        captures.put(name, Map.copyOf(output));
+        // Not Map.copyOf: step outputs may legitimately contain null-valued fields.
+        captures.put(name, java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(output)));
     }
 
     public Map<String, Map<String, Object>> all() {

@@ -225,6 +225,41 @@ class PluginGenerationTest {
         assertThat(content).contains("process(");
     }
 
+    @Test
+    void streamingPlugin_withoutSubject_usesCorrectReturnType() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamNoSubjectApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("stream-nosub")
+                public interface StreamNoSubjectApi {
+                    @PlatformMutation(streaming = true)
+                    @GeneratePlugin
+                    String streamItems(@ContextParam("tenancyId") String tenancyId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=stream-nosub", "-AgeneratePlugins=true",
+                                                                          "-AgenerateGraphQL=false", "-AgenerateRest=false")
+                                                             .compile(spi);
+
+        var pluginSource = compilation.generatedSourceFile(
+                "test.plugin.StreamNosubStreamItemsPlugin");
+        assertThat(pluginSource).as("Plugin source should be generated").isPresent();
+
+        String content = pluginSource.get().getCharContent(true).toString();
+        assertThat(content).contains("process(");
+        assertThat(content).contains("public String process(");
+        assertThat(content).contains("io.casehub.platform.api.identity.CurrentPrincipal __principal");
+        assertThat(content).contains("__principal.tenancyId()");
+        assertThat(content).doesNotContain("public Result execute(");
+        assertThat(content).doesNotContain("Result.of(");
+    }
+
 
     @Test
     void derivePluginName_no_collision_uses_short_name() {

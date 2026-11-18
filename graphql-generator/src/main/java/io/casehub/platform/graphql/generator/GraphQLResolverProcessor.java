@@ -2011,15 +2011,17 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     boolean hasNonHttpContextParams = op.params().stream()
                             .anyMatch(p -> p.isContextParam() && !isHttpOnlyContextParam(p.contextParamKey()));
                     out.println("    @Execute");
-                    if (isStreaming && !meta.subject.isEmpty()) {
-                        String subjectType = findParamType(op, meta.subject);
-                        if (hasNonHttpContextParams) {
-                            out.println("    public " + op.returnTypeStr() + " process("
-                                    + subjectType + " " + meta.subject + ", " + executeParamType + " api, io.casehub.platform.api.identity.CurrentPrincipal __principal) {");
-                        } else {
-                            out.println("    public " + op.returnTypeStr() + " process("
-                                    + subjectType + " " + meta.subject + ", " + executeParamType + " api) {");
+                    if (isStreaming) {
+                        StringBuilder sig = new StringBuilder("    public " + op.returnTypeStr() + " process(");
+                        if (!meta.subject.isEmpty()) {
+                            sig.append(findParamType(op, meta.subject)).append(" ").append(meta.subject).append(", ");
                         }
+                        sig.append(executeParamType).append(" api");
+                        if (hasNonHttpContextParams) {
+                            sig.append(", io.casehub.platform.api.identity.CurrentPrincipal __principal");
+                        }
+                        sig.append(") {");
+                        out.println(sig.toString());
                     } else if (hasNonHttpContextParams) {
                         out.println("    public Result execute(" + executeParamType + " api, io.casehub.platform.api.identity.CurrentPrincipal __principal) {");
                     } else {
@@ -2044,7 +2046,7 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
 
                     String delegateCall = "api." + op.methodName() + "(" + methodArgs + ")";
 
-                    if (isStreaming && !meta.subject.isEmpty()) {
+                    if (isStreaming) {
                         out.println("        return " + delegateCall + ";");
                     } else {
                         String resultCode = generatePluginResultCode(op.returnTypeStr(), delegateCall);

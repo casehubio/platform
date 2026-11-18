@@ -220,4 +220,50 @@ class PlaybookModuleBridgeTest {
                 .isEqualTo("nested");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void expandBranchesRegistersNewMapInLocationIndex() {
+        var locations    = new io.casehub.yaml.core.error.LocationIndex();
+        var stepLocation = new io.casehub.yaml.core.error.SourceLocation("test.yaml", 5, 3);
+
+        Map<String, Object> thenStep = Map.of("agent-invoke", Map.of("prompt", "inside then"));
+        Map<String, Object> ifStep   = new LinkedHashMap<>();
+        ifStep.put("if", "true");
+        ifStep.put("then", new ArrayList<>(List.of(thenStep)));
+
+        locations.put(ifStep, stepLocation);
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("steps", new ArrayList<>(List.of(ifStep)));
+
+        Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
+                content, Map.of(), locations);
+
+        var steps          = (List<Map<String, Object>>) result.get("steps");
+        var expandedIfStep = steps.get(0);
+
+        assertThat(expandedIfStep).isNotSameAs(ifStep);
+        assertThat(locations.locationOf(expandedIfStep)).isEqualTo(stepLocation);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void expandBranchesWithoutLocationIndexDoesNotFail() {
+        Map<String, Object> ifStep = new LinkedHashMap<>();
+        ifStep.put("if", "true");
+        ifStep.put("then", new ArrayList<>(List.of(
+                Map.of("agent-invoke", Map.of("prompt", "inside then")))));
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("steps", new ArrayList<>(List.of(ifStep)));
+
+        Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
+                content, Map.of());
+
+        var steps = (List<Map<String, Object>>) result.get("steps");
+        assertThat(steps).hasSize(1);
+        assertThat(steps.get(0)).containsKey("if");
+    }
+
+
 }

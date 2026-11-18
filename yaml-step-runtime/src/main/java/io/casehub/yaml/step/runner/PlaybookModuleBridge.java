@@ -30,12 +30,19 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
     @SuppressWarnings("unchecked")
     public static Map<String, Object> expandUseSteps(Map<String, Object> content,
                                                      Map<String, Object> expandedStepSections) {
+        return expandUseSteps(content, expandedStepSections, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> expandUseSteps(Map<String, Object> content,
+                                                     Map<String, Object> expandedStepSections,
+                                                     io.casehub.yaml.core.error.LocationIndex locations) {
         var steps = (List<Map<String, Object>>) content.get("steps");
         if (steps == null || steps.isEmpty()) {
             return content;
         }
 
-        List<Map<String, Object>> expandedSteps = expandStepList(steps, expandedStepSections);
+        List<Map<String, Object>> expandedSteps = expandStepList(steps, expandedStepSections, locations);
 
         Map<String, Object> result = new LinkedHashMap<>(content);
         result.put("steps", expandedSteps);
@@ -48,7 +55,8 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> expandStepList(
-            List<Map<String, Object>> steps, Map<String, Object> expandedStepSections) {
+            List<Map<String, Object>> steps, Map<String, Object> expandedStepSections,
+            io.casehub.yaml.core.error.LocationIndex locations) {
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (Map<String, Object> step : steps) {
@@ -75,7 +83,7 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
                     }
                 }
             } else {
-                result.add(expandBranches(step, expandedStepSections));
+                result.add(expandBranches(step, expandedStepSections, locations));
             }
         }
         return result;
@@ -83,7 +91,8 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> expandBranches(
-            Map<String, Object> step, Map<String, Object> expandedStepSections) {
+            Map<String, Object> step, Map<String, Object> expandedStepSections,
+            io.casehub.yaml.core.error.LocationIndex locations) {
         boolean hasBranch = false;
         for (String key : step.keySet()) {
             if (BRANCH_KEYS.contains(key) && step.get(key) instanceof List) {
@@ -97,10 +106,13 @@ public final class PlaybookModuleBridge implements ModuleBridge<Map<String, Obje
         for (Map.Entry<String, Object> entry : step.entrySet()) {
             if (BRANCH_KEYS.contains(entry.getKey()) && entry.getValue() instanceof List<?> branch) {
                 expanded.put(entry.getKey(),
-                             expandStepList((List<Map<String, Object>>) branch, expandedStepSections));
+                             expandStepList((List<Map<String, Object>>) branch, expandedStepSections, locations));
             } else {
                 expanded.put(entry.getKey(), entry.getValue());
             }
+        }
+        if (locations != null) {
+            locations.transferFrom(locations, step, expanded);
         }
         return expanded;
     }

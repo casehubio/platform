@@ -345,7 +345,7 @@ public final class PlaybookRunnerCore {
 
         if (expandedStepSections != null) {
             Map<String, Object> withInlinedSteps = PlaybookModuleBridge.expandUseSteps(
-                    expandedContent, expandedStepSections);
+                    expandedContent, expandedStepSections, locations);
             content.clear();
             content.putAll(withInlinedSteps);
         } else {

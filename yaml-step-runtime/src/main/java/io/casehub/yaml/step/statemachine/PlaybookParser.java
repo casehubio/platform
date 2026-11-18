@@ -69,6 +69,7 @@ public final class PlaybookParser {
             } else if (thirdDoc instanceof Map<?, ?> mapDoc) {
                 @SuppressWarnings("unchecked")
                 var typedMap = (Map<String, Object>) mapDoc;
+                rejectStepsWrapper(typedMap);
                 metadata.putAll(typedMap);
             }
 

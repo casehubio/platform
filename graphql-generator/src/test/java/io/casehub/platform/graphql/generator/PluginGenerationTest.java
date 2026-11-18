@@ -194,6 +194,39 @@ class PluginGenerationTest {
     }
 
     @Test
+    void streamingPlugin_withContextParam_includesPrincipal() throws Exception {
+        var spi = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "test.StreamApi",
+                """
+                package test;
+                import io.casehub.platform.api.mcp.*;
+                
+                @McpDomain("stream-tenant")
+                public interface StreamApi {
+                    @PlatformMutation(streaming = true)
+                    @GeneratePlugin(subject = "channelId")
+                    String streamItems(String channelId, @ContextParam("tenancyId") String tenancyId);
+                }
+                """);
+
+        var compilation = com.google.testing.compile.Compiler.javac()
+                                                             .withProcessors(new GraphQLResolverProcessor())
+                                                             .withOptions("-AdomainFilter=stream-tenant", "-AgeneratePlugins=true",
+                                                                          "-AgenerateGraphQL=false", "-AgenerateRest=false")
+                                                             .compile(spi);
+
+        var pluginSource = compilation.generatedSourceFile(
+                "test.plugin.StreamTenantStreamItemsPlugin");
+        assertThat(pluginSource).as("Plugin source should be generated").isPresent();
+
+        String content = pluginSource.get().getCharContent(true).toString();
+        assertThat(content).contains("io.casehub.platform.api.identity.CurrentPrincipal __principal");
+        assertThat(content).contains("__principal.tenancyId()");
+        assertThat(content).contains("process(");
+    }
+
+
+    @Test
     void derivePluginName_no_collision_uses_short_name() {
         Set<String> collisions = Set.of();
         assertThat(GraphQLResolverProcessor.derivePluginName("connectors/voice", "speak", collisions))

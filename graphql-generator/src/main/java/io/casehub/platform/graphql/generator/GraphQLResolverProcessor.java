@@ -2013,8 +2013,13 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     out.println("    @Execute");
                     if (isStreaming && !meta.subject.isEmpty()) {
                         String subjectType = findParamType(op, meta.subject);
-                        out.println("    public " + op.returnTypeStr() + " process("
-                                + subjectType + " " + meta.subject + ", " + executeParamType + " api) {");
+                        if (hasNonHttpContextParams) {
+                            out.println("    public " + op.returnTypeStr() + " process("
+                                    + subjectType + " " + meta.subject + ", " + executeParamType + " api, io.casehub.platform.api.identity.CurrentPrincipal __principal) {");
+                        } else {
+                            out.println("    public " + op.returnTypeStr() + " process("
+                                    + subjectType + " " + meta.subject + ", " + executeParamType + " api) {");
+                        }
                     } else if (hasNonHttpContextParams) {
                         out.println("    public Result execute(" + executeParamType + " api, io.casehub.platform.api.identity.CurrentPrincipal __principal) {");
                     } else {
@@ -2024,7 +2029,6 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
                     // Delegate call — always api.methodName(params)
                     StringBuilder methodArgs = new StringBuilder();
                     for (ResolvedParam p : op.params()) {
-                        if (isStreaming && !meta.subject.isEmpty() && p.name().equals(meta.subject)) continue;
                         if (p.isContextParam()) {
                             if (!methodArgs.isEmpty()) methodArgs.append(", ");
                             if (isHttpOnlyContextParam(p.contextParamKey())) {

@@ -647,6 +647,64 @@ N-way branching with value matching, structural matching, and guards:
 
 **Matching semantics:** first-match-wins, scalar equality or top-level structural subset match. `${match}` and `${match.*}` expose the matched value inside cases. `default:` must be the last case.
 
+### `parallel:` — concurrent execution
+
+Two forms: list (all steps run concurrently with no policy) and map (steps plus execution policy).
+
+**List form** — all steps launch concurrently, all must succeed:
+
+```yaml
+- parallel:
+    - rest-call: { url: "/api/users" }
+    - rest-call: { url: "/api/orders" }
+    - rest-call: { url: "/api/inventory" }
+```
+
+**Map form** — steps with execution policy:
+
+```yaml
+- parallel:
+    steps:
+      - fetch-users: ...
+      - fetch-orders: ...
+      - fetch-inventory: ...
+    concurrency: 2
+    cancel-remaining: true
+    advance-after: 2
+    collection-timeout: 30s
+```
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `steps` | list | required | Steps to execute concurrently |
+| `concurrency` | integer | `0` (unbounded) | Bounds concurrent step execution via semaphore |
+| `cancel-remaining` | boolean | `false` | Fail-fast — cancel remaining steps on first failure |
+| `advance-after` | integer or `"all"` | `"all"` | Complete after N steps finish (policy-based advancement) |
+| `collection-timeout` | duration | none | Maximum wall-clock time for all steps to complete |
+
+### `race:` — first-to-complete
+
+Launches N branches concurrently; the first successful result wins:
+
+```yaml
+- race:
+    - rest-call: { url: "${var.primary}" }
+    - rest-call: { url: "${var.fallback}" }
+```
+
+### `try/catch/finally` — error handling
+
+```yaml
+- try:
+    - risky-operation: ...
+  catch:
+    - log: "Error: ${error.message}"
+  finally:
+    - cleanup: ...
+```
+
+`${error.message}` is available inside `catch:` blocks.
+
 ### Decorator evaluation order
 
 All decorators apply uniformly to all step types:

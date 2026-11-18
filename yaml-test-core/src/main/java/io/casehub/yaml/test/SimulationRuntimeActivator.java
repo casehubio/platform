@@ -16,6 +16,10 @@ import java.nio.file.Path;
 
 public final class SimulationRuntimeActivator implements SimulationActivator {
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper YAML_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper(
+                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
+
     private final SimulationRuntime runtime;
     private final Path resourceRoot;
 
@@ -64,9 +68,7 @@ public final class SimulationRuntimeActivator implements SimulationActivator {
     @SuppressWarnings("unchecked")
     private static java.util.Map<String, Object> loadYamlMap(Path path) {
         try (var is = Files.newInputStream(path)) {
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper(
-                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
-            return mapper.readValue(is, java.util.Map.class);
+            return YAML_MAPPER.readValue(is, java.util.Map.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to load: " + path, e);
         }

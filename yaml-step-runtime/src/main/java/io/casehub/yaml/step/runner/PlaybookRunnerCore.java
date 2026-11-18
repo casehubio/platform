@@ -154,7 +154,7 @@ public final class PlaybookRunnerCore {
                         Object captureVal = step.decorators().get("capture");
                         if (captureVal != null) {
                             String captureName = String.valueOf(captureVal);
-                            Map<String, Object> captured = Map.copyOf(result.output());
+                            Map<String, Object> captured = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(result.output()));
                             resolver = resolver.withObjectScope(captureName, captured::get);
                         }
                         outputVars.putAll(result.output());

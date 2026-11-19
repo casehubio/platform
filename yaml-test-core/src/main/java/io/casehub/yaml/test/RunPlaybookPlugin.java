@@ -1,10 +1,10 @@
 package io.casehub.yaml.test;
 
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
-import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
 import io.casehub.yaml.step.runner.FileSystemModuleLoader;
 import io.casehub.yaml.step.runner.PlaybookRunConfig;
@@ -41,12 +41,14 @@ public final class RunPlaybookPlugin implements Action {
                       : (String) params.get("file");
 
         if (file == null || file.isBlank()) {
-            return Result.failed("run-playbook requires a file path");
+            return Result.failed("run-playbook requires a file path or qualified ID");
         }
 
-        Path playbookPath = ctx.resourceRoot().resolve(file);
-        if (!Files.exists(playbookPath)) {
-            return Result.failed("Playbook not found: " + playbookPath);
+        Path playbookPath;
+        try {
+            playbookPath = resolvePlaybook(file, ctx);
+        } catch (IllegalArgumentException e) {
+            return Result.failed(e.getMessage());
         }
 
         Map<String, Object> callerVars = params.containsKey("vars")
@@ -99,5 +101,19 @@ public final class RunPlaybookPlugin implements Action {
             resultMap.put("stateMachines", sanitized);
         }
         return Result.of(resultMap);
+    }
+
+    static Path resolvePlaybook(String ref, TestExecutionContext ctx) {
+        Path filePath = ctx.resourceRoot().resolve(ref);
+        if (Files.exists(filePath)) {
+            return filePath;
+        }
+        if (!ref.endsWith(".yaml") && !ref.startsWith(".") && !ref.startsWith("/")) {
+            return PlaybookIndex.fromClasspath()
+                                .resolve(ref)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                        "Playbook not found: '" + ref + "' — not a file path and no matching qualified ID on classpath"));
+        }
+        throw new IllegalArgumentException("Playbook not found: " + filePath);
     }
 }

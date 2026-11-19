@@ -1,0 +1,19 @@
+name: Deferred condition in branch (truthy)
+
+vars:
+  feature_on: true
+
+imports:
+  - module: greetings
+    as: g
+    parameters:
+      greeting: "hi"
+  - module: conditional-dep
+    as: dep
+    condition: "${var.feature_on}"
+
+steps:
+  - use: g.say-hello
+  - if: "true"
+    then:
+      - use: dep.extra-work

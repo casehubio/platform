@@ -33,74 +33,73 @@ simulate:
       response: "Watch earnings growth, P/E ratios, and Fed rate policy."
     - prompt: "stocks"
       response: "Monitor AAPL, MSFT, NVDA for Q4 positioning."
-
-tests:
-  - name: "ex01 direct invoke classifies document"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 3
-        message: "invoke + two queries = 3 executed steps"
-
-  - name: "ex02 conversation multi-turn responses"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 5
-        message: "open + 3 queries + close = 5 executed steps"
-
-  - name: "ex03 clear gives second customer clean context"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 6
-        message: "session lifecycle steps for two customers with context clear"
-
-  - name: "ex05 pool-backed infrastructure"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 4
-        message: "pool-backed session lifecycle steps"
-
-  - name: "ex06 multi-channel separate pools"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 6
-        message: "multi-channel session steps across support and sales"
-
-  - name: "ex07 salience pools priority levels"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 9
-        message: "three priority pools with agent queries"
-
-  - name: "ex08 structured output returns corpus JSON"
-    steps:
-      - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stepEvents
-        hasSize: 4
-        message: "open + 2 queries + close"
+---
+name: "ex01 direct invoke classifies document"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/01-direct-invoke.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 3
+  message: "invoke + two queries = 3 executed steps"
+---
+name: "ex02 conversation multi-turn responses"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/02-session-conversation.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 5
+  message: "open + 3 queries + close = 5 executed steps"
+---
+name: "ex03 clear gives second customer clean context"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/03-session-with-clear.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 6
+  message: "session lifecycle steps for two customers with context clear"
+---
+name: "ex05 pool-backed infrastructure"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/05-pool-backed.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 4
+  message: "pool-backed session lifecycle steps"
+---
+name: "ex06 multi-channel separate pools"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/06-multi-channel.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 6
+  message: "multi-channel session steps across support and sales"
+---
+name: "ex07 salience pools priority levels"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/07-salience-priority.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 9
+  message: "three priority pools with agent queries"
+---
+name: "ex08 structured output returns corpus JSON"
+---
+- run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stepEvents
+  hasSize: 4
+  message: "open + 2 queries + close"

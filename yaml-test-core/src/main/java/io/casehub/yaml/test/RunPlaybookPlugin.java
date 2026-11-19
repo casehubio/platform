@@ -109,6 +109,10 @@ public final class RunPlaybookPlugin implements Action {
             return filePath;
         }
         if (!ref.endsWith(".yaml") && !ref.startsWith(".") && !ref.startsWith("/")) {
+            Path withSuffix = ctx.resourceRoot().resolve(ref + ".playbook.yaml");
+            if (Files.exists(withSuffix)) {
+                return withSuffix;
+            }
             return PlaybookIndex.fromClasspath()
                                 .resolve(ref)
                                 .orElseThrow(() -> new IllegalArgumentException(

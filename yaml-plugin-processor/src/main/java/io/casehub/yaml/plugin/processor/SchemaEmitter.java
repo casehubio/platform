@@ -69,6 +69,7 @@ class SchemaEmitter {
             case "double", "float", "java.lang.Double", "java.lang.Float" -> "number";
             case "boolean", "java.lang.Boolean" -> "boolean";
             default -> {
+                if (javaType.startsWith("java.util.List")) {yield "array";}
                 if (javaType.startsWith("java.util.Map")) {yield "object";}
                 yield "object";
             }

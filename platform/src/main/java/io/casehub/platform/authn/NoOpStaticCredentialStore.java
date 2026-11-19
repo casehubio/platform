@@ -27,4 +27,7 @@ public class NoOpStaticCredentialStore implements StaticCredentialStore {
 
     @Override
     public void delete(String actorId, String provider, String tenancyId) {}
+
+    @Override
+    public void revoke(String actorId, String provider, String tenancyId) {}
 }

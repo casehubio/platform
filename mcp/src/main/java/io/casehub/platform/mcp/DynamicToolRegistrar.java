@@ -37,6 +37,10 @@ public class DynamicToolRegistrar {
 
     @ConfigProperty(name = "casehub.mcp.schema-mode", defaultValue = "simple")
     SchemaMode schemaMode;
+
+    @ConfigProperty(name = "casehub.mcp.tool-exposure", defaultValue = "dispatch")
+    String toolExposure;
+
     private final Set<String> activatedDomains = ConcurrentHashMap.newKeySet();
 
 
@@ -50,6 +54,44 @@ public class DynamicToolRegistrar {
     void onScanComplete(@Observes ModelScanComplete event) {
         registry.discoverAppCapabilities();
 
+        if ("flat".equals(toolExposure)) {
+            registerFlatTools();
+        } else {
+            registerDispatchTools();
+        }
+
+        for (var entry : registry.getReportProviders().entrySet()) {
+            String                                           domain   = entry.getKey();
+            io.casehub.platform.api.mcp.DomainReportProvider provider = entry.getValue();
+            String                                           toolName = domain + "_report";
+
+            toolManager.newTool(toolName)
+                       .setDescription("Runtime status report for the " + domain + " domain — "
+                                       + "providers, capabilities, and health status")
+                       .addArgument("scope", "Filter: 'all' (default), single provider key, "
+                                             + "or comma-separated keys (e.g. 'email,bank')", false, String.class)
+                       .setAnnotations(new ToolManager.ToolAnnotations(null, true, false, true, false))
+                       .setHandler(args -> {
+                           try {
+                               String                                   scope  = (String) args.args().get("scope");
+                               io.casehub.platform.api.mcp.DomainReport report = provider.report(domain);
+                               if (scope != null && !scope.isBlank() && !"all".equalsIgnoreCase(scope)) {
+                                   report = filterByScope(report, scope);
+                               }
+                               return ToolResponse.success(mapper.writeValueAsString(report));
+                           } catch (Exception e) {
+                               LOG.errorf(e, "%s report failed", toolName);
+                               return ToolResponse.error(e.getMessage());
+                           }
+                       }, true)
+                       .register();
+
+            LOG.infof("Registered report tool '%s'", toolName);
+        }
+    }
+
+
+    private void registerDispatchTools() {
         Map<String, Object> schema = new McpSchemaBuilder()
                                              .build(schemaMode, registry.getDomains());
 
@@ -77,9 +119,9 @@ public class DynamicToolRegistrar {
                            McpCapabilityException capEx = unwrapCapabilityException(e);
                            if (capEx != null) {
                                try {
-                                   String domain = (String) args.args().get("domain");
+                                   String domain    = (String) args.args().get("domain");
                                    String operation = (String) args.args().get("operation");
-                                   var capResult = McpOperationResult.from(capEx, domain, operation);
+                                   var    capResult = McpOperationResult.from(capEx, domain, operation);
                                    return ToolResponse.success(mapper.writeValueAsString(capResult));
                                } catch (Exception jsonEx) {
                                    return ToolResponse.error(capEx.getMessage());
@@ -100,36 +142,23 @@ public class DynamicToolRegistrar {
 
         LOG.infof("Registered casehub_action with %s schema (%d domains) + casehub_activate",
                   schemaMode, registry.getDomains().size());
-
-        for (var entry : registry.getReportProviders().entrySet()) {
-            String domain = entry.getKey();
-            io.casehub.platform.api.mcp.DomainReportProvider provider = entry.getValue();
-            String toolName = domain + "_report";
-
-            toolManager.newTool(toolName)
-                .setDescription("Runtime status report for the " + domain + " domain — "
-                                + "providers, capabilities, and health status")
-                .addArgument("scope", "Filter: 'all' (default), single provider key, "
-                             + "or comma-separated keys (e.g. 'email,bank')", false, String.class)
-                .setAnnotations(new ToolManager.ToolAnnotations(null, true, false, true, false))
-                .setHandler(args -> {
-                    try {
-                        String scope = (String) args.args().get("scope");
-                        io.casehub.platform.api.mcp.DomainReport report = provider.report(domain);
-                        if (scope != null && !scope.isBlank() && !"all".equalsIgnoreCase(scope)) {
-                            report = filterByScope(report, scope);
-                        }
-                        return ToolResponse.success(mapper.writeValueAsString(report));
-                    } catch (Exception e) {
-                        LOG.errorf(e, "%s report failed", toolName);
-                        return ToolResponse.error(e.getMessage());
-                    }
-                }, true)
-                .register();
-
-            LOG.infof("Registered report tool '%s'", toolName);
-        }
     }
+
+    private void registerFlatTools() {
+        int count = 0;
+        for (DomainModel domain : registry.getDomains()) {
+            for (OperationDescriptor op : domain.operations()) {
+                if (op.type() == OperationDescriptor.OperationType.STREAM
+                    || op.type() == OperationDescriptor.OperationType.STREAMING_MUTATION) {continue;}
+                String toolName = domain.name().replace("/", "_") + "_" + op.name();
+                registerOperationTool(domain.name(), op, toolName);
+                count++;
+            }
+        }
+        LOG.infof("Flat mode: registered %d individual tools across %d domains",
+                  count, registry.getDomains().size());
+    }
+
 
     ToolResponse activateDomain(String domain) {
         DomainModel model = registry.getDomain(domain).orElse(null);

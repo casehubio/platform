@@ -103,21 +103,45 @@ public final class RunPlaybookPlugin implements Action {
         return Result.of(resultMap);
     }
 
+    private static final String PLAYBOOKS_ROOT = "playbooks";
+    private static final String PLAYBOOK_SUFFIX = ".playbook.yaml";
+
     static Path resolvePlaybook(String ref, TestExecutionContext ctx) {
         Path filePath = ctx.resourceRoot().resolve(ref);
         if (Files.exists(filePath)) {
             return filePath;
         }
-        if (!ref.endsWith(".yaml") && !ref.startsWith(".") && !ref.startsWith("/")) {
-            Path withSuffix = ctx.resourceRoot().resolve(ref + ".playbook.yaml");
-            if (Files.exists(withSuffix)) {
-                return withSuffix;
-            }
-            return PlaybookIndex.fromClasspath()
-                                .resolve(ref)
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                        "Playbook not found: '" + ref + "' — not a file path and no matching qualified ID on classpath"));
+        if (ref.endsWith(".yaml") || ref.startsWith(".") || ref.startsWith("/")) {
+            throw new IllegalArgumentException("Playbook not found: " + filePath);
         }
-        throw new IllegalArgumentException("Playbook not found: " + filePath);
+        String qualifiedRef = ref.contains("/") ? ref : derivePackage(ctx) + ref;
+        var classLoader = Thread.currentThread().getContextClassLoader();
+        try {
+            var roots = classLoader.getResources(PLAYBOOKS_ROOT);
+            while (roots.hasMoreElements()) {
+                var url = roots.nextElement();
+                try {
+                    Path root = Path.of(url.toURI());
+                    Path candidate = root.resolve(qualifiedRef + PLAYBOOK_SUFFIX);
+                    if (Files.exists(candidate)) {
+                        return candidate;
+                    }
+                } catch (java.net.URISyntaxException | IllegalArgumentException ignored) {}
+            }
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to scan classpath for playbooks", e);
+        }
+        throw new IllegalArgumentException("Playbook not found: '" + ref + "' (resolved as '" + qualifiedRef + "')");
+    }
+
+    private static String derivePackage(TestExecutionContext ctx) {
+        Path resourceRoot = ctx.resourceRoot();
+        for (Path ancestor = resourceRoot; ancestor != null; ancestor = ancestor.getParent()) {
+            if (PLAYBOOKS_ROOT.equals(ancestor.getFileName().toString())) {
+                String relative = ancestor.relativize(resourceRoot).toString().replace('\\', '/');
+                return relative.isEmpty() ? "" : relative + "/";
+            }
+        }
+        return "";
     }
 }

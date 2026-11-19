@@ -396,24 +396,26 @@ class StructuralStepEvaluatorTest {
         }
 
         @Test
-        void oneStepFails_waitsForAll_returnsFailure() {
-            var completed = new AtomicInteger(0);
-            var step = new ResolvedStep.ParallelStep(null, 
-                    List.of(leaf("fail"), leaf("ok")), Map.of());
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void oneStepFails_failsFast_returnsFirstFailure() {
+            // The slow branch blocks until released; fail-fast (#841) must cancel it
+            // rather than wait for it, so evaluate() returns well inside the timeout.
+            var neverReleased = new CountDownLatch(1);
+            var step = new ResolvedStep.ParallelStep(null,
+                    List.of(leaf("fail"), leaf("slow")), Map.of());
             var result = evaluator.evaluate(step, resolver, (s, r) -> {
                 if (s instanceof ResolvedStep.InvokeStep inv
                         && "fail".equals(inv.invokeSpec().get("id"))) {
-                    completed.incrementAndGet();
                     return Result.failed("boom");
                 }
-                try { Thread.sleep(50); } catch (InterruptedException e) {
+                try { neverReleased.await(30, TimeUnit.SECONDS); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                completed.incrementAndGet();
                 return Result.of(Map.of());
             });
             assertThat(result.isSuccess()).isFalse();
-            assertThat(completed.get()).isEqualTo(2);
+            assertThat(result).isInstanceOfSatisfying(Result.Failure.class,
+                    failure -> assertThat(failure.message()).isEqualTo("boom"));
         }
 
         @Test

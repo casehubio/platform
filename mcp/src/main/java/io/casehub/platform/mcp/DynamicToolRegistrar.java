@@ -64,8 +64,10 @@ public class DynamicToolRegistrar {
             registerDispatchTools();
         }
 
+        DomainFilter reportFilter = domainFilter.isResolvable() ? domainFilter.get() : null;
         for (var entry : registry.getReportProviders().entrySet()) {
             String                                           domain   = entry.getKey();
+            if (reportFilter != null && !reportFilter.isAllowed(domain)) continue;
             io.casehub.platform.api.mcp.DomainReportProvider provider = entry.getValue();
             String                                           toolName = domain + "_report";
 

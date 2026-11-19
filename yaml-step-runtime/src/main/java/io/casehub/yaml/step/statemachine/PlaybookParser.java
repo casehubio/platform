@@ -29,24 +29,6 @@ public final class PlaybookParser {
 
     public record ParseResult(PlaybookDocument document, LocationIndex locations) {}
 
-    public record RawParseResult(Object root, LocationIndex locations) {}
-
-    static RawParseResult parseRawWithLocations(String yaml, String filePath) {
-        if (yaml == null || yaml.isBlank()) {
-            return new RawParseResult(null, new LocationIndex());
-        }
-        var index = new LocationIndex();
-        try {
-            ObjectReader reader = MAPPER.readerFor(Object.class)
-                    .withAttribute(LocationTrackingModule.LOCATION_INDEX_KEY, index)
-                    .withAttribute(LocationTrackingModule.FILE_PATH_KEY, filePath);
-            Object root = reader.readValue(yaml);
-            return new RawParseResult(root, index);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to parse YAML", e);
-        }
-    }
-
 
     private PlaybookParser() {}
 

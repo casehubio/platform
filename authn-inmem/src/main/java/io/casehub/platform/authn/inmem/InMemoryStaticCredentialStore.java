@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +30,7 @@ public class InMemoryStaticCredentialStore implements StaticCredentialStore {
 
     @Override
     public void store(StaticCredentialRecord record) {
+        Objects.requireNonNull(record.credential(), "credential required for store");
         store.values().removeIf(r ->
                 r.actorId().equals(record.actorId())
                 && r.provider().equals(record.provider())

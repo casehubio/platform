@@ -3,24 +3,23 @@ name: Multi-test file
 setup:
   - emit-event: test.init
 
-tests:
-  - name: First test
-    steps:
-      - agent-invoke "risk":
-        capture: output
-      - assertThat: ${output.text}
-        contains: 'risk'
-
-  - name: Second test
-    setup:
-      - emit-event: test.per-test-setup
-    steps:
-      - agent-invoke "rebalance":
-        capture: output
-      - assertThat: ${output.text}
-        contains: 'rebalance'
-    teardown:
-      - emit-event: test.per-test-teardown
-
 teardown:
   - emit-event: test.destroy
+---
+name: First test
+---
+- agent-invoke "risk":
+  capture: output
+- assertThat: ${output.text}
+  contains: 'risk'
+---
+name: Second test
+setup:
+  - emit-event: test.per-test-setup
+teardown:
+  - emit-event: test.per-test-teardown
+---
+- agent-invoke "rebalance":
+  capture: output
+- assertThat: ${output.text}
+  contains: 'rebalance'

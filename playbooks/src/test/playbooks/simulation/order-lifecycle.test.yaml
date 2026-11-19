@@ -3,15 +3,14 @@ simulate:
   agent:
     - prompt: "fallback"
       response: "static fallback"
-
-tests:
-  - name: "step completion advances state machine and changes agent responses"
-    steps:
-      - run-playbook: ../../../main/playbooks/simulation/order-lifecycle.playbook.yaml
-        capture: output
-      - assertThat: output.succeeded
-        equals: true
-      - assertThat: output.stateMachines.agent-provider_invoke
-        equals: shipped
-      - assertThat: output.output.response
-        contains: "Payment confirmed"
+---
+name: "step completion advances state machine and changes agent responses"
+---
+- run-playbook: ../../../main/playbooks/simulation/order-lifecycle.playbook.yaml
+  capture: output
+- assertThat: output.succeeded
+  equals: true
+- assertThat: output.stateMachines.agent-provider_invoke
+  equals: shipped
+- assertThat: output.output.response
+  contains: "Payment confirmed"

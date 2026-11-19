@@ -61,11 +61,6 @@
       "$ref": "#/$defs/stepList",
       "description": "File-level teardown steps (test files)."
     },
-    "tests": {
-      "type": "array",
-      "description": "Multiple test cases in one file.",
-      "items": { "$ref": "#/$defs/testCase" }
-    },
     "playbook": { "type": "string", "description": "Playbook name (alternative location to front matter)." },
     "scenario": { "description": "Reserved key for scenario content." },
     "states": { "description": "Reserved key for state machine definitions." },
@@ -544,18 +539,6 @@
           }
         ]
       }
-    },
-    "testCase": {
-      "type": "object",
-      "required": ["name", "steps"],
-      "properties": {
-        "name": { "type": "string" },
-        "setup": { "$ref": "#/$defs/stepList" },
-        "steps": { "$ref": "#/$defs/stepList" },
-        "teardown": { "$ref": "#/$defs/stepList" },
-        "simulate": { "$ref": "#/$defs/simulateBlock", "description": "Per-test simulation config — overlays file-level simulate block for this test case." }
-      },
-      "additionalProperties": true
     },
     "parameterDeclaration": {
       "oneOf": [

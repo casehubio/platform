@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.handler;
 
 import io.casehub.platform.agent.AgentEvent;
+import io.casehub.platform.agent.ResponseFormat;
 import io.casehub.platform.agent.session.SessionPipeline;
 import io.casehub.yaml.core.step.Declaration;
 import io.casehub.yaml.core.step.InvokeBinding;
@@ -30,6 +31,7 @@ public class AgentSessionQueryHandler implements InvokeHandler {
     @Override
     public Action create(Declaration declaration, InvokeBinding binding) {
         var query = (InvokeBinding.SessionQuery) binding;
+        ResponseFormat format = toResponseFormat(query.responseFormat());
         return (params, services) -> {
             try {
                 var responseText = new StringBuilder();
@@ -37,14 +39,14 @@ public class AgentSessionQueryHandler implements InvokeHandler {
 
                 if (query.priority()) {
                     pipeline.executeSinglePriority(query.session(), session -> {
-                        session.query(query.user())
+                        session.query(query.user(), format)
                                 .subscribe().asStream()
                                 .forEach(event -> collectEvent(event, responseText, metadata));
                         return null;
                     }, DEFAULT_TIMEOUT);
                 } else {
                     pipeline.executeSingle(query.session(), session -> {
-                        session.query(query.user())
+                        session.query(query.user(), format)
                                 .subscribe().asStream()
                                 .forEach(event -> collectEvent(event, responseText, metadata));
                         return null;
@@ -59,6 +61,32 @@ public class AgentSessionQueryHandler implements InvokeHandler {
                 return Result.failed("Session query failed: " + e.getMessage());
             }
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    static ResponseFormat toResponseFormat(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof ResponseFormat rf) {
+            return rf;
+        }
+        if (raw instanceof Map<?, ?> rawMap) {
+            var map = (Map<String, Object>) rawMap;
+            String type = String.valueOf(map.getOrDefault("type", "json"));
+            if ("text".equalsIgnoreCase(type)) {
+                return ResponseFormat.TEXT;
+            }
+            String name = (String) map.get("name");
+            Object schemaRaw = map.get("schema");
+            String schema = schemaRaw instanceof String s ? s
+                    : schemaRaw != null ? schemaRaw.toString() : null;
+            if (name != null && schema != null) {
+                return ResponseFormat.json(name, schema);
+            }
+            return ResponseFormat.jsonAny();
+        }
+        return null;
     }
 
     private void collectEvent(AgentEvent event, StringBuilder text, Map<String, Object> metadata) {

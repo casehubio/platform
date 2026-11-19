@@ -41,6 +41,19 @@ public interface AgentSession extends AutoCloseable {
     Multi<AgentEvent> query(String prompt);
 
     /**
+     * Send a query with an optional response format and stream the response.
+     *
+     * <p>Default delegates to {@link #query(String)}, ignoring the format.
+     * Backends that support per-query structured output override this.
+     *
+     * @param responseFormat the desired output format, or {@code null} for text
+     */
+    default Multi<AgentEvent> query(String prompt, ResponseFormat responseFormat) {
+        return query(prompt);
+    }
+
+
+    /**
      * Send an interrupt signal to the Claude CLI subprocess.
      *
      * <p>Best-effort fire-and-forget. The session remains ACTIVE. If the CLI responds by

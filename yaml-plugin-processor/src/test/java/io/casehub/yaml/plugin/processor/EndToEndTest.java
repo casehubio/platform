@@ -161,5 +161,24 @@ class EndToEndTest {
         assertThat(content).contains("\"tags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }");
     }
 
+    @Test
+    void standaloneRecordFieldGeneratesObjectWithProperties() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/RecordFieldTestPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/record-field-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"address\"");
+        assertThat(content).contains("\"street\": { \"type\": \"string\" }");
+        assertThat(content).contains("\"city\": { \"type\": \"string\" }");
+        assertThat(content).contains("\"post-code\": { \"type\": \"integer\" }");
+        assertThat(content).contains("\"required\": [\"street\", \"city\", \"post-code\"]");
+    }
+
 
 }

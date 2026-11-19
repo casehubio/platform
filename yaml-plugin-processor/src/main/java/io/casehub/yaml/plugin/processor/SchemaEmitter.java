@@ -89,36 +89,52 @@ class SchemaEmitter {
                 }
                 return;
             }
+            if (isRecordType(type)) {
+                writeRecordProperty(w, dt, key, indent);
+                return;
+            }
         }
         w.print(indent + "\"" + key + "\": { \"type\": \"" + toJsonType(type.toString()) + "\" }");
     }
 
     private void writeArrayRecordProperty(PrintWriter w, DeclaredType elementType, String key, String indent) {
-        TypeElement                            recordElement = (TypeElement) elementType.asElement();
-        List<? extends RecordComponentElement> components    = recordElement.getRecordComponents();
-
         w.println(indent + "\"" + key + "\": {");
         w.println(indent + "  \"type\": \"array\",");
-        w.println(indent + "  \"items\": {");
-        w.println(indent + "    \"type\": \"object\",");
-        w.println(indent + "    \"properties\": {");
+        w.print(indent + "  \"items\": ");
+        writeRecordSchema(w, elementType, indent + "  ");
+        w.println();
+        w.print(indent + "}");
+    }
+
+    private void writeRecordProperty(PrintWriter w, DeclaredType type, String key, String indent) {
+        w.print(indent + "\"" + key + "\": ");
+        writeRecordSchema(w, type, indent);
+    }
+
+    private void writeRecordSchema(PrintWriter w, DeclaredType type, String indent) {
+        TypeElement                            recordElement = (TypeElement) type.asElement();
+        List<? extends RecordComponentElement> components    = recordElement.getRecordComponents();
+
+        w.println("{");
+        w.println(indent + "  \"type\": \"object\",");
+        w.println(indent + "  \"properties\": {");
 
         for (int j = 0; j < components.size(); j++) {
             RecordComponentElement comp    = components.get(j);
             String                 compKey = BinderEmitter.toKebabCase(comp.getSimpleName().toString());
-            writeProperty(w, comp.asType(), compKey, indent + "      ");
+            writeProperty(w, comp.asType(), compKey, indent + "    ");
             if (j < components.size() - 1) {w.print(",");}
             w.println();
         }
 
-        w.println(indent + "    },");
+        w.println(indent + "  },");
         List<String> required = components.stream()
                                           .map(c -> "\"" + BinderEmitter.toKebabCase(c.getSimpleName().toString()) + "\"")
                                           .toList();
-        w.println(indent + "    \"required\": [" + String.join(", ", required) + "]");
-        w.println(indent + "  }");
+        w.println(indent + "  \"required\": [" + String.join(", ", required) + "]");
         w.print(indent + "}");
     }
+
 
     private boolean isRecordType(TypeMirror type) {
         if (type instanceof DeclaredType dt) {

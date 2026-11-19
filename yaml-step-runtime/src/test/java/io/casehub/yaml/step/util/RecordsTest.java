@@ -25,6 +25,9 @@ class RecordsTest {
 
     record WithSimpleList(String id, List<String> tags) {}
 
+    record NestedNullable(String label, WithNullComponent inner) {}
+
+
     @Test
     void simple_record() {
         var result = Records.toMap(new Simple("hello", 42));
@@ -118,5 +121,17 @@ class RecordsTest {
         assertThat(result).containsEntry("id", "x");
         assertThat(result).containsEntry("note", "note-text");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void toMapNonNull_propagates_to_nested_records() {
+        var result = Records.toMapNonNull(new NestedNullable("outer", new WithNullComponent("req", null)));
+        assertThat(result).containsEntry("label", "outer");
+        @SuppressWarnings("unchecked")
+        var inner = (Map<String, Object>) result.get("inner");
+        assertThat(inner).containsEntry("required", "req");
+        assertThat(inner).doesNotContainKey("nullable");
+    }
+
 
 }

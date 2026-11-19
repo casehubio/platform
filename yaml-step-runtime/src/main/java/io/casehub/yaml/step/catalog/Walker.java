@@ -513,25 +513,17 @@ public final class Walker {
                     decorators);
         }
         if ("parallel".equals(structuralType)) {
-            if (structuralValue instanceof java.util.List) {
-                @SuppressWarnings("unchecked")
-                var stepList = (List<Map<String, Object>>) structuralValue;
-                return new ResolvedStep.ParallelStep(
-                        stepName,
-                        resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations),
-                        decorators);
-            }
-            @SuppressWarnings("unchecked")
-            var policyMap = (Map<String, Object>) structuralValue;
-            @SuppressWarnings("unchecked")
-            var stepList = (List<Map<String, Object>>) policyMap.get("steps");
-            if (stepList == null || stepList.isEmpty()) {
+            if (!(structuralValue instanceof java.util.List)) {
                 throw new IllegalArgumentException(
-                        "parallel map form requires a non-empty 'steps' list at " + stepPath);
+                        stepPath + ": parallel value must be a bare list of branches — the map form with 'steps:' is no longer supported. "
+                        + "Use advance-after, cancel-remaining, collection-timeout, concurrency as sibling keys.");
             }
-            var    resolved        = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
-            Object advanceAfterRaw = policyMap.get("advance-after");
-            int    advanceAfter;
+            @SuppressWarnings("unchecked")
+            var stepList = (List<Map<String, Object>>) structuralValue;
+            var resolved = resolve(stepList, registry, depth + 1, stepPath + " → parallel", seenNames, annotations, stepKey + ".", 0, collector, playbookFile, locations);
+
+            Object advanceAfterRaw = decorators.remove("advance-after");
+            int advanceAfter;
             if (advanceAfterRaw == null || "all".equals(advanceAfterRaw)) {
                 advanceAfter = resolved.size();
             } else if (advanceAfterRaw instanceof Number n) {
@@ -540,19 +532,22 @@ public final class Walker {
                 throw new IllegalArgumentException(
                         "advance-after must be a positive integer or 'all', got: " + advanceAfterRaw + " at " + stepPath);
             }
-            boolean            cancelRemaining   = Boolean.TRUE.equals(policyMap.get("cancel-remaining"));
+            boolean cancelRemaining = Boolean.TRUE.equals(decorators.remove("cancel-remaining"));
             java.time.Duration collectionTimeout = null;
-            Object             ctRaw             = policyMap.get("collection-timeout");
+            Object ctRaw = decorators.remove("collection-timeout");
             if (ctRaw != null) {
                 collectionTimeout = io.casehub.yaml.core.orchestration.DurationParser.parse(ctRaw.toString());
             }
             int concurrency = 0;
-            Object concRaw = policyMap.get("concurrency");
+            Object concRaw = decorators.remove("concurrency");
             if (concRaw instanceof Number n) {
                 concurrency = n.intValue();
             }
-            return new ResolvedStep.ParallelStep(
-                    stepName, resolved, advanceAfter, cancelRemaining, collectionTimeout, concurrency, decorators);
+            if (advanceAfterRaw != null || cancelRemaining || collectionTimeout != null || concurrency > 0) {
+                return new ResolvedStep.ParallelStep(
+                        stepName, resolved, advanceAfter, cancelRemaining, collectionTimeout, concurrency, decorators);
+            }
+            return new ResolvedStep.ParallelStep(stepName, resolved, decorators);
         }
         if ("try".equals(structuralType)) {
             var    trySteps     = (List<Map<String, Object>>) structuralValue;

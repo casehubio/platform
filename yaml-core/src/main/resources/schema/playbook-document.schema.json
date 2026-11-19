@@ -106,20 +106,11 @@
         "name": { "type": "string", "description": "Human-readable step name for tracing, state machine transitions, and step-lifecycle events. Alias for 'step' but allowed inside structural blocks." },
         "invoke": { "$ref": "#/$defs/invokeBinding" },
         "block": { "$ref": "#/$defs/stepList" },
-        "parallel": {
-          "oneOf": [
-            { "$ref": "#/$defs/stepList" },
-            {
-              "type": "object",
-              "properties": {
-                "steps": { "$ref": "#/$defs/stepList" },
-                "advance-after": { "oneOf": [{ "type": "integer" }, { "type": "string" }] },
-                "cancel-remaining": { "type": "boolean" },
-                "collection-timeout": { "type": "string" }
-              }
-            }
-          ]
-        },
+        "parallel": { "$ref": "#/$defs/stepList" },
+        "advance-after": { "oneOf": [{ "type": "integer" }, { "type": "string" }], "description": "Parallel policy: complete after N branches (or 'all')." },
+        "cancel-remaining": { "type": "boolean", "description": "Parallel policy: cancel remaining branches after advance-after reached." },
+        "collection-timeout": { "type": "string", "description": "Parallel policy: max time to wait for remaining branches." },
+        "concurrency": { "type": "integer", "description": "Parallel policy: max concurrent branches." },
         "try": { "$ref": "#/$defs/stepList" },
         "catch": { "$ref": "#/$defs/stepList" },
         "finally": { "$ref": "#/$defs/stepList" },

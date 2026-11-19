@@ -12,7 +12,8 @@ public final class StepKeywords {
             "semaphore", "barrier", "quorum",
             "at", "on-complete", "resource", "priority",
             "cancel", "background", "from",
-            "wait", "mutex", "when", "capture");
+            "wait", "mutex", "when", "capture",
+            "advance-after", "cancel-remaining", "collection-timeout", "concurrency");
 
     public static final Set<String> STRUCTURAL_KEYS = Set.of(
             "step", "name", "invoke",

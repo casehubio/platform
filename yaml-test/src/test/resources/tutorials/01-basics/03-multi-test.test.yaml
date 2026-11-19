@@ -1,16 +1,15 @@
 name: Multi-test basics
-
-tests:
-  - name: First invocation
-    steps:
-      - agent-invoke "hello":
-        capture: output
-      - assertThat: ${output.text}
-        not-empty: true
-
-  - name: Second invocation
-    steps:
-      - agent-invoke "world":
-        capture: output
-      - assertThat: ${output.text}
-        contains: 'world'
+---
+name: First invocation
+---
+- agent-invoke "hello":
+  capture: output
+- assertThat: ${output.text}
+  not-empty: true
+---
+name: Second invocation
+---
+- agent-invoke "world":
+  capture: output
+- assertThat: ${output.text}
+  contains: 'world'

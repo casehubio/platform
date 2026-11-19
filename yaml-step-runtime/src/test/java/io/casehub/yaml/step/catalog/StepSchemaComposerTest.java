@@ -145,35 +145,18 @@ class StepSchemaComposerTest {
     }
 
     @Test
-    void parallelVariant_supportsPolymorphicSyntax() {
+    void parallelVariant_policyKeysAreSiblings() {
         PluginRegistry registry = registryWith("process", Map.of());
         ObjectNode     schema   = StepSchemaComposer.compose(registry, mapper);
 
         for (var variant : schema.get("oneOf")) {
             if (variant.has("properties") && variant.get("properties").has("parallel")) {
-                var parallelSchema = variant.get("properties").get("parallel");
-                assertThat(parallelSchema.has("oneOf")).isTrue();
-                var parallelOneOf = parallelSchema.get("oneOf");
-                assertThat(parallelOneOf.size()).isEqualTo(2);
-
-                boolean hasArray  = false;
-                boolean hasObject = false;
-                for (var form : parallelOneOf) {
-                    if ("array".equals(form.path("type").asText())) {hasArray = true;}
-                    if ("object".equals(form.path("type").asText())) {hasObject = true;}
-                }
-                assertThat(hasArray).as("list form").isTrue();
-                assertThat(hasObject).as("map form").isTrue();
-
-                for (var form : parallelOneOf) {
-                    if ("object".equals(form.path("type").asText())) {
-                        var props = form.get("properties");
-                        assertThat(props.has("steps")).isTrue();
-                        assertThat(props.has("advance-after")).isTrue();
-                        assertThat(props.has("cancel-remaining")).isTrue();
-                        assertThat(props.has("collection-timeout")).isTrue();
-                    }
-                }
+                var props = variant.get("properties");
+                assertThat(props.get("parallel").path("type").asText()).isEqualTo("array");
+                assertThat(props.has("advance-after")).isTrue();
+                assertThat(props.has("cancel-remaining")).isTrue();
+                assertThat(props.has("collection-timeout")).isTrue();
+                assertThat(props.has("concurrency")).isTrue();
                 return;
             }
         }

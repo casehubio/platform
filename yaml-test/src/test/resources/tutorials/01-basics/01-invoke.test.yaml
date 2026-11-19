@@ -1,9 +1,8 @@
 name: Basic agent invocation
-
-steps:
-  - agent-invoke "What's my risk profile?":
-    capture: output
-  - assertThat: ${output.text}
-    not-empty: true
-  - assertThat: ${output.tokens}
-    greaterThan: 0
+---
+- agent-invoke "What's my risk profile?":
+  capture: output
+- assertThat: ${output.text}
+  not-empty: true
+- assertThat: ${output.tokens}
+  greaterThan: 0

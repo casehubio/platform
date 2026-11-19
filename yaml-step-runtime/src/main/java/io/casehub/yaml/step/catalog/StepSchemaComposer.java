@@ -92,21 +92,14 @@ public final class StepSchemaComposer {
         if (capabilities.contains(PlaybookCapabilities.CONCURRENCY)) {
             ObjectNode parallelVariant = mapper.createObjectNode();
             ObjectNode parallelProps   = parallelVariant.putObject("properties");
-            ObjectNode parallelSchema  = parallelProps.putObject("parallel");
-            ArrayNode  parallelOneOf   = parallelSchema.putArray("oneOf");
-            parallelOneOf.addObject().put("type", "array");
-            ObjectNode mapForm = parallelOneOf.addObject();
-            mapForm.put("type", "object");
-            ObjectNode mapFormProps = mapForm.putObject("properties");
-            mapFormProps.putObject("steps").put("type", "array");
-            ObjectNode advanceAfter = mapFormProps.putObject("advance-after");
+            parallelProps.putObject("parallel").put("type", "array");
+            ObjectNode advanceAfter = parallelProps.putObject("advance-after");
             ArrayNode  advanceOneOf = advanceAfter.putArray("oneOf");
             advanceOneOf.addObject().put("type", "integer");
             advanceOneOf.addObject().put("type", "string").putArray("enum").add("all");
-            mapFormProps.putObject("cancel-remaining").put("type", "boolean");
-            mapFormProps.putObject("collection-timeout").put("type", "string");
-            mapFormProps.putObject("concurrency").put("type", "integer");
-            mapForm.putArray("required").add("steps");
+            parallelProps.putObject("cancel-remaining").put("type", "boolean");
+            parallelProps.putObject("collection-timeout").put("type", "string");
+            parallelProps.putObject("concurrency").put("type", "integer");
             parallelVariant.putArray("required").add("parallel");
             oneOf.add(parallelVariant);
 

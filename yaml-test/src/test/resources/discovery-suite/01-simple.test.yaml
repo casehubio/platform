@@ -1,5 +1,4 @@
 name: Simple engine discovery test
-
-steps:
-  - assert:
-      expression: "true"
+---
+- assert:
+    expression: "true"

@@ -219,13 +219,15 @@ class PlaybookSchemaValidationTest {
 
     private void validateTestFixture(Path yamlPath) throws IOException {
         Yaml snakeYaml = new Yaml();
-        Object doc;
+        List<Object> documents = new ArrayList<>();
         try (InputStream is = Files.newInputStream(yamlPath)) {
-            doc = snakeYaml.load(is);
+            for (Object doc : snakeYaml.loadAll(is)) {
+                if (doc != null) documents.add(doc);
+            }
         }
-        if (doc == null) return;
+        if (documents.isEmpty()) return;
 
-        JsonNode jsonContent = MAPPER.valueToTree(doc);
+        JsonNode jsonContent = MAPPER.valueToTree(documents.get(0));
         Set<ValidationMessage> errors = schema.validate(jsonContent);
 
         assertThat(errors)

@@ -76,4 +76,28 @@ class AgentSessionInitTest {
         assertThat(updated.responseFormat()).isEqualTo(format);
         assertThat(updated.model()).isEqualTo("gpt-4");
     }
+
+    @Test
+    void modelParametersDefaultsToNull() {
+        var init = AgentSessionInit.of("sys");
+        assertThat(init.modelParameters()).isNull();
+    }
+
+    @Test
+    void withModelParametersSetsParameters() {
+        var init    = AgentSessionInit.of("sys");
+        var params  = ModelParameters.of().withTemperature(0.7).withMaxTokens(1024);
+        var updated = init.withModelParameters(params);
+        assertThat(updated.modelParameters()).isEqualTo(params);
+        assertThat(updated.systemPrompt()).isEqualTo("sys");
+    }
+
+    @Test
+    void withModelPreservesModelParameters() {
+        var params  = ModelParameters.of().withTemperature(0.5);
+        var init    = AgentSessionInit.of("sys").withModelParameters(params);
+        var updated = init.withModel("gpt-4");
+        assertThat(updated.modelParameters()).isEqualTo(params);
+    }
+
 }

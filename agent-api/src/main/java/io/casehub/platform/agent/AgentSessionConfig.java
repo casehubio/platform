@@ -15,7 +15,8 @@ public record AgentSessionConfig(
         String model,
         io.casehub.platform.api.model.ModelQuery modelQuery,
         ModelChain modelChain,
-        ResponseFormat responseFormat
+        ResponseFormat responseFormat,
+        ModelParameters modelParameters
 ) {
     public AgentSessionConfig {
         Objects.requireNonNull(systemPrompt, "systemPrompt");
@@ -27,50 +28,63 @@ public record AgentSessionConfig(
                               List<AgentMcpServer> mcpServers, Duration timeout,
                               String correlationId, String model,
                               io.casehub.platform.api.model.ModelQuery modelQuery,
+                              ModelChain modelChain,
+                              ResponseFormat responseFormat) {
+        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat, null);
+    }
+
+    public AgentSessionConfig(String systemPrompt, String userPrompt,
+                              List<AgentMcpServer> mcpServers, Duration timeout,
+                              String correlationId, String model,
+                              io.casehub.platform.api.model.ModelQuery modelQuery,
                               ModelChain modelChain) {
-        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, null);
+        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, null, null);
     }
 
     public AgentSessionConfig(String systemPrompt, String userPrompt,
                               List<AgentMcpServer> mcpServers, Duration timeout,
                               String correlationId, String model,
                               io.casehub.platform.api.model.ModelQuery modelQuery) {
-        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, null, null);
+        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, null, null, null);
     }
 
     public AgentSessionConfig(String systemPrompt, String userPrompt,
                               List<AgentMcpServer> mcpServers, Duration timeout,
                               String correlationId, String model) {
-        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, null, null, null);
+        this(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, null, null, null, null);
     }
 
     public static AgentSessionConfig of(String systemPrompt, String userPrompt) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, null, null, null, null);
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, null, null, null, null, null);
     }
 
     public AgentSessionConfig withModel(String model) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, null, null, responseFormat);
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, null, null, responseFormat, modelParameters);
     }
 
     public AgentSessionConfig withModel(io.casehub.platform.api.model.ModelQuery modelQuery) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, null, modelQuery, null, responseFormat);
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, null, modelQuery, null, responseFormat, modelParameters);
     }
 
     public AgentSessionConfig withModelChain(ModelChain chain) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, null, null, chain, responseFormat);
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, null, null, chain, responseFormat, modelParameters);
     }
 
     public AgentSessionConfig withResponseFormat(ResponseFormat responseFormat) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat);
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat, modelParameters);
+    }
+
+    public AgentSessionConfig withModelParameters(ModelParameters modelParameters) {
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat, modelParameters);
     }
 
     public static AgentSessionConfig of(String systemPrompt, String userPrompt,
                                         Duration timeout) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null, null, null, null, null);
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null, null, null, null, null, null);
     }
 
     public static AgentSessionConfig of(String systemPrompt, String userPrompt,
                                         String model) {
-        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, model, null, null, null);
+        return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), null, null, model, null, null, null, null);
     }
 }

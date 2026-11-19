@@ -93,4 +93,31 @@ class AgentSessionConfigTest {
         assertThat(updated.responseFormat()).isEqualTo(format);
         assertThat(updated.model()).isEqualTo("gpt-4");
     }
+
+    @Test
+    void modelParametersDefaultsToNull() {
+        var config = AgentSessionConfig.of("sys", "user");
+        assertThat(config.modelParameters()).isNull();
+    }
+
+    @Test
+    void withModelParametersSetsParameters() {
+        var config  = AgentSessionConfig.of("sys", "user");
+        var params  = ModelParameters.of().withTemperature(0.7).withMaxTokens(1024);
+        var updated = config.withModelParameters(params);
+        assertThat(updated.modelParameters()).isEqualTo(params);
+        assertThat(updated.modelParameters().temperature()).isEqualTo(0.7);
+        assertThat(updated.modelParameters().maxTokens()).isEqualTo(1024);
+        assertThat(updated.systemPrompt()).isEqualTo("sys");
+    }
+
+    @Test
+    void withModelPreservesModelParameters() {
+        var params  = ModelParameters.of().withTemperature(0.5);
+        var config  = AgentSessionConfig.of("sys", "user").withModelParameters(params);
+        var updated = config.withModel("gpt-4");
+        assertThat(updated.modelParameters()).isEqualTo(params);
+        assertThat(updated.model()).isEqualTo("gpt-4");
+    }
+
 }

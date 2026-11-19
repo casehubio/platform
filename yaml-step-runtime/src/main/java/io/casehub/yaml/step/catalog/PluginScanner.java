@@ -73,7 +73,7 @@ public class PluginScanner {
 
         java.util.Optional<StreamingTypeInfo> streamingType = java.util.Optional.empty();
         if (annotation.streaming()) {
-            streamingType = buildStreamingTypeInfo(pluginClass, executeMethod);
+            streamingType = buildStreamingTypeInfo(pluginClass, executeMethod, name, inputsCopy, declaration, javaTypedInputs);
         }
         registry.register(new Definition(name, description, inputs, Map.of(), portability, action, capability, streamingType, annotation.absorbSiblings()));
     }
@@ -162,7 +162,10 @@ public class PluginScanner {
 
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private java.util.Optional<StreamingTypeInfo> buildStreamingTypeInfo(Class<?> pluginClass, Method executeMethod) {
+    private java.util.Optional<StreamingTypeInfo> buildStreamingTypeInfo(Class<?> pluginClass, Method executeMethod,
+                                                                         String actionName, Map<String, Parameter> inputs,
+                                                                         Declaration declaration,
+                                                                         Map<String, Class<?>> javaTypedInputs) {
         java.lang.reflect.Parameter[] params = executeMethod.getParameters();
         if (params.length == 0) {return java.util.Optional.empty();}
 
@@ -172,12 +175,20 @@ public class PluginScanner {
 
         StreamingStepFactory<?, ?> factory = (resolvedParams, services) -> {
             try {
+                Map<String, Object> coerced = coerceParams(resolvedParams, inputs);
+                List<String> validationErrors = io.casehub.yaml.core.step.Validator.validateStep(actionName, coerced, declaration);
+                List<String> javaTypeErrors = validateJavaTypedInputs(actionName, coerced, inputs, javaTypedInputs);
+                validationErrors.addAll(javaTypeErrors);
+                if (!validationErrors.isEmpty()) {
+                    throw new IllegalStateException("Input validation: " + String.join("; ", validationErrors));
+                }
+
                 RecordComponent[] components = pluginClass.getRecordComponents();
                 Object[]          ctorArgs   = new Object[components.length];
                 Class<?>[]        ctorTypes  = new Class<?>[components.length];
                 for (int i = 0; i < components.length; i++) {
                     ctorTypes[i] = components[i].getType();
-                    ctorArgs[i]  = extractParam(resolvedParams, toKebabCase(components[i].getName()), components[i].getType());
+                    ctorArgs[i]  = extractParam(coerced, toKebabCase(components[i].getName()), components[i].getType());
                 }
                 Constructor<?> ctor     = pluginClass.getDeclaredConstructor(ctorTypes);
                 Object         instance = ctor.newInstance(ctorArgs);
@@ -206,6 +217,8 @@ public class PluginScanner {
                         }
                     }
                 };
+            } catch (IllegalStateException e) {
+                throw e;
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to create streaming step for " + pluginClass.getName(), e);
             }

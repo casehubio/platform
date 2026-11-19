@@ -4,10 +4,12 @@ import io.casehub.yaml.plugin.api.MapServiceRegistry;
 import io.casehub.yaml.plugin.api.ParameterType;
 import io.casehub.yaml.plugin.api.Portability;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.yaml.plugin.api.StreamingStep;
 import io.casehub.yaml.step.catalog.scannertest.BinaryPlugin;
 import io.casehub.yaml.step.catalog.scannertest.CamelCasePlugin;
 import io.casehub.yaml.step.catalog.scannertest.EnumPlugin;
 import io.casehub.yaml.step.catalog.scannertest.FloatPlugin;
+import io.casehub.yaml.step.catalog.scannertest.NumericStreamingPlugin;
 import io.casehub.yaml.step.catalog.scannertest.TestPlugin;
 import io.casehub.yaml.step.catalog.scannertest.UniversalPlugin;
 import org.junit.jupiter.api.Test;
@@ -297,4 +299,38 @@ class PluginScannerTest {
         assertThat(((Result.Failure) result).message())
                 .contains("Input validation").contains("'data' expected type byte[] but got String");
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void streamingFactory_coercesStringToInt() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(NumericStreamingPlugin.class, registry);
+
+        var def           = registry.resolve("numeric-streaming").orElseThrow();
+        var streamingType = def.streamingType().orElseThrow();
+        StreamingStep<String, String> step = (StreamingStep<String, String>) streamingType.factory().create(
+                Map.of("threshold", "5"),
+                new MapServiceRegistry());
+        assertThat(step.apply("hello")).isEqualTo("hello");
+        assertThat(step.apply("hi")).isEqualTo("");
+    }
+
+    @Test
+    void streamingFactory_validatesRequiredFields() {
+        PluginScanner           scanner  = new PluginScanner();
+        CompositePluginRegistry registry = new CompositePluginRegistry();
+        scanner.scanAndRegister(io.casehub.yaml.step.catalog.scannertest.StreamingPlugin.class, registry);
+
+        var def           = registry.resolve("streaming-test").orElseThrow();
+        var streamingType = def.streamingType().orElseThrow();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                                                                   streamingType.factory().create(Map.of(), new MapServiceRegistry()))
+                                       .isInstanceOf(IllegalStateException.class)
+                                       .hasMessageContaining("required");
+    }
+
+
+
+
 }

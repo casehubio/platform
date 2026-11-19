@@ -110,7 +110,7 @@ class PlaybookModuleBridgeTest {
                 Map.of("use", "no-dot-reference"))));
 
         assertThatThrownBy(() -> PlaybookModuleBridge.expandUseSteps(
-                content, Map.of()))
+                content, Map.<String, Object>of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("alias.step-name");
     }
@@ -123,7 +123,7 @@ class PlaybookModuleBridgeTest {
                 Map.of("agent-invoke", Map.of("prompt", "hi"))));
 
         Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
-                content, Map.of());
+                content, Map.<String, Object>of());
 
         var steps = (List<Map<String, Object>>) result.get("steps");
         assertThat(steps).hasSize(1);
@@ -135,7 +135,7 @@ class PlaybookModuleBridgeTest {
         content.put("name", "empty");
 
         Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
-                content, Map.of());
+                content, Map.<String, Object>of());
 
         assertThat(result).containsEntry("name", "empty");
         assertThat(result).doesNotContainKey("steps");
@@ -258,7 +258,7 @@ class PlaybookModuleBridgeTest {
         content.put("steps", new ArrayList<>(List.of(ifStep)));
 
         Map<String, Object> result = PlaybookModuleBridge.expandUseSteps(
-                content, Map.of());
+                content, Map.<String, Object>of());
 
         var steps = (List<Map<String, Object>>) result.get("steps");
         assertThat(steps).hasSize(1);

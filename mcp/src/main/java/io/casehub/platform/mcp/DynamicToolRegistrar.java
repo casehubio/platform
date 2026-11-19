@@ -9,6 +9,7 @@ import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -34,6 +35,9 @@ public class DynamicToolRegistrar {
 
     @Inject
     ReflectiveOperationDispatcher dispatcher;
+    @Inject
+    Instance<DomainFilter>        domainFilter;
+
 
     @ConfigProperty(name = "casehub.mcp.schema-mode", defaultValue = "simple")
     SchemaMode schemaMode;
@@ -145,8 +149,13 @@ public class DynamicToolRegistrar {
     }
 
     private void registerFlatTools() {
-        int count = 0;
+        DomainFilter filter = domainFilter.isResolvable() ? domainFilter.get() : null;
+        int          count  = 0;
         for (DomainModel domain : registry.getDomains()) {
+            if (filter != null && !filter.isAllowed(domain.name())) {
+                LOG.infof("Skipping domain '%s' — excluded by domain filter", domain.name());
+                continue;
+            }
             for (OperationDescriptor op : domain.operations()) {
                 if (op.type() == OperationDescriptor.OperationType.STREAM
                     || op.type() == OperationDescriptor.OperationType.STREAMING_MUTATION) {continue;}

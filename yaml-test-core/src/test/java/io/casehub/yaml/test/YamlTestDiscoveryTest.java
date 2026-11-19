@@ -63,7 +63,7 @@ class YamlTestDiscoveryTest {
         setup.createNewFile();
         teardown.createNewFile();
         java.nio.file.Files.writeString(test.toPath(),
-                "name: Actual test\nsteps:\n  - assert:\n      expression: 'true'\n");
+                "name: Actual test\n---\n- assert:\n    expression: 'true'\n");
 
         try {
             var descriptors = YamlTestDiscovery.discover(lifecycleDir);

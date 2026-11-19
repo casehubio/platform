@@ -1,14 +1,14 @@
 name: Composition category validation
-steps:
-  - validate-playbook:
-      directory: ../../../main/playbooks/composition
-    capture: output
-  - assertThat: output.validatedCount
-    equals: 10
-    message: "all 10 composition files are discovered"
-  - assertThat: output.errors
-    hasSize: 0
-    message: "all composition playbooks compile without errors"
-  - assertThat: output.headerErrors
-    hasSize: 0
-    message: "all composition playbooks have tutorial headers"
+---
+- validate-playbook:
+    directory: ../../../main/playbooks/composition
+  capture: output
+- assertThat: output.validatedCount
+  equals: 10
+  message: "all 10 composition files are discovered"
+- assertThat: output.errors
+  hasSize: 0
+  message: "all composition playbooks compile without errors"
+- assertThat: output.headerErrors
+  hasSize: 0
+  message: "all composition playbooks have tutorial headers"

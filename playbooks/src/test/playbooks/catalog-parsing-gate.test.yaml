@@ -1,13 +1,13 @@
 name: Playbook catalog parsing gate
-steps:
-  - validate-playbook:
-      directory: ../../main/playbooks
-    capture: output
-  - assertThat: output.validatedCount
-    greaterThan: 60
-  - assertThat: output.errors
-    hasSize: 0
-    message: "All shipped playbooks must pass validation"
-  - assertThat: output.headerErrors
-    hasSize: 0
-    message: "All playbooks must have level, layer, and teaches in meta"
+---
+- validate-playbook:
+    directory: ../../main/playbooks
+  capture: output
+- assertThat: output.validatedCount
+  greaterThan: 60
+- assertThat: output.errors
+  hasSize: 0
+  message: "All shipped playbooks must pass validation"
+- assertThat: output.headerErrors
+  hasSize: 0
+  message: "All playbooks must have level, layer, and teaches in meta"

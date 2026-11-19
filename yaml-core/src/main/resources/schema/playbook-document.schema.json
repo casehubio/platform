@@ -19,10 +19,6 @@
       },
       "additionalProperties": true
     },
-    "steps": {
-      "$ref": "#/$defs/stepList",
-      "description": "The step sequence. Required unless 'tests' is present."
-    },
     "params": {
       "type": "object",
       "description": "Typed parameter declarations with optional constraints.",

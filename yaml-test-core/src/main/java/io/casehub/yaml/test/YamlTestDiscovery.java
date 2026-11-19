@@ -2,8 +2,10 @@ package io.casehub.yaml.test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLParser;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -50,13 +52,20 @@ public final class YamlTestDiscovery {
     @SuppressWarnings("unchecked")
     static TestFileDescriptor parseTestFile(Path file) {
         try {
-            Map<String, Object>       doc           = MAPPER.readValue(Files.newInputStream(file), Map.class);
-            String                    name          = (String) doc.getOrDefault("name", file.getFileName().toString());
-            Map<String, Object>       simulateBlock = (Map<String, Object>) doc.get("simulate");
-            List<Map<String, Object>> fileSetup     = (List<Map<String, Object>>) doc.get("setup");
-            List<Map<String, Object>> fileTeardown  = (List<Map<String, Object>>) doc.get("teardown");
-            Map<String, Object>       varsBlock     = (Map<String, Object>) doc.get("vars");
-            Map<String, Object>       paramsBlock   = (Map<String, Object>) doc.get("params");
+            List<Object> documents = readAllDocuments(file);
+            Map<String, Object> doc = (Map<String, Object>) documents.get(0);
+
+            if (doc.containsKey("steps") && doc.get("steps") instanceof List<?>) {
+                throw new IllegalArgumentException(file + ": top-level 'steps:' is not allowed. "
+                        + "Use bare-list format: add '---' before the step list and remove the 'steps:' line.");
+            }
+
+            String                    name            = (String) doc.getOrDefault("name", file.getFileName().toString());
+            Map<String, Object>       simulateBlock   = (Map<String, Object>) doc.get("simulate");
+            List<Map<String, Object>> fileSetup       = (List<Map<String, Object>>) doc.get("setup");
+            List<Map<String, Object>> fileTeardown    = (List<Map<String, Object>>) doc.get("teardown");
+            Map<String, Object>       varsBlock       = (Map<String, Object>) doc.get("vars");
+            Map<String, Object>       paramsBlock     = (Map<String, Object>) doc.get("params");
             String                    servicesProfile = (String) doc.get("services");
 
             List<TestCase> testCases;
@@ -68,12 +77,13 @@ public final class YamlTestDiscovery {
                     var    perTestSetup    = (List<Map<String, Object>>) testEntry.get("setup");
                     var    steps           = (List<Map<String, Object>>) testEntry.get("steps");
                     var    perTestTeardown = (List<Map<String, Object>>) testEntry.get("teardown");
-                    var perTestSimulate = (Map<String, Object>) testEntry.get("simulate");
+                    var    perTestSimulate = (Map<String, Object>) testEntry.get("simulate");
                     testCases.add(new TestCase(testName, perTestSetup, steps, perTestTeardown, perTestSimulate));
                 }
+            } else if (documents.size() > 1 && documents.get(1) instanceof List<?> stepList) {
+                testCases = List.of(new TestCase(name, null, (List<Map<String, Object>>) (List<?>) stepList, null));
             } else {
-                var steps = (List<Map<String, Object>>) doc.get("steps");
-                testCases = List.of(new TestCase(name, null, steps, null));
+                testCases = List.of(new TestCase(name, null, List.of(), null));
             }
 
             return new TestFileDescriptor(name, file, simulateBlock, fileSetup, fileTeardown,
@@ -81,5 +91,20 @@ public final class YamlTestDiscovery {
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse test file: " + file, e);
         }
+    }
+
+    private static List<Object> readAllDocuments(Path file) throws IOException {
+        List<Object> documents = new ArrayList<>();
+        try (InputStream is = Files.newInputStream(file);
+             YAMLParser parser = (YAMLParser) new YAMLFactory().createParser(is)) {
+            var iterator = MAPPER.readValues(parser, Object.class);
+            while (iterator.hasNext()) {
+                documents.add(iterator.next());
+            }
+        }
+        if (documents.isEmpty()) {
+            throw new IllegalArgumentException("Empty test file: " + file);
+        }
+        return documents;
     }
 }

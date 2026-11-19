@@ -1,14 +1,14 @@
 name: Data delivery category validation
-steps:
-  - validate-playbook:
-      directory: ../../../main/playbooks/data-delivery
-    capture: output
-  - assertThat: output.validatedCount
-    equals: 3
-    message: "all 3 data-delivery playbooks are discovered"
-  - assertThat: output.errors
-    hasSize: 0
-    message: "all data-delivery playbooks compile without errors"
-  - assertThat: output.headerErrors
-    hasSize: 0
-    message: "all data-delivery playbooks have tutorial headers"
+---
+- validate-playbook:
+    directory: ../../../main/playbooks/data-delivery
+  capture: output
+- assertThat: output.validatedCount
+  equals: 3
+  message: "all 3 data-delivery playbooks are discovered"
+- assertThat: output.errors
+  hasSize: 0
+  message: "all data-delivery playbooks compile without errors"
+- assertThat: output.headerErrors
+  hasSize: 0
+  message: "all data-delivery playbooks have tutorial headers"

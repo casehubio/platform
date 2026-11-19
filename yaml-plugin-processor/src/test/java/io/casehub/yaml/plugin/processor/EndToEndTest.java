@@ -146,5 +146,20 @@ class EndToEndTest {
         assertThat(content).contains("\"required\": [\"id\", \"char-offset\"]");
     }
 
+    @Test
+    void nestedRecordListFieldGeneratesArrayItemsRecursively() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/NestedListTestPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/nested-list-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"tags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }");
+    }
+
 
 }

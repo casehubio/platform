@@ -104,10 +104,9 @@ class SchemaEmitter {
         w.println(indent + "    \"properties\": {");
 
         for (int j = 0; j < components.size(); j++) {
-            RecordComponentElement comp     = components.get(j);
-            String                 compKey  = BinderEmitter.toKebabCase(comp.getSimpleName().toString());
-            String                 compType = toJsonType(comp.asType().toString());
-            w.print(indent + "      \"" + compKey + "\": { \"type\": \"" + compType + "\" }");
+            RecordComponentElement comp    = components.get(j);
+            String                 compKey = BinderEmitter.toKebabCase(comp.getSimpleName().toString());
+            writeProperty(w, comp.asType(), compKey, indent + "      ");
             if (j < components.size() - 1) {w.print(",");}
             w.println();
         }

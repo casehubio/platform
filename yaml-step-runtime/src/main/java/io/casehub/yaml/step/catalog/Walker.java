@@ -25,6 +25,7 @@ public final class Walker {
             "for-each", "retry", "timeout", "when", "mutex", "loop");
 
     private static final Set<String> REMOVED_KEYS           = Set.of("steps", "do");
+    private static final Set<String> PARALLEL_ONLY_KEYS     = Set.of("advance-after", "cancel-remaining", "collection-timeout", "concurrency");
     private static final Set<String> RESERVED_CAPTURE_NAMES = StepKeywords.RESERVED_CAPTURE_NAMES;
     static final         int         MAX_DEPTH           = 32;
     private static final Set<String> MIGRATED_DECORATORS = Set.of(
@@ -403,6 +404,15 @@ public final class Walker {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": unknown key '" + first.getKey()
                     + "'. Available actions: " + registry.availableActions());
+        }
+
+        if (!"parallel".equals(structuralType)) {
+            for (String pKey : PARALLEL_ONLY_KEYS) {
+                if (decorators.containsKey(pKey)) {
+                    throw new IllegalArgumentException(
+                            path + " → Step " + index + ": '" + pKey + "' is only valid on parallel steps");
+                }
+            }
         }
 
         if (stepFromKey && structuralType != null) {

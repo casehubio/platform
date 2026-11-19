@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class YamlTestDiscoveryTest {
 
@@ -88,4 +89,23 @@ class YamlTestDiscoveryTest {
             empty.toFile().delete();
         }
     }
+
+    @Test
+    void bareListFirstDocument_throwsWithClearMessage() {
+        var dir = Path.of("src/test/resources/test-suite-barefirst");
+        dir.toFile().mkdirs();
+        var test = new java.io.File(dir.toFile(), "bad.test.yaml");
+        try {
+            java.nio.file.Files.writeString(test.toPath(), "- click: A\n- click: B\n");
+            assertThatThrownBy(() -> YamlTestDiscovery.discover(dir))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("metadata document");
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            test.delete();
+            dir.toFile().delete();
+        }
+    }
+
 }

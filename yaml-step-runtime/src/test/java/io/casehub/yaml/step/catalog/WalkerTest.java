@@ -921,6 +921,17 @@ class WalkerTest {
                 .hasMessageContaining("bare list");
     }
 
+    @Test
+    void parallel_policyKey_onNonParallelStep_throws() {
+        Map<String, Object> step = new java.util.LinkedHashMap<>();
+        step.put("block", List.of(Map.<String, Object>of("process", Map.of("command", "a.sh"))));
+        step.put("advance-after", 1);
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only valid on parallel");
+    }
+
+
     // --- structural decorator forms ---
 
     @Test

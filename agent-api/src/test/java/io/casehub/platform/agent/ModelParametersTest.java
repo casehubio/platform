@@ -3,6 +3,7 @@ package io.casehub.platform.agent;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModelParametersTest {
 
@@ -53,4 +54,52 @@ class ModelParametersTest {
         assertThat(params.topP()).isEqualTo(0.95);
         assertThat(params.topK()).isEqualTo(50);
     }
+
+    @Test
+    void withTemperature_negative_throws() {
+        assertThatThrownBy(() -> ModelParameters.of().withTemperature(-0.1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("temperature");
+    }
+
+    @Test
+    void withTemperature_aboveMax_throws() {
+        assertThatThrownBy(() -> ModelParameters.of().withTemperature(2.1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("temperature");
+    }
+
+    @Test
+    void withMaxTokens_zero_throws() {
+        assertThatThrownBy(() -> ModelParameters.of().withMaxTokens(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxTokens");
+    }
+
+    @Test
+    void withTopP_aboveOne_throws() {
+        assertThatThrownBy(() -> ModelParameters.of().withTopP(1.1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("topP");
+    }
+
+    @Test
+    void withTopK_negative_throws() {
+        assertThatThrownBy(() -> ModelParameters.of().withTopK(-1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("topK");
+    }
+
+    @Test
+    void withTemperature_boundaryValues_accepted() {
+        assertThat(ModelParameters.of().withTemperature(0).temperature()).isEqualTo(0.0);
+        assertThat(ModelParameters.of().withTemperature(2).temperature()).isEqualTo(2.0);
+    }
+
+    @Test
+    void withTopP_boundaryValues_accepted() {
+        assertThat(ModelParameters.of().withTopP(0).topP()).isEqualTo(0.0);
+        assertThat(ModelParameters.of().withTopP(1).topP()).isEqualTo(1.0);
+    }
+
 }

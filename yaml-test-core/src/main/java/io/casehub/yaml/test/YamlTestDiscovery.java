@@ -53,6 +53,9 @@ public final class YamlTestDiscovery {
     static TestFileDescriptor parseTestFile(Path file) {
         try {
             List<Object> documents = readAllDocuments(file);
+            if (!(documents.get(0) instanceof Map<?, ?>)) {
+                throw new IllegalArgumentException(file + ": test file must start with a metadata document (name:), not a bare list.");
+            }
             Map<String, Object> doc = (Map<String, Object>) documents.get(0);
 
             if (doc.containsKey("steps") && doc.get("steps") instanceof List<?>) {

@@ -77,38 +77,29 @@ class SchemaEmitter {
     }
 
     private void writeProperty(PrintWriter w, TypeMirror type, String key, String indent) {
+        w.print(indent + "\"" + key + "\": ");
+        writeTypeSchema(w, type, indent);
+    }
+
+    private void writeTypeSchema(PrintWriter w, TypeMirror type, String indent) {
         if (type instanceof DeclaredType dt) {
             String typeName = ((TypeElement) dt.asElement()).getQualifiedName().toString();
             if (typeName.equals("java.util.List") && !dt.getTypeArguments().isEmpty()) {
                 TypeMirror elementType = dt.getTypeArguments().get(0);
-                if (isRecordType(elementType)) {
-                    writeArrayRecordProperty(w, (DeclaredType) elementType, key, indent);
-                } else {
-                    String itemType = toJsonType(elementType.toString());
-                    w.print(indent + "\"" + key + "\": { \"type\": \"array\", \"items\": { \"type\": \"" + itemType + "\" } }");
-                }
+                w.println("{");
+                w.println(indent + "  \"type\": \"array\",");
+                w.print(indent + "  \"items\": ");
+                writeTypeSchema(w, elementType, indent + "  ");
+                w.println();
+                w.print(indent + "}");
                 return;
             }
             if (isRecordType(type)) {
-                writeRecordProperty(w, dt, key, indent);
+                writeRecordSchema(w, dt, indent);
                 return;
             }
         }
-        w.print(indent + "\"" + key + "\": { \"type\": \"" + toJsonType(type.toString()) + "\" }");
-    }
-
-    private void writeArrayRecordProperty(PrintWriter w, DeclaredType elementType, String key, String indent) {
-        w.println(indent + "\"" + key + "\": {");
-        w.println(indent + "  \"type\": \"array\",");
-        w.print(indent + "  \"items\": ");
-        writeRecordSchema(w, elementType, indent + "  ");
-        w.println();
-        w.print(indent + "}");
-    }
-
-    private void writeRecordProperty(PrintWriter w, DeclaredType type, String key, String indent) {
-        w.print(indent + "\"" + key + "\": ");
-        writeRecordSchema(w, type, indent);
+        w.print("{ \"type\": \"" + toJsonType(type.toString()) + "\" }");
     }
 
     private void writeRecordSchema(PrintWriter w, DeclaredType type, String indent) {

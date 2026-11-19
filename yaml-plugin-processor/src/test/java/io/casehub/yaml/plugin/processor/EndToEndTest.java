@@ -159,7 +159,9 @@ class EndToEndTest {
                 "META-INF/yaml-plugins/nested-list-test.schema.json").orElseThrow();
         String content = schema.getCharContent(false).toString();
 
-        assertThat(content).contains("\"tags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }");
+        assertThat(content).contains("\"tags\":");
+        assertThat(content).contains("\"type\": \"array\"");
+        assertThat(content).contains("\"items\": { \"type\": \"string\" }");
     }
 
     @Test
@@ -199,6 +201,24 @@ class EndToEndTest {
                 }
             }
         }
+    }
+
+    @Test
+    void listOfListGeneratesNestedArrayItems() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/NestedListOfListTestPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/nested-list-of-list-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"matrix\"");
+        assertThat(content).contains("\"type\": \"array\"");
+        assertThat(content).contains("\"type\": \"array\"");
+        assertThat(content).contains("\"items\": { \"type\": \"string\" }");
     }
 
 

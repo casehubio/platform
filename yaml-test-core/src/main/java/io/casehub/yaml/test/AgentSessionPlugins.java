@@ -43,6 +43,7 @@ public final class AgentSessionPlugins {
     private static Definition queryDefinition(String name, SessionPipeline pipeline) {
         return Definition.of(name)
                 .description("Queries an agent session")
+                .absorbSiblings(true)
                 .execute((params, services) -> {
                     String sessionId = resolveSessionId(params);
                     String prompt = params.containsKey("user")

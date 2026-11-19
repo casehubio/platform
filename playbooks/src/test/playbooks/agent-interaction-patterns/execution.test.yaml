@@ -99,5 +99,8 @@ tests:
     steps:
       - run-playbook: ../../../main/playbooks/agent-interaction-patterns/08-structured-output.playbook.yaml
         capture: output
-      - assertThat: output.error
-        contains: "response-format"
+      - assertThat: output.succeeded
+        equals: true
+      - assertThat: output.stepEvents
+        hasSize: 4
+        message: "open + 2 queries + close"

@@ -53,6 +53,31 @@ The `isRecordType` check is a single call: `dt.asElement().getKind() == ElementK
 
 This is a universal APT pitfall. The moment you call `toString()` on a `TypeMirror`, you've opted out of the compiler's type system. You're pattern-matching strings instead of walking a structure. For simple types — `String`, `int`, `boolean` — the string representation is unambiguous. For generic types, it's a lossy encoding.
 
+## The string path survived inside the fix
+
+The initial fix handled `List<T>` at the top level — the plugin record's own fields. But `writeArrayRecordProperty` still called `toJsonType(comp.asType().toString())` for each component of the nested record. If `TextMark` itself had a `List<String> tags` field, that inner list produced `{ "type": "array" }` without items. The same string-based path, one level deeper.
+
+The fix is to call `writeProperty` recursively instead of `toJsonType`. Every component of a nested record gets the same TypeMirror-aware handling as a top-level plugin field. A `List<Outer>` where `Outer` has `List<String> tags` now generates items all the way down.
+
+The same gap existed for standalone record fields. A plugin with `@Optional Address address` where `Address` is a record produced `{ "type": "object" }` — no properties, no required array. The compiler knows the record's components. We were throwing that away.
+
+Both fixes converge on a shared method:
+
+```java
+private void writeRecordSchema(PrintWriter w, DeclaredType type, String indent) {
+    TypeElement recordElement = (TypeElement) type.asElement();
+    List<? extends RecordComponentElement> components =
+        recordElement.getRecordComponents();
+    // ... emit properties, recurse via writeProperty, emit required
+}
+```
+
+`writeArrayRecordProperty` wraps it in an array; `writeRecordProperty` writes it directly. Both delegate component handling back to `writeProperty`, which dispatches on List, Record, or simple type. The recursion terminates because Java records can't form cycles — a record component can't be its own enclosing type.
+
+<img src="assets/2026-11-19-recursive-type-walking.svg" alt="Recursive writeProperty walks the full type tree. List and standalone Record paths both delegate to writeRecordSchema, which calls writeProperty for each component." />
+
+The progression is worth noticing. The original code had one method (`toJsonType`) that mapped types to JSON Schema strings. The first fix added a second path (`writeProperty`) that handled List specially but left everything else on the string path. The final design makes `writeProperty` the single entry point for all type schema emission — List, Record, and simple types are all handled there, with `writeRecordSchema` as the shared recursive core. Each step was driven by a specific test failure, not by anticipating future requirements.
+
 ## The last SnakeYAML import
 
 A related cleanup: the platform's config loaders were the last two files with direct SnakeYAML imports. `YamlPreferenceLoader` and `YamlEndpointLoader` both used `new Yaml().load(is)` to parse simple YAML config files. No position tracking, no dual-parse — just config loading.

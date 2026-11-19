@@ -108,4 +108,43 @@ class EndToEndTest {
         assertThat(content).contains("\"name\": \"compare-state\"");
         assertThat(content).contains("\"actionClass\": \"test.plugins.CompareStatePluginAction\"");
     }
+
+    @Test
+    void listStringFieldGeneratesArrayWithStringItems() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/ListTestPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/list-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"tags\"");
+        assertThat(content).contains("\"items\": { \"type\": \"string\" }");
+    }
+
+    @Test
+    void listRecordFieldGeneratesArrayWithObjectItems() throws IOException {
+        Compilation compilation = javac()
+                                          .withProcessors(new StepPluginProcessor())
+                                          .compile(JavaFileObjects.forResource("test-plugins/ListTestPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject schema = compilation.generatedFile(
+                StandardLocation.CLASS_OUTPUT,
+                "META-INF/yaml-plugins/list-test.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"marks\"");
+        assertThat(content).contains("\"type\": \"array\"");
+        assertThat(content).contains("\"items\"");
+        assertThat(content).contains("\"type\": \"object\"");
+        assertThat(content).contains("\"id\": { \"type\": \"string\" }");
+        assertThat(content).contains("\"char-offset\": { \"type\": \"integer\" }");
+        assertThat(content).contains("\"required\": [\"id\", \"char-offset\"]");
+    }
+
+
 }

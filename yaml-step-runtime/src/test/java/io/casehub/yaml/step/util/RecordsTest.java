@@ -97,4 +97,26 @@ class RecordsTest {
         assertThatThrownBy(() -> Records.toMap("not a record"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void toMapNonNull_omits_null_values() {
+        var result = Records.toMapNonNull(new WithNullComponent("req", null));
+        assertThat(result).containsEntry("required", "req");
+        assertThat(result).doesNotContainKey("nullable");
+    }
+
+    @Test
+    void toMapNonNull_omits_empty_optional() {
+        var result = Records.toMapNonNull(new WithOptional("x", Optional.empty()));
+        assertThat(result).containsEntry("id", "x");
+        assertThat(result).doesNotContainKey("note");
+    }
+
+    @Test
+    void toMapNonNull_keeps_present_optional() {
+        var result = Records.toMapNonNull(new WithOptional("x", Optional.of("note-text")));
+        assertThat(result).containsEntry("id", "x");
+        assertThat(result).containsEntry("note", "note-text");
+    }
+
 }

@@ -31,6 +31,31 @@ public final class Records {
         return result;
     }
 
+    public static Map<String, Object> toMapNonNull(Object record) {
+        if (record == null) {
+            throw new IllegalArgumentException("record must not be null");
+        }
+        if (!record.getClass().isRecord()) {
+            throw new IllegalArgumentException(
+                    record.getClass().getName() + " is not a record");
+        }
+        var result = new LinkedHashMap<String, Object>();
+        for (RecordComponent component : record.getClass().getRecordComponents()) {
+            try {
+                Object value     = component.getAccessor().invoke(record);
+                Object converted = convert(value);
+                if (converted != null) {
+                    result.put(component.getName(), converted);
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(
+                        "Failed to read record component: " + component.getName(), e);
+            }
+        }
+        return result;
+    }
+
+
     private static Object convert(Object value) {
         if (value == null) {
             return null;

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
+import java.util.List;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
@@ -178,6 +179,26 @@ class EndToEndTest {
         assertThat(content).contains("\"city\": { \"type\": \"string\" }");
         assertThat(content).contains("\"post-code\": { \"type\": \"integer\" }");
         assertThat(content).contains("\"required\": [\"street\", \"city\", \"post-code\"]");
+    }
+
+    @Test
+    void allSchemaTestPluginsGenerateValidJson() throws IOException {
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        for (String plugin : List.of("ListTestPlugin", "NestedListTestPlugin", "RecordFieldTestPlugin")) {
+            Compilation compilation = javac()
+                                              .withProcessors(new StepPluginProcessor())
+                                              .compile(JavaFileObjects.forResource("test-plugins/" + plugin + ".java"));
+            assertThat(compilation).succeededWithoutWarnings();
+
+            for (var generatedFile : compilation.generatedFiles()) {
+                if (generatedFile.getName().endsWith(".schema.json")) {
+                    String content = generatedFile.getCharContent(false).toString();
+                    var    parsed  = objectMapper.readTree(content);
+                    assertThat(parsed.has("$schema")).as("schema in " + plugin).isTrue();
+                    assertThat(parsed.has("properties")).as("properties in " + plugin).isTrue();
+                }
+            }
+        }
     }
 
 

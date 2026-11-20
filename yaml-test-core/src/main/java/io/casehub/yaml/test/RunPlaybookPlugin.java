@@ -115,23 +115,35 @@ public final class RunPlaybookPlugin implements Action {
             throw new IllegalArgumentException("Playbook not found: " + filePath);
         }
         String qualifiedRef = ref.contains("/") ? ref : derivePackage(ctx) + ref;
-        String resourcePath = PLAYBOOKS_ROOT + "/" + qualifiedRef + PLAYBOOK_SUFFIX;
-        var    classLoader  = Thread.currentThread().getContextClassLoader();
+        String bare     = qualifiedRef + PLAYBOOK_SUFFIX;
+        String prefixed = PLAYBOOKS_ROOT + "/" + bare;
+        var    classLoader = Thread.currentThread().getContextClassLoader();
         try {
-            var urls = classLoader.getResources(resourcePath);
-            while (urls.hasMoreElements()) {
-                var url = urls.nextElement();
-                try {
-                    Path resolved = toPath(url);
-                    if (Files.exists(resolved)) {
-                        return resolved;
-                    }
-                } catch (Exception ignored) {}
+            Path found = scanClasspath(classLoader, bare);
+            if (found == null) {
+                found = scanClasspath(classLoader, prefixed);
+            }
+            if (found != null) {
+                return found;
             }
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Failed to scan classpath for playbooks", e);
         }
         throw new IllegalArgumentException("Playbook not found: '" + ref + "' (resolved as '" + qualifiedRef + "')");
+    }
+
+    private static Path scanClasspath(ClassLoader cl, String resourcePath) throws java.io.IOException {
+        var urls = cl.getResources(resourcePath);
+        while (urls.hasMoreElements()) {
+            var url = urls.nextElement();
+            try {
+                Path resolved = toPath(url);
+                if (Files.exists(resolved)) {
+                    return resolved;
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     private static Path toPath(java.net.URL url) throws Exception {

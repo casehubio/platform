@@ -135,17 +135,17 @@ class RunPlaybookPluginTest {
 
     @Test
     void resolvesPlaybookFromAlternateClasspathRoot(@TempDir Path tempDir) throws IOException {
-        Path testRoot = tempDir.resolve("test-classes/playbooks/io/casehub/app");
-        Path mainRoot = tempDir.resolve("classes/playbooks/io/casehub/app");
-        Files.createDirectories(testRoot);
-        Files.createDirectories(mainRoot);
+        Path testPlaybooks = tempDir.resolve("test-classes/playbooks/tutorials");
+        Path mainClasses   = tempDir.resolve("classes/tutorials");
+        Files.createDirectories(testPlaybooks);
+        Files.createDirectories(mainClasses);
 
-        Files.writeString(mainRoot.resolve("shared-flow.playbook.yaml"), """
-                                                                         name: shared flow
-                                                                         ---
-                                                                         - echo:
-                                                                             text: from-main
-                                                                         """);
+        Files.writeString(mainClasses.resolve("01-send-chat-message.playbook.yaml"), """
+                                                                                     name: send chat message
+                                                                                     ---
+                                                                                     - echo:
+                                                                                         text: hello
+                                                                                     """);
 
         var testClassesUrl = tempDir.resolve("test-classes").toUri().toURL();
         var mainClassesUrl = tempDir.resolve("classes").toUri().toURL();
@@ -158,13 +158,13 @@ class RunPlaybookPluginTest {
             Thread.currentThread().setContextClassLoader(customCl);
 
             var registry = new CompositePluginRegistry();
-            var services = buildServices(registry, testRoot);
+            var services = buildServices(registry, testPlaybooks);
 
-            Path resolved = RunPlaybookPlugin.resolvePlaybook("shared-flow",
+            Path resolved = RunPlaybookPlugin.resolvePlaybook("01-send-chat-message",
                                                               services.lookup(TestExecutionContext.class));
 
             assertThat(resolved).exists();
-            assertThat(resolved.toString()).contains("classes");
+            assertThat(resolved.getFileName().toString()).isEqualTo("01-send-chat-message.playbook.yaml");
         } finally {
             Thread.currentThread().setContextClassLoader(originalCl);
             customCl.close();

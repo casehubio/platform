@@ -1,4 +1,4 @@
-package io.casehub.platform.authn.quarkus;
+package io.casehub.platform.authn;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.AuthenticationResult;
@@ -14,22 +14,22 @@ import io.casehub.platform.api.mcp.PathParam;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.api.mcp.RestMethod;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@ApplicationScoped
 @McpDomain("webauthn")
-public class WebAuthnEndpoint {
+public class WebAuthnEndpointCore {
 
-    @Inject
-    WebAuthnCredentialStore credentialStore;
+    private final WebAuthnCredentialStore credentialStore;
+    private final AuthenticationRouter authenticationRouter;
 
-    @Inject
-    AuthenticationRouter authenticationRouter;
+    public WebAuthnEndpointCore(WebAuthnCredentialStore credentialStore,
+                                AuthenticationRouter authenticationRouter) {
+        this.credentialStore = credentialStore;
+        this.authenticationRouter = authenticationRouter;
+    }
 
     @PlatformQuery("List WebAuthn credentials for the current user")
     public List<WebAuthnCredential> listCredentials(
@@ -49,7 +49,8 @@ public class WebAuthnEndpoint {
                        .ifPresentOrElse(
                                c -> credentialStore.delete(credentialId),
                                () -> {
-                                   throw new SecurityException("Credential not found or not owned by current user");
+                                   throw new SecurityException(
+                                           "Credential not found or not owned by current user");
                                });
     }
 

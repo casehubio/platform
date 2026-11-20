@@ -1,4 +1,4 @@
-package io.casehub.platform.authn.quarkus;
+package io.casehub.platform.authn;
 
 import io.casehub.platform.api.authn.AuthenticationContext;
 import io.casehub.platform.api.authn.AuthenticationResult;
@@ -8,18 +8,18 @@ import io.casehub.platform.api.mcp.ContextParam;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.PathParam;
 import io.casehub.platform.api.mcp.PlatformMutation;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.util.Map;
 import java.util.Optional;
 
-@ApplicationScoped
 @McpDomain("social-auth")
-public class SocialAuthEndpoint {
+public class SocialAuthEndpointCore {
 
-    @Inject
-    AuthenticationRouter authenticationRouter;
+    private final AuthenticationRouter authenticationRouter;
+
+    public SocialAuthEndpointCore(AuthenticationRouter authenticationRouter) {
+        this.authenticationRouter = authenticationRouter;
+    }
 
     @PlatformMutation("Initiate OAuth authorization flow for a social provider")
     public ChallengeResponse authorize(

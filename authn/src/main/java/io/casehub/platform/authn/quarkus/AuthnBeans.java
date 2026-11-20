@@ -11,26 +11,28 @@ import io.casehub.platform.api.authn.SessionStore;
 import io.casehub.platform.api.authn.UserResolver;
 import io.casehub.platform.api.authn.UserStatusResolver;
 import io.casehub.platform.api.authn.WebAuthnCredentialStore;
-import io.casehub.platform.registration.UserProvisioner;
 import io.casehub.platform.authn.AuthenticationRouterCore;
+import io.casehub.platform.authn.ConnectionEndpointCore;
 import io.casehub.platform.authn.JwtIssuerCore;
+import io.casehub.platform.authn.SocialAuthEndpointCore;
+import io.casehub.platform.authn.WebAuthnEndpointCore;
 import io.casehub.platform.authn.SessionManagerCore;
 import io.casehub.platform.authn.social.AppleAuthenticationProvider;
 import io.casehub.platform.authn.social.GitHubAuthenticationProvider;
 import io.casehub.platform.authn.social.GoogleAuthenticationProvider;
-import io.casehub.platform.authn.social.JdkOAuthHttpClient;
 import io.casehub.platform.authn.social.HttpTokenRefreshClient;
+import io.casehub.platform.authn.social.JdkOAuthHttpClient;
 import io.casehub.platform.authn.social.OAuthHttpClient;
 import io.casehub.platform.authn.social.OAuthTokenManagerCore;
 import io.casehub.platform.authn.webauthn.WebAuthnAuthenticationProvider;
 import io.casehub.platform.authn.webauthn.WebAuthnConfig;
+import io.casehub.platform.registration.UserProvisioner;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.Set;
 
 @ApplicationScoped
@@ -214,6 +216,30 @@ public class AuthnBeans {
             OAuthTokenManagerCore tokenManager,
             io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
         return new io.casehub.platform.authn.social.ServiceConnectionProviderCore(tokenStore, tokenManager, scopeRegistry);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public ConnectionEndpointCore connectionEndpointCore(
+            io.casehub.platform.authn.social.ServiceConnectionProviderCore connectionProvider,
+            io.casehub.platform.authn.social.IncrementalConsentHandlerCore consentHandler,
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
+        return new ConnectionEndpointCore(connectionProvider, consentHandler, scopeRegistry);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public WebAuthnEndpointCore webAuthnEndpointCore(
+            WebAuthnCredentialStore credentialStore,
+            AuthenticationRouterCore authenticationRouter) {
+        return new WebAuthnEndpointCore(credentialStore, authenticationRouter);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public SocialAuthEndpointCore socialAuthEndpointCore(
+            AuthenticationRouterCore authenticationRouter) {
+        return new SocialAuthEndpointCore(authenticationRouter);
     }
 
 

@@ -1,4 +1,4 @@
-package io.casehub.platform.authn.quarkus;
+package io.casehub.platform.authn;
 
 import io.casehub.platform.api.authn.ConsentRequest;
 import io.casehub.platform.api.authn.IncrementalConsentHandler;
@@ -12,24 +12,24 @@ import io.casehub.platform.api.mcp.PathParam;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.api.mcp.RestMethod;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Set;
 
-@ApplicationScoped
 @McpDomain("connections")
-public class ConnectionEndpoint {
+public class ConnectionEndpointCore {
 
-    @Inject
-    ServiceConnectionProvider connectionProvider;
+    private final ServiceConnectionProvider connectionProvider;
+    private final IncrementalConsentHandler consentHandler;
+    private final ScopeRegistry scopeRegistry;
 
-    @Inject
-    IncrementalConsentHandler consentHandler;
-
-    @Inject
-    ScopeRegistry scopeRegistry;
+    public ConnectionEndpointCore(ServiceConnectionProvider connectionProvider,
+                                  IncrementalConsentHandler consentHandler,
+                                  ScopeRegistry scopeRegistry) {
+        this.connectionProvider = connectionProvider;
+        this.consentHandler = consentHandler;
+        this.scopeRegistry = scopeRegistry;
+    }
 
     @PlatformQuery("List all service connections for the current user")
     public List<ServiceConnection> listConnections(

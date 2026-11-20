@@ -108,6 +108,11 @@
                             <artifactId>casehub-platform-graphql-generator</artifactId>
                             <version>${project.version}</version>
                         </path>
+                        <path>
+                            <groupId>io.casehub</groupId>
+                            <artifactId>casehub-platform-authn-core</artifactId>
+                            <version>${project.version}</version>
+                        </path>
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>-AgenerateGraphQL=false</arg>

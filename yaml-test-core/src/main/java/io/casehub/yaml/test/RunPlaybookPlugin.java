@@ -115,23 +115,43 @@ public final class RunPlaybookPlugin implements Action {
             throw new IllegalArgumentException("Playbook not found: " + filePath);
         }
         String qualifiedRef = ref.contains("/") ? ref : derivePackage(ctx) + ref;
+        String resourcePath = PLAYBOOKS_ROOT + "/" + qualifiedRef + PLAYBOOK_SUFFIX;
         var    classLoader  = Thread.currentThread().getContextClassLoader();
         try {
-            var roots = classLoader.getResources(PLAYBOOKS_ROOT);
-            while (roots.hasMoreElements()) {
-                var url = roots.nextElement();
+            var urls = classLoader.getResources(resourcePath);
+            while (urls.hasMoreElements()) {
+                var url = urls.nextElement();
                 try {
-                    Path root      = Path.of(url.toURI());
-                    Path candidate = root.resolve(qualifiedRef + PLAYBOOK_SUFFIX);
-                    if (Files.exists(candidate)) {
-                        return candidate;
+                    Path resolved = toPath(url);
+                    if (Files.exists(resolved)) {
+                        return resolved;
                     }
-                } catch (java.net.URISyntaxException | IllegalArgumentException ignored) {}
+                } catch (Exception ignored) {}
             }
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Failed to scan classpath for playbooks", e);
         }
         throw new IllegalArgumentException("Playbook not found: '" + ref + "' (resolved as '" + qualifiedRef + "')");
+    }
+
+    private static Path toPath(java.net.URL url) throws Exception {
+        var uri = url.toURI();
+        if ("file".equals(uri.getScheme())) {
+            return Path.of(uri);
+        }
+        if ("jar".equals(uri.getScheme())) {
+            String[] parts = uri.toString().split("!", 2);
+            var jarUri = java.net.URI.create(parts[0]);
+            var env = java.util.Map.<String, String>of();
+            java.nio.file.FileSystem fs;
+            try {
+                fs = java.nio.file.FileSystems.getFileSystem(jarUri);
+            } catch (java.nio.file.FileSystemNotFoundException e) {
+                fs = java.nio.file.FileSystems.newFileSystem(jarUri, env);
+            }
+            return fs.getPath(parts[1]);
+        }
+        return Path.of(uri);
     }
 
     private static String derivePackage(TestExecutionContext ctx) {

@@ -133,6 +133,44 @@ class RunPlaybookPluginTest {
         assertThat(captures.get("second")).containsEntry("value", "beta");
     }
 
+    @Test
+    void resolvesPlaybookFromAlternateClasspathRoot(@TempDir Path tempDir) throws IOException {
+        Path testRoot = tempDir.resolve("test-classes/playbooks/io/casehub/app");
+        Path mainRoot = tempDir.resolve("classes/playbooks/io/casehub/app");
+        Files.createDirectories(testRoot);
+        Files.createDirectories(mainRoot);
+
+        Files.writeString(mainRoot.resolve("shared-flow.playbook.yaml"), """
+                                                                         name: shared flow
+                                                                         ---
+                                                                         - echo:
+                                                                             text: from-main
+                                                                         """);
+
+        var testClassesUrl = tempDir.resolve("test-classes").toUri().toURL();
+        var mainClassesUrl = tempDir.resolve("classes").toUri().toURL();
+        var customCl = new java.net.URLClassLoader(
+                new java.net.URL[]{testClassesUrl, mainClassesUrl},
+                Thread.currentThread().getContextClassLoader());
+
+        var originalCl = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(customCl);
+
+            var registry = new CompositePluginRegistry();
+            var services = buildServices(registry, testRoot);
+
+            Path resolved = RunPlaybookPlugin.resolvePlaybook("shared-flow",
+                                                              services.lookup(TestExecutionContext.class));
+
+            assertThat(resolved).exists();
+            assertThat(resolved.toString()).contains("classes");
+        } finally {
+            Thread.currentThread().setContextClassLoader(originalCl);
+            customCl.close();
+        }
+    }
+
 
     private MapServiceRegistry buildServices(CompositePluginRegistry registry, Path root) {
         var services = new MapServiceRegistry();

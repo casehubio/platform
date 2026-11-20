@@ -180,6 +180,21 @@ class PlaybookParserTest {
     }
 
     @Test
+    void parseLegacyMultiDoc_rejectsStepsKeyInSecondDoc() {
+        String yaml = """
+                      name: test
+                      ---
+                      steps:
+                        - log: hello
+                      """;
+
+        assertThatThrownBy(() -> PlaybookParser.parse(yaml))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'steps:' wrapper key is not allowed");
+    }
+
+
+    @Test
     void parseTwoDocFormat_bareListAsSteps() {
         String yaml = """
                 playbook: "1.0"

@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WebAuthnEndpointTest {
 
@@ -52,10 +53,27 @@ class WebAuthnEndpointTest {
 
     @Test
     void deleteCredentialDelegatesToStore() {
-        endpoint.deleteCredential("cred-1");
+        credentialStore.credentials = List.of(
+                new WebAuthnCredential("cred-1", "user-1", "tenant-1",
+                                       new byte[]{1, 2, 3}, 0, Set.of("usb"), null,
+                                       "My YubiKey", Instant.now(), null, true));
+
+        endpoint.deleteCredential("cred-1", "user-1", "tenant-1");
 
         assertThat(credentialStore.deletedId).isEqualTo("cred-1");
     }
+
+    @Test
+    void deleteCredentialRejectsNonOwner() {
+        credentialStore.credentials = List.of(
+                new WebAuthnCredential("cred-1", "user-1", "tenant-1",
+                                       new byte[]{1, 2, 3}, 0, Set.of("usb"), null,
+                                       "My YubiKey", Instant.now(), null, true));
+
+        assertThatThrownBy(() -> endpoint.deleteCredential("cred-1", "other-user", "tenant-1"))
+                .isInstanceOf(SecurityException.class);
+    }
+
 
     @Test
     void registerOptionsInitiatesWebAuthnFlow() {
@@ -105,7 +123,9 @@ class WebAuthnEndpointTest {
 
         @Override
         public Optional<WebAuthnCredential> findByCredentialId(String credentialId) {
-            return Optional.empty();
+            return credentials.stream()
+                              .filter(c -> c.credentialId().equals(credentialId))
+                              .findFirst();
         }
 
         @Override

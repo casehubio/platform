@@ -40,8 +40,17 @@ public class WebAuthnEndpoint {
 
     @PlatformMutation("Delete a WebAuthn credential")
     @RestMethod(HttpMethod.DELETE)
-    public void deleteCredential(@PathParam String credentialId) {
-        credentialStore.delete(credentialId);
+    public void deleteCredential(
+            @PathParam String credentialId,
+            @ContextParam("actorId") String actorId,
+            @ContextParam("tenancyId") String tenancyId) {
+        credentialStore.findByCredentialId(credentialId)
+                       .filter(c -> c.actorId().equals(actorId) && c.tenancyId().equals(tenancyId))
+                       .ifPresentOrElse(
+                               c -> credentialStore.delete(credentialId),
+                               () -> {
+                                   throw new SecurityException("Credential not found or not owned by current user");
+                               });
     }
 
     @PlatformMutation("Generate WebAuthn registration options")

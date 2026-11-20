@@ -69,7 +69,7 @@ public class DynamicToolRegistrar {
             String                                           domain   = entry.getKey();
             if (reportFilter != null && !reportFilter.isAllowed(domain)) continue;
             io.casehub.platform.api.mcp.DomainReportProvider provider = entry.getValue();
-            String                                           toolName = domain + "_report";
+            String                                           toolName = ToolNameUtils.reportToolName(domain);
 
             toolManager.newTool(toolName)
                        .setDescription("Runtime status report for the " + domain + " domain — "
@@ -161,7 +161,7 @@ public class DynamicToolRegistrar {
             for (OperationDescriptor op : domain.operations()) {
                 if (op.type() == OperationDescriptor.OperationType.STREAM
                     || op.type() == OperationDescriptor.OperationType.STREAMING_MUTATION) {continue;}
-                String toolName = domain.name().replace("/", "_") + "_" + op.name();
+                String toolName = ToolNameUtils.toolName(domain.name(), op.name());
                 registerOperationTool(domain.name(), op, toolName);
                 count++;
             }
@@ -186,7 +186,7 @@ public class DynamicToolRegistrar {
         try {
             for (OperationDescriptor op : model.operations()) {
                 if (op.type() == OperationDescriptor.OperationType.STREAM || op.type() == OperationDescriptor.OperationType.STREAMING_MUTATION) continue;
-                String toolName = domain + "_" + op.name();
+                String toolName = ToolNameUtils.toolName(domain, op.name());
                 registerOperationTool(domain, op, toolName);
                 registered.add(toolName);
             }

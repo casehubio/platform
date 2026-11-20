@@ -9,6 +9,7 @@ import io.casehub.platform.mcp.DomainModelRegistry;
 import io.casehub.platform.mcp.McpSchemaBuilder;
 import io.casehub.platform.mcp.OperationDescriptor;
 import io.casehub.platform.mcp.SchemaMode;
+import io.casehub.platform.mcp.ToolNameUtils;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -135,7 +136,7 @@ public class CaseHubToolCallbackProvider implements ToolCallbackProvider {
     }
 
     private ToolCallback buildOperationTool(String domain, OperationDescriptor op) {
-        String toolName = domain.replace("-", "_") + "_" + op.name();
+        String toolName = ToolNameUtils.toolName(domain, op.name());
         String description = op.summary() != null && !op.summary().isBlank()
                 ? op.summary()
                 : "[" + domain + "] " + op.name();

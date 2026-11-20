@@ -35,10 +35,11 @@ class DynamicToolRegistrarTest {
     }
 
     @Test
-    void casehubModelToolIsStillAnnotationBased() {
-        var tool = toolManager.getTool("casehub_model");
-        assertThat(tool).isNotNull();
-        assertThat(tool.isMethod()).isTrue();
+    void casehubModelToolIsNotRegisteredWithoutDispatchModule() {
+        // casehub_model / casehub_search live in casehub-platform-mcp-dispatch together with the
+        // named "casehub" server; the infrastructure module must not contribute either (#926).
+        assertThat(toolManager.getTool("casehub_model")).isNull();
+        assertThat(toolManager.getTool("casehub_search")).isNull();
     }
 
     @Test

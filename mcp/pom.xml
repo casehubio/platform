@@ -13,9 +13,10 @@
     <artifactId>casehub-platform-mcp</artifactId>
     <packaging>jar</packaging>
     <name>CaseHub Platform MCP</name>
-    <description>MCP hierarchical model — casehub_model + casehub_action tools.
+    <description>MCP infrastructure — @McpDomain discovery, casehub_action / flat tools, MCP resources.
         Auto-discovers GraphQL resolvers annotated with @McpDomain at startup via Jandex.
-        No quarkus:build goal (library module).</description>
+        Declares no named MCP server; dispatch-mode navigation tools (casehub_model, casehub_search)
+        are in casehub-platform-mcp-dispatch. No quarkus:build goal (library module).</description>
 
     <dependencies>
         <dependency>
@@ -99,6 +100,16 @@
                     <execution>
                         <id>make-index</id>
                         <goals><goal>jandex</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Test fixtures are reused by casehub-platform-mcp-dispatch -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals><goal>test-jar</goal></goals>
                     </execution>
                 </executions>
             </plugin>

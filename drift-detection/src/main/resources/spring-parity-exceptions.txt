@@ -139,3 +139,5 @@ coordination-core
 mcp-standalone-test
 # Standalone MCP server defaults — Quarkus-only @DefaultBean anonymous principal; Spring MCP is covered by mcp-spring
 mcp-server
+# Dispatch-mode casehub_model/casehub_search tools on the named "casehub" Quarkus MCP server; Spring equivalent is CaseHubToolCallbackProvider in mcp-spring
+mcp-dispatch

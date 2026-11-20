@@ -1,10 +1,10 @@
 package io.casehub.yaml.test;
 
+import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.plugin.api.Action;
 import io.casehub.yaml.plugin.api.Definition;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
-import io.casehub.platform.simulation.SimulationRuntime;
 import io.casehub.yaml.step.plugin.TestExecutionContext;
 import io.casehub.yaml.step.runner.FileSystemModuleLoader;
 import io.casehub.yaml.step.runner.PlaybookRunConfig;
@@ -41,12 +41,14 @@ public final class RunPlaybookPlugin implements Action {
                       : (String) params.get("file");
 
         if (file == null || file.isBlank()) {
-            return Result.failed("run-playbook requires a file path");
+            return Result.failed("run-playbook requires a file path or qualified ID");
         }
 
-        Path playbookPath = ctx.resourceRoot().resolve(file);
-        if (!Files.exists(playbookPath)) {
-            return Result.failed("Playbook not found: " + playbookPath);
+        Path playbookPath;
+        try {
+            playbookPath = resolvePlaybook(file, ctx);
+        } catch (IllegalArgumentException e) {
+            return Result.failed(e.getMessage());
         }
 
         Map<String, Object> callerVars = params.containsKey("vars")
@@ -56,7 +58,7 @@ public final class RunPlaybookPlugin implements Action {
         SimulationRuntime simRuntime = ctx.simulationRuntime() instanceof SimulationRuntime sr ? sr : null;
         boolean           dryRun     = simRuntime != null;
 
-        var config = new PlaybookRunConfig(dryRun, callerVars, null, null);
+        var config    = new PlaybookRunConfig(dryRun, callerVars, null, null);
         var activator = simRuntime != null ? new SimulationRuntimeActivator(simRuntime, ctx.resourceRoot()) : null;
         var runner = new PlaybookRunnerCore(ctx.pluginRegistry(), ctx.serviceRegistry(),
                                             ctx.resourceRoot(), activator, new FileSystemModuleLoader());
@@ -91,7 +93,7 @@ public final class RunPlaybookPlugin implements Action {
             }
         }
         if (simRuntime != null) {
-            var smStates = simRuntime.stateMachineStates();
+            var smStates  = simRuntime.stateMachineStates();
             var sanitized = new java.util.LinkedHashMap<String, Object>();
             for (var smEntry : smStates.entrySet()) {
                 sanitized.put(smEntry.getKey().replace('.', '_'), smEntry.getValue());
@@ -99,5 +101,47 @@ public final class RunPlaybookPlugin implements Action {
             resultMap.put("stateMachines", sanitized);
         }
         return Result.of(resultMap);
+    }
+
+    private static final String PLAYBOOKS_ROOT  = "playbooks";
+    private static final String PLAYBOOK_SUFFIX = ".playbook.yaml";
+
+    static Path resolvePlaybook(String ref, TestExecutionContext ctx) {
+        Path filePath = ctx.resourceRoot().resolve(ref);
+        if (Files.exists(filePath)) {
+            return filePath;
+        }
+        if (ref.endsWith(".yaml") || ref.startsWith(".") || ref.startsWith("/")) {
+            throw new IllegalArgumentException("Playbook not found: " + filePath);
+        }
+        String qualifiedRef = ref.contains("/") ? ref : derivePackage(ctx) + ref;
+        var    classLoader  = Thread.currentThread().getContextClassLoader();
+        try {
+            var roots = classLoader.getResources(PLAYBOOKS_ROOT);
+            while (roots.hasMoreElements()) {
+                var url = roots.nextElement();
+                try {
+                    Path root      = Path.of(url.toURI());
+                    Path candidate = root.resolve(qualifiedRef + PLAYBOOK_SUFFIX);
+                    if (Files.exists(candidate)) {
+                        return candidate;
+                    }
+                } catch (java.net.URISyntaxException | IllegalArgumentException ignored) {}
+            }
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to scan classpath for playbooks", e);
+        }
+        throw new IllegalArgumentException("Playbook not found: '" + ref + "' (resolved as '" + qualifiedRef + "')");
+    }
+
+    private static String derivePackage(TestExecutionContext ctx) {
+        Path resourceRoot = ctx.resourceRoot();
+        for (Path ancestor = resourceRoot; ancestor != null; ancestor = ancestor.getParent()) {
+            if (PLAYBOOKS_ROOT.equals(ancestor.getFileName().toString())) {
+                String relative = ancestor.relativize(resourceRoot).toString().replace('\\', '/');
+                return relative.isEmpty() ? "" : relative + "/";
+            }
+        }
+        return "";
     }
 }

@@ -1,0 +1,170 @@
+package io.casehub.yaml.core.resolver;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class TemplateExtractorTest {
+
+    @Test
+    void extractsSingleVariable() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        Optional<Map<String, String>> result = extractor.extract("Hello world");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "world"));
+    }
+
+    @Test
+    void extractsMultipleVariables() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design because ${rationale}");
+        Optional<Map<String, String>> result = extractor.extract("I approve this design because the error handling is solid");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "decision", "approve",
+                "rationale", "the error handling is solid"
+        ));
+    }
+
+    @Test
+    void lazyMatchingBetweenVariablesGreedyForLast() {
+        var extractor = TemplateExtractor.compile("${first} and ${second} and ${third}");
+        Optional<Map<String, String>> result = extractor.extract("a and b and c and d");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "first", "a",
+                "second", "b",
+                "third", "c and d"
+        ));
+    }
+
+    @Test
+    void returnsEmptyWhenNoMatch() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design");
+        Optional<Map<String, String>> result = extractor.extract("completely different text");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void literalSegmentsAreRegexQuoted() {
+        var extractor = TemplateExtractor.compile("price is $${amount} (USD)");
+        Optional<Map<String, String>> result = extractor.extract("price is $42.50 (USD)");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("amount", "42.50"));
+    }
+
+    @Test
+    void templateWithNoVariablesMatchesLiteralExactly() {
+        var extractor = TemplateExtractor.compile("hello world");
+        assertThat(extractor.extract("hello world")).isPresent();
+        assertThat(extractor.extract("hello world").get()).isEmpty();
+        assertThat(extractor.extract("hello universe")).isEmpty();
+    }
+
+    @Test
+    void variableAtStartOfTemplate() {
+        var extractor = TemplateExtractor.compile("${greeting}, world");
+        Optional<Map<String, String>> result = extractor.extract("hi there, world");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("greeting", "hi there"));
+    }
+
+    @Test
+    void variableAtEndOfTemplate() {
+        var extractor = TemplateExtractor.compile("hello ${name}");
+        Optional<Map<String, String>> result = extractor.extract("hello Mark Proctor");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "Mark Proctor"));
+    }
+
+    @Test
+    void adjacentVariables() {
+        var extractor = TemplateExtractor.compile("${a}${b}");
+        Optional<Map<String, String>> result = extractor.extract("xy");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of("a", "x", "b", "y"));
+    }
+
+    @Test
+    void variablesRequireAtLeastOneCharacter() {
+        var extractor = TemplateExtractor.compile("start ${a} end");
+        assertThat(extractor.extract("start  end")).isEmpty();
+    }
+
+    @Test
+    void compileRejectsNullTemplate() {
+        assertThatThrownBy(() -> TemplateExtractor.compile(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void extractRejectsNullInput() {
+        var extractor = TemplateExtractor.compile("${x}");
+        assertThatThrownBy(() -> extractor.extract(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void compileRejectsDuplicateVariableNames() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a} and ${a}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate");
+    }
+
+    @Test
+    void compileRejectsInvalidVariableNames() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${my-var}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+        assertThatThrownBy(() -> TemplateExtractor.compile("${1x}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+        assertThatThrownBy(() -> TemplateExtractor.compile("${my.var}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void emptyTemplateMatchesEmptyInput() {
+        var extractor = TemplateExtractor.compile("");
+        assertThat(extractor.extract("")).isPresent();
+        assertThat(extractor.extract("")).get().satisfies(m -> assertThat(m).isEmpty());
+        assertThat(extractor.extract("non-empty")).isEmpty();
+    }
+
+    @Test
+    void emptyInputDoesNotMatchVariableTemplate() {
+        var extractor = TemplateExtractor.compile("${x}");
+        assertThat(extractor.extract("")).isEmpty();
+    }
+
+    @Test
+    void extractedMapIsUnmodifiable() {
+        var                 extractor = TemplateExtractor.compile("hello ${name}");
+        Map<String, String> result    = extractor.extract("hello world").orElseThrow();
+        assertThatThrownBy(() -> result.put("name", "other"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+
+    @Test
+    void patternAccessor() {
+        var extractor = TemplateExtractor.compile("hello ${name}");
+        assertThat(extractor.pattern().pattern()).contains("name");
+    }
+
+    @Test
+    void variableNamesAccessor() {
+        var extractor = TemplateExtractor.compile("I ${decision} because ${rationale}");
+        assertThat(extractor.variableNames()).containsExactly("decision", "rationale");
+    }
+
+    @Test
+    void templateAccessor() {
+        var extractor = TemplateExtractor.compile("hello ${name}");
+        assertThat(extractor.template()).isEqualTo("hello ${name}");
+    }
+}

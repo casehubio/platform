@@ -176,11 +176,12 @@ class WalkerErrorCollectionTest {
     @Test
     void errorLocationCarriesLineAndColumn_whenParsedWithLocations() {
         String yaml = """
-                      steps:
-                        - log: hello
-                        - nonexistent: bad
-                        - process:
-                            command: run.sh
+                      name: test
+                      ---
+                      - log: hello
+                      - nonexistent: bad
+                      - process:
+                          command: run.sh
                       """;
         var parsed    = PlaybookParser.parseWithLocations(yaml, "playbook.yaml");
         var steps     = (List<Map<String, Object>>) parsed.document().content().get("steps");
@@ -190,7 +191,7 @@ class WalkerErrorCollectionTest {
         assertThat(collector.errors()).hasSize(1);
         var error = collector.errors().get(0);
         assertThat(error.location().file()).isEqualTo("playbook.yaml");
-        assertThat(error.location().line()).isEqualTo(3);
+        assertThat(error.location().line()).isEqualTo(4);
         assertThat(error.location().isKnown()).isTrue();
     }
 

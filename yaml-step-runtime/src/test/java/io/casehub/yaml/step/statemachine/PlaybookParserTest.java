@@ -168,14 +168,15 @@ class PlaybookParserTest {
     }
 
     @Test
-    void parseLegacySingleDoc_allowsStepsKey() {
+    void parseLegacySingleDoc_rejectsStepsKey() {
         String yaml = """
-                steps:
-                  - log: hello
-                """;
+                      steps:
+                        - log: hello
+                      """;
 
-        PlaybookDocument doc = PlaybookParser.parse(yaml);
-        assertThat(doc.content()).containsKey("steps");
+        assertThatThrownBy(() -> PlaybookParser.parse(yaml))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'steps:' wrapper key is not allowed");
     }
 
     @Test
@@ -302,10 +303,11 @@ class PlaybookParserTest {
         @Test
         void tracksStepListLocations() {
             String yaml = """
-                          steps:
-                            - log: hello
-                            - process:
-                                command: run.sh
+                          name: test
+                          ---
+                          - log: hello
+                          - process:
+                              command: run.sh
                           """;
             var result = PlaybookParser.parseWithLocations(yaml, "test.yaml");
             assertThat(result.locations().isEmpty()).isFalse();
@@ -316,19 +318,18 @@ class PlaybookParserTest {
 
             SourceLocation loc0 = result.locations().locationOf(steps.get(0));
             assertThat(loc0.file()).isEqualTo("test.yaml");
-            assertThat(loc0.line()).isEqualTo(2);
+            assertThat(loc0.line()).isEqualTo(3);
             assertThat(loc0.isKnown()).isTrue();
 
             SourceLocation loc1 = result.locations().locationOf(steps.get(1));
             assertThat(loc1.file()).isEqualTo("test.yaml");
-            assertThat(loc1.line()).isEqualTo(3);
+            assertThat(loc1.line()).isEqualTo(4);
         }
 
         @Test
         void tracksRootContentLocation() {
             String yaml = """
-                          steps:
-                            - log: hello
+                          scenario: test
                           """;
             var            result  = PlaybookParser.parseWithLocations(yaml, "test.yaml");
             SourceLocation rootLoc = result.locations().locationOf(result.document().content());
@@ -339,8 +340,9 @@ class PlaybookParserTest {
         @Test
         void unknownObjectReturnsFallback() {
             String yaml = """
-                          steps:
-                            - log: hello
+                          name: test
+                          ---
+                          - log: hello
                           """;
             var            result = PlaybookParser.parseWithLocations(yaml, "test.yaml");
             SourceLocation loc    = result.locations().locationOf(Map.of("unrelated", "map"), "fallback.yaml");
@@ -379,8 +381,9 @@ class PlaybookParserTest {
         @Test
         void nullFilePath_producesNullFileInLocation() {
             String yaml = """
-                          steps:
-                            - log: hello
+                          name: test
+                          ---
+                          - log: hello
                           """;
             var result = PlaybookParser.parseWithLocations(yaml, null);
             @SuppressWarnings("unchecked")

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://casehub.io/yaml-core/playbook-document.schema.json
 playbook: "1.0"
 schema: client
 ---

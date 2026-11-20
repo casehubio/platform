@@ -33,6 +33,13 @@ public final class AnnotationExtractor {
 
             if (trimmed.isEmpty() || trimmed.startsWith("#")) {continue;}
 
+            if (trimmed.equals("---")) {
+                flushToDocument(documentAnnotations, pendingAnnotations);
+                inSteps = true;
+                indentCounters.clear();
+                continue;
+            }
+
             if (!inSteps && trimmed.startsWith("steps:")) {
                 flushToDocument(documentAnnotations, pendingAnnotations);
                 inSteps = true;
@@ -54,6 +61,10 @@ public final class AnnotationExtractor {
                     stepAnnotations.put(stepKey, List.copyOf(pendingAnnotations));
                     pendingAnnotations.clear();
                 }
+                continue;
+            }
+
+            if (inSteps && !trimmed.startsWith("- ")) {
                 continue;
             }
 

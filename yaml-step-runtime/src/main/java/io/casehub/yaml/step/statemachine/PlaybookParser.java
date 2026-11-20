@@ -1,7 +1,7 @@
 package io.casehub.yaml.step.statemachine;
 
-import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -68,15 +68,22 @@ public final class PlaybookParser {
     private static PlaybookDocument assembleDocument(List<Object> documents) {
         if (documents.size() == 1) {
             var root = asMap(documents.get(0));
+            rejectStepsWrapper(root);
             return new PlaybookDocument(null, root);
         }
 
         var firstDoc = asMap(documents.get(0));
 
         if (!firstDoc.containsKey(PLAYBOOK_KEY)) {
-            var merged    = new LinkedHashMap<String, Object>(firstDoc);
-            var secondDoc = asMap(documents.get(1));
-            merged.putAll(secondDoc);
+            Object secondDoc = documents.get(1);
+            if (secondDoc instanceof List<?> stepList) {
+                var merged = new LinkedHashMap<String, Object>(firstDoc);
+                merged.put(STEPS_KEY, stepList);
+                return new PlaybookDocument(null, merged);
+            }
+            var merged = new LinkedHashMap<String, Object>(firstDoc);
+            merged.putAll(asMap(secondDoc));
+            rejectStepsWrapper(merged);
             return new PlaybookDocument(null, merged);
         }
 
@@ -120,7 +127,7 @@ public final class PlaybookParser {
     private static void rejectStepsWrapper(Map<String, Object> content) {
         if (content.containsKey(STEPS_KEY) && content.get(STEPS_KEY) instanceof List<?>) {
             throw new IllegalArgumentException(
-                    "The 'steps:' wrapper key is not allowed in versioned playbooks. "
+                    "The 'steps:' wrapper key is not allowed. "
                     + "Use bare-list format: add '---' before the step list and remove the 'steps:' line.");
         }
     }

@@ -16,8 +16,8 @@ import io.casehub.platform.authn.SessionManagerCore;
 import io.casehub.platform.authn.social.AppleAuthenticationProvider;
 import io.casehub.platform.authn.social.GitHubAuthenticationProvider;
 import io.casehub.platform.authn.social.GoogleAuthenticationProvider;
-import io.casehub.platform.authn.social.JdkOAuthHttpClient;
 import io.casehub.platform.authn.social.HttpTokenRefreshClient;
+import io.casehub.platform.authn.social.JdkOAuthHttpClient;
 import io.casehub.platform.authn.social.OAuthHttpClient;
 import io.casehub.platform.authn.social.OAuthTokenManagerCore;
 import io.casehub.platform.authn.webauthn.WebAuthnAuthenticationProvider;
@@ -262,6 +262,30 @@ public class AuthnSpringAutoConfiguration {
             OAuthTokenManagerCore tokenManager,
             io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
         return new io.casehub.platform.authn.social.ServiceConnectionProviderCore(tokenStore, tokenManager, scopeRegistry);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.ConnectionEndpointCore connectionEndpointCore(
+            io.casehub.platform.authn.social.ServiceConnectionProviderCore connectionProvider,
+            io.casehub.platform.authn.social.IncrementalConsentHandlerCore consentHandler,
+            io.casehub.platform.authn.ScopeRegistryCore scopeRegistry) {
+        return new io.casehub.platform.authn.ConnectionEndpointCore(connectionProvider, consentHandler, scopeRegistry);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.WebAuthnEndpointCore webAuthnEndpointCore(
+            io.casehub.platform.api.authn.WebAuthnCredentialStore credentialStore,
+            AuthenticationRouterCore authenticationRouter) {
+        return new io.casehub.platform.authn.WebAuthnEndpointCore(credentialStore, authenticationRouter);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public io.casehub.platform.authn.SocialAuthEndpointCore socialAuthEndpointCore(
+            AuthenticationRouterCore authenticationRouter) {
+        return new io.casehub.platform.authn.SocialAuthEndpointCore(authenticationRouter);
     }
 
 

@@ -16,7 +16,9 @@
     <description>Spring Boot auto-configuration for authentication — mirrors
         Quarkus authn module. Produces JwtIssuerCore, SessionManagerCore,
         AuthenticationRouterCore, and conditionally configured WebAuthn
-        and social OAuth providers. No quarkus:build goal.</description>
+        and social OAuth providers. Generated REST controllers for
+        connections, webauthn, and social-auth domains via
+        graphql-spring-generator. No quarkus:build goal.</description>
 
     <dependencies>
         <dependency>
@@ -43,6 +45,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.graphql</groupId>
+            <artifactId>spring-graphql</artifactId>
+        </dependency>
 
         <!-- Test -->
         <dependency>
@@ -56,4 +66,35 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.casehub</groupId>
+                <artifactId>casehub-platform-graphql-spring-generator</artifactId>
+                <version>${project.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate</id>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../authn-core</quarkusModule>
+                            </quarkusModules>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-drift</id>
+                        <goals><goal>verify</goal></goals>
+                        <phase>verify</phase>
+                        <configuration>
+                            <quarkusModules>
+                                <quarkusModule>${project.basedir}/../authn-core</quarkusModule>
+                            </quarkusModules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

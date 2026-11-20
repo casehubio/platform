@@ -6,9 +6,8 @@ params:
 imports:
   - module: greetings
     as: g
-
-steps:
-  - use: g.say-hello
-  - agent-invoke:
-      prompt: ${params.custom-prompt}
-    capture: output
+---
+- use: g.say-hello
+- agent-invoke:
+    prompt: ${params.custom-prompt}
+  capture: output

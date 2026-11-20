@@ -13,7 +13,6 @@ imports:
   - module: conditional-dep
     as: dep
     condition: "${params.feature_enabled}"
-
-steps:
-  - use: g.say-hello
-  - use: dep.extra-work
+---
+- use: g.say-hello
+- use: dep.extra-work

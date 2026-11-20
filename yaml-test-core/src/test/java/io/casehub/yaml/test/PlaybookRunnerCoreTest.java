@@ -76,16 +76,16 @@ class PlaybookRunnerCoreTest {
     void topLevelCaptureIsVisibleToLaterTopLevelSteps(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"), """
                 name: Capture chain
-                steps:
-                  - agent-invoke:
-                      prompt: hello
-                    capture: first
-                  - agent-invoke:
-                      prompt: ${first.text} world
-                    capture: second
-                  - agent-invoke:
-                      prompt: ${second.text}!
-                    capture: third
+                ---
+                - agent-invoke:
+                    prompt: hello
+                  capture: first
+                - agent-invoke:
+                    prompt: ${first.text} world
+                  capture: second
+                - agent-invoke:
+                    prompt: ${second.text}!
+                  capture: third
                 """);
 
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry, tempDir, null);
@@ -433,7 +433,7 @@ class PlaybookRunnerCoreTest {
     @Test
     void dryRunDiscoversSiblingSimulationYaml(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"),
-                          "name: Sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
+                          "name: Sim test\n---\n- agent-invoke:\n    prompt: hello\n  capture: output\n");
         Files.writeString(tempDir.resolve("simulation.yaml"),
                           "methods:\n  agent-provider.invoke:\n    strategy: sequential\n");
 
@@ -457,7 +457,7 @@ class PlaybookRunnerCoreTest {
         Path subdir = tempDir.resolve("nested/playbooks");
         Files.createDirectories(subdir);
         Files.writeString(subdir.resolve("playbook.yaml"),
-                          "name: Nested sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
+                          "name: Nested sim test\n---\n- agent-invoke:\n    prompt: hello\n  capture: output\n");
         Files.writeString(tempDir.resolve("simulation.yaml"),
                           "methods:\n  agent-provider.invoke:\n    strategy: key\n");
 
@@ -479,7 +479,7 @@ class PlaybookRunnerCoreTest {
     @Test
     void dryRunFallsThroughToEmptyOverlayWhenNoSimulationYaml(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("playbook.yaml"),
-                          "name: No sim test\nsteps:\n  - agent-invoke:\n      prompt: hello\n    capture: output\n");
+                          "name: No sim test\n---\n- agent-invoke:\n    prompt: hello\n  capture: output\n");
 
         var runtime = new RecordingSimulationRuntime();
         var activator = new SimulationRuntimeActivator(runtime, tempDir);

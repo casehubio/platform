@@ -5,9 +5,8 @@ imports:
     as: g
   - module: simulation-provider
     as: sim
-
-steps:
-  - use: g.say-hello
-  - use: sim.configure
-  - agent-invoke:
-      prompt: "done"
+---
+- use: g.say-hello
+- use: sim.configure
+- agent-invoke:
+    prompt: "done"

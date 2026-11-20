@@ -30,9 +30,9 @@ class RunPlaybookPluginTest {
         Path playbook = tempDir.resolve("simple.yaml");
         Files.writeString(playbook, """
                 name: simple test
-                steps:
-                  - echo:
-                      text: hello
+                ---
+                - echo:
+                    text: hello
                 """);
 
         var services = buildServices(registry, tempDir);
@@ -54,8 +54,8 @@ class RunPlaybookPluginTest {
         Path playbook = tempDir.resolve("failing.yaml");
         Files.writeString(playbook, """
                 name: failing test
-                steps:
-                  - fail-step: {}
+                ---
+                - fail-step: {}
                 """);
 
         var services = buildServices(registry, tempDir);
@@ -87,8 +87,9 @@ class RunPlaybookPluginTest {
 
         Path playbook = tempDir.resolve("noop.yaml");
         Files.writeString(playbook, """
-                steps:
-                  - noop: {}
+                name: noop
+                ---
+                - noop: {}
                 """);
 
         var services = buildServices(registry, tempDir);
@@ -109,13 +110,13 @@ class RunPlaybookPluginTest {
         Path playbook = tempDir.resolve("captures.yaml");
         Files.writeString(playbook, """
                                     name: captures test
-                                    steps:
-                                      - echo:
-                                          text: alpha
-                                        capture: first
-                                      - echo:
-                                          text: beta
-                                        capture: second
+                                    ---
+                                    - echo:
+                                        text: alpha
+                                      capture: first
+                                    - echo:
+                                        text: beta
+                                      capture: second
                                     """);
 
         var services = buildServices(registry, tempDir);

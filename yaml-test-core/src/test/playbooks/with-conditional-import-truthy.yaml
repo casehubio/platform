@@ -8,7 +8,6 @@ imports:
   - module: conditional-dep
     as: dep
     condition: "${module.g.full-greeting}"
-
-steps:
-  - use: g.say-hello
-  - use: dep.extra-work
+---
+- use: g.say-hello
+- use: dep.extra-work

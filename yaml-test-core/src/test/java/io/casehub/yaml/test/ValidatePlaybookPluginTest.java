@@ -117,13 +117,13 @@ class ValidatePlaybookPluginTest {
 
         Files.writeString(playbooksDir.resolve("hello.yaml"), """
                 name: hello
-                steps:
-                  - log: "hello"
+                ---
+                - log: "hello"
                 """);
         Files.writeString(playbooksDir.resolve("world.yaml"), """
                 name: world
-                steps:
-                  - log: "world"
+                ---
+                - log: "world"
                 """);
 
         var pluginRegistry = new CompositePluginRegistry();

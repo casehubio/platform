@@ -1,8 +1,8 @@
 name: Simple playbook
-steps:
-  - agent-invoke:
-      prompt: "hello"
-    capture: output
-  - agent-invoke:
-      prompt: "world"
-    capture: output2
+---
+- agent-invoke:
+    prompt: "hello"
+  capture: output
+- agent-invoke:
+    prompt: "world"
+  capture: output2

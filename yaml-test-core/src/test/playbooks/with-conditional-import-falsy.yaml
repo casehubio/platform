@@ -8,6 +8,5 @@ imports:
   - module: conditional-dep
     as: dep
     condition: "false"
-
-steps:
-  - use: g.say-hello
+---
+- use: g.say-hello

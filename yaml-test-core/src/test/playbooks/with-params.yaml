@@ -1,7 +1,7 @@
 name: Parameterized playbook
 params:
   greeting: "default hello"
-steps:
-  - agent-invoke:
-      prompt: ${params.greeting}
-    capture: output
+---
+- agent-invoke:
+    prompt: ${params.greeting}
+  capture: output

@@ -5,9 +5,8 @@ imports:
     as: sim
     parameters:
       model: "claude-3"
-
-steps:
-  - use: sim.configure
-  - agent-invoke:
-      prompt: "using model ${module.sim.configured-model}"
-    capture: final-result
+---
+- use: sim.configure
+- agent-invoke:
+    prompt: "using model ${module.sim.configured-model}"
+  capture: final-result

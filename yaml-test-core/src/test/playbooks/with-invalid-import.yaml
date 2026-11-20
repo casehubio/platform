@@ -3,6 +3,5 @@ name: Playbook with invalid import
 imports:
   - module: with-bad-step
     as: bad
-
-steps:
-  - use: bad.do-work
+---
+- use: bad.do-work

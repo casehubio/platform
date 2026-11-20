@@ -11,9 +11,8 @@ imports:
   - module: conditional-dep
     as: dep
     condition: "${var.feature_on}"
-
-steps:
-  - use: g.say-hello
-  - if: "true"
-    then:
-      - use: dep.extra-work
+---
+- use: g.say-hello
+- if: "true"
+  then:
+    - use: dep.extra-work

@@ -35,6 +35,7 @@ class SocialAuthEndpointCoreTest {
         assertThat(result.challengeId()).isEqualTo("challenge-456");
         assertThat(authRouter.lastContext.method()).isEqualTo("google");
         assertThat(authRouter.lastContext.tenancyId()).isEqualTo("tenant-1");
+        assertThat(authRouter.lastContext.origin()).isEqualTo("https://app.example.com");
         assertThat(authRouter.lastContext.existingPrincipal()).isEmpty();
     }
 
@@ -47,7 +48,9 @@ class SocialAuthEndpointCoreTest {
         var result = endpoint.callback("google", "auth-code-xyz", "state-abc", "tenant-1");
 
         assertThat(result.principal()).isEqualTo(PrincipalId.human("user-1"));
+        assertThat(result.method()).isEqualTo("google");
         assertThat(authRouter.lastVerifyMethod).isEqualTo("google");
+        assertThat(authRouter.lastVerifyChallengeId).isEqualTo("state-abc");
         assertThat(authRouter.lastVerifyData).containsEntry("code", "auth-code-xyz");
     }
 
@@ -70,11 +73,12 @@ class SocialAuthEndpointCoreTest {
         AuthenticationResult verifyResult;
         AuthenticationContext lastContext;
         String lastVerifyMethod;
+        String lastVerifyChallengeId;
         Map<String, Object> lastVerifyData;
 
         @Override public ChallengeResponse initiate(AuthenticationContext context) { lastContext = context; return challengeResponse; }
         @Override public AuthenticationResult verify(String method, String challengeId, Map<String, Object> data) {
-            lastVerifyMethod = method; lastVerifyData = data; return verifyResult;
+            lastVerifyMethod = method; lastVerifyChallengeId = challengeId; lastVerifyData = data; return verifyResult;
         }
         @Override public Set<String> availableMethods() { return Set.of("google", "github", "apple"); }
     }

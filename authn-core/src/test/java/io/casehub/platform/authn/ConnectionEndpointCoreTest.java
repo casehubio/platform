@@ -42,6 +42,7 @@ class ConnectionEndpointCoreTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).provider()).isEqualTo("google");
+        assertThat(result.get(0).status()).isEqualTo(ServiceConnectionStatus.CONNECTED);
     }
 
     @Test
@@ -54,6 +55,7 @@ class ConnectionEndpointCoreTest {
         var result = endpoint.getConnection("github", "user-1", "tenant-1");
 
         assertThat(result.provider()).isEqualTo("github");
+        assertThat(result.status()).isEqualTo(ServiceConnectionStatus.PARTIAL);
         assertThat(result.missingScopes()).containsExactly("admin:org");
     }
 
@@ -65,6 +67,7 @@ class ConnectionEndpointCoreTest {
 
         var result = endpoint.requestConsent("google", Set.of("calendar"), "user-1", "tenant-1");
 
+        assertThat(result.authorizationUrl()).contains("google");
         assertThat(result.provider()).isEqualTo("google");
         assertThat(result.requestedScopes()).containsExactly("calendar");
     }
@@ -75,6 +78,7 @@ class ConnectionEndpointCoreTest {
 
         assertThat(connectionProvider.disconnectedProvider).isEqualTo("github");
         assertThat(connectionProvider.disconnectedActor).isEqualTo("user-1");
+        assertThat(connectionProvider.disconnectedTenant).isEqualTo("tenant-1");
     }
 
     @Test
@@ -91,11 +95,12 @@ class ConnectionEndpointCoreTest {
         ServiceConnection singleConnection;
         String disconnectedProvider;
         String disconnectedActor;
+        String disconnectedTenant;
 
         @Override public ServiceConnection getConnection(String actorId, String provider, String tenancyId) { return singleConnection; }
         @Override public List<ServiceConnection> listConnections(String actorId, String tenancyId) { return connections; }
         @Override public ServiceAccessToken getAccessToken(String actorId, String provider, String tenancyId) { throw new UnsupportedOperationException(); }
-        @Override public void disconnect(String actorId, String provider, String tenancyId) { disconnectedActor = actorId; disconnectedProvider = provider; }
+        @Override public void disconnect(String actorId, String provider, String tenancyId) { disconnectedActor = actorId; disconnectedProvider = provider; disconnectedTenant = tenancyId; }
         @Override public Set<String> missingScopes(String actorId, String provider, String tenancyId) { return Set.of(); }
     }
 

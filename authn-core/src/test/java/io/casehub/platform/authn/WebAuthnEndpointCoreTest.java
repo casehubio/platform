@@ -77,6 +77,8 @@ class WebAuthnEndpointCoreTest {
 
         assertThat(result.challengeId()).isEqualTo("challenge-123");
         assertThat(authRouter.lastContext.method()).isEqualTo("webauthn");
+        assertThat(authRouter.lastContext.tenancyId()).isEqualTo("tenant-1");
+        assertThat(authRouter.lastContext.origin()).isEqualTo("https://example.com");
         assertThat(authRouter.lastContext.existingPrincipal())
                 .isPresent()
                 .get().isEqualTo(PrincipalId.human("user-1"));
@@ -93,6 +95,8 @@ class WebAuthnEndpointCoreTest {
 
         assertThat(result.principal()).isEqualTo(PrincipalId.human("user-1"));
         assertThat(authRouter.lastVerifyMethod).isEqualTo("webauthn");
+        assertThat(authRouter.lastVerifyChallengeId).isEqualTo("challenge-123");
+        assertThat(authRouter.lastVerifyData).containsKey("id");
     }
 
     private record SimpleChallengeResponse(String challengeId, Instant expiresAt) implements ChallengeResponse {}
@@ -115,9 +119,11 @@ class WebAuthnEndpointCoreTest {
         AuthenticationResult verifyResult;
         AuthenticationContext lastContext;
         String lastVerifyMethod;
+        String lastVerifyChallengeId;
+        Map<String, Object> lastVerifyData;
 
         @Override public ChallengeResponse initiate(AuthenticationContext context) { lastContext = context; return challengeResponse; }
-        @Override public AuthenticationResult verify(String method, String challengeId, Map<String, Object> data) { lastVerifyMethod = method; return verifyResult; }
+        @Override public AuthenticationResult verify(String method, String challengeId, Map<String, Object> data) { lastVerifyMethod = method; lastVerifyChallengeId = challengeId; lastVerifyData = data; return verifyResult; }
         @Override public Set<String> availableMethods() { return Set.of("webauthn"); }
     }
 }

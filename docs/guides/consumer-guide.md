@@ -1137,7 +1137,7 @@ spring.flyway.locations=classpath:db/migration,classpath:db/platform/migration,c
 | `casehub-platform-expression-spring` | `casehub-platform-expression` | Expression engine registry (JQ, MVEL, JEXL) |
 | `casehub-platform-governance-spring` | `casehub-platform-governance` | `PolicyEnforcer` for retry/timeout/circuit-breaker |
 | `casehub-platform-callback-spring` | `casehub-platform-callback` | `BeanPostProcessor` that wraps `@CallbackEligible` SPIs |
-| `casehub-platform-mcp-spring` | `casehub-platform-mcp` | MCP tool infrastructure |
+| `casehub-platform-mcp-spring` | `casehub-platform-mcp` + `casehub-platform-mcp-dispatch` | MCP tool infrastructure, including the `casehub_model` / `casehub_search` navigation tools that Quarkus apps get from `casehub-platform-mcp-dispatch` |
 | `casehub-platform-agent-*-spring` | `casehub-platform-agent-*` | Agent backend auto-configs (Claude, OpenAI, Codex, Gemini, Gemini CLI, Ollama, Router, Config, Gate) + ChatModel routing (3 manual configs) |
 | `casehub-platform-spring-actuator` | `casehub-platform-observability` | Health indicators (model registry, agent backends, delivery channels, SCIM, certificate expiry), metrics BPP (wraps AgentBackend + AccessControlProvider), info contributor |
 

@@ -17,20 +17,25 @@ public final class ConditionEvaluator {
             Object value = resolver.resolve(condition);
             if (value instanceof Boolean b) {return b;}
             if (value instanceof String s) {
-                if ("true".equals(s)) {return true;}
-                if ("false".equals(s)) {return false;}
+                Boolean result = yamlTruthyOrNull(s);
+                if (result != null) {return result;}
             }
         }
 
         String resolved = resolver.resolveString(condition, context);
 
-        if ("true".equals(resolved)) {return true;}
-        if ("false".equals(resolved)) {return false;}
+        Boolean result = yamlTruthyOrNull(resolved);
+        if (result != null) {return result;}
 
         if (expressionDelegate == null) {
             throw new ConditionEvaluationException(
-                    "Cannot evaluate '" + condition + "' — no expression engine configured", null);
+                    "Cannot evaluate '" + condition + "' (resolved: '" + resolved + "') — no expression engine configured", null);
         }
         return expressionDelegate.evaluate(resolved, resolver.buildExpressionContext());
+    }
+
+    private static Boolean yamlTruthyOrNull(String value) {
+        try { return Truthiness.isYamlTruthy(value); }
+        catch (IllegalArgumentException e) { return null; }
     }
 }

@@ -85,6 +85,49 @@ class ConditionEvaluatorTest {
     }
 
     @Test
+    void sole_variable_reference_resolved_to_yaml_yes() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "yes" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isTrue();
+    }
+
+    @Test
+    void sole_variable_reference_resolved_to_yaml_no() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "no" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isFalse();
+    }
+
+    @Test
+    void sole_variable_reference_resolved_to_yaml_on() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "on" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isTrue();
+    }
+
+    @Test
+    void sole_variable_reference_resolved_to_yaml_off() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "flag".equals(name) ? "off" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThat(evaluator.evaluate("${var.flag}", resolver, "test")).isFalse();
+    }
+
+    @Test
+    void no_delegate_includes_resolved_value_in_error() {
+        var resolver = new io.casehub.yaml.core.resolver.VariableResolver(java.util.Map.of(), java.util.Set.of())
+                               .withObjectScope("var", name -> "mode".equals(name) ? "production" : null);
+        var evaluator = new ConditionEvaluator(null);
+        assertThatThrownBy(() -> evaluator.evaluate("${var.mode}", resolver, "test"))
+                .isInstanceOf(ConditionEvaluationException.class)
+                .hasMessageContaining("production")
+                .hasMessageContaining("no expression engine configured");
+    }
+
+    @Test
     void expression_delegate_throws_propagates() {
         ConditionDelegate delegate = (expr, bindings) -> {
             throw new RuntimeException("eval failed");

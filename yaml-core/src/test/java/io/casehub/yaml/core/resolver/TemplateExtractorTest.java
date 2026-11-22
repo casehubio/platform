@@ -167,4 +167,139 @@ class TemplateExtractorTest {
         var extractor = TemplateExtractor.compile("hello ${name}");
         assertThat(extractor.template()).isEqualTo("hello ${name}");
     }
+
+    // --- Optional segments ---
+
+    @Test
+    void optionalSegmentMatchesWhenPresent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var result = extractor.extract("I approve this design because the error handling is solid");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "decision", "approve",
+                "rationale", "the error handling is solid"
+        ));
+    }
+
+    @Test
+    void optionalSegmentMatchesWhenAbsent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var result = extractor.extract("I approve this design");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("decision", "approve"));
+    }
+
+    @Test
+    void optionalSegmentAbsentVariablesNotInMap() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var result = extractor.extract("I approve this design");
+        assertThat(result).isPresent();
+        assertThat(result.get()).doesNotContainKey("rationale");
+    }
+
+    @Test
+    void optionalSegmentWithOnlyLiteralText() {
+        var extractor = TemplateExtractor.compile("hello${name}[ world]");
+        assertThat(extractor.extract("helloMark world")).isPresent();
+        assertThat(extractor.extract("helloMark world").get()).containsExactly(Map.entry("name", "Mark"));
+        assertThat(extractor.extract("helloMark")).isPresent();
+        assertThat(extractor.extract("helloMark").get()).containsExactly(Map.entry("name", "Mark"));
+    }
+
+    @Test
+    void optionalSegmentAtStart() {
+        var extractor = TemplateExtractor.compile("[${greeting} ]hello");
+        var withGreeting = extractor.extract("hi hello");
+        assertThat(withGreeting).isPresent();
+        assertThat(withGreeting.get()).containsExactly(Map.entry("greeting", "hi"));
+
+        var withoutGreeting = extractor.extract("hello");
+        assertThat(withoutGreeting).isPresent();
+        assertThat(withoutGreeting.get()).isEmpty();
+    }
+
+    @Test
+    void multipleOptionalSegments() {
+        var extractor = TemplateExtractor.compile("${action}[ by ${actor}][ at ${time}]");
+        var both = extractor.extract("deploy by admin at noon");
+        assertThat(both).isPresent();
+        assertThat(both.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "action", "deploy",
+                "actor", "admin",
+                "time", "noon"
+        ));
+
+        var actorOnly = extractor.extract("deploy by admin");
+        assertThat(actorOnly).isPresent();
+        assertThat(actorOnly.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "action", "deploy",
+                "actor", "admin"
+        ));
+
+        var neitherOptional = extractor.extract("deploy");
+        assertThat(neitherOptional).isPresent();
+        assertThat(neitherOptional.get()).containsExactly(Map.entry("action", "deploy"));
+    }
+
+    @Test
+    void optionalSegmentVariableNamesIncludesOptionalVars() {
+        var extractor = TemplateExtractor.compile("I ${decision}[ because ${rationale}]");
+        assertThat(extractor.variableNames()).containsExactly("decision", "rationale");
+    }
+
+    @Test
+    void optionalSegmentWithMultipleVariables() {
+        var extractor = TemplateExtractor.compile("${action}[ from ${source} to ${target}]");
+        var withOptional = extractor.extract("copy from A to B");
+        assertThat(withOptional).isPresent();
+        assertThat(withOptional.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "action", "copy",
+                "source", "A",
+                "target", "B"
+        ));
+
+        var withoutOptional = extractor.extract("copy");
+        assertThat(withoutOptional).isPresent();
+        assertThat(withoutOptional.get()).containsExactly(Map.entry("action", "copy"));
+    }
+
+    @Test
+    void compileRejectsUnclosedBracket() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("hello[ world"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unclosed optional segment");
+    }
+
+    @Test
+    void compileRejectsUnmatchedClosingBracket() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("hello] world"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unexpected ']'");
+    }
+
+    @Test
+    void compileRejectsNestedBrackets() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("hello[ world[ nested]]"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Nested optional segments");
+    }
+
+    @Test
+    void escapedBracketsTreatedAsLiterals() {
+        var extractor = TemplateExtractor.compile("array\\[${index}\\]");
+        var result = extractor.extract("array[42]");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("index", "42"));
+    }
+
+    @Test
+    void optionalSegmentPreservesExistingBehavior() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design because ${rationale}");
+        var result = extractor.extract("I approve this design because the error handling is solid");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "decision", "approve",
+                "rationale", "the error handling is solid"
+        ));
+    }
 }

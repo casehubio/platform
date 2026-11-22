@@ -15,7 +15,6 @@ public final class TemplateExtractor {
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
     private static final Pattern VALID_GROUP_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9]*");
 
-
     private final String template;
     private final Pattern pattern;
     private final List<String> variableNames;
@@ -29,13 +28,34 @@ public final class TemplateExtractor {
     public static TemplateExtractor compile(String template) {
         Objects.requireNonNull(template, "template");
 
-        Matcher               matcher   = VAR_PATTERN.matcher(template);
-        List<String>          names     = new ArrayList<>();
-        List<int[]>           positions = new ArrayList<>();
-        java.util.Set<String> seen      = new java.util.HashSet<>();
+        List<Segment> segments = parseSegments(template);
+        List<String> names = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
 
-        while (matcher.find()) {
-            String name = matcher.group(1);
+        StringBuilder regex = new StringBuilder();
+        for (Segment segment : segments) {
+            if (segment.optional) {
+                regex.append("(?:");
+            }
+            appendSegmentRegex(regex, segment.text, names, seen, segment.lastVarIsLast);
+            if (segment.optional) {
+                regex.append(")?");
+            }
+        }
+
+        Pattern compiled = Pattern.compile(regex.toString());
+        return new TemplateExtractor(template, compiled, Collections.unmodifiableList(names));
+    }
+
+    private static void appendSegmentRegex(StringBuilder regex, String text,
+                                           List<String> names, java.util.Set<String> seen,
+                                           boolean lastVarIsGlobal) {
+        Matcher varMatcher = VAR_PATTERN.matcher(text);
+        List<String> segNames = new ArrayList<>();
+        List<int[]> positions = new ArrayList<>();
+
+        while (varMatcher.find()) {
+            String name = varMatcher.group(1);
             if (!VALID_GROUP_NAME.matcher(name).matches()) {
                 throw new IllegalArgumentException(
                         "Invalid variable name '" + name + "': must match [a-zA-Z][a-zA-Z0-9]*");
@@ -43,30 +63,85 @@ public final class TemplateExtractor {
             if (!seen.add(name)) {
                 throw new IllegalArgumentException("Duplicate variable name: " + name);
             }
-            names.add(name);
-            positions.add(new int[]{matcher.start(), matcher.end()});
+            segNames.add(name);
+            positions.add(new int[]{varMatcher.start(), varMatcher.end()});
         }
 
-        StringBuilder regex   = new StringBuilder();
-        int           lastEnd = 0;
-
-        for (int i = 0; i < names.size(); i++) {
+        int lastEnd = 0;
+        for (int i = 0; i < segNames.size(); i++) {
             int[] pos = positions.get(i);
             if (pos[0] > lastEnd) {
-                regex.append(Pattern.quote(template.substring(lastEnd, pos[0])));
+                regex.append(Pattern.quote(text.substring(lastEnd, pos[0])));
             }
-            boolean isLast     = (i == names.size() - 1);
-            String  quantifier = isLast ? ".+" : ".+?";
-            regex.append("(?<").append(names.get(i)).append(">").append(quantifier).append(")");
+            boolean isLast = (i == segNames.size() - 1);
+            String quantifier = (isLast && lastVarIsGlobal) ? ".+" : ".+?";
+            regex.append("(?<").append(segNames.get(i)).append(">").append(quantifier).append(")");
             lastEnd = pos[1];
         }
 
-        if (lastEnd < template.length()) {
-            regex.append(Pattern.quote(template.substring(lastEnd)));
+        if (lastEnd < text.length()) {
+            regex.append(Pattern.quote(text.substring(lastEnd)));
         }
 
-        Pattern compiled = Pattern.compile(regex.toString());
-        return new TemplateExtractor(template, compiled, Collections.unmodifiableList(names));
+        names.addAll(segNames);
+    }
+
+    private static List<Segment> parseSegments(String template) {
+        List<Segment> segments = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inOptional = false;
+        int i = 0;
+
+        while (i < template.length()) {
+            char c = template.charAt(i);
+
+            if (c == '\\' && i + 1 < template.length()) {
+                char next = template.charAt(i + 1);
+                if (next == '[' || next == ']') {
+                    current.append(next);
+                    i += 2;
+                    continue;
+                }
+            }
+
+            if (c == '[') {
+                if (inOptional) {
+                    throw new IllegalArgumentException("Nested optional segments are not supported");
+                }
+                if (current.length() > 0) {
+                    segments.add(new Segment(current.toString(), false, false));
+                    current.setLength(0);
+                }
+                inOptional = true;
+                i++;
+            } else if (c == ']') {
+                if (!inOptional) {
+                    throw new IllegalArgumentException("Unexpected ']' without matching '['");
+                }
+                segments.add(new Segment(current.toString(), true, false));
+                current.setLength(0);
+                inOptional = false;
+                i++;
+            } else {
+                current.append(c);
+                i++;
+            }
+        }
+
+        if (inOptional) {
+            throw new IllegalArgumentException("Unclosed optional segment");
+        }
+
+        if (current.length() > 0) {
+            segments.add(new Segment(current.toString(), false, false));
+        }
+
+        if (!segments.isEmpty()) {
+            Segment last = segments.get(segments.size() - 1);
+            segments.set(segments.size() - 1, new Segment(last.text, last.optional, true));
+        }
+
+        return segments;
     }
 
     public Optional<Map<String, String>> extract(String input) {
@@ -79,7 +154,10 @@ public final class TemplateExtractor {
 
         Map<String, String> result = new LinkedHashMap<>();
         for (String name : variableNames) {
-            result.put(name, matcher.group(name));
+            String value = matcher.group(name);
+            if (value != null) {
+                result.put(name, value);
+            }
         }
         return Optional.of(Collections.unmodifiableMap(result));
     }
@@ -96,4 +174,5 @@ public final class TemplateExtractor {
         return variableNames;
     }
 
+    private record Segment(String text, boolean optional, boolean lastVarIsLast) {}
 }

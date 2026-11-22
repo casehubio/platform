@@ -119,74 +119,8 @@ public final class PlaybookRunnerCore {
                                              eventCapture.all(), Map.of(), null);
             }
 
-            var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
-            runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
-
-            List<ResolvedStep>                   resolved     = Walker.resolve(steps, pluginRegistry);
-            var                                  stepRunner   = new CatalogStepRunner(pluginRegistry, runServices);
-            java.util.function.Predicate<String> simChecker   = null;
-            java.util.function.Consumer<String>  stepNotifier = null;
-            if (simulationActivator != null) {
-                stepNotifier = simulationActivator.stepCompletionNotifier();
-                if (config.dryRun()) {
-                    simChecker = simulationActivator.simulationChecker();
-                }
-            }
-            var traceCollector   = new StepTraceCollector(simChecker, stepNotifier);
-            var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
-
-            try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
-                var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
-                Map<String, io.casehub.yaml.step.catalog.ResolvedStep> stepIndex =
-                        io.casehub.yaml.step.eval.StepIndexBuilder.build(resolved);
-                io.casehub.yaml.step.eval.StepLookup stepLookup = stepIndex::get;
-
-                var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
-                                        .withListener(traceCollector)
-                                        .withCaptureCollector(captureCollector);
-
-                evaluator.preRegisterLatches(resolved);
-
-                Map<String, Object> outputVars = new LinkedHashMap<>();
-                boolean             allPassed  = true;
-                String              errorMsg   = null;
-
-                for (int i = 0; i < resolved.size(); i++) {
-                    var    step   = resolved.get(i);
-                    Result result = evaluator.evaluate(step, resolver, stepRunner);
-
-                    if (!result.isSuccess()) {
-                        allPassed = false;
-                        errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
-                        break;
-                    }
-
-                    if (result.output() != null) {
-                        outputVars.putAll(result.output());
-                    }
-
-                    Object captureVal = step.decorators().get("capture");
-                    if (captureVal != null) {
-                        String              captureName = String.valueOf(captureVal);
-                        Map<String, Object> captured    = captureCollector.get(captureName);
-                        if (captured != null) {
-                            resolver = resolver.withObjectScope(captureName, captured::get);
-                        }
-                    }
-                }
-
-                var primitiveSnapshot = scope.snapshotPrimitives();
-
-                long durationMs = (System.nanoTime() - start) / 1_000_000;
-                var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
-                                                  allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
-                                                  durationMs, Map.of(), traceCollector.rootChildren());
-
-                return new PlaybookRunResult(allPassed, playbookName,
-                                             playbookPath.toString(), durationMs, rootTrace,
-                                             eventCapture.all(), outputVars, captureCollector.all(),
-                                             primitiveSnapshot, errorMsg);
-            }
+            return executeSteps(steps, playbookName, playbookPath.toString(),
+                                config, resolver, start, eventCapture, true);
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -253,71 +187,8 @@ public final class PlaybookRunnerCore {
                                              eventCapture.all(), Map.of(), null);
             }
 
-            var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
-            runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
-
-            List<ResolvedStep>                   resolved     = Walker.resolve(steps, pluginRegistry);
-            var                                  stepRunner   = new CatalogStepRunner(pluginRegistry, runServices);
-            java.util.function.Predicate<String> simChecker   = null;
-            java.util.function.Consumer<String>  stepNotifier = null;
-            if (simulationActivator != null) {
-                stepNotifier = simulationActivator.stepCompletionNotifier();
-            }
-            var traceCollector   = new StepTraceCollector(simChecker, stepNotifier);
-            var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
-
-            try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
-                var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
-                Map<String, io.casehub.yaml.step.catalog.ResolvedStep> stepIndex =
-                        io.casehub.yaml.step.eval.StepIndexBuilder.build(resolved);
-                io.casehub.yaml.step.eval.StepLookup stepLookup = stepIndex::get;
-
-                var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
-                                        .withListener(traceCollector)
-                                        .withCaptureCollector(captureCollector);
-
-                evaluator.preRegisterLatches(resolved);
-
-                Map<String, Object> outputVars = new LinkedHashMap<>();
-                boolean             allPassed  = true;
-                String              errorMsg   = null;
-
-                for (int i = 0; i < resolved.size(); i++) {
-                    var    step   = resolved.get(i);
-                    Result result = evaluator.evaluate(step, resolver, stepRunner);
-
-                    if (!result.isSuccess()) {
-                        allPassed = false;
-                        errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
-                        break;
-                    }
-
-                    if (result.output() != null) {
-                        outputVars.putAll(result.output());
-                    }
-
-                    Object captureVal = step.decorators().get("capture");
-                    if (captureVal != null) {
-                        String              captureName = String.valueOf(captureVal);
-                        Map<String, Object> captured    = captureCollector.get(captureName);
-                        if (captured != null) {
-                            resolver = resolver.withObjectScope(captureName, captured::get);
-                        }
-                    }
-                }
-
-                var primitiveSnapshot = scope.snapshotPrimitives();
-
-                long durationMs = (System.nanoTime() - start) / 1_000_000;
-                var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
-                                                  allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
-                                                  durationMs, Map.of(), traceCollector.rootChildren());
-
-                return new PlaybookRunResult(allPassed, playbookName,
-                                             INLINE_SOURCE, durationMs, rootTrace,
-                                             eventCapture.all(), outputVars, captureCollector.all(),
-                                             primitiveSnapshot, errorMsg);
-            }
+            return executeSteps(steps, playbookName, INLINE_SOURCE,
+                                config, resolver, start, eventCapture, false);
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -329,6 +200,78 @@ public final class PlaybookRunnerCore {
             return new PlaybookRunResult(false, INLINE_SOURCE,
                                          INLINE_SOURCE, durationMs, null, List.of(), Map.of(),
                                          e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    private PlaybookRunResult executeSteps(List<Map<String, Object>> steps,
+                                           String playbookName, String sourceLabel,
+                                           PlaybookRunConfig config, VariableResolver resolver,
+                                           long start, EventCapture eventCapture,
+                                           boolean enableDryRunSimulation) {
+        var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
+        runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
+
+        List<ResolvedStep>                   resolved     = Walker.resolve(steps, pluginRegistry);
+        var                                  stepRunner   = new CatalogStepRunner(pluginRegistry, runServices);
+        java.util.function.Predicate<String> simChecker   = null;
+        java.util.function.Consumer<String>  stepNotifier = null;
+        if (simulationActivator != null) {
+            stepNotifier = simulationActivator.stepCompletionNotifier();
+            if (enableDryRunSimulation && config.dryRun()) {
+                simChecker = simulationActivator.simulationChecker();
+            }
+        }
+        var traceCollector   = new StepTraceCollector(simChecker, stepNotifier);
+        var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
+
+        try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
+            var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
+
+            var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
+                                    .withListener(traceCollector)
+                                    .withCaptureCollector(captureCollector);
+
+            evaluator.preRegisterLatches(resolved);
+
+            Map<String, Object> outputVars = new LinkedHashMap<>();
+            boolean             allPassed  = true;
+            String              errorMsg   = null;
+
+            for (int i = 0; i < resolved.size(); i++) {
+                var    step   = resolved.get(i);
+                Result result = evaluator.evaluate(step, resolver, stepRunner);
+
+                if (!result.isSuccess()) {
+                    allPassed = false;
+                    errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
+                    break;
+                }
+
+                if (result.output() != null) {
+                    outputVars.putAll(result.output());
+                }
+
+                Object captureVal = step.decorators().get("capture");
+                if (captureVal != null) {
+                    String              captureName = String.valueOf(captureVal);
+                    Map<String, Object> captured    = captureCollector.get(captureName);
+                    if (captured != null) {
+                        resolver = resolver.withObjectScope(captureName, captured::get);
+                    }
+                }
+            }
+
+            var primitiveSnapshot = scope.snapshotPrimitives();
+
+            long durationMs = (System.nanoTime() - start) / 1_000_000;
+            var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
+                                              allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
+                                              durationMs, Map.of(), traceCollector.rootChildren());
+
+            return new PlaybookRunResult(allPassed, playbookName,
+                                         sourceLabel, durationMs, rootTrace,
+                                         eventCapture.all(), outputVars, captureCollector.all(),
+                                         primitiveSnapshot, errorMsg);
         }
     }
 

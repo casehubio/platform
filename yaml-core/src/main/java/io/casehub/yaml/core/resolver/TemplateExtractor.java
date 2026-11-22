@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class TemplateExtractor {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-    private static final Pattern VALID_VAR_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9.\\-]*");
+    private static final Pattern VALID_VAR_NAME = Pattern.compile("[a-zA-Z]([a-zA-Z0-9]*[.\\-][a-zA-Z0-9]+)*[a-zA-Z0-9]*");
 
     private final String template;
     private final Pattern pattern;
@@ -59,7 +59,7 @@ public final class TemplateExtractor {
             String name = varMatcher.group(1);
             if (!VALID_VAR_NAME.matcher(name).matches()) {
                 throw new IllegalArgumentException(
-                        "Invalid variable name '" + name + "': must match [a-zA-Z][a-zA-Z0-9.\\-]*");
+                        "Invalid variable name '" + name + "': must start with a letter, contain only letters, digits, dots and hyphens, with dots and hyphens separated by at least one alphanumeric character");
             }
             if (!seen.add(name)) {
                 throw new IllegalArgumentException("Duplicate variable name: " + name);

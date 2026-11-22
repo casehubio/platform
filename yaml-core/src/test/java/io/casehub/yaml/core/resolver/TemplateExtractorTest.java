@@ -379,4 +379,48 @@ class TemplateExtractorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Duplicate");
     }
+
+    // --- Trailing dots and hyphens ---
+
+    @Test
+    void compileRejectsTrailingDot() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${abc.}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void compileRejectsTrailingHyphen() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${abc-}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void compileRejectsConsecutiveDots() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a..b}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void compileRejectsConsecutiveHyphens() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a--b}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void compileRejectsConsecutiveDotHyphen() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a.-b}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
+
+    @Test
+    void compileRejectsConsecutiveHyphenDot() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a-.b}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+    }
 }

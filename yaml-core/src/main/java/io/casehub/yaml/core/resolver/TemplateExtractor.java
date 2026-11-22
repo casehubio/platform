@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class TemplateExtractor {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-    private static final Pattern VALID_GROUP_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9]*");
+    private static final Pattern VALID_VAR_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9.\\-]*");
 
     private final String template;
     private final Pattern pattern;
@@ -52,18 +52,20 @@ public final class TemplateExtractor {
                                            boolean lastVarIsGlobal) {
         Matcher varMatcher = VAR_PATTERN.matcher(text);
         List<String> segNames = new ArrayList<>();
+        List<String> segGroupNames = new ArrayList<>();
         List<int[]> positions = new ArrayList<>();
 
         while (varMatcher.find()) {
             String name = varMatcher.group(1);
-            if (!VALID_GROUP_NAME.matcher(name).matches()) {
+            if (!VALID_VAR_NAME.matcher(name).matches()) {
                 throw new IllegalArgumentException(
-                        "Invalid variable name '" + name + "': must match [a-zA-Z][a-zA-Z0-9]*");
+                        "Invalid variable name '" + name + "': must match [a-zA-Z][a-zA-Z0-9.\\-]*");
             }
             if (!seen.add(name)) {
                 throw new IllegalArgumentException("Duplicate variable name: " + name);
             }
             segNames.add(name);
+            segGroupNames.add(sanitizeGroupName(name));
             positions.add(new int[]{varMatcher.start(), varMatcher.end()});
         }
 
@@ -75,7 +77,7 @@ public final class TemplateExtractor {
             }
             boolean isLast = (i == segNames.size() - 1);
             String quantifier = (isLast && lastVarIsGlobal) ? ".+" : ".+?";
-            regex.append("(?<").append(segNames.get(i)).append(">").append(quantifier).append(")");
+            regex.append("(?<").append(segGroupNames.get(i)).append(">").append(quantifier).append(")");
             lastEnd = pos[1];
         }
 
@@ -84,6 +86,13 @@ public final class TemplateExtractor {
         }
 
         names.addAll(segNames);
+    }
+
+    private static String sanitizeGroupName(String name) {
+        if (name.indexOf('.') < 0 && name.indexOf('-') < 0) {
+            return name;
+        }
+        return name.replace(".", "0DOT0").replace("-", "0HYPHEN0");
     }
 
     private static List<Segment> parseSegments(String template) {
@@ -154,7 +163,8 @@ public final class TemplateExtractor {
 
         Map<String, String> result = new LinkedHashMap<>();
         for (String name : variableNames) {
-            String value = matcher.group(name);
+            String groupName = sanitizeGroupName(name);
+            String value = matcher.group(groupName);
             if (value != null) {
                 result.put(name, value);
             }

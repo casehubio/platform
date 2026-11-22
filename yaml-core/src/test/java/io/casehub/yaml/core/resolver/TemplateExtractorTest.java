@@ -116,13 +116,13 @@ class TemplateExtractorTest {
 
     @Test
     void compileRejectsInvalidVariableNames() {
-        assertThatThrownBy(() -> TemplateExtractor.compile("${my-var}"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid variable name");
         assertThatThrownBy(() -> TemplateExtractor.compile("${1x}"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid variable name");
-        assertThatThrownBy(() -> TemplateExtractor.compile("${my.var}"))
+        assertThatThrownBy(() -> TemplateExtractor.compile("${.dotstart}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid variable name");
+        assertThatThrownBy(() -> TemplateExtractor.compile("${my var}"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid variable name");
     }
@@ -301,5 +301,82 @@ class TemplateExtractorTest {
                 "decision", "approve",
                 "rationale", "the error handling is solid"
         ));
+    }
+
+    // --- Dotted and hyphenated variable names ---
+
+    @Test
+    void dottedVariableNameExtractsCorrectly() {
+        var extractor = TemplateExtractor.compile("user ${context.user} logged in");
+        var result = extractor.extract("user admin logged in");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("context.user", "admin"));
+    }
+
+    @Test
+    void hyphenatedVariableNameExtractsCorrectly() {
+        var extractor = TemplateExtractor.compile("status is ${my-status}");
+        var result = extractor.extract("status is active");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("my-status", "active"));
+    }
+
+    @Test
+    void multipleDottedVariables() {
+        var extractor = TemplateExtractor.compile("${context.user} did ${context.action}");
+        var result = extractor.extract("admin did deploy");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "context.user", "admin",
+                "context.action", "deploy"
+        ));
+    }
+
+    @Test
+    void dottedVariableInOptionalSegment() {
+        var extractor = TemplateExtractor.compile("${action}[ by ${context.actor}]");
+        var withActor = extractor.extract("deploy by admin");
+        assertThat(withActor).isPresent();
+        assertThat(withActor.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "action", "deploy",
+                "context.actor", "admin"
+        ));
+
+        var withoutActor = extractor.extract("deploy");
+        assertThat(withoutActor).isPresent();
+        assertThat(withoutActor.get()).containsExactly(Map.entry("action", "deploy"));
+    }
+
+    @Test
+    void dottedVariableNamesInVariableNamesAccessor() {
+        var extractor = TemplateExtractor.compile("${context.user} did ${action}");
+        assertThat(extractor.variableNames()).containsExactly("context.user", "action");
+    }
+
+    @Test
+    void deeplyDottedVariableName() {
+        var extractor = TemplateExtractor.compile("value is ${a.b.c.d}");
+        var result = extractor.extract("value is 42");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("a.b.c.d", "42"));
+    }
+
+    @Test
+    void mixedDottedHyphenatedAndSimpleVariables() {
+        var extractor = TemplateExtractor.compile("${user} at ${org.name} with ${access-level}");
+        var result = extractor.extract("alice at acme with admin");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "user", "alice",
+                "org.name", "acme",
+                "access-level", "admin"
+        ));
+    }
+
+    @Test
+    void duplicateDottedVariableNameRejected() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${a.b} and ${a.b}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate");
     }
 }

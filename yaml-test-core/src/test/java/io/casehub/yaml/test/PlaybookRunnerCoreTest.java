@@ -59,6 +59,86 @@ class PlaybookRunnerCoreTest {
     }
 
     @Test
+    void runFromYamlStringSucceeds() {
+        String yaml = """
+                      name: Inline playbook
+                      ---
+                      - agent-invoke:
+                          prompt: "hello"
+                        capture: output
+                      """;
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var result = runner.run(yaml, PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.playbookName()).isEqualTo("Inline playbook");
+        assertThat(result.playbookPath()).isEqualTo("<inline>");
+        assertThat(result.trace()).isNotNull();
+        assertThat(result.trace().children()).hasSize(1);
+    }
+
+    @Test
+    void runFromYamlStringWithVarsSucceeds() {
+        String yaml = """
+                      name: Parameterized inline
+                      params:
+                        greeting:
+                          type: STRING
+                      ---
+                      - agent-invoke:
+                          prompt: "${params.greeting} world"
+                        capture: output
+                      """;
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var config = new PlaybookRunConfig(false, Map.of("greeting", "hi"), null, null);
+        var result = runner.run(yaml, config);
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.captures().get("output")).containsEntry("text", "hi world");
+    }
+
+    @Test
+    void runFromYamlStringWithImportsReturnsError() {
+        String yaml = """
+                      name: Imports not supported inline
+                      imports:
+                        - module: some-module
+                          as: m
+                      ---
+                      - agent-invoke:
+                          prompt: "hello"
+                      """;
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null, new FileSystemModuleLoader());
+        var result = runner.run(yaml, PlaybookRunConfig.defaults());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error()).contains("import");
+    }
+
+    @Test
+    void runFromYamlStringFallsBackToInlineNameWhenNoNameProvided() {
+        String yaml = """
+                      ---
+                      - agent-invoke:
+                          prompt: "hello"
+                        capture: output
+                      """;
+        var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
+                                            PLAYBOOK_ROOT, null);
+        var result = runner.run(yaml, PlaybookRunConfig.defaults());
+
+        assertThat(result.error()).as("run error").isNull();
+        assertThat(result.success()).isTrue();
+        assertThat(result.playbookName()).isEqualTo("<inline>");
+    }
+
+
+    @Test
     void capturesAreExposedInRunResult() {
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
                                             PLAYBOOK_ROOT, null);

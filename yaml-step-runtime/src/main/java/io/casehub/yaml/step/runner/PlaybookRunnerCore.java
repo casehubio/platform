@@ -205,6 +205,134 @@ public final class PlaybookRunnerCore {
         }
     }
 
+    private static final String INLINE_SOURCE = "<inline>";
+
+    @SuppressWarnings("unchecked")
+    public PlaybookRunResult run(String yamlContent, PlaybookRunConfig config) {
+        long         start        = System.nanoTime();
+        EventCapture eventCapture = new EventCapture();
+
+        try {
+            PlaybookDocument    doc     = PlaybookParser.parse(yamlContent);
+            Map<String, Object> content = new LinkedHashMap<>(doc.content());
+
+            @SuppressWarnings("unchecked")
+            var rawImports = (List<Map<String, Object>>) content.get("imports");
+            if (rawImports != null && !rawImports.isEmpty()) {
+                throw new IllegalStateException(
+                        "Playbook imports are not supported for inline YAML content — " +
+                        "import expansion requires a filesystem path for module resolution");
+            }
+
+            String playbookName = extractNameInline(doc, content);
+
+            var parsed = PlaybookVariableParser.parse(content);
+
+            Map<String, String> callerParams = new LinkedHashMap<>();
+            if (config.vars() != null) {
+                for (var entry : config.vars().entrySet()) {
+                    callerParams.put(entry.getKey(), String.valueOf(entry.getValue()));
+                }
+            }
+
+            if (!parsed.params().isEmpty()) {
+                io.casehub.yaml.core.module.ParameterValidator.validateOrThrow(
+                        parsed.params(), callerParams);
+            }
+
+            VariableResolver resolver = buildResolver(parsed, callerParams, null, Map.of());
+
+            @SuppressWarnings("unchecked")
+            var steps = (List<Map<String, Object>>) content.get("steps");
+            if (steps == null || steps.isEmpty()) {
+                long durationMs = (System.nanoTime() - start) / 1_000_000;
+                return new PlaybookRunResult(true, playbookName,
+                                             INLINE_SOURCE, durationMs,
+                                             StepTraceNode.leaf(0, playbookName, "playbook", null,
+                                                                StepOutcome.EXECUTED, durationMs, Map.of()),
+                                             eventCapture.all(), Map.of(), null);
+            }
+
+            var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
+            runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
+
+            List<ResolvedStep>                   resolved     = Walker.resolve(steps, pluginRegistry);
+            var                                  stepRunner   = new CatalogStepRunner(pluginRegistry, runServices);
+            java.util.function.Predicate<String> simChecker   = null;
+            java.util.function.Consumer<String>  stepNotifier = null;
+            if (simulationActivator != null) {
+                stepNotifier = simulationActivator.stepCompletionNotifier();
+            }
+            var traceCollector   = new StepTraceCollector(simChecker, stepNotifier);
+            var captureCollector = new io.casehub.yaml.step.eval.CaptureCollector();
+
+            try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
+                var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
+                Map<String, io.casehub.yaml.step.catalog.ResolvedStep> stepIndex =
+                        io.casehub.yaml.step.eval.StepIndexBuilder.build(resolved);
+                io.casehub.yaml.step.eval.StepLookup stepLookup = stepIndex::get;
+
+                var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
+                                        .withListener(traceCollector)
+                                        .withCaptureCollector(captureCollector);
+
+                evaluator.preRegisterLatches(resolved);
+
+                Map<String, Object> outputVars = new LinkedHashMap<>();
+                boolean             allPassed  = true;
+                String              errorMsg   = null;
+
+                for (int i = 0; i < resolved.size(); i++) {
+                    var    step   = resolved.get(i);
+                    Result result = evaluator.evaluate(step, resolver, stepRunner);
+
+                    if (!result.isSuccess()) {
+                        allPassed = false;
+                        errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
+                        break;
+                    }
+
+                    if (result.output() != null) {
+                        outputVars.putAll(result.output());
+                    }
+
+                    Object captureVal = step.decorators().get("capture");
+                    if (captureVal != null) {
+                        String              captureName = String.valueOf(captureVal);
+                        Map<String, Object> captured    = captureCollector.get(captureName);
+                        if (captured != null) {
+                            resolver = resolver.withObjectScope(captureName, captured::get);
+                        }
+                    }
+                }
+
+                var primitiveSnapshot = scope.snapshotPrimitives();
+
+                long durationMs = (System.nanoTime() - start) / 1_000_000;
+                var rootTrace = new StepTraceNode(0, playbookName, "playbook", null,
+                                                  allPassed ? StepOutcome.EXECUTED : StepOutcome.FAILED,
+                                                  durationMs, Map.of(), traceCollector.rootChildren());
+
+                return new PlaybookRunResult(allPassed, playbookName,
+                                             INLINE_SOURCE, durationMs, rootTrace,
+                                             eventCapture.all(), outputVars, captureCollector.all(),
+                                             primitiveSnapshot, errorMsg);
+            }
+
+        } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
+            long durationMs = (System.nanoTime() - start) / 1_000_000;
+            return new PlaybookRunResult(false, INLINE_SOURCE,
+                                         INLINE_SOURCE, durationMs, null, List.of(), Map.of(),
+                                         "Parameter validation failed: " + e.getMessage());
+        } catch (Exception e) {
+            long durationMs = (System.nanoTime() - start) / 1_000_000;
+            return new PlaybookRunResult(false, INLINE_SOURCE,
+                                         INLINE_SOURCE, durationMs, null, List.of(), Map.of(),
+                                         e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+
     @SuppressWarnings("unchecked")
     public PlaybookValidationResult validate(Path playbookPath) {
         try {
@@ -325,6 +453,13 @@ public final class PlaybookRunnerCore {
             return doc.frontMatter().name();
         }
         return (String) content.getOrDefault("name", path.getFileName().toString());
+    }
+
+    private static String extractNameInline(PlaybookDocument doc, Map<String, Object> content) {
+        if (doc.hasPlaybookHeader() && doc.frontMatter().name() != null) {
+            return doc.frontMatter().name();
+        }
+        return (String) content.getOrDefault("name", INLINE_SOURCE);
     }
 
 

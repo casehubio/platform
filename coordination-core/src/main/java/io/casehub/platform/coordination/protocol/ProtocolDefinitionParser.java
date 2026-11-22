@@ -2,6 +2,7 @@ package io.casehub.platform.coordination.protocol;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLParser;
 import io.casehub.yaml.core.resolver.TemplateExtractor;
 
 import java.io.ByteArrayInputStream;
@@ -15,7 +16,10 @@ import java.util.Objects;
 
 public final class ProtocolDefinitionParser {
 
-    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(
+            YAMLFactory.builder()
+                       .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS)
+                       .build());
 
     private ProtocolDefinitionParser() {}
 

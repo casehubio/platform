@@ -150,6 +150,20 @@ class ProtocolDefinitionParserTest {
         assertThat(def.templates().keySet()).containsExactly("charlie", "alpha", "bravo");
     }
 
+    @Test
+    void preservesBooleanLikeWordsAsStrings() {
+        String yaml = """
+                      name: review
+                      templates:
+                        confirm: "yes"
+                        deny: "no"
+                      """;
+        ProtocolDefinition def = ProtocolDefinitionParser.parse("review", toStream(yaml));
+        assertThat(def.templates()).containsEntry("confirm", "yes");
+        assertThat(def.templates()).containsEntry("deny", "no");
+    }
+
+
     private static InputStream toStream(String yaml) {
         return new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8));
     }

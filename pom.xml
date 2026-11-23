@@ -259,6 +259,7 @@
         <module>spring-boot-starter-streams</module>
         <module>spring-boot-starter-authn</module>
         <module>spring-integration-test</module>
+        <module>message-extraction-api</module>
     </modules>
 
     <properties>

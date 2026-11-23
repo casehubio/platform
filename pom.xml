@@ -260,6 +260,7 @@
         <module>spring-boot-starter-authn</module>
         <module>spring-integration-test</module>
         <module>message-extraction-api</module>
+        <module>message-extraction</module>
     </modules>
 
     <properties>

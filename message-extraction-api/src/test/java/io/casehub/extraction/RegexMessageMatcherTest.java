@@ -159,4 +159,15 @@ class RegexMessageMatcherTest {
         assertThat(result.type()).isEqualTo("action");
         assertThat(result.fields()).containsEntry("action", "celebrate");
     }
+
+    @Test
+    void emptyInputReturnsUnmatched() {
+        var schema = MessageSchema.builder()
+                                  .message("vote")
+                                  .template("I ${decision}")
+                                  .done()
+                                  .build();
+        var matcher = new RegexMessageMatcher(schema);
+        assertThat(matcher.match("")).isInstanceOf(MessageMatch.Unmatched.class);
+    }
 }

@@ -144,7 +144,7 @@ public final class RegexMessageMatcher implements MessageMatcher {
                 if (inOptional) {
                     throw new IllegalArgumentException("Nested optional segments are not supported");
                 }
-                if (current.length() > 0) {
+                if (!current.isEmpty()) {
                     segments.add(new Segment(current.toString(), false, false));
                     current.setLength(0);
                 }
@@ -168,7 +168,7 @@ public final class RegexMessageMatcher implements MessageMatcher {
             throw new IllegalArgumentException("Unclosed optional segment");
         }
 
-        if (current.length() > 0) {
+        if (!current.isEmpty()) {
             segments.add(new Segment(current.toString(), false, false));
         }
 

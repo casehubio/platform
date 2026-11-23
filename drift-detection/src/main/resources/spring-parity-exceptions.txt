@@ -141,3 +141,5 @@ mcp-standalone-test
 mcp-server
 # Dispatch-mode casehub_model/casehub_search tools on the named "casehub" Quarkus MCP server; Spring equivalent is CaseHubToolCallbackProvider in mcp-spring
 mcp-dispatch
+# OpenNLP structural message matching — plain Java, no Quarkus or CDI beans
+message-extraction

@@ -179,15 +179,15 @@ class DynamicToolRegistrarTest {
 
     @Test
     void reportTool_slashedDomainNormalisesToUnderscore() {
-        assertThat(toolManager.getTool("test_nested_report")).isNotNull();
-        assertThat(toolManager.getTool("test/nested_report")).isNull();
+        assertThat(toolManager.getTool("nested_child_report")).isNotNull();
+        assertThat(toolManager.getTool("nested/child_report")).isNull();
     }
 
     @Test
     void activateDomain_slashedDomainNormalisesToolNames() {
-        registrar.activateDomain("test/nested");
-        assertThat(toolManager.getTool("test_nested_ping")).isNotNull();
-        assertThat(toolManager.getTool("test/nested_ping")).isNull();
+        registrar.activateDomain("nested/child");
+        assertThat(toolManager.getTool("nested_child_ping")).isNotNull();
+        assertThat(toolManager.getTool("nested/child_ping")).isNull();
     }
 
     @Test

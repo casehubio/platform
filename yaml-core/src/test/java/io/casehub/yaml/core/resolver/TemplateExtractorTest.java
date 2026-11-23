@@ -562,8 +562,6 @@ class TemplateExtractorTest {
         assertThat(result.get()).containsExactly(Map.entry("name", "world"));
     }
 
-
-
     @Test
     void extractWithConstraintsRejectsNullConstraints() {
         var extractor = TemplateExtractor.compile("Hello ${name}");

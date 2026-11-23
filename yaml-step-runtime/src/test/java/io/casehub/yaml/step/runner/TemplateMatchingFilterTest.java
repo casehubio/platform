@@ -126,4 +126,83 @@ class TemplateMatchingFilterTest {
         assertThat(result).isPresent();
         assertThat(result.get().fields()).containsEntry("item", "the deployment");
     }
+
+
+    // --- evaluate() with TemplateMatchResult ---
+
+    @Test
+    void evaluateReturnsMatchedForRegexHit() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var filter = createFilter(templates, Map.of(), null);
+        var result = filter.evaluate("I approve this design");
+        assertThat(result).isInstanceOf(TemplateMatchResult.Matched.class);
+        var matched = (TemplateMatchResult.Matched) result;
+        assertThat(matched.event().type()).isEqualTo("vote");
+    }
+
+    @Test
+    void evaluateReturnsPassThroughForNoAffinity() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var filter = createFilter(templates, Map.of(), null);
+        var result = filter.evaluate("let's schedule a meeting");
+        assertThat(result).isInstanceOf(TemplateMatchResult.PassThrough.class);
+        assertThat(((TemplateMatchResult.PassThrough) result).input()).isEqualTo("let's schedule a meeting");
+    }
+
+    @Test
+    void evaluateReturnsNearMissForKeywordAffinity() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var filter = createFilter(templates, Map.of(), null);
+        // "design" is a keyword from the template — this input shares it
+        var result = filter.evaluate("the design looks good to me");
+        assertThat(result).isInstanceOf(TemplateMatchResult.NearMiss.class);
+        var nearMiss = (TemplateMatchResult.NearMiss) result;
+        assertThat(nearMiss.suggestedTemplate()).isEqualTo("vote");
+        assertThat(nearMiss.suggestedFormat()).contains("[decision]");
+        assertThat(nearMiss.suggestedFormat()).contains("design");
+    }
+
+    @Test
+    void rephraseDisabledReturnsPassThroughInsteadOfNearMiss() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var protocol = new ProtocolDefinition("test", templates);
+        var filter = new TemplateMatchingFilter(protocol, Map.of(), null, false);
+        var result = filter.evaluate("the design looks good to me");
+        assertThat(result).isInstanceOf(TemplateMatchResult.PassThrough.class);
+    }
+
+    @Test
+    void nearMissFormatsSuggestionFromPattern() {
+        String format = TemplateMatchingFilter.formatSuggestion("I ${decision} this ${subject}[ because ${rationale}]");
+        assertThat(format).isEqualTo("I [decision] this [subject] because [rationale]");
+    }
+
+    @Test
+    void constraintFailureTriggerNearMissWhenAffinityPresent() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var constraints = Map.of("vote",
+                Map.<String, VariableConstraint>of("decision",
+                        VariableConstraint.enumOf("approve", "reject")));
+        var filter = createFilter(templates, constraints, null);
+        // Regex matches but enum constraint fails — "maybe" is not in [approve, reject]
+        // "design" keyword gives affinity → near-miss
+        var result = filter.evaluate("I maybe this design");
+        assertThat(result).isInstanceOf(TemplateMatchResult.NearMiss.class);
+    }
+
+    // --- match() backward compatibility ---
+
+    @Test
+    void matchStillReturnsOptionalForBackwardCompat() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("vote", "I ${decision} this design");
+        var filter = createFilter(templates, Map.of(), null);
+        assertThat(filter.match("I approve this design")).isPresent();
+        assertThat(filter.match("completely unrelated")).isEmpty();
+    }
 }

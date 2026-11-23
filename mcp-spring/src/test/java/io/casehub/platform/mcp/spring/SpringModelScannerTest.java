@@ -82,8 +82,8 @@ class SpringModelScannerTest {
                     assertThat(toolNames).contains(
                             "casehub_model",
                             "casehub_action",
-                            "test_domain_getItems",
-                            "test_domain_createItem");
+                            "test-domain_getItems",
+                            "test-domain_createItem");
                 });
     }
 

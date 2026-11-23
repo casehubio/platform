@@ -53,7 +53,8 @@ public class AgentManifestLoader {
                                DIDResolver didResolver,
                                AgentManifestSecurityConfig securityConfig) {
         this.mapper = YamlMappers.create()
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .addMixIn(ModelDescriptor.class, ModelDescriptorMixin.class);
         this.credentialResolver = credentialResolver;
         this.didResolver = didResolver;
         this.securityConfig = securityConfig != null ? securityConfig : new AgentManifestSecurityConfig(false);

@@ -381,6 +381,16 @@ class AgentManifestLoaderTest {
         assertThat(merged.pools().get("other-pool").agentId()).isEqualTo("agent-c");
     }
 
+
+    @Test
+    void instanceIdDeserializesToBackendInstanceId() throws URISyntaxException {
+        var uri      = getClass().getClassLoader().getResource("manifests/instance-id.yaml").toURI();
+        var manifest = loader.loadResource(uri);
+        assertThat(manifest.models()).hasSize(1);
+        var model = manifest.models().get(0);
+        assertThat(model.backendInstanceId()).isEqualTo("vertex");
+    }
+
     private ModelDescriptor testModel(String id, ModelTier tier) {
         return new ModelDescriptor(id, id, "backend", null, "vendor", "fam", id, tier,
                 Set.of("text"), 200000, 16384, ModelLocality.CLOUD, CostTier.MEDIUM, "api-key", Map.of());

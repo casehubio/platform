@@ -18,7 +18,6 @@
         <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-impl-core</artifactId>
-            <version>7.35.3.Final</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -31,19 +30,16 @@
         <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-impl-jackson</artifactId>
-            <version>7.35.3.Final</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-persistence-mvstore</artifactId>
-            <version>7.35.3.Final</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.serverlessworkflow</groupId>
             <artifactId>serverlessworkflow-fluent-spec</artifactId>
-            <version>7.35.3.Final</version>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -28,7 +28,7 @@ class GraphQLModelScannerTest {
     @Test
     void discoversMutationOperations() {
         var domain = registry.getDomain("test").orElseThrow();
-        assertThat(domain.mutationCount()).isEqualTo(2);}
+        assertThat(domain.mutationCount()).isEqualTo(3);}
 
     @Test
     void operationHasDescription() {
@@ -174,7 +174,7 @@ class GraphQLModelScannerTest {
         // If the direct interface path incorrectly overwrote it, counts would differ
         var domain = registry.getDomain("test").orElseThrow();
         assertThat(domain.queryCount()).isEqualTo(2);
-        assertThat(domain.mutationCount()).isEqualTo(2);
+        assertThat(domain.mutationCount()).isEqualTo(3);
     }
 
 

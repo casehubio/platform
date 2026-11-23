@@ -423,4 +423,27 @@ class TemplateExtractorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid variable name");
     }
+
+    // --- Sanitized group name collisions ---
+
+    @Test
+    void compileRejectsSanitizedDotCollision() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${context.user} and ${context0DOT0user}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("collision");
+    }
+
+    @Test
+    void compileRejectsSanitizedHyphenCollision() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${my-status} and ${my0HYPHEN0status}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("collision");
+    }
+
+    @Test
+    void compileRejectsSanitizedCollisionReversedOrder() {
+        assertThatThrownBy(() -> TemplateExtractor.compile("${context0DOT0user} and ${context.user}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("collision");
+    }
 }

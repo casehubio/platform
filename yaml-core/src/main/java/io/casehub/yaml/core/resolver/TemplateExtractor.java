@@ -31,13 +31,14 @@ public final class TemplateExtractor {
         List<Segment> segments = parseSegments(template);
         List<String> names = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
+        java.util.Map<String, String> sanitizedToOriginal = new java.util.HashMap<>();
 
         StringBuilder regex = new StringBuilder();
         for (Segment segment : segments) {
             if (segment.optional) {
                 regex.append("(?:");
             }
-            appendSegmentRegex(regex, segment.text, names, seen, segment.lastVarIsLast);
+            appendSegmentRegex(regex, segment.text, names, seen, sanitizedToOriginal, segment.lastVarIsLast);
             if (segment.optional) {
                 regex.append(")?");
             }
@@ -49,6 +50,7 @@ public final class TemplateExtractor {
 
     private static void appendSegmentRegex(StringBuilder regex, String text,
                                            List<String> names, java.util.Set<String> seen,
+                                           java.util.Map<String, String> sanitizedToOriginal,
                                            boolean lastVarIsGlobal) {
         Matcher varMatcher = VAR_PATTERN.matcher(text);
         List<String> segNames = new ArrayList<>();
@@ -65,7 +67,13 @@ public final class TemplateExtractor {
                 throw new IllegalArgumentException("Duplicate variable name: " + name);
             }
             segNames.add(name);
-            segGroupNames.add(sanitizeGroupName(name));
+            String groupName = sanitizeGroupName(name);
+            String previous = sanitizedToOriginal.put(groupName, name);
+            if (previous != null) {
+                throw new IllegalArgumentException(
+                        "Sanitized group name collision: '" + name + "' and '" + previous + "' both resolve to '" + groupName + "'");
+            }
+            segGroupNames.add(groupName);
             positions.add(new int[]{varMatcher.start(), varMatcher.end()});
         }
 

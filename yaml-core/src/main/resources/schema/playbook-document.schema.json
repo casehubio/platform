@@ -91,6 +91,29 @@
         },
         "required": ["as", "in"]
       }
+    },
+    "templates": {
+      "type": "object",
+      "description": "Protocol template declarations for structured message extraction.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "pattern": { "type": "string", "description": "Template pattern with ${var} placeholders and [optional] segments." },
+          "variables": {
+            "type": "object",
+            "description": "Per-variable type constraints.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "enum": ["string", "enum"] },
+                "values": { "type": "array", "items": { "type": "string" } },
+                "required": { "type": "boolean", "default": true }
+              }
+            }
+          }
+        },
+        "required": ["pattern"]
+      }
     }
   },
   "additionalProperties": true,

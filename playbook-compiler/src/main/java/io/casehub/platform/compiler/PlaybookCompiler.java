@@ -23,6 +23,9 @@ import io.serverlessworkflow.api.types.TryTask;
 import io.serverlessworkflow.api.types.TryTaskCatch;
 import io.serverlessworkflow.api.types.Workflow;
 
+import io.casehub.platform.coordination.protocol.ProtocolDefinition;
+import io.casehub.yaml.core.resolver.VariableConstraint;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -106,6 +109,11 @@ public final class PlaybookCompiler {
                 ? parsePools((Map<String, Object>) content.get("pools"), diagnostics)
                 : List.<io.casehub.platform.agent.config.PoolDeclaration>of();
 
+        TemplateSpec templateSpec = null;
+        if (content.containsKey("templates")) {
+            templateSpec = parseTemplates(name, (Map<String, Object>) content.get("templates"));
+        }
+
         PlaybookVariableContext variableContext =
                 PlaybookVariableContext.from(
                         io.casehub.yaml.core.playbook.PlaybookVariableParser.parse(content));
@@ -133,7 +141,7 @@ public final class PlaybookCompiler {
         var workflow = new Workflow(doc, taskItems);
 
         return new CompilationOutcome.Success(
-                new CompilationResult(workflow, coordination.build(), sourceMap.build(), poolDeclarations, variableContext));
+                new CompilationResult(workflow, coordination.build(), sourceMap.build(), poolDeclarations, variableContext, templateSpec));
     }
 
     TaskItem compileStep(Map<String, Object> step, CompilationContext ctx) {
@@ -374,5 +382,47 @@ public final class PlaybookCompiler {
     private static String sanitizeName(String name) {
         return name.replaceAll("[^a-zA-Z0-9-]", "-").replaceAll("^-+|-+$", "")
                 .substring(0, Math.min(name.length(), 63));
+    }
+
+    @SuppressWarnings("unchecked")
+    private TemplateSpec parseTemplates(String playbookName, Map<String, Object> templatesMap) {
+        var patternMap = new LinkedHashMap<String, String>();
+        var constraintsMap = new LinkedHashMap<String, Map<String, VariableConstraint>>();
+
+        for (var entry : templatesMap.entrySet()) {
+            String templateName = entry.getKey();
+            var templateDef = (Map<String, Object>) entry.getValue();
+            String pattern = (String) templateDef.get("pattern");
+            patternMap.put(templateName, pattern);
+
+            if (templateDef.containsKey("variables")) {
+                var varsMap = (Map<String, Object>) templateDef.get("variables");
+                var constraints = new LinkedHashMap<String, VariableConstraint>();
+                for (var varEntry : varsMap.entrySet()) {
+                    var varDef = (Map<String, Object>) varEntry.getValue();
+                    constraints.put(varEntry.getKey(), parseVariableConstraint(varDef));
+                }
+                constraintsMap.put(templateName, Map.copyOf(constraints));
+            }
+        }
+
+        var protocol = new ProtocolDefinition(playbookName, patternMap);
+        return new TemplateSpec(protocol, constraintsMap);
+    }
+
+    @SuppressWarnings("unchecked")
+    private VariableConstraint parseVariableConstraint(Map<String, Object> varDef) {
+        String type = (String) varDef.getOrDefault("type", "string");
+        boolean required = (boolean) varDef.getOrDefault("required", true);
+
+        VariableConstraint constraint;
+        if ("enum".equals(type)) {
+            var values = (List<String>) varDef.get("values");
+            constraint = VariableConstraint.enumOf(values.toArray(new String[0]));
+        } else {
+            constraint = VariableConstraint.string();
+        }
+
+        return required ? constraint : constraint.optional();
     }
 }

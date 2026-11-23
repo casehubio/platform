@@ -176,4 +176,28 @@ class DynamicToolRegistrarTest {
         assertThat(annotations.get().readOnlyHint()).isTrue();
         assertThat(annotations.get().idempotentHint()).isTrue();
     }
+
+    @Test
+    void reportTool_slashedDomainNormalisesToUnderscore() {
+        assertThat(toolManager.getTool("test_nested_report")).isNotNull();
+        assertThat(toolManager.getTool("test/nested_report")).isNull();
+    }
+
+    @Test
+    void activateDomain_slashedDomainNormalisesToolNames() {
+        registrar.activateDomain("test/nested");
+        assertThat(toolManager.getTool("test_nested_ping")).isNotNull();
+        assertThat(toolManager.getTool("test/nested_ping")).isNull();
+    }
+
+    @Test
+    void activatedTool_schemaDoesNotContainRefOrDefs() {
+        registrar.activateDomain("test");
+        var tool = toolManager.getTool("test_updateRef");
+        assertThat(tool).isNotNull();
+
+        String schemaJson = tool.asJson().getJsonObject("inputSchema").toString();
+        assertThat(schemaJson).doesNotContain("$ref");
+        assertThat(schemaJson).doesNotContain("$defs");
+    }
 }

@@ -220,18 +220,16 @@ public class DynamicToolRegistrar {
 
         java.lang.reflect.Parameter[] methodParams = op.method().getParameters();
         List<ParameterDescriptor>     paramDescs   = op.params();
-        for (int i = 0; i < paramDescs.size(); i++) {
-            ParameterDescriptor pd = paramDescs.get(i);
-            def.addArgument(pd.name(), pd.description(),
-                            pd.required(), methodParams[i].getParameterizedType());
-        }
+
+        Map<String, Object> inputSchema = InlineSchemaBuilder.buildToolSchema(paramDescs, methodParams);
+        def.setInputSchema(inputSchema);
 
         def.setAnnotations(new ToolManager.ToolAnnotations(
                 null,
-                isQuery,   // readOnlyHint
-                false,     // destructiveHint
-                isQuery,   // idempotentHint
-                false      // openWorldHint
+                isQuery,
+                false,
+                isQuery,
+                false
         ));
 
         def.setHandler(args -> {

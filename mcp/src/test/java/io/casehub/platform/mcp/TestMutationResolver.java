@@ -24,4 +24,10 @@ public class TestMutationResolver {
         return input.name() + ":" + input.count();
     }
 
+
+    @Mutation
+    @Description("Update with ref-producing input")
+    public String updateRef(@Name("input") RefTestInput input) {
+        return input.primary().size() + "+" + input.secondary().size();
+    }
 }

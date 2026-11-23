@@ -161,7 +161,8 @@ public class ClaudeAgentClient {
                                     : properties.defaultTimeout();
 
         var optionsBuilder = CLIOptions.builder()
-                                       .systemPrompt(config.systemPrompt());
+                                       .systemPrompt(config.systemPrompt())
+                                       .model(config.model());
 
         Map<String, McpServerConfig> sdkMcpServers = toSdkMcpServers(config.mcpServers());
         if (!sdkMcpServers.isEmpty()) {
@@ -295,7 +296,8 @@ public class ClaudeAgentClient {
                                               : properties.defaultTimeout();
 
             var optionsBuilder = CLIOptions.builder()
-                                           .systemPrompt(init.systemPrompt());
+                                           .systemPrompt(init.systemPrompt())
+                                           .model(init.model());
             final Map<String, McpServerConfig> sdkMcpServers = toSdkMcpServers(init.mcpServers());
             if (!sdkMcpServers.isEmpty()) {optionsBuilder.mcpServers(sdkMcpServers);}
             if (!env.isEmpty()) {optionsBuilder.env(new HashMap<>(env));}

@@ -11,3 +11,5 @@ Users/
 .worktrees/
 .claude/
 
+# IntelliJ IDE
+*.iml

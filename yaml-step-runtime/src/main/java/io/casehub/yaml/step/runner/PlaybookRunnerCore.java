@@ -16,6 +16,7 @@ import io.casehub.yaml.core.playbook.PlaybookFrontMatter;
 import io.casehub.yaml.core.playbook.PlaybookVariableParser;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
+import io.casehub.platform.coordination.protocol.NlpProtocolMatcher;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
@@ -42,12 +43,13 @@ public final class PlaybookRunnerCore {
     private final Path resourceRoot;
     private final SimulationActivator simulationActivator;
     private final ModuleLoader moduleLoader;
+    private final NlpProtocolMatcher nlpMatcher;
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
                               SimulationActivator simulationActivator) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null);
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null, null);
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -55,11 +57,21 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader) {
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, null);
+    }
+
+    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
+                              ServiceRegistry serviceRegistry,
+                              Path resourceRoot,
+                              SimulationActivator simulationActivator,
+                              ModuleLoader moduleLoader,
+                              NlpProtocolMatcher nlpMatcher) {
         this.pluginRegistry = pluginRegistry;
         this.serviceRegistry = serviceRegistry;
         this.resourceRoot = resourceRoot;
         this.simulationActivator = simulationActivator;
         this.moduleLoader = moduleLoader;
+        this.nlpMatcher = nlpMatcher;
     }
 
     @SuppressWarnings("unchecked")
@@ -106,6 +118,15 @@ public final class PlaybookRunnerCore {
                         content, importResult.expandedStepSections(), null, inactiveAliases);
                 content.clear();
                 content.putAll(withInlinedSteps);
+            }
+
+            if (content.containsKey("templates")) {
+                @SuppressWarnings("unchecked")
+                var templatesMap = (Map<String, Object>) content.get("templates");
+                var filter = TemplateMatchingFilter.fromYaml(playbookName, templatesMap, nlpMatcher);
+                if (serviceRegistry instanceof io.casehub.yaml.plugin.api.MapServiceRegistry mapRegistry) {
+                    mapRegistry.register(TemplateMatchingFilter.class, filter);
+                }
             }
 
             @SuppressWarnings("unchecked")
@@ -175,6 +196,15 @@ public final class PlaybookRunnerCore {
             }
 
             VariableResolver resolver = buildResolver(parsed, callerParams, null, Map.of());
+
+            if (content.containsKey("templates")) {
+                @SuppressWarnings("unchecked")
+                var templatesMap = (Map<String, Object>) content.get("templates");
+                var filter = TemplateMatchingFilter.fromYaml(playbookName, templatesMap, nlpMatcher);
+                if (serviceRegistry instanceof io.casehub.yaml.plugin.api.MapServiceRegistry mapRegistry) {
+                    mapRegistry.register(TemplateMatchingFilter.class, filter);
+                }
+            }
 
             @SuppressWarnings("unchecked")
             var steps = (List<Map<String, Object>>) content.get("steps");

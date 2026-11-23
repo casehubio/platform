@@ -9,6 +9,7 @@ import io.casehub.yaml.core.resolver.TemplateExtractor;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,6 +36,48 @@ public final class TemplateMatchingFilter {
         protocol.templates().forEach((name, pattern) ->
                 extractorMap.put(name, TemplateExtractor.compile(pattern)));
         this.extractors = Map.copyOf(extractorMap);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static TemplateMatchingFilter fromYaml(String name,
+                                                   Map<String, Object> templatesMap,
+                                                   NlpProtocolMatcher nlpMatcher) {
+        var patternMap = new LinkedHashMap<String, String>();
+        var constraintsMap = new LinkedHashMap<String, Map<String, VariableConstraint>>();
+
+        for (var entry : templatesMap.entrySet()) {
+            String templateName = entry.getKey();
+            var templateDef = (Map<String, Object>) entry.getValue();
+            String pattern = (String) templateDef.get("pattern");
+            patternMap.put(templateName, pattern);
+
+            if (templateDef.containsKey("variables")) {
+                var varsMap = (Map<String, Object>) templateDef.get("variables");
+                var constraints = new LinkedHashMap<String, VariableConstraint>();
+                for (var varEntry : varsMap.entrySet()) {
+                    var varDef = (Map<String, Object>) varEntry.getValue();
+                    constraints.put(varEntry.getKey(), parseConstraint(varDef));
+                }
+                constraintsMap.put(templateName, Map.copyOf(constraints));
+            }
+        }
+
+        var protocol = new ProtocolDefinition(name, patternMap);
+        return new TemplateMatchingFilter(protocol, constraintsMap, nlpMatcher);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static VariableConstraint parseConstraint(Map<String, Object> varDef) {
+        String type = (String) varDef.getOrDefault("type", "string");
+        boolean required = (boolean) varDef.getOrDefault("required", true);
+        VariableConstraint constraint;
+        if ("enum".equals(type)) {
+            var values = (List<String>) varDef.get("values");
+            constraint = VariableConstraint.enumOf(values.toArray(new String[0]));
+        } else {
+            constraint = VariableConstraint.string();
+        }
+        return required ? constraint : constraint.optional();
     }
 
     public Optional<TemplateMatchEvent> match(String input) {

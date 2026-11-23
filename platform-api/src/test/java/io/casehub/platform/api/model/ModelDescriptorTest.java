@@ -1,8 +1,10 @@
 package io.casehub.platform.api.model;
 
+import org.junit.jupiter.api.Test;
+
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -80,4 +82,13 @@ class ModelDescriptorTest {
         assertThat(desc.vendor()).isEqualTo("anthropic");
         assertThat(desc.family()).isEqualTo("claude");
     }
+
+    @Test
+    void nullApiModelId_defaultsToId() {
+        var desc = new ModelDescriptor("claude-sonnet-5", null, "claude", null,
+                                       "anthropic", "claude", "Claude Sonnet 5", ModelTier.STANDARD,
+                                       Set.of(), 200000, 16384, ModelLocality.CLOUD, null, null, null);
+        assertThat(desc.apiModelId()).isEqualTo("claude-sonnet-5");
+    }
+
 }

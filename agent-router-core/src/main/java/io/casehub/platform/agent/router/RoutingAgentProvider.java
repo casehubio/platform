@@ -194,7 +194,7 @@ public class RoutingAgentProvider implements AgentProvider {
         ResolvedRoute route;
         try {
             route = switch (entry) {
-                case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef());
+                case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef(), false);
                 case ModelChain.ModelChainEntry.Queried q -> resolveQuery(q.query());
             };
         } catch (IllegalArgumentException e) {
@@ -205,9 +205,9 @@ public class RoutingAgentProvider implements AgentProvider {
                 config.systemPrompt(), config.userPrompt(), config.mcpServers(),
                 config.timeout(), config.correlationId(), route.apiModelId());
         return annotateRouting(route.backend().invoke(rewritten), route.backend())
-            .onFailure(this::isRetryableApiError)
-            .recoverWithMulti(err -> Multi.createFrom().failure(
-                new ModelChainRetryableException(entry, err)));
+                       .onFailure(this::isRetryableApiError)
+                       .recoverWithMulti(err -> Multi.createFrom().failure(
+                               new ModelChainRetryableException(entry, err)));
     }
 
 
@@ -270,7 +270,7 @@ public class RoutingAgentProvider implements AgentProvider {
             attempted.add(entry);
             try {
                 ResolvedRoute route = switch (entry) {
-                    case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef());
+                    case ModelChain.ModelChainEntry.Named n -> resolve(n.modelRef(), false);
                     case ModelChain.ModelChainEntry.Queried q -> resolveQuery(q.query());
                 };
 
@@ -282,7 +282,7 @@ public class RoutingAgentProvider implements AgentProvider {
                 }
 
                 LOG.infof("Chain resolved to %s after %d attempt(s) (fallback=%s)",
-                           route.apiModelId(), attempted.size(), attempted.size() > 1);
+                          route.apiModelId(), attempted.size(), attempted.size() > 1);
                 return route;
             } catch (IllegalArgumentException e) {
                 LOG.debugf("Chain entry %s failed resolution: %s", entry, e.getMessage());
@@ -346,7 +346,9 @@ public class RoutingAgentProvider implements AgentProvider {
         return resolveQuery(query);
     }
 
-    private ResolvedRoute resolve(String model) {
+    private ResolvedRoute resolve(String model) {return resolve(model, true);}
+
+    private ResolvedRoute resolve(String model, boolean allowDefaultFallback) {
         if (model == null) {
             var backend = registry.resolve(defaultBackendKey, "default");
             if (backend.isEmpty()) {
@@ -381,7 +383,17 @@ public class RoutingAgentProvider implements AgentProvider {
             return new ResolvedRoute(backend.get(), null);
         }
 
-        // Step 4: Fail-fast
+        // Step 4: Fall back to default backend (direct resolution only, not chain entries)
+        if (allowDefaultFallback) {
+            var defaultBackend = registry.resolve(defaultBackendKey, "default");
+            if (defaultBackend.isPresent()) {
+                LOG.warnf("No specific mapping for model '%s' — falling back to default backend '%s'",
+                          model, defaultBackendKey);
+                return new ResolvedRoute(defaultBackend.get(), model);
+            }
+        }
+
         throw new IllegalArgumentException("No model or backend for: " + model);
     }
+
 }

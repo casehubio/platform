@@ -5,9 +5,9 @@ import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
+import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelDescriptor;
 import io.casehub.platform.api.model.ModelLocality;
-import io.casehub.platform.api.model.ModelChain;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRegistry;
 import io.casehub.platform.api.model.ModelTier;
@@ -166,14 +166,41 @@ class RoutingAgentProviderTest {
     }
 
     @Test
-    void unknownKeyWithNoRegistryMatchThrows() {
+    void unknownKeyWithNoRegistryMatchThrows_whenNoDefaultBackend() {
         var router = new RoutingAgentProvider(
-                backendRegistry(stubBackend("claude")), "claude", emptyRegistry());
+                backendRegistry(stubBackend("openai")), "claude", emptyRegistry());
         var config = AgentSessionConfig.of("sys", "user", "mistral");
         assertThatThrownBy(() -> router.invoke(config))
-                  .isInstanceOf(IllegalArgumentException.class)
-                  .hasMessageContaining("mistral");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mistral");
     }
+
+    @Test
+    void unknownModelFallsBackToDefaultBackend() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", emptyRegistry());
+        var config = AgentSessionConfig.of("sys", "user", "claude-haiku-4-5@20251001");
+        var events = router.invoke(config).collect().asList().await().indefinitely();
+        assertThat(events).hasSize(1);
+        assertThat(((AgentEvent.TextDelta) events.get(0)).text()).isEqualTo("from-claude");
+        assertThat(configCapture.get().model()).isEqualTo("claude-haiku-4-5@20251001");
+    }
+
+    @Test
+    void unknownModelFallsBackToDefaultBackend_openSession() {
+        var configCapture = new AtomicReference<AgentSessionConfig>();
+        var initCapture   = new AtomicReference<AgentSessionInit>();
+        var router = new RoutingAgentProvider(
+                backendRegistry(capturingBackend("claude", configCapture, initCapture)),
+                "claude", emptyRegistry());
+        var init = AgentSessionInit.of("sys", "claude-haiku-4-5@20251001");
+        router.openSession(init);
+        assertThat(initCapture.get().model()).isEqualTo("claude-haiku-4-5@20251001");
+    }
+
 
     @Test
     void noDefaultBackendThrowsOnNullModel() {

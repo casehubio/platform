@@ -446,4 +446,166 @@ class TemplateExtractorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("collision");
     }
+
+
+    // --- Variable constraint validation ---
+
+    @Test
+    void enumConstraintAcceptsValidValue() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design");
+        var constraints = Map.of("decision", VariableConstraint.enumOf("approve", "reject", "abstain"));
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("decision", "approve"));
+    }
+
+    @Test
+    void enumConstraintIsCaseInsensitive() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design");
+        var constraints = Map.of("decision", VariableConstraint.enumOf("approve", "reject"));
+        var result = extractor.extract("I APPROVE this design", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("decision", "APPROVE"));
+    }
+
+    @Test
+    void enumConstraintRejectsInvalidValue() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design");
+        var constraints = Map.of("decision", VariableConstraint.enumOf("approve", "reject", "abstain"));
+        var result = extractor.extract("I maybe this design", constraints);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void requiredStringConstraintPassesWhenPresent() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        var constraints = Map.of("name", VariableConstraint.string());
+        var result = extractor.extract("Hello world", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "world"));
+    }
+
+    @Test
+    void requiredConstraintFailsWhenVariableAbsent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var constraints = Map.of("rationale", VariableConstraint.string());
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void optionalConstraintPassesWhenVariableAbsent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var constraints = Map.of("rationale", VariableConstraint.string().optional());
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("decision", "approve"));
+    }
+
+    @Test
+    void requiredEnumConstraintFailsWhenVariableAbsent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var constraints = Map.of("rationale", VariableConstraint.enumOf("good", "bad"));
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void optionalEnumConstraintPassesWhenVariableAbsent() {
+        var extractor = TemplateExtractor.compile("I ${decision} this design[ because ${rationale}]");
+        var constraints = Map.of("rationale", VariableConstraint.enumOf("good", "bad").optional());
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("decision", "approve"));
+    }
+
+    @Test
+    void multipleConstraintsAllPass() {
+        var extractor = TemplateExtractor.compile("I ${decision} this ${subject}");
+        var constraints = Map.of(
+                "decision", VariableConstraint.enumOf("approve", "reject"),
+                "subject", VariableConstraint.string()
+        );
+        var result = extractor.extract("I approve this design", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "decision", "approve",
+                "subject", "design"
+        ));
+    }
+
+    @Test
+    void multipleConstraintsOneFailsReturnsEmpty() {
+        var extractor = TemplateExtractor.compile("I ${decision} this ${subject}");
+        var constraints = Map.of(
+                "decision", VariableConstraint.enumOf("approve", "reject"),
+                "subject", VariableConstraint.enumOf("design", "proposal")
+        );
+        var result = extractor.extract("I maybe this design", constraints);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void emptyConstraintsMapBehavesLikeNoConstraints() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        var result = extractor.extract("Hello world", Map.of());
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "world"));
+    }
+
+    @Test
+    void constraintForUnknownVariableIsIgnored() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        var constraints = Map.of("unknown", VariableConstraint.string());
+        var result = extractor.extract("Hello world", constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "world"));
+    }
+
+
+
+    @Test
+    void extractWithConstraintsRejectsNullConstraints() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        assertThatThrownBy(() -> extractor.extract("Hello world", null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void extractWithoutConstraintsStillWorks() {
+        var extractor = TemplateExtractor.compile("Hello ${name}");
+        var result = extractor.extract("Hello world");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(Map.entry("name", "world"));
+    }
+
+    // --- VariableConstraint type tests ---
+
+    @Test
+    void enumConstraintRejectsEmptyValues() {
+        assertThatThrownBy(() -> VariableConstraint.enumOf())
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void enumConstraintRejectsNullValues() {
+        assertThatThrownBy(() -> VariableConstraint.enumOf((String[]) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void stringConstraintIsRequiredByDefault() {
+        assertThat(VariableConstraint.string().required()).isTrue();
+    }
+
+    @Test
+    void enumConstraintIsRequiredByDefault() {
+        assertThat(VariableConstraint.enumOf("a").required()).isTrue();
+    }
+
+    @Test
+    void optionalReturnsNonRequiredConstraint() {
+        assertThat(VariableConstraint.string().optional().required()).isFalse();
+        assertThat(VariableConstraint.enumOf("a").optional().required()).isFalse();
+    }
 }

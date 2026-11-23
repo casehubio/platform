@@ -2,6 +2,7 @@ package io.casehub.platform.coordination.protocol;
 
 import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
+import java.util.Optional;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,5 +117,91 @@ class ProtocolEvaluatorTest {
     @Test
     void isRegisteredReturnsFalseForUnknown() {
         assertThat(evaluator.isRegistered("unknown")).isFalse();
+    }
+
+
+    // --- NLP fallback ---
+
+    @Test
+    void nlpFallbackMatchesWhenRegexFails() {
+        NlpProtocolMatcher mockNlp = (templates, input) ->
+                Optional.of(new NlpProtocolMatcher.NlpMatch("approve",
+                        Map.of("decision", "approved"), 0.85));
+        var eval = new ProtocolEvaluator(mockNlp);
+        eval.register(votingProtocol());
+        var key = new ProtocolInstanceKey("voting", "inst-1");
+        var result = eval.evaluate(key, "I've approved the design changes");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Matched.class);
+        var matched = (ProtocolMatchResult.Matched) result;
+        assertThat(matched.templateName()).isEqualTo("approve");
+        assertThat(matched.params()).containsEntry("decision", "approved");
+    }
+
+    @Test
+    void regexTakesPrecedenceOverNlp() {
+        NlpProtocolMatcher mockNlp = (templates, input) -> {
+            throw new AssertionError("NLP should not be called when regex matches");
+        };
+        var eval = new ProtocolEvaluator(mockNlp);
+        eval.register(votingProtocol());
+        var key = new ProtocolInstanceKey("voting", "inst-1");
+        var result = eval.evaluate(key, "I approve this design");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Matched.class);
+        assertThat(((ProtocolMatchResult.Matched) result).templateName()).isEqualTo("approve");
+    }
+
+    @Test
+    void nlpReturnsUnmatchedWhenNoNlpMatch() {
+        NlpProtocolMatcher mockNlp = (templates, input) -> Optional.empty();
+        var eval = new ProtocolEvaluator(mockNlp);
+        eval.register(votingProtocol());
+        var key = new ProtocolInstanceKey("voting", "inst-1");
+        var result = eval.evaluate(key, "completely unrelated text");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Unmatched.class);
+    }
+
+    @Test
+    void noNlpMatcherReturnsUnmatchedOnRegexFail() {
+        var eval = new ProtocolEvaluator();
+        eval.register(votingProtocol());
+        var key = new ProtocolInstanceKey("voting", "inst-1");
+        var result = eval.evaluate(key, "I've approved the design changes");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Unmatched.class);
+    }
+
+    @Test
+    void keywordScopingFiltersCandidates() {
+        var templates = new LinkedHashMap<String, String>();
+        templates.put("approve", "I ${decision} this design");
+        templates.put("schedule", "please schedule ${event} meeting");
+        var protocol = new ProtocolDefinition("multi", templates);
+
+        NlpProtocolMatcher mockNlp = (scopedTemplates, input) -> {
+            assertThat(scopedTemplates).containsKey("schedule");
+            assertThat(scopedTemplates).doesNotContainKey("approve");
+            return Optional.of(new NlpProtocolMatcher.NlpMatch("schedule",
+                    Map.of("event", "weekly"), 0.7));
+        };
+        var eval = new ProtocolEvaluator(mockNlp);
+        eval.register(protocol);
+        var key = new ProtocolInstanceKey("multi", "inst-1");
+        var result = eval.evaluate(key, "schedule the weekly meeting please");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Matched.class);
+        assertThat(((ProtocolMatchResult.Matched) result).templateName()).isEqualTo("schedule");
+    }
+
+    @Test
+    void deregisterClearsNlpState() {
+        NlpProtocolMatcher mockNlp = (templates, input) ->
+                Optional.of(new NlpProtocolMatcher.NlpMatch("approve",
+                        Map.of("decision", "yes"), 0.8));
+        var eval = new ProtocolEvaluator(mockNlp);
+        eval.register(votingProtocol());
+        eval.deregister("voting");
+        assertThat(eval.isRegistered("voting")).isFalse();
+        eval.register(votingProtocol());
+        var key = new ProtocolInstanceKey("voting", "inst-1");
+        var result = eval.evaluate(key, "I approve this design");
+        assertThat(result).isInstanceOf(ProtocolMatchResult.Matched.class);
     }
 }

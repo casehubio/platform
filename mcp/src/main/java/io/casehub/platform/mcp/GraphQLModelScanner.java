@@ -329,8 +329,16 @@ public class GraphQLModelScanner {
     private static boolean isRequired(Parameter param) {
         if (Optional.class.isAssignableFrom(param.getType())) return false;
         if (param.isAnnotationPresent(DefaultValue.class)) return false;
-        if (param.isAnnotationPresent(QueryParam.class) && !param.getType().isPrimitive()) return false;
+        if (hasQueryParam(param) && !param.getType().isPrimitive()) return false;
         return true;
+    }
+
+    private static boolean hasQueryParam(Parameter param) {
+        for (var ann : param.getAnnotations()) {
+            String name = ann.annotationType().getSimpleName();
+            if ("QueryParam".equals(name)) return true;
+        }
+        return false;
     }
 
     Map<String, String> expandFields(Class<?> type) {

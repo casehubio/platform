@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.platform.api.identity.CurrentPrincipal;
 import io.casehub.platform.api.mcp.ContextParam;
+import io.casehub.platform.api.mcp.DefaultValue;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
@@ -57,6 +58,10 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
             Object rawValue  = effectiveParams.get(paramName);
             if (rawValue != null) {
                 args[i] = mapper.convertValue(rawValue, param.getType());
+            } else if (param.getType().isPrimitive()) {
+                args[i] = param.isAnnotationPresent(DefaultValue.class)
+                        ? mapper.convertValue(param.getAnnotation(DefaultValue.class).value(), param.getType())
+                        : primitiveDefault(param.getType());
             }
         }
 
@@ -145,6 +150,18 @@ public class ReflectiveOperationDispatcher implements io.casehub.platform.api.mc
             }
         }
         return param.getName();
+    }
+
+    private static Object primitiveDefault(Class<?> type) {
+        if (type == boolean.class) return false;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == double.class) return 0.0;
+        if (type == float.class) return 0.0f;
+        if (type == short.class) return (short) 0;
+        if (type == byte.class) return (byte) 0;
+        if (type == char.class) return '\0';
+        return null;
     }
 
     private Object resolveContextParam(String key) {

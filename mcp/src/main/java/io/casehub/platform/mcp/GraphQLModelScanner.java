@@ -1,11 +1,13 @@
 package io.casehub.platform.mcp;
 
 import io.casehub.platform.api.mcp.ContextParam;
+import io.casehub.platform.api.mcp.DefaultValue;
 import io.casehub.platform.api.mcp.McpDomain;
 import io.casehub.platform.api.mcp.ModelEnricher;
 import io.casehub.platform.api.mcp.PlatformMutation;
 import io.casehub.platform.api.mcp.PlatformQuery;
 import io.casehub.platform.api.mcp.PlatformStream;
+import io.casehub.platform.api.mcp.QueryParam;
 import io.quarkus.arc.Arc;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -316,12 +318,19 @@ public class GraphQLModelScanner {
             String              name        = readParamName(param);
             String              description = readParamDescription(param);
             Map<String, String> fields      = expandFields(param.getType());
-            boolean             required    = !Optional.class.isAssignableFrom(param.getType());
+            boolean             required    = isRequired(param);
 
             params.add(new ParameterDescriptor(name, mapTypeName(param.getType()),
                                                required, description, fields));
         }
         return params;
+    }
+
+    private static boolean isRequired(Parameter param) {
+        if (Optional.class.isAssignableFrom(param.getType())) return false;
+        if (param.isAnnotationPresent(DefaultValue.class)) return false;
+        if (param.isAnnotationPresent(QueryParam.class) && !param.getType().isPrimitive()) return false;
+        return true;
     }
 
     Map<String, String> expandFields(Class<?> type) {

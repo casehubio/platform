@@ -143,3 +143,5 @@ mcp-server
 mcp-dispatch
 # OpenNLP structural message matching — plain Java, no Quarkus or CDI beans
 message-extraction
+# NLP template registry — Spring auto-configuration deferred to consumer migration (#961)
+template-registry

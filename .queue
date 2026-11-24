@@ -13,4 +13,7 @@ design-section-hashes:
 
 ## Queue
 - [x] casehubio/engine#782 — Issue #782
-- [ ] casehubio/platform#934 — RoutingAgentProvider fails to fall back to default backend ← active
+- [x] casehubio/platform#934 — RoutingAgentProvider fails to fall back to default backend
+- [ ] casehubio/platform#948 — refactor: extract shared template YAML parsing utility ← active
+- [ ] casehubio/platform#944 — feat: variable type validation in TemplateExtractor
+- [ ] casehubio/platform#945 — feat: connect NLP fallback to ProtocolEvaluator with keyword-scoped candidate selection

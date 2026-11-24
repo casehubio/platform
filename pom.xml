@@ -261,6 +261,7 @@
         <module>spring-integration-test</module>
         <module>message-extraction-api</module>
         <module>message-extraction</module>
+        <module>template-registry-api</module>
     </modules>
 
     <properties>

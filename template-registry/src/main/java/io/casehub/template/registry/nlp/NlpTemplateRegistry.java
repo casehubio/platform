@@ -88,7 +88,7 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
                 StructuralMatcher matcher = compiled.matchers().get(i);
                 var result = matcher.match(inputTokens, def.variables());
-                if (result.isPresent() && result.get().score() >= scoreThreshold) {
+                if (result.isPresent() && result.get().score() > scoreThreshold) {
                     if (bestMatch == null
                         || result.get().score() > bestMatch.score()) {
                         bestMatch = new TemplateMatch.Matched(

@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 public final class LemmatisedKeywordFilter {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{[^}]+}");
+    private static final Pattern OPTIONAL_SEGMENT = Pattern.compile("\\[[^\\]]*\\]");
     private static final Pattern BRACKET_PATTERN = Pattern.compile("[\\[\\]]");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
@@ -26,8 +27,8 @@ public final class LemmatisedKeywordFilter {
     private LemmatisedKeywordFilter() {}
 
     public static Set<String> extract(String template, NlpTokenizer tokenizer) {
-        String stripped = VAR_PATTERN.matcher(template).replaceAll(" ");
-        stripped = BRACKET_PATTERN.matcher(stripped).replaceAll(" ");
+        String stripped = OPTIONAL_SEGMENT.matcher(template).replaceAll(" ");
+        stripped = VAR_PATTERN.matcher(stripped).replaceAll(" ");
         String cleaned = stripped.trim();
         if (cleaned.isEmpty()) {
             return Set.of();
@@ -45,8 +46,8 @@ public final class LemmatisedKeywordFilter {
     }
 
     public static Set<String> extractRaw(String template) {
-        String stripped = VAR_PATTERN.matcher(template).replaceAll(" ");
-        stripped = BRACKET_PATTERN.matcher(stripped).replaceAll(" ");
+        String stripped = OPTIONAL_SEGMENT.matcher(template).replaceAll(" ");
+        stripped = VAR_PATTERN.matcher(stripped).replaceAll(" ");
         String[] words = WHITESPACE.split(stripped.trim());
         Set<String> keywords = new LinkedHashSet<>();
         for (String word : words) {

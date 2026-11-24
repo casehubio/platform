@@ -28,43 +28,97 @@ public final class StructuralMatcher {
         Objects.requireNonNull(template, "template");
         Objects.requireNonNull(tokenizer, "tokenizer");
 
-        String stripped = template.replace("[", "").replace("]", "");
-
+        List<TextSegment> segments = parseTextSegments(template);
         List<Element> elements = new ArrayList<>();
-        Matcher varMatcher = VAR_PATTERN.matcher(stripped);
+
+        for (TextSegment segment : segments) {
+            compileSegment(segment.text, segment.optional, tokenizer, elements);
+        }
+
+        return new StructuralMatcher(elements);
+    }
+
+    private static void compileSegment(String text, boolean optional,
+                                        NlpTokenizer tokenizer,
+                                        List<Element> elements) {
+        Matcher varMatcher = VAR_PATTERN.matcher(text);
         int lastEnd = 0;
 
         while (varMatcher.find()) {
             if (varMatcher.start() > lastEnd) {
-                String literal = stripped.substring(lastEnd, varMatcher.start());
-                List<AnnotatedToken> literalTokens = tokenizer.tokenize(literal.trim());
-                for (AnnotatedToken token : literalTokens) {
-                    elements.add(new Element(
-                        ElementKind.LITERAL, token.surface(), token.lemma(),
-                        token.pos(), null, false));
+                String literal = text.substring(lastEnd, varMatcher.start()).trim();
+                if (!literal.isEmpty()) {
+                    List<AnnotatedToken> literalTokens = tokenizer.tokenize(literal);
+                    for (AnnotatedToken token : literalTokens) {
+                        elements.add(new Element(
+                            ElementKind.LITERAL, token.surface(), token.lemma(),
+                            token.pos(), null, optional));
+                    }
                 }
             }
 
             String varName = varMatcher.group(1);
-            elements.add(new Element(ElementKind.CLAUSE, null, null, null, varName, false));
+            elements.add(new Element(
+                ElementKind.CLAUSE, null, null, null, varName, optional));
 
             lastEnd = varMatcher.end();
         }
 
-        if (lastEnd < stripped.length()) {
-            String trailing = stripped.substring(lastEnd).trim();
+        if (lastEnd < text.length()) {
+            String trailing = text.substring(lastEnd).trim();
             if (!trailing.isEmpty()) {
                 List<AnnotatedToken> trailingTokens = tokenizer.tokenize(trailing);
                 for (AnnotatedToken token : trailingTokens) {
                     elements.add(new Element(
                         ElementKind.LITERAL, token.surface(), token.lemma(),
-                        token.pos(), null, false));
+                        token.pos(), null, optional));
                 }
             }
         }
-
-        return new StructuralMatcher(elements);
     }
+
+    private static List<TextSegment> parseTextSegments(String template) {
+        List<TextSegment> segments = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inOptional = false;
+        int i = 0;
+
+        while (i < template.length()) {
+            char c = template.charAt(i);
+            if (c == '\\' && i + 1 < template.length()) {
+                char next = template.charAt(i + 1);
+                if (next == '[' || next == ']') {
+                    current.append(next);
+                    i += 2;
+                    continue;
+                }
+            }
+            if (c == '[') {
+                if (current.length() > 0) {
+                    segments.add(new TextSegment(current.toString(), false));
+                    current.setLength(0);
+                }
+                inOptional = true;
+                i++;
+            } else if (c == ']') {
+                segments.add(new TextSegment(current.toString(), true));
+                current.setLength(0);
+                inOptional = false;
+                i++;
+            } else {
+                current.append(c);
+                i++;
+            }
+        }
+
+        if (current.length() > 0) {
+            segments.add(new TextSegment(current.toString(), inOptional));
+        }
+
+        return segments;
+    }
+
+    private record TextSegment(String text, boolean optional) {}
 
     public Optional<MatchResult> match(List<AnnotatedToken> tokens,
                                         Map<String, VariableConstraint> constraints) {

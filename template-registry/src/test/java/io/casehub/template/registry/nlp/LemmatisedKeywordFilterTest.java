@@ -59,7 +59,7 @@ class LemmatisedKeywordFilterTest {
     void rawExtractionWithoutNlp() {
         var keywords = LemmatisedKeywordFilter.extractRaw(
             "Escalating to ${target}[ due to ${reason}]");
-        assertThat(keywords).contains("escalating", "due");
-        assertThat(keywords).doesNotContain("to");
+        assertThat(keywords).contains("escalating");
+        assertThat(keywords).doesNotContain("to", "due");
     }
 }

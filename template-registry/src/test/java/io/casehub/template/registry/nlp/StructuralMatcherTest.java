@@ -85,6 +85,29 @@ class StructuralMatcherTest {
     }
 
     @Test
+    void optionalSegmentMatchesWithoutOptional() {
+        var matcher = StructuralMatcher.compile(
+            "I ${decision} this ${subject}[ because ${rationale}]", tokenizer);
+        var constraints = Map.of("decision",
+            VariableConstraint.enumOf("approve", "reject", "abstain"));
+        var tokens = tokenizer.tokenize("I approved this design");
+        var result = matcher.match(tokens, constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get().fields()).containsEntry("decision", "approve");
+        assertThat(result.get().fields()).containsEntry("subject", "design");
+    }
+
+    @Test
+    void optionalSegmentMatchesWithOptional() {
+        var matcher = StructuralMatcher.compile(
+            "I ${decision} this ${subject}[ because ${rationale}]", tokenizer);
+        var tokens = tokenizer.tokenize("I approve this design because it is clean");
+        var result = matcher.match(tokens, Map.of());
+        assertThat(result).isPresent();
+        assertThat(result.get().fields()).containsKey("rationale");
+    }
+
+    @Test
     void stringVariableReturnsSurface() {
         var matcher = StructuralMatcher.compile(
             "I ${decision} this ${subject}", tokenizer);

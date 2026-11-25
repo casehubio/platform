@@ -13,6 +13,23 @@ class ProtocolMatchResultTest {
         var result = new ProtocolMatchResult.Matched("vote", Map.of("decision", "approve"));
         assertThat(result.templateName()).isEqualTo("vote");
         assertThat(result.params()).containsEntry("decision", "approve");
+        assertThat(result.score()).isEqualTo(1.0);
+    }
+
+    @Test
+    void matchedWithExplicitScore() {
+        var result = new ProtocolMatchResult.Matched("vote", Map.of("decision", "approve"), 0.85);
+        assertThat(result.templateName()).isEqualTo("vote");
+        assertThat(result.params()).containsEntry("decision", "approve");
+        assertThat(result.score()).isEqualTo(0.85);
+    }
+
+    @Test
+    void matchedScoreOutOfRangeThrows() {
+        assertThatThrownBy(() -> new ProtocolMatchResult.Matched("vote", Map.of(), 1.5))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ProtocolMatchResult.Matched("vote", Map.of(), -0.1))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -125,11 +125,11 @@ public final class TemplateMatchingFilter {
                         return detectNearMiss(input);
                     }
                     return new TemplateMatchResult.Matched(new TemplateMatchEvent(
-                            matched.templateName(), validated.get(), 1.0, input));
+                            matched.templateName(), validated.get(), matched.score(), input));
                 }
             }
             return new TemplateMatchResult.Matched(new TemplateMatchEvent(
-                    matched.templateName(), matched.params(), 1.0, input));
+                    matched.templateName(), matched.params(), matched.score(), input));
         }
 
         return detectNearMiss(input);

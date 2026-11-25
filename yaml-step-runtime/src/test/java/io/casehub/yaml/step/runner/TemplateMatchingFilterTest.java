@@ -79,6 +79,7 @@ class TemplateMatchingFilterTest {
         assertThat(result).isPresent();
         assertThat(result.get().type()).isEqualTo("vote");
         assertThat(result.get().fields()).containsEntry("decision", "approved");
+        assertThat(result.get().score()).isEqualTo(0.85);
     }
 
     @Test

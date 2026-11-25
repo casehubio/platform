@@ -70,7 +70,7 @@ public class ProtocolEvaluator {
                 Optional<NlpProtocolMatcher.NlpMatch> nlpMatch = nlpMatcher.match(scopedTemplates, response);
                 if (nlpMatch.isPresent()) {
                     return new ProtocolMatchResult.Matched(
-                            nlpMatch.get().templateName(), nlpMatch.get().params());
+                            nlpMatch.get().templateName(), nlpMatch.get().params(), nlpMatch.get().score());
                 }
             }
         }

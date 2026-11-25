@@ -29,6 +29,7 @@ class ProtocolEvaluatorTest {
         assertThat(matched.templateName()).isEqualTo("approve");
         assertThat(matched.params()).containsEntry("decision", "approve");
         assertThat(matched.params()).containsEntry("rationale", "the error handling is solid");
+        assertThat(matched.score()).isEqualTo(1.0);
     }
 
     @Test
@@ -135,6 +136,7 @@ class ProtocolEvaluatorTest {
         var matched = (ProtocolMatchResult.Matched) result;
         assertThat(matched.templateName()).isEqualTo("approve");
         assertThat(matched.params()).containsEntry("decision", "approved");
+        assertThat(matched.score()).isEqualTo(0.85);
     }
 
     @Test

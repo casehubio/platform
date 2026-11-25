@@ -209,9 +209,6 @@ public final class StructuralMatcher {
             Element elem = elements.get(i);
             if (tokenIdx >= tokens.size()) {
                 traces.add(new ElementTrace(elem.kind(), elementExpected(elem), null, false));
-                if (!elem.optional()) {
-                    failed = true;
-                }
                 continue;
             }
 

@@ -1,6 +1,7 @@
 package io.casehub.template.registry.nlp;
 
 import io.casehub.template.registry.AnnotatedToken;
+import io.casehub.template.registry.ElementKind;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 
@@ -269,7 +270,6 @@ public final class StructuralMatcher {
         }
     }
 
-    public enum ElementKind { LITERAL, VARIABLE, CLAUSE }
 
     public record Element(
         ElementKind kind,

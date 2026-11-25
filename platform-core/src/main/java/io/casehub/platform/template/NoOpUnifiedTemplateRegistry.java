@@ -1,5 +1,7 @@
 package io.casehub.platform.template;
 
+import io.casehub.template.registry.MatchTrace;
+import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
@@ -27,6 +29,19 @@ public class NoOpUnifiedTemplateRegistry implements UnifiedTemplateRegistry {
     public TemplateMatch match(String namespaceName, String input) {
         return new TemplateMatch.Unmatched(input);
     }
+
+    @Override
+    public MatchTraceResult matchWithTrace(String input) {
+        return new MatchTraceResult(new TemplateMatch.Unmatched(input),
+                                    new MatchTrace(List.of(), null, 0.0));
+    }
+
+    @Override
+    public MatchTraceResult matchWithTrace(String namespaceName, String input) {
+        return new MatchTraceResult(new TemplateMatch.Unmatched(input),
+                                    new MatchTrace(List.of(), null, 0.0));
+    }
+
 
     @Override
     public String generate(String namespaceName, String templateName,

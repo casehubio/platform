@@ -15,6 +15,11 @@ public interface UnifiedTemplateRegistry {
 
     TemplateMatch match(String namespaceName, String input);
 
+    MatchTraceResult matchWithTrace(String input);
+
+    MatchTraceResult matchWithTrace(String namespaceName, String input);
+
+
     String generate(String namespaceName, String templateName,
                     Map<String, String> values);
 

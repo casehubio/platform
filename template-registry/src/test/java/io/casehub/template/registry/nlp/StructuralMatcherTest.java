@@ -80,7 +80,7 @@ class StructuralMatcherTest {
             "I ${decision} this ${subject}", tokenizer);
         assertThat(matcher.elements()).isNotEmpty();
         assertThat(matcher.elements().stream()
-            .filter(e -> e.kind() == StructuralMatcher.ElementKind.CLAUSE)
+            .filter(e -> e.kind() == io.casehub.template.registry.ElementKind.CLAUSE)
             .count()).isGreaterThanOrEqualTo(1);
     }
 

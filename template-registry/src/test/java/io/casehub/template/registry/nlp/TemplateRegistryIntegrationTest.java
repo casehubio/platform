@@ -609,6 +609,78 @@ class TemplateRegistryIntegrationTest {
     }
 
     /**
+     * The Paraphrase Cliff — proving the boundary between inflection and paraphrase.
+     *
+     * <p>The NLP tier handles <b>inflection</b> — grammatical variation of the same words:
+     * "approved" → "approve", "these" → "this", "designs" → "design". All of these preserve
+     * the template's structural pattern; the words are the same, just inflected differently.
+     *
+     * <p>The NLP tier does NOT handle <b>paraphrase</b> — semantically equivalent sentences
+     * with different words or structure. "I'm in favour of this design" means the same thing
+     * as "I approve this design", but the words and structure are completely different. The
+     * structural matcher has no way to know that "in favour of" is a synonym for "approve".
+     *
+     * <p>This is a deliberate boundary, not a bug. Schema publication mitigates it: the
+     * published template schema tells LLMs exactly what sentence shapes the protocol expects.
+     * A well-prompted agent conforms to the schema. But agents drift from schemas in
+     * multi-turn conversations — this test documents what happens when they do.
+     */
+    @Nested
+    class ParaphraseCliff {
+
+        @BeforeEach void init() { registerProtocol(); }
+
+        @Test
+        void inflectionMatches_paraphraseDoesNot() {
+            // Inflection: same structure, different verb form → NLP handles it
+            var inflected = registry.match("protocol:review", "I approved this design");
+            assertThat(inflected)
+                .as("inflection ('approved') is handled — same word, different form")
+                .isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(((TemplateMatch.Matched) inflected).fields().get("decision"))
+                .isEqualTo("approve");
+
+            // Paraphrase: same meaning, different words → NOT handled
+            var paraphrased = registry.match("protocol:review",
+                "I'm in favour of this design");
+            assertThat(paraphrased)
+                .as("paraphrase ('in favour of') is NOT handled — different words entirely")
+                .isInstanceOf(TemplateMatch.Unmatched.class);
+        }
+
+        @ParameterizedTest(name = "paraphrase unmatched: \"{0}\"")
+        @ValueSource(strings = {
+            "I'm in favour of this design",
+            "This design has my approval",
+            "I give this design the green light",
+            "I support this proposal fully",
+            "Thumbs up on this architecture",
+            "I'm on board with this approach"
+        })
+        void semanticEquivalentsDoNotMatch(String input) {
+            var r = registry.match("protocol:review", input);
+            assertThat(r)
+                .as("'%s' is semantically equivalent to 'I approve this design' "
+                    + "but structurally different — the NLP handles inflection, not paraphrase", input)
+                .isInstanceOf(TemplateMatch.Unmatched.class);
+        }
+
+        @Test
+        void schemaPublicationMitigatesParaphrase() {
+            // The schema tells the LLM exactly what shapes to produce
+            var schema = registry.schema("protocol:review", "vote");
+            assertThat(schema).isPresent();
+            assertThat(schema.get().patterns())
+                .as("schema publishes the expected sentence pattern — "
+                    + "LLMs that conform to the schema won't paraphrase")
+                .containsExactly("I ${decision} this ${subject}[ because ${rationale}]");
+            assertThat(schema.get().variables())
+                .as("schema publishes allowed values — LLMs know the vocabulary")
+                .containsKey("decision");
+        }
+    }
+
+    /**
      * End-to-End: Prose → Match → Extract → Function Call / Event.
      *
      * <p>This is the full pipeline that protocols use. An LLM produces a sentence.

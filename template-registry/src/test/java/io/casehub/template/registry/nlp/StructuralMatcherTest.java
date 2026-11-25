@@ -141,4 +141,45 @@ class StructuralMatcherTest {
                 "On behalf of ${agent} I ${action} this ${target}", tokenizer);
         assertThat(matcher.elements()).isNotEmpty();
     }
+
+    @Test
+    void multiWordEnumValueMatchesFullClause() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var constraints = Map.of("decision",
+                                 VariableConstraint.enumOf("strongly approve", "conditionally accept", "reject"));
+        var tokens = tokenizer.tokenize("I strongly approve this design");
+        var result = matcher.match(tokens, constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get().fields().get("decision"))
+                .as("multi-word enum value should match full clause, not just first token")
+                .isEqualTo("strongly approve");
+    }
+
+    @Test
+    void multiWordEnumWithInflection() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var constraints = Map.of("decision",
+                                 VariableConstraint.enumOf("strongly approve", "conditionally accept", "reject"));
+        var tokens = tokenizer.tokenize("I strongly approved this design");
+        var result = matcher.match(tokens, constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get().fields().get("decision"))
+                .as("inflected multi-word enum should lemmatise to base form")
+                .isEqualTo("strongly approve");
+    }
+
+    @Test
+    void singleWordEnumStillWorks() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var constraints = Map.of("decision",
+                                 VariableConstraint.enumOf("approve", "reject"));
+        var tokens = tokenizer.tokenize("I approved this design");
+        var result = matcher.match(tokens, constraints);
+        assertThat(result).isPresent();
+        assertThat(result.get().fields().get("decision"))
+                .isEqualTo("approve");
+    }
 }

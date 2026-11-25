@@ -19,9 +19,11 @@ public final class StructuralMatcher {
     private static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private final List<Element> elements;
+    private final NlpTokenizer tokenizer;
 
-    private StructuralMatcher(List<Element> elements) {
+    private StructuralMatcher(List<Element> elements, NlpTokenizer tokenizer) {
         this.elements = List.copyOf(elements);
+        this.tokenizer = tokenizer;
     }
 
     public static StructuralMatcher compile(String template, NlpTokenizer tokenizer) {
@@ -36,7 +38,7 @@ public final class StructuralMatcher {
         }
 
         validateNoAdjacentClauses(elements);
-        return new StructuralMatcher(elements);
+        return new StructuralMatcher(elements, tokenizer);
     }
 
     private static void validateNoAdjacentClauses(List<Element> elements) {
@@ -236,9 +238,22 @@ public final class StructuralMatcher {
         String value = clause.toString();
         VariableConstraint constraint = constraints.get(variableName);
         if (constraint instanceof VariableConstraint.EnumConstraint ec) {
-            AnnotatedToken firstToken = tokens.get(startIdx);
-            if (ec.values().stream().anyMatch(v -> v.equalsIgnoreCase(firstToken.lemma()))) {
-                return new ClauseCapture(firstToken.lemma(), endIdx);
+            StringBuilder lemmaClause = new StringBuilder();
+            for (int t = startIdx; t < endIdx; t++) {
+                if (!lemmaClause.isEmpty()) lemmaClause.append(' ');
+                lemmaClause.append(tokens.get(t).lemma());
+            }
+            String capturedLemma = lemmaClause.toString();
+            for (String enumValue : ec.values()) {
+                List<AnnotatedToken> enumTokens = tokenizer.tokenize(enumValue);
+                StringBuilder enumLemma = new StringBuilder();
+                for (AnnotatedToken et : enumTokens) {
+                    if (!enumLemma.isEmpty()) enumLemma.append(' ');
+                    enumLemma.append(et.lemma());
+                }
+                if (capturedLemma.equalsIgnoreCase(enumLemma.toString())) {
+                    return new ClauseCapture(enumValue, endIdx);
+                }
             }
             return new ClauseCapture(null, endIdx);
         }

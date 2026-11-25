@@ -197,4 +197,44 @@ class InMemoryTemplateRegistryTest {
             "protocol:review", matched.templateName(), matched.fields());
         assertThat(generated).isEqualTo(input);
     }
+
+    @Test
+    void matchWithTraceOnMatchReportsCandidate() {
+        var registry = new InMemoryTemplateRegistry();
+        registry.register(reviewNamespace());
+        var result = registry.matchWithTrace("protocol:review",
+                                             "I approve this design");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
+        assertThat(result.trace().bestCandidate()).isEqualTo("protocol:review:vote");
+        assertThat(result.trace().bestScore()).isEqualTo(1.0);
+        assertThat(result.trace().candidates()).isNotEmpty();
+        var matched = result.trace().candidates().stream()
+                            .filter(c -> c.outcome() == CandidateOutcome.MATCHED)
+                            .findFirst().orElseThrow();
+        assertThat(matched.templateName()).isEqualTo("vote");
+        assertThat(matched.score()).isEqualTo(1.0);
+        assertThat(matched.elements()).isEmpty();
+    }
+
+    @Test
+    void matchWithTraceOnFailReportsAllCandidates() {
+        var registry = new InMemoryTemplateRegistry();
+        registry.register(reviewNamespace());
+        var result = registry.matchWithTrace("protocol:review",
+                                             "completely unrelated input");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Unmatched.class);
+        assertThat(result.trace().bestCandidate()).isNull();
+        assertThat(result.trace().candidates()).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(result.trace().candidates()).allMatch(
+                c -> c.outcome() == CandidateOutcome.REGEX_FAILED);
+    }
+
+    @Test
+    void matchWithTraceGlobalSearchesAllNamespaces() {
+        var registry = new InMemoryTemplateRegistry();
+        registry.register(reviewNamespace());
+        var result = registry.matchWithTrace("I approve this design");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
+        assertThat(result.trace().candidates()).isNotEmpty();
+    }
 }

@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -144,5 +143,60 @@ class NlpTemplateRegistryTest {
         assertThat(r2).isInstanceOf(TemplateMatch.Matched.class);
         assertThat(((TemplateMatch.Matched) r2).namespace())
             .isEqualTo("protocol:workflow");
+    }
+
+    @Test
+    void matchWithTraceReportsKeywordFiltering() {
+        var escalate = TemplateDefinition.builder("escalate")
+                                         .pattern("Escalating to ${target} for review")
+                                         .variable("target", VariableConstraint.string())
+                                         .build();
+        var templates = new LinkedHashMap<String, TemplateDefinition>();
+        templates.put("escalate", escalate);
+        var escalateRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer());
+        escalateRegistry.register(new TemplateNamespace("protocol:escalation", templates));
+
+        var result = escalateRegistry.matchWithTrace("protocol:escalation",
+                                                     "The weather is nice");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Unmatched.class);
+        var filtered = result.trace().candidates().stream()
+                             .filter(c -> c.outcome() == io.casehub.template.registry.CandidateOutcome.KEYWORD_FILTERED)
+                             .toList();
+        assertThat(filtered).isNotEmpty();
+        assertThat(filtered.get(0).keywordAffinity()).isGreaterThanOrEqualTo(0.0);
+        assertThat(filtered.get(0).keywordAffinity()).isLessThan(0.3);
+    }
+
+    @Test
+    void matchWithTraceReportsNlpElements() {
+        var result = registry.matchWithTrace("protocol:review",
+                                             "I approved this design");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
+        var nlpCandidate = result.trace().candidates().stream()
+                                 .filter(c -> c.outcome() == io.casehub.template.registry.CandidateOutcome.MATCHED
+                                              && !c.elements().isEmpty())
+                                 .findFirst();
+        assertThat(nlpCandidate).isPresent();
+        assertThat(nlpCandidate.get().elements()).isNotEmpty();
+    }
+
+    @Test
+    void matchWithTraceReportsRegexMatchBeforeNlp() {
+        var result = registry.matchWithTrace("protocol:review",
+                                             "I approve this design");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
+        var matched = result.trace().candidates().stream()
+                            .filter(c -> c.outcome() == io.casehub.template.registry.CandidateOutcome.MATCHED)
+                            .findFirst().orElseThrow();
+        assertThat(matched.score()).isEqualTo(1.0);
+        assertThat(matched.elements()).isEmpty();
+    }
+
+    @Test
+    void matchWithTraceGlobalBestScore() {
+        var result = registry.matchWithTrace("I approved this design");
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
+        assertThat(result.trace().bestCandidate()).isNotNull();
+        assertThat(result.trace().bestScore()).isGreaterThan(0.0);
     }
 }

@@ -1,13 +1,19 @@
 package io.casehub.template.registry.nlp;
 
 import io.casehub.template.registry.AnnotatedToken;
+import io.casehub.template.registry.CandidateOutcome;
+import io.casehub.template.registry.CandidateTrace;
+import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.InMemoryTemplateRegistry;
+import io.casehub.template.registry.MatchTrace;
+import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -120,6 +126,89 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
         return bestMatch != null ? bestMatch : new TemplateMatch.Unmatched(input);
     }
+
+    @Override
+    protected List<CandidateTrace> matchInNamespaceWithTrace(
+            String namespaceName, TemplateNamespace ns,
+            String input, Snapshot snap) {
+        List<CandidateTrace> candidates = new ArrayList<>(
+                super.matchInNamespaceWithTrace(namespaceName, ns, input, snap));
+
+        List<AnnotatedToken> inputTokens = tokenizer.tokenize(input);
+
+        for (var templateEntry : ns.templates().entrySet()) {
+            TemplateDefinition                      def      = templateEntry.getValue();
+            String                                  key      = namespaceName + ":" + def.name();
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
+            if (compiled == null) {continue;}
+
+            for (int i = 0; i < compiled.matchers().size(); i++) {
+                Set<String> keywords = compiled.keywordSets().get(i);
+                double affinity = LemmatisedKeywordFilter.affinity(
+                        keywords, inputTokens);
+                if (affinity < affinityThreshold && !keywords.isEmpty()) {
+                    candidates.add(new CandidateTrace(
+                            namespaceName, def.name(), i, affinity,
+                            CandidateOutcome.KEYWORD_FILTERED, List.of(), 0.0));
+                    continue;
+                }
+
+                StructuralMatcher  matcher     = compiled.matchers().get(i);
+                var                traceResult = matcher.matchWithTrace(inputTokens, def.variables());
+                List<ElementTrace> elements    = traceResult.elements();
+
+                if (traceResult.result().isPresent()
+                    && traceResult.result().get().score() > scoreThreshold) {
+                    double score = traceResult.result().get().score();
+                    candidates.add(new CandidateTrace(
+                            namespaceName, def.name(), i, affinity,
+                            CandidateOutcome.MATCHED, elements, score));
+                } else if (traceResult.result().isPresent()) {
+                    candidates.add(new CandidateTrace(
+                            namespaceName, def.name(), i, affinity,
+                            CandidateOutcome.BELOW_THRESHOLD, elements,
+                            traceResult.result().get().score()));
+                } else {
+                    candidates.add(new CandidateTrace(
+                            namespaceName, def.name(), i, affinity,
+                            CandidateOutcome.STRUCTURAL_FAILED, elements, 0.0));
+                }
+            }
+        }
+        return candidates;
+    }
+
+    @Override
+    public MatchTraceResult matchWithTrace(String input) {
+        Objects.requireNonNull(input, "input");
+        List<CandidateTrace>  allCandidates = new ArrayList<>();
+        TemplateMatch.Matched bestMatch     = null;
+
+        for (String ns : namespaces()) {
+            var nsResult = matchWithTrace(ns, input);
+            allCandidates.addAll(nsResult.trace().candidates());
+            if (nsResult.result() instanceof TemplateMatch.Matched matched) {
+                if (matched.score() == 1.0) {
+                    return new MatchTraceResult(matched,
+                                                new MatchTrace(allCandidates,
+                                                               matched.namespace() + ":" + matched.templateName(),
+                                                               matched.score()));
+                }
+                if (bestMatch == null || matched.score() > bestMatch.score()) {
+                    bestMatch = matched;
+                }
+            }
+        }
+
+        TemplateMatch result = bestMatch != null
+                               ? bestMatch : new TemplateMatch.Unmatched(input);
+        String bestCandidate = bestMatch != null
+                               ? bestMatch.namespace() + ":" + bestMatch.templateName() : null;
+        double bestScore = bestMatch != null ? bestMatch.score() : 0.0;
+        return new MatchTraceResult(result,
+                                    new MatchTrace(allCandidates, bestCandidate, bestScore));
+    }
+
 
     @Override
     protected TemplateSchema buildSchema(String namespaceName,

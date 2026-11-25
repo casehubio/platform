@@ -1075,4 +1075,41 @@ class TemplateRegistryIntegrationTest {
                 .contains("3)");
         }
     }
+
+    @Test
+    void traceExplainsWhyInputDidNotMatch() {
+        registry.register(reviewNamespace());
+
+        var result = registry.matchWithTrace("protocol:review",
+                                             "the design looks good to me");
+
+        assertThat(result.result()).isInstanceOf(TemplateMatch.Unmatched.class);
+
+        var trace = result.trace();
+        assertThat(trace.bestCandidate()).isNull();
+
+        var regexCandidate = trace.candidates().stream()
+                                  .filter(c -> c.outcome() == io.casehub.template.registry.CandidateOutcome.REGEX_FAILED)
+                                  .findFirst();
+        assertThat(regexCandidate).isPresent()
+                                  .hasValueSatisfying(c -> {
+                                      assertThat(c.templateName()).isEqualTo("vote");
+                                      assertThat(c.keywordAffinity()).isEqualTo(-1.0);
+                                      assertThat(c.elements()).isEmpty();
+                                  });
+
+        var nlpCandidates = trace.candidates().stream()
+                                 .filter(c -> c.outcome() != io.casehub.template.registry.CandidateOutcome.REGEX_FAILED
+                                              && c.outcome() != io.casehub.template.registry.CandidateOutcome.KEYWORD_FILTERED)
+                                 .toList();
+        if (!nlpCandidates.isEmpty()) {
+            var nlpCandidate = nlpCandidates.get(0);
+            assertThat(nlpCandidate.keywordAffinity()).isGreaterThanOrEqualTo(0.0);
+            assertThat(nlpCandidate.elements()).isNotEmpty();
+            var failedElement = nlpCandidate.elements().stream()
+                                            .filter(e -> !e.matched())
+                                            .findFirst();
+            assertThat(failedElement).isPresent();
+        }
+    }
 }

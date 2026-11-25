@@ -952,6 +952,20 @@ class TemplateRegistryIntegrationTest {
                 .as("plural surface form preserved, not lemmatised to singular")
                 .contains("proposals");
         }
+
+        @Test
+        void generationDoesNotAdaptDeterminerToPlural() {
+            // Known limitation: slot-filling generates "this designs" (wrong)
+            // because the template has "this" as a literal and generation doesn't
+            // adapt grammar. Future morphological generation (#962) would produce
+            // "these designs" when the subject is plural.
+            String generated = registry.generate("protocol:review", "vote",
+                Map.of("decision", "approve", "subject", "designs"));
+            assertThat(generated)
+                .as("slot-filling keeps the template's literal 'this' — does NOT adapt to 'these' for plural. "
+                    + "This is the morphological generation gap: matching handles plurals, generation doesn't yet.")
+                .isEqualTo("I approve this designs");
+        }
     }
 
     /**

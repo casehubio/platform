@@ -77,9 +77,25 @@ switch (match.templateName()) {
 
 The key insight: "I rejected this proposal", "I reject this proposal", and "I rejects this proposal" all produce `decision=reject`. The protocol engine sees the same normalised action regardless of the verb form in the input. NLP normalisation means the dispatch logic doesn't need to handle grammar variation — it's already resolved.
 
-## Singular and plural — same template, both match
+## Named agents — pronouns and delegation
+
+A protocol might need to track who voted, not just what they voted. The template `"On behalf of ${agent} I ${decision} this ${subject}"` captures the agent as a string variable — it can be a name, a title, or a multi-word entity:
+
+| Input | agent | decision |
+|---|---|---|
+| "On behalf of Sarah I approve this design" | Sarah | approve |
+| "On behalf of Mark I reject this proposal" | Mark | reject |
+| "On behalf of the committee I approve this budget" | the committee | approve |
+| "On behalf of the security review board I reject this deployment plan" | the security review board | reject |
+| "On behalf of Sarah I approved this architecture" | Sarah | approve (tense normalised) |
+
+The template doesn't need to know about gender or person — the `${agent}` variable captures whatever noun phrase appears, and the NLP handles verb inflection transparently.
+
+## Singular and plural — matching works, generation doesn't yet
 
 The template `"I ${decision} this ${subject}"` matches both "I approve this design" and "I approve these designs". The NLP tier normalises "these" via lemma equivalence with "this". The extracted subject preserves the surface form — the caller sees "designs" (plural), not "design" (singular) — so downstream code knows whether the input referred to one thing or several.
+
+There's an asymmetry here worth calling out. **Matching** handles plurals — "these designs" matches a template that says "this". But **generation** doesn't adapt — `generate("vote", {subject: "designs"})` produces "I approve this designs" (grammatically wrong) because slot-filling keeps the template's literal "this" without adjusting to "these". Matching is grammar-tolerant; generation is grammar-literal. The morphological generation work (#962) addresses this — POS metadata from the NLP compilation is already preserved, it just isn't used for inflection yet.
 
 ## The full range — what the integration tests prove
 

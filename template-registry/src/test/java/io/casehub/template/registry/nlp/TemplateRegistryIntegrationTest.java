@@ -584,6 +584,52 @@ class TemplateRegistryIntegrationTest {
             var r = registry.match("protocol:review", "Acknowledged by Sarah");
             assertThat(r).isInstanceOf(TemplateMatch.Unmatched.class);
         }
+
+        @Test
+        void globalMatchReturnsBestNlpScoreAcrossNamespaces() {
+            // Two namespaces with structurally similar templates.
+            // Input "I approved this design" bypasses regex (past tense),
+            // so both namespaces compete in the NLP tier.
+            //
+            // NS1 has an extra trailing stop-word literal "of" that the input lacks.
+            // "of" is a stop word → keyword filter passes (empty keyword set).
+            // StructuralMatcher scores matched/required: 4/5 = 0.8 (above threshold).
+            // NS2 matches perfectly: 4/4 = 1.0.
+            // The global match should return NS2 (higher score), not NS1 (first hit).
+
+            // Namespace registered FIRST — scores 0.8 (trailing "of" unmatched)
+            var lowerScore = TemplateDefinition.builder("vote")
+                                               .pattern("I ${decision} this ${subject} of")
+                                               .variable("decision", VariableConstraint.enumOf("approve", "reject"))
+                                               .variable("subject", VariableConstraint.string())
+                                               .build();
+            var lowerTemplates = new LinkedHashMap<String, TemplateDefinition>();
+            lowerTemplates.put("vote", lowerScore);
+            registry.register(new TemplateNamespace("protocol:lower", lowerTemplates));
+
+            // Namespace registered SECOND — scores 1.0 (perfect structural match)
+            var higherScore = TemplateDefinition.builder("vote")
+                                                .pattern("I ${decision} this ${subject}")
+                                                .variable("decision", VariableConstraint.enumOf("approve", "reject"))
+                                                .variable("subject", VariableConstraint.string())
+                                                .build();
+            var higherTemplates = new LinkedHashMap<String, TemplateDefinition>();
+            higherTemplates.put("vote", higherScore);
+            registry.register(new TemplateNamespace("protocol:higher", higherTemplates));
+
+            // Past tense bypasses regex → NLP tier competes across namespaces
+            var result = registry.match("I approved this design");
+            assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+            var matched = (TemplateMatch.Matched) result;
+            assertThat(matched.namespace())
+                    .as("global match should return best NLP score across all namespaces, not first hit")
+                    .isEqualTo("protocol:higher");
+            assertThat(matched.score())
+                    .as("best score is 1.0 from the tight template")
+                    .isEqualTo(1.0);
+        }
+
+
     }
 
     // ─────────────────────────────────────────────────────────────

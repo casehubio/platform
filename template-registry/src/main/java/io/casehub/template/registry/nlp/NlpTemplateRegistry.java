@@ -8,9 +8,7 @@ import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,6 +54,27 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
             }
         }
         super.deregister(namespaceName);
+    }
+
+
+    @Override
+    public TemplateMatch match(String input) {
+        Objects.requireNonNull(input, "input");
+        TemplateMatch.Matched bestMatch = null;
+
+        for (String ns : namespaces()) {
+            TemplateMatch result = match(ns, input);
+            if (result instanceof TemplateMatch.Matched matched) {
+                if (matched.score() == 1.0) {
+                    return matched;
+                }
+                if (bestMatch == null || matched.score() > bestMatch.score()) {
+                    bestMatch = matched;
+                }
+            }
+        }
+
+        return bestMatch != null ? bestMatch : new TemplateMatch.Unmatched(input);
     }
 
     @Override

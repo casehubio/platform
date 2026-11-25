@@ -4,7 +4,7 @@
 status: pending
 branch: 
 project-sha: eaecf32a37138e850429e5cc5fcc99d1e32298a3
-date: 2026-08-24
+date: 2026-11-25
 issue-repo: casehubio/platform
 covers: 934
 flyway-next-v: none
@@ -12,8 +12,5 @@ design-repo: workspace
 design-section-hashes: 
 
 ## Queue
-- [x] casehubio/engine#782 — Issue #782
-- [x] casehubio/platform#934 — RoutingAgentProvider fails to fall back to default backend
-- [ ] casehubio/platform#948 — refactor: extract shared template YAML parsing utility ← active
-- [ ] casehubio/platform#944 — feat: variable type validation in TemplateExtractor
-- [ ] casehubio/platform#945 — feat: connect NLP fallback to ProtocolEvaluator with keyword-scoped candidate selection
+- [x] casehubio/platform#948 — refactor: extract shared template YAML parsing utility
+- [ ] casehubio/platform#977 — fix global match NLP best-score

@@ -199,4 +199,55 @@ class NlpTemplateRegistryTest {
         assertThat(result.trace().bestCandidate()).isNotNull();
         assertThat(result.trace().bestScore()).isGreaterThan(0.0);
     }
+
+    @Test
+    void nearMissOnPartialStructuralMatch() {
+        var escalate = TemplateDefinition.builder("escalate")
+                                         .pattern("Escalating to ${target} for review")
+                                         .variable("target", VariableConstraint.string())
+                                         .build();
+        var templates = new LinkedHashMap<String, TemplateDefinition>();
+        templates.put("escalate", escalate);
+        var nearMissRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer(), 0.1, 0.7);
+        nearMissRegistry.register(new TemplateNamespace("protocol:ops", templates));
+
+        var result = nearMissRegistry.match("protocol:ops",
+                                            "Escalating to the board");
+        assertThat(result).isInstanceOf(TemplateMatch.NearMiss.class);
+        var nearMiss = (TemplateMatch.NearMiss) result;
+        assertThat(nearMiss.namespace()).isEqualTo("protocol:ops");
+        assertThat(nearMiss.suggestedTemplate()).isEqualTo("escalate");
+        assertThat(nearMiss.suggestedFormat()).contains("[target]");
+    }
+
+    @Test
+    void unmatchedStaysUnmatchedForZeroStructuralScore() {
+        var result = registry.match("protocol:review",
+                                    "The weather is nice");
+        assertThat(result).isInstanceOf(TemplateMatch.Unmatched.class);
+    }
+
+    @Test
+    void matchedSuppressesNearMiss() {
+        var result = registry.match("protocol:review",
+                                    "I approve this design");
+        assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
+    @Test
+    void globalMatchReturnsNearMissWhenNoMatch() {
+        var escalate = TemplateDefinition.builder("escalate")
+                                         .pattern("Escalating to ${target} for review")
+                                         .variable("target", VariableConstraint.string())
+                                         .build();
+        var templates = new LinkedHashMap<String, TemplateDefinition>();
+        templates.put("escalate", escalate);
+        var nearMissRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer(), 0.1, 0.7);
+        nearMissRegistry.register(new TemplateNamespace("protocol:ops", templates));
+
+        var result = nearMissRegistry.match("Escalating to the board");
+        assertThat(result).isInstanceOf(TemplateMatch.NearMiss.class);
+        var nearMiss = (TemplateMatch.NearMiss) result;
+        assertThat(nearMiss.namespace()).isEqualTo("protocol:ops");
+    }
 }

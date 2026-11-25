@@ -9,6 +9,7 @@ import io.casehub.template.registry.MatchTrace;
 import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.template.registry.TemplateDefinition;
+import io.casehub.template.registry.TemplateFormatHelper;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
@@ -66,7 +67,8 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
     @Override
     public TemplateMatch match(String input) {
         Objects.requireNonNull(input, "input");
-        TemplateMatch.Matched bestMatch = null;
+        TemplateMatch.Matched  bestMatch    = null;
+        TemplateMatch.NearMiss bestNearMiss = null;
 
         for (String ns : namespaces()) {
             TemplateMatch result = match(ns, input);
@@ -77,54 +79,79 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                 if (bestMatch == null || matched.score() > bestMatch.score()) {
                     bestMatch = matched;
                 }
+            } else if (result instanceof TemplateMatch.NearMiss nearMiss) {
+                if (bestNearMiss == null) {
+                    bestNearMiss = nearMiss;
+                }
             }
         }
 
-        return bestMatch != null ? bestMatch : new TemplateMatch.Unmatched(input);
+        if (bestMatch != null) {
+            return bestMatch;
+        }
+        if (bestNearMiss != null) {
+            return bestNearMiss;
+        }
+        return new TemplateMatch.Unmatched(input);
     }
 
     @Override
     protected TemplateMatch matchInNamespace(String namespaceName,
-                                              TemplateNamespace ns,
-                                              String input,
-                                              Snapshot snap) {
+                                             TemplateNamespace ns,
+                                             String input,
+                                             Snapshot snap) {
         TemplateMatch regexResult = super.matchInNamespace(
-            namespaceName, ns, input, snap);
+                namespaceName, ns, input, snap);
         if (regexResult instanceof TemplateMatch.Matched) {
             return regexResult;
         }
 
-        List<AnnotatedToken> inputTokens = tokenizer.tokenize(input);
-        TemplateMatch.Matched bestMatch = null;
+        List<AnnotatedToken>  inputTokens      = tokenizer.tokenize(input);
+        TemplateMatch.Matched bestMatch        = null;
+        String                nearMissTemplate = null;
+        String                nearMissPattern  = null;
+        double                nearMissScore    = 0.0;
 
         for (var templateEntry : ns.templates().entrySet()) {
-            TemplateDefinition def = templateEntry.getValue();
-            String key = namespaceName + ":" + def.name();
+            TemplateDefinition                      def      = templateEntry.getValue();
+            String                                  key      = namespaceName + ":" + def.name();
             NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
-            if (compiled == null) continue;
+            if (compiled == null) {continue;}
 
             for (int i = 0; i < compiled.matchers().size(); i++) {
                 Set<String> keywords = compiled.keywordSets().get(i);
                 double affinity = LemmatisedKeywordFilter.affinity(
-                    keywords, inputTokens);
+                        keywords, inputTokens);
                 if (affinity < affinityThreshold && !keywords.isEmpty()) {
                     continue;
                 }
 
                 StructuralMatcher matcher = compiled.matchers().get(i);
-                var result = matcher.match(inputTokens, def.variables());
+                var               result  = matcher.match(inputTokens, def.variables());
                 if (result.isPresent() && result.get().score() > scoreThreshold) {
                     if (bestMatch == null
                         || result.get().score() > bestMatch.score()) {
                         bestMatch = new TemplateMatch.Matched(
-                            namespaceName, def.name(), i,
-                            result.get().fields(), result.get().score());
+                                namespaceName, def.name(), i,
+                                result.get().fields(), result.get().score());
                     }
+                } else if (result.isPresent() && result.get().score() > nearMissScore) {
+                    nearMissScore    = result.get().score();
+                    nearMissTemplate = def.name();
+                    nearMissPattern  = def.patterns().get(i);
                 }
             }
         }
 
-        return bestMatch != null ? bestMatch : new TemplateMatch.Unmatched(input);
+        if (bestMatch != null) {
+            return bestMatch;
+        }
+        if (nearMissTemplate != null) {
+            return new TemplateMatch.NearMiss(
+                    namespaceName, input, nearMissTemplate,
+                    TemplateFormatHelper.formatSuggestion(nearMissPattern));
+        }
+        return new TemplateMatch.Unmatched(input);
     }
 
     @Override

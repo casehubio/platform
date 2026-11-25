@@ -29,14 +29,29 @@ public final class StructuralMatcher {
         Objects.requireNonNull(tokenizer, "tokenizer");
 
         List<TextSegment> segments = parseTextSegments(template);
-        List<Element> elements = new ArrayList<>();
+        List<Element>     elements = new ArrayList<>();
 
         for (TextSegment segment : segments) {
             compileSegment(segment.text, segment.optional, tokenizer, elements);
         }
 
+        validateNoAdjacentClauses(elements);
         return new StructuralMatcher(elements);
     }
+
+    private static void validateNoAdjacentClauses(List<Element> elements) {
+        for (int i = 1; i < elements.size(); i++) {
+            if (elements.get(i).kind == ElementKind.CLAUSE
+                && elements.get(i - 1).kind == ElementKind.CLAUSE) {
+                throw new IllegalArgumentException(
+                        "Template has adjacent variables '${" + elements.get(i - 1).variableName
+                        + "}' and '${" + elements.get(i).variableName
+                        + "}' with no literal between them — the structural matcher needs"
+                        + " a literal anchor to know where one variable ends and the next begins");
+            }
+        }
+    }
+
 
     private static void compileSegment(String text, boolean optional,
                                         NlpTokenizer tokenizer,

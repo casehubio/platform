@@ -116,4 +116,29 @@ class StructuralMatcherTest {
         assertThat(result).isPresent();
         assertThat(result.get().fields().get("subject")).isEqualTo("design");
     }
+
+    @Test
+    void adjacentClauseVariablesThrowAtCompileTime() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                                                                   StructuralMatcher.compile("${agent} ${action} ${target}", tokenizer)
+                                                          ).isInstanceOf(IllegalArgumentException.class)
+                                       .hasMessageContaining("agent")
+                                       .hasMessageContaining("action");
+    }
+
+    @Test
+    void adjacentClauseVariablesInMiddleThrow() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                                                                   StructuralMatcher.compile("Send ${message} ${recipient} now", tokenizer)
+                                                          ).isInstanceOf(IllegalArgumentException.class)
+                                       .hasMessageContaining("message")
+                                       .hasMessageContaining("recipient");
+    }
+
+    @Test
+    void separatedClauseVariablesCompileSuccessfully() {
+        var matcher = StructuralMatcher.compile(
+                "On behalf of ${agent} I ${action} this ${target}", tokenizer);
+        assertThat(matcher.elements()).isNotEmpty();
+    }
 }

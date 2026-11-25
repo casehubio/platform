@@ -12,5 +12,4 @@ design-repo: workspace
 design-section-hashes: 
 
 ## Queue
-- [x] casehubio/platform#948 — refactor: extract shared template YAML parsing utility
-- [ ] casehubio/platform#977 — fix global match NLP best-score
+(empty — issues created during design)

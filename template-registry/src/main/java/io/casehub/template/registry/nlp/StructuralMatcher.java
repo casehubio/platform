@@ -2,6 +2,7 @@ package io.casehub.template.registry.nlp;
 
 import io.casehub.template.registry.AnnotatedToken;
 import io.casehub.template.registry.ElementKind;
+import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 
@@ -196,6 +197,88 @@ public final class StructuralMatcher {
         return Optional.of(new MatchResult(fields, score));
     }
 
+    public TraceableMatchResult matchWithTrace(List<AnnotatedToken> tokens,
+                                               Map<String, VariableConstraint> constraints) {
+        List<ElementTrace>  traces   = new ArrayList<>();
+        Map<String, String> fields   = new LinkedHashMap<>();
+        int                 tokenIdx = 0;
+        int                 matched  = 0;
+        boolean             failed   = false;
+
+        for (int i = 0; i < elements.size(); i++) {
+            Element elem = elements.get(i);
+            if (tokenIdx >= tokens.size()) {
+                traces.add(new ElementTrace(elem.kind(), elementExpected(elem), null, false));
+                if (!elem.optional()) {
+                    failed = true;
+                }
+                continue;
+            }
+
+            AnnotatedToken token = tokens.get(tokenIdx);
+
+            switch (elem.kind()) {
+                case LITERAL -> {
+                    boolean match = token.lemma().equalsIgnoreCase(elem.lemma())
+                                    || token.surface().equalsIgnoreCase(elem.surface());
+                    traces.add(new ElementTrace(elem.kind(), elem.lemma(), token.lemma(), match));
+                    if (match) {
+                        matched++;
+                        tokenIdx++;
+                    } else if (!elem.optional()) {
+                        failed = true;
+                    }
+                }
+                case VARIABLE -> {
+                    String  value = resolveVariableValue(token, elem, constraints);
+                    boolean match = value != null;
+                    traces.add(new ElementTrace(elem.kind(), elem.variableName(),
+                                                match ? value : token.surface(), match));
+                    if (match) {
+                        fields.put(elem.variableName(), value);
+                        matched++;
+                        tokenIdx++;
+                    } else if (!elem.optional()) {
+                        failed = true;
+                    }
+                }
+                case CLAUSE -> {
+                    ClauseCapture capture = captureClause(tokens, tokenIdx, i, constraints, elem.variableName());
+                    boolean       match   = capture.value() != null && !capture.value().isBlank();
+                    traces.add(new ElementTrace(elem.kind(), elem.variableName(),
+                                                capture.value(), match));
+                    if (match) {
+                        fields.put(elem.variableName(), capture.value());
+                        matched++;
+                    }
+                    tokenIdx = capture.endIdx();
+                    if (!match && !elem.optional()) {
+                        failed = true;
+                    }
+                }
+            }
+        }
+
+        if (failed || matched == 0) {
+            return new TraceableMatchResult(Optional.empty(), traces);
+        }
+        long requiredCount = elements.stream().filter(e -> !e.optional()).count();
+        if (requiredCount == 0) {
+            return new TraceableMatchResult(Optional.empty(), traces);
+        }
+        double score = Math.min((double) matched / requiredCount, 1.0);
+        if (score <= 0.0) {
+            return new TraceableMatchResult(Optional.empty(), traces);
+        }
+        return new TraceableMatchResult(
+                Optional.of(new MatchResult(fields, score)), traces);
+    }
+
+    private String elementExpected(Element elem) {
+        return elem.variableName() != null ? elem.variableName() : elem.lemma();
+    }
+
+
     public List<Element> elements() {
         return elements;
     }
@@ -267,6 +350,16 @@ public final class StructuralMatcher {
     public record MatchResult(Map<String, String> fields, double score) {
         public MatchResult {
             fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));
+        }
+    }
+
+    public record TraceableMatchResult(
+            Optional<MatchResult> result,
+            List<ElementTrace> elements
+    ) {
+        public TraceableMatchResult {
+            Objects.requireNonNull(elements, "elements");
+            elements = List.copyOf(elements);
         }
     }
 

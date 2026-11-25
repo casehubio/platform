@@ -182,4 +182,46 @@ class StructuralMatcherTest {
         assertThat(result.get().fields().get("decision"))
                 .isEqualTo("approve");
     }
+
+    @Test
+    void matchWithTraceReportsElementsOnSuccess() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var tokens = tokenizer.tokenize("I approve this design");
+        var result = matcher.matchWithTrace(tokens, Map.of());
+        assertThat(result.result()).isPresent();
+        assertThat(result.elements()).isNotEmpty();
+        assertThat(result.elements().get(0).kind())
+                .isEqualTo(io.casehub.template.registry.ElementKind.LITERAL);
+        assertThat(result.elements().get(0).matched()).isTrue();
+    }
+
+    @Test
+    void matchWithTraceReportsFailedLiteral() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var tokens = tokenizer.tokenize("the design looks good to me");
+        var result = matcher.matchWithTrace(tokens, Map.of());
+        assertThat(result.result()).isEmpty();
+        assertThat(result.elements()).isNotEmpty();
+        var firstLiteral = result.elements().stream()
+                                 .filter(e -> e.kind() == io.casehub.template.registry.ElementKind.LITERAL)
+                                 .findFirst().orElseThrow();
+        assertThat(firstLiteral.matched()).isFalse();
+        assertThat(firstLiteral.expected()).isEqualTo("i");
+    }
+
+    @Test
+    void matchWithTraceReportsVariableCapture() {
+        var matcher = StructuralMatcher.compile(
+                "I ${decision} this ${subject}", tokenizer);
+        var tokens = tokenizer.tokenize("I approve this design");
+        var result = matcher.matchWithTrace(tokens, Map.of());
+        var clauseElements = result.elements().stream()
+                                   .filter(e -> e.kind() == io.casehub.template.registry.ElementKind.CLAUSE)
+                                   .toList();
+        assertThat(clauseElements).isNotEmpty();
+        assertThat(clauseElements.stream().anyMatch(e ->
+                                                            "decision".equals(e.expected()) && e.matched())).isTrue();
+    }
 }

@@ -16,4 +16,13 @@ public sealed interface RecoveryAction {
             enrichedDetail = enrichedDetail != null ? Map.copyOf(enrichedDetail) : Map.of();
         }
     }
+
+    record PromptUser(String promptText, String variableName,
+                      String capability, Map<String, Object> metadata)
+            implements RecoveryAction {
+        public PromptUser {
+            metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
+        }
+    }
+
 }

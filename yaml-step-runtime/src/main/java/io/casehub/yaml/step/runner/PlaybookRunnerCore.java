@@ -373,6 +373,9 @@ public final class PlaybookRunnerCore {
                 case RecoveryAction.Resolved r -> RecoveryOutcome.recovered(null);
                 case RecoveryAction.Unrecoverable u -> RecoveryOutcome.notRecovered(
                         new Result.Failure(u.reason(), failure.category(), u.enrichedDetail()));
+                case RecoveryAction.PromptUser pu -> RecoveryOutcome.notRecovered(
+                        new Result.Failure("Manual resolution not yet supported",
+                                           failure.category(), Map.of()));
             };
         }
         return RecoveryOutcome.notRecovered(failure);

@@ -5,5 +5,6 @@ public enum StepOutcome {
     SKIPPED,
     SIMULATED,
     FAILED,
-    ERROR
+    ERROR,
+    RECOVERED
 }

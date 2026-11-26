@@ -1,5 +1,6 @@
 package io.casehub.platform.agent;
 
+import dev.langchain4j.agent.tool.ToolSpecification;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -119,5 +120,33 @@ class AgentSessionConfigTest {
         assertThat(updated.modelParameters()).isEqualTo(params);
         assertThat(updated.model()).isEqualTo("gpt-4");
     }
+
+    @Test
+    void toolsDefaultsToEmptyList() {
+        var config = AgentSessionConfig.of("sys", "user");
+        assertThat(config.tools()).isEmpty();
+    }
+
+    @Test
+    void toolsFieldCarriesSpecifications() {
+        var tool   = ToolSpecification.builder().name("calculator").description("math").build();
+        var config = AgentSessionConfig.of("sys", "user").withTools(List.of(tool));
+        assertThat(config.tools()).hasSize(1);
+        assertThat(config.tools().get(0).name()).isEqualTo("calculator");
+    }
+
+    @Test
+    void withToolsPreservesOtherFields() {
+        var format = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var tool   = ToolSpecification.builder().name("calc").description("math").build();
+        var config = AgentSessionConfig.of("sys", "user")
+                                       .withResponseFormat(format)
+                                       .withModel("gpt-4")
+                                       .withTools(List.of(tool));
+        assertThat(config.tools()).hasSize(1);
+        assertThat(config.responseFormat()).isEqualTo(format);
+        assertThat(config.model()).isEqualTo("gpt-4");
+    }
+
 
 }

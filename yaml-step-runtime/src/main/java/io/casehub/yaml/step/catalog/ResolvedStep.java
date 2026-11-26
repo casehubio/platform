@@ -105,17 +105,50 @@ public sealed interface ResolvedStep permits
             String name,
             String scrutinee,
             List<ResolvedMatchCase> cases,
+            TemplateMatchSpec templateSpec,
             Map<String, Object> decorators,
             List<Annotation> annotations) implements ResolvedStep {
 
         public MatchStep {
-            cases       = List.copyOf(cases);
+            cases       = cases != null ? List.copyOf(cases) : List.of();
             decorators  = Map.copyOf(decorators);
             annotations = annotations != null ? List.copyOf(annotations) : List.of();
         }
 
+        public boolean isTemplateMode() { return templateSpec != null; }
+
+        static MatchStep valueMode(String name, String scrutinee,
+                List<ResolvedMatchCase> cases, Map<String, Object> decorators) {
+            java.util.Objects.requireNonNull(scrutinee, "scrutinee required for value mode");
+            return new MatchStep(name, scrutinee, cases, null, decorators, List.of());
+        }
+
+        static MatchStep valueMode(String name, String scrutinee,
+                List<ResolvedMatchCase> cases, Map<String, Object> decorators,
+                List<Annotation> annotations) {
+            java.util.Objects.requireNonNull(scrutinee, "scrutinee required for value mode");
+            return new MatchStep(name, scrutinee, cases, null, decorators, annotations);
+        }
+
+        static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
+                Map<String, Object> decorators) {
+            java.util.Objects.requireNonNull(templateSpec, "templateSpec required for template mode");
+            return new MatchStep(name, null, List.of(), templateSpec, decorators, List.of());
+        }
+
+        static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
+                Map<String, Object> decorators, List<Annotation> annotations) {
+            java.util.Objects.requireNonNull(templateSpec, "templateSpec required for template mode");
+            return new MatchStep(name, null, List.of(), templateSpec, decorators, annotations);
+        }
+
         public MatchStep(String name, String scrutinee, List<ResolvedMatchCase> cases, Map<String, Object> decorators) {
-            this(name, scrutinee, cases, decorators, List.of());
+            this(name, scrutinee, cases, null, decorators, List.of());
+        }
+
+        public MatchStep(String name, String scrutinee, List<ResolvedMatchCase> cases,
+                Map<String, Object> decorators, List<Annotation> annotations) {
+            this(name, scrutinee, cases, null, decorators, annotations);
         }
     }
 

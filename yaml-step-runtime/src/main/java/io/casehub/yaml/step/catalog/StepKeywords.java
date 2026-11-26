@@ -24,7 +24,7 @@ public final class StepKeywords {
 
     static final Set<String> RESERVED_KEYS;
     public static final Set<String> RESERVED_CAPTURE_NAMES = Set.of(
-            "result", "error", "each", "var", "params", "module", "events");
+            "result", "error", "each", "var", "params", "module", "events", "_tmatch");
 
     static {
         var combined = new LinkedHashSet<String>();

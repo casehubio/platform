@@ -264,8 +264,6 @@
         <module>spring-boot-starter-streams</module>
         <module>spring-boot-starter-authn</module>
         <module>spring-integration-test</module>
-        <module>message-extraction-api</module>
-        <module>message-extraction</module>
         <module>template-registry-api</module>
         <module>template-registry</module>
         <module>template-registry-llm</module>

@@ -2,20 +2,25 @@ package io.casehub.platform.agent.service;
 
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentResolver;
-import io.casehub.platform.agent.AgentService;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Produces;
-import jakarta.enterprise.inject.spi.InjectionPoint;
 import jakarta.inject.Inject;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.ParameterizedType;
 
 @ApplicationScoped
 public class AgentServiceBeans {
 
     @Inject AgentProvider agentProvider;
     @Inject AgentResolver agentResolver;
+
+
+    public AgentServiceBeans() {}
+
+    public AgentServiceBeans(AgentProvider agentProvider, AgentResolver agentResolver) {
+        this.agentProvider = agentProvider;
+        this.agentResolver = agentResolver;
+    }
+
 
     public <T> T createProxy(Class<T> serviceInterface) {
         String proxyClassName = serviceInterface.getName() + "Proxy";

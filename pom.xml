@@ -190,6 +190,7 @@
         <module>guardrail</module>
         <module>agent-service-generator</module>
         <module>agent-service</module>
+        <module>agent-service-spring</module>
         <module>guardrail-spring</module>
         <module>graphql</module>
         <module>graphql-client</module>

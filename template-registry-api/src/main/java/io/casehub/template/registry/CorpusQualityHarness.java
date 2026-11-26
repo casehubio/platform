@@ -53,20 +53,21 @@ public class CorpusQualityHarness {
                     .add(result);
 
             int[] counters = countersByTemplate
-                                     .computeIfAbsent(fixture.templateName(), k -> new int[3]);
+                                     .computeIfAbsent(fixture.templateName(), k -> new int[4]);
 
-            totalVariations++;
             if (fixture.expectMatch()) {
+                counters[0]++;
+                totalVariations++;
                 if (isCorrectMatch) {
-                    counters[0]++;
+                    counters[1]++;
                     totalMatched++;
                     if (!fieldsMatch) {
-                        counters[1]++;
+                        counters[2]++;
                     }
                 }
             } else {
                 if (isCorrectMatch) {
-                    counters[2]++;
+                    counters[3]++;
                     totalFalsePositives++;
                 }
             }
@@ -85,10 +86,9 @@ public class CorpusQualityHarness {
 
         List<TemplateReport> templateReports = new ArrayList<>();
         for (var entry : resultsByTemplate.entrySet()) {
-            int[] c        = countersByTemplate.get(entry.getKey());
-            int   varCount = entry.getValue().size();
+            int[] c = countersByTemplate.get(entry.getKey());
             templateReports.add(new TemplateReport(
-                    entry.getKey(), varCount, c[0], c[1], c[2], entry.getValue()));
+                    entry.getKey(), c[0], c[1], c[2], c[3], entry.getValue()));
         }
 
         return new CorpusQualityReport(

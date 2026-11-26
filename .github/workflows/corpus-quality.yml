@@ -1,0 +1,62 @@
+name: Corpus Quality (Ollama)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    services:
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Bootstrap API dependencies
+        run: python3 .github/scripts/bootstrap-release-apis.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull model
+        run: |
+          until curl -sf http://localhost:11434/api/tags; do sleep 2; done
+          curl -sf http://localhost:11434/api/pull -d '{"name": "qwen2.5:1.5b"}'
+
+      - name: Build and run Ollama integration tests
+        run: >
+          mvn --batch-mode verify -ntp
+          -pl template-registry-llm -am
+          -Dit.test=CorpusQualityOllamaIT
+          -Dcasehub.ollama.host=http://localhost:11434
+          -Dcasehub.ollama.model=qwen2.5:1.5b
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        timeout-minutes: 30
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-quality-report
+          path: "template-registry-llm/target/corpus-quality/"
+          if-no-files-found: ignore

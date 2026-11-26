@@ -13,7 +13,7 @@ class VariationFixtureLoaderTest {
 
     @Test
     void load_fromInputStream() {
-        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.variations.yaml");
+        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.yaml");
         List<VariationFixture> fixtures = VariationFixtureLoader.load(is);
 
         assertThat(fixtures).hasSize(3);
@@ -25,7 +25,7 @@ class VariationFixtureLoaderTest {
 
     @Test
     void load_negativeFixtureHasEmptyFields() {
-        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.variations.yaml");
+        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.yaml");
         List<VariationFixture> fixtures = VariationFixtureLoader.load(is);
 
         var negative = fixtures.get(1);
@@ -35,7 +35,7 @@ class VariationFixtureLoaderTest {
 
     @Test
     void namespace_readsFromFile() throws Exception {
-        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.variations.yaml");
+        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.yaml");
         Path tmp = Files.createTempFile("fixtures", ".yaml");
         try {
             Files.write(tmp, is.readAllBytes());
@@ -48,7 +48,7 @@ class VariationFixtureLoaderTest {
 
     @Test
     void load_fromPath() throws Exception {
-        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.variations.yaml");
+        InputStream is = getClass().getResourceAsStream("/fixtures/test-fixtures.yaml");
         Path tmp = Files.createTempFile("fixtures", ".yaml");
         try {
             Files.write(tmp, is.readAllBytes());

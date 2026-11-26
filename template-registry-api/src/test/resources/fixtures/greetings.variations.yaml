@@ -1,0 +1,20 @@
+namespace: test:greetings
+fixtures:
+  - template: hello
+    input: "hello world"
+    expectMatch: true
+    expectedFields:
+      target: world
+  - template: hello
+    input: "hello team"
+    expectMatch: true
+    expectedFields:
+      target: team
+  - template: hello
+    input: "hi there everyone"
+    expectMatch: false
+  - template: goodbye
+    input: "goodbye friends"
+    expectMatch: true
+    expectedFields:
+      target: friends

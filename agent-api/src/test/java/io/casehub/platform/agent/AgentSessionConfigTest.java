@@ -149,4 +149,34 @@ class AgentSessionConfigTest {
     }
 
 
+    @Test
+    void cachePolicyEnumValues() {
+        assertThat(CachePolicy.values())
+                .containsExactly(CachePolicy.NONE, CachePolicy.SYSTEM_AND_TOOLS, CachePolicy.ALL_STATIC);
+    }
+
+    @Test
+    void cachePolicyDefaultsToNull() {
+        var config = AgentSessionConfig.of("sys", "user");
+        assertThat(config.cachePolicy()).isNull();
+    }
+
+    @Test
+    void withCachePolicySetsPolicy() {
+        var config = AgentSessionConfig.of("sys", "user")
+                                       .withCachePolicy(CachePolicy.SYSTEM_AND_TOOLS);
+        assertThat(config.cachePolicy()).isEqualTo(CachePolicy.SYSTEM_AND_TOOLS);
+    }
+
+    @Test
+    void withCachePolicyPreservesOtherFields() {
+        var format = ResponseFormat.json("weather", "{\"type\":\"object\"}");
+        var config = AgentSessionConfig.of("sys", "user")
+                                       .withResponseFormat(format)
+                                       .withModel("gpt-4")
+                                       .withCachePolicy(CachePolicy.ALL_STATIC);
+        assertThat(config.cachePolicy()).isEqualTo(CachePolicy.ALL_STATIC);
+        assertThat(config.responseFormat()).isEqualTo(format);
+        assertThat(config.model()).isEqualTo("gpt-4");
+    }
 }

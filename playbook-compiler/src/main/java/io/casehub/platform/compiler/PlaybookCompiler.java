@@ -74,11 +74,21 @@ public final class PlaybookCompiler {
     }
 
     private io.casehub.yaml.plugin.api.PluginRegistry pluginRegistry;
+    private TemplateSchemaResolver schemaResolver = TemplateSchemaResolver.noOp();
 
     public PlaybookCompiler(io.casehub.yaml.plugin.api.PluginRegistry pluginRegistry) {
         this();
         this.pluginRegistry = pluginRegistry;
     }
+
+    public PlaybookCompiler(io.casehub.yaml.plugin.api.PluginRegistry pluginRegistry,
+                            TemplateSchemaResolver schemaResolver) {
+        this();
+        this.pluginRegistry = pluginRegistry;
+        this.schemaResolver = java.util.Objects.requireNonNull(schemaResolver);
+    }
+
+    TemplateSchemaResolver schemaResolver() { return schemaResolver; }
 
     public java.util.Optional<io.casehub.yaml.plugin.api.PluginRegistry> pluginRegistry() {
         return java.util.Optional.ofNullable(pluginRegistry);

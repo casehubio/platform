@@ -71,4 +71,6 @@ public final class CompilationContext {
     String currentPath() { return currentPath; }
 
     int stepIndex() { return stepIndex; }
+
+    PlaybookCompiler compiler() { return compiler; }
 }

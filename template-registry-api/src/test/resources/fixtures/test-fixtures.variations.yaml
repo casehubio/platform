@@ -1,0 +1,15 @@
+namespace: test:greetings
+fixtures:
+  - template: hello
+    input: "hi there friend"
+    expectMatch: true
+    expectedFields:
+      target: friend
+  - template: hello
+    input: "random unrelated text"
+    expectMatch: false
+  - template: goodbye
+    input: "see you later team"
+    expectMatch: true
+    expectedFields:
+      target: team

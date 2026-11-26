@@ -45,6 +45,28 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
     }
 
     @Override
+    public void replaceOrRegister(TemplateNamespace namespace) {
+        Objects.requireNonNull(namespace, "namespace");
+        while (true) {
+            Snapshot current = snapshot.get();
+            Snapshot next = current.withoutNamespace(namespace.name())
+                                   .withNamespace(namespace);
+            if (snapshot.compareAndSet(current, next)) {
+                return;
+            }
+        }
+    }
+
+    protected Snapshot currentSnapshot() {
+        return snapshot.get();
+    }
+
+    protected boolean compareAndSetSnapshot(Snapshot expected, Snapshot next) {
+        return snapshot.compareAndSet(expected, next);
+    }
+
+
+    @Override
     public TemplateMatch match(String input) {
         Objects.requireNonNull(input, "input");
         Snapshot snap = snapshot.get();

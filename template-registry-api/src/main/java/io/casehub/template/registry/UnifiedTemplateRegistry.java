@@ -29,4 +29,14 @@ public interface UnifiedTemplateRegistry {
     List<TemplateSchema> schemas(String namespaceName);
 
     Set<String> namespaces();
+
+    default void replaceOrRegister(TemplateNamespace namespace) {
+        deregister(namespace.name());
+        register(namespace);
+    }
+
+    default TemplateMatch matchStructural(String input) {
+        return match(input);
+    }
+
 }

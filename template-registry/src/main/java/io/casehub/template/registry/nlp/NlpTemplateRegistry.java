@@ -63,6 +63,20 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
         super.deregister(namespaceName);
     }
 
+    @Override
+    public void replaceOrRegister(TemplateNamespace namespace) {
+        super.replaceOrRegister(namespace);
+        recompileNlp(namespace.name(), namespace);
+    }
+
+    protected void recompileNlp(String namespaceName, TemplateNamespace namespace) {
+        nlpCompiled.keySet().removeIf(k -> k.startsWith(namespaceName + ":"));
+        for (TemplateDefinition def : namespace.templates().values()) {
+            String key = namespaceName + ":" + def.name();
+            nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer));
+        }
+    }
+
 
     @Override
     public TemplateMatch match(String input) {

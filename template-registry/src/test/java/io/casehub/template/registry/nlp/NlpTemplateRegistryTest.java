@@ -250,4 +250,35 @@ class NlpTemplateRegistryTest {
         var nearMiss = (TemplateMatch.NearMiss) result;
         assertThat(nearMiss.namespace()).isEqualTo("protocol:ops");
     }
+
+    @Test
+    void replaceOrRegister_updatesNlpCompiledCache() {
+        registry.deregister("protocol:review");
+
+        var ns1 = new TemplateNamespace("ns", java.util.Map.of("t1",
+                                                               TemplateDefinition.builder("t1")
+                                                                                 .pattern("I ${decision} this ${subject}")
+                                                                                 .variable("decision", VariableConstraint.enumOf("approve", "reject"))
+                                                                                 .variable("subject", VariableConstraint.string())
+                                                                                 .build()));
+        registry.register(ns1);
+
+        var before = registry.match("ns", "I approved this design");
+        assertThat(before).isInstanceOf(TemplateMatch.Matched.class);
+
+        var ns2 = new TemplateNamespace("ns", java.util.Map.of("t1",
+                                                               TemplateDefinition.builder("t1")
+                                                                                 .pattern("${subject} gets my ${decision}")
+                                                                                 .variable("decision", VariableConstraint.enumOf("approve", "reject"))
+                                                                                 .variable("subject", VariableConstraint.string())
+                                                                                 .build()));
+        registry.replaceOrRegister(ns2);
+
+        var afterOld = registry.match("ns", "I approved this design");
+        assertThat(afterOld).isNotInstanceOf(TemplateMatch.Matched.class);
+
+        var afterNew = registry.match("ns", "design gets my approve");
+        assertThat(afterNew).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
 }

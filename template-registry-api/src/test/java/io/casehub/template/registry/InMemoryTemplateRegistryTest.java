@@ -230,6 +230,58 @@ class InMemoryTemplateRegistryTest {
     }
 
     @Test
+    void replaceOrRegister_replacesExistingNamespace() {
+        var registry = new InMemoryTemplateRegistry();
+        var ns1 = new TemplateNamespace("ns",
+            Map.of("t1", TemplateDefinition.builder("t1")
+                .pattern("hello ${name}").build()));
+        registry.register(ns1);
+
+        var ns2 = new TemplateNamespace("ns",
+            Map.of("t1", TemplateDefinition.builder("t1")
+                .pattern("hi ${name}").build()));
+        registry.replaceOrRegister(ns2);
+
+        var result = registry.match("ns", "hi world");
+        assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+        var matched = (TemplateMatch.Matched) result;
+        assertThat(matched.fields()).containsEntry("name", "world");
+
+        var old = registry.match("ns", "hello world");
+        assertThat(old).isInstanceOf(TemplateMatch.Unmatched.class);
+    }
+
+    @Test
+    void replaceOrRegister_registersNewNamespace() {
+        var registry = new InMemoryTemplateRegistry();
+        var ns = new TemplateNamespace("ns",
+            Map.of("t1", TemplateDefinition.builder("t1")
+                .pattern("hello ${name}").build()));
+        registry.replaceOrRegister(ns);
+
+        var result = registry.match("ns", "hello world");
+        assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
+    @Test
+    void matchStructural_delegatesToMatch() {
+        var registry = new InMemoryTemplateRegistry();
+        registry.register(reviewNamespace());
+
+        var result = registry.matchStructural("I approve this design");
+        assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
+    @Test
+    void matchStructural_returnsUnmatchedForNoMatch() {
+        var registry = new InMemoryTemplateRegistry();
+        registry.register(reviewNamespace());
+
+        var result = registry.matchStructural("something unrelated");
+        assertThat(result).isInstanceOf(TemplateMatch.Unmatched.class);
+    }
+
+    @Test
     void matchWithTraceGlobalSearchesAllNamespaces() {
         var registry = new InMemoryTemplateRegistry();
         registry.register(reviewNamespace());

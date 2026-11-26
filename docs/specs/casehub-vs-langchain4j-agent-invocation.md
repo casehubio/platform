@@ -131,9 +131,11 @@ Annotation-based, compile-time proxy (APT). Model resolved via manifest alias �
 
 ### Where AiServices is better
 
-- **Simpler getting-started experience.** Builder pattern, no annotation processing, no manifest YAML. For a developer who wants to call one model with one prompt, AiServices is less ceremony.
-- **More caching knobs today.** LangChain4j has exposed more of the SDK caching features through their abstraction. CaseHub has the same SDK access but hasn't wired all the config through yet (#988).
-- **Larger ecosystem.** More examples, more community answers, more tutorials.
+- **Larger ecosystem.** More examples, more community answers, more tutorials. This is community size, not technical merit — it reflects LangChain4j's head start and broader adoption, not a capability gap.
+
+AiServices previously had two additional advantages that are being eliminated:
+- **Simpler getting-started** — the builder pattern required no annotation processing or manifest YAML. With `@AgentService`, the annotation is less ceremony than the builder: one annotation vs explicit model/memory/tools wiring in code. The manifest YAML is project-level configuration, not per-interface overhead.
+- **More caching knobs** — LangChain4j exposed more SDK caching features through their wrapper. Since CaseHub uses the same SDKs directly, this was a wiring gap, not an architectural one. #988 wires the remaining caching features through the platform's config layer.
 
 ### Where @AgentService is better
 

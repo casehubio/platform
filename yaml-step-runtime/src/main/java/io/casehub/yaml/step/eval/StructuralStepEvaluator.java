@@ -6,8 +6,11 @@ import io.casehub.yaml.core.orchestration.OrcChannel;
 import io.casehub.yaml.core.orchestration.OrcSignal;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.plugin.api.Result;
+import io.casehub.template.registry.TemplateMatch;
+import io.casehub.template.registry.UnifiedTemplateRegistry;
 import io.casehub.yaml.step.catalog.ResolvedMatchCase;
 import io.casehub.yaml.step.catalog.ResolvedStep;
+import io.casehub.yaml.step.catalog.TemplateMatchSpec;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +36,7 @@ public final class StructuralStepEvaluator {
     private final Map<String, Object>                                           injectedBindings;
     private final StepExecutionListener                                        listener;
     private final CaptureCollector                                             captureCollector;
+    private final UnifiedTemplateRegistry                                      templateRegistry;
 
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator) {
@@ -40,10 +44,14 @@ public final class StructuralStepEvaluator {
     }
 
     public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope) {
-        this(conditionEvaluator, scope, Map.of(), null, null);
+        this(conditionEvaluator, scope, Map.of(), null, null, null);
     }
 
-    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener, CaptureCollector captureCollector) {
+    public StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, UnifiedTemplateRegistry templateRegistry) {
+        this(conditionEvaluator, scope, Map.of(), null, null, templateRegistry);
+    }
+
+    private StructuralStepEvaluator(ConditionEvaluator conditionEvaluator, ExecutionScope scope, Map<String, Object> injectedBindings, StepExecutionListener listener, CaptureCollector captureCollector, UnifiedTemplateRegistry templateRegistry) {
         this.conditionEvaluator = conditionEvaluator;
         this.scope              = scope;
         this.speedMultiplier    = io.casehub.yaml.core.runtime.SpeedMultiplier.identity();
@@ -59,12 +67,13 @@ public final class StructuralStepEvaluator {
         this.injectedBindings   = Map.copyOf(injectedBindings);
         this.listener           = listener;
         this.captureCollector   = captureCollector;
+        this.templateRegistry   = templateRegistry;
     }
 
-    public StructuralStepEvaluator withListener(StepExecutionListener listener) {return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, listener, this.captureCollector);}
+    public StructuralStepEvaluator withListener(StepExecutionListener listener) {return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, listener, this.captureCollector, this.templateRegistry);}
 
     public StructuralStepEvaluator withCaptureCollector(CaptureCollector captureCollector) {
-        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, this.listener, captureCollector);
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, this.injectedBindings, this.listener, captureCollector, this.templateRegistry);
     }
 
 
@@ -82,7 +91,7 @@ public final class StructuralStepEvaluator {
             }
             injected.put(binding.variableName(), resolved);
         }
-        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected, this.listener, this.captureCollector);
+        return new StructuralStepEvaluator(this.conditionEvaluator, this.scope, injected, this.listener, this.captureCollector, this.templateRegistry);
     }
 
 
@@ -159,6 +168,18 @@ public final class StructuralStepEvaluator {
                     preRegisterLatches(t.trySteps());
                     preRegisterLatches(t.catchSteps());
                     preRegisterLatches(t.finallySteps());
+                }
+                case ResolvedStep.MatchStep m -> {
+                    if (m.isTemplateMode()) {
+                        for (var handler : m.templateSpec().handlers().values()) {
+                            preRegisterLatches(handler);
+                        }
+                        preRegisterLatches(m.templateSpec().unmatchedHandler());
+                    } else {
+                        for (var mc : m.cases()) {
+                            preRegisterLatches(mc.steps());
+                        }
+                    }
                 }
                 default -> {}
             }
@@ -324,6 +345,9 @@ public final class StructuralStepEvaluator {
 
     private Result evaluateMatch(ResolvedStep.MatchStep match,
                                  StepContext ctx, StepRunner runner) {
+        if (match.isTemplateMode()) {
+            return evaluateTemplateMatch(match.templateSpec(), ctx, runner);
+        }
         Object scrutineeValue = ctx.resolver().resolve(match.scrutinee());
 
         for (ResolvedMatchCase mc : match.cases()) {
@@ -347,6 +371,72 @@ public final class StructuralStepEvaluator {
                     new ResolvedStep.BlockStep(null, mc.steps(), Map.of()), matchCtx, runner);
         }
         return Result.of(Map.of());
+    }
+
+    private Result evaluateTemplateMatch(TemplateMatchSpec spec,
+                                         StepContext ctx, StepRunner runner) {
+        Object inputValue = ctx.resolver().resolve(spec.inputExpression());
+        String input = String.valueOf(inputValue);
+
+        if (templateRegistry == null) {
+            return Result.failed("Template matching requires a UnifiedTemplateRegistry but none is configured");
+        }
+
+        TemplateMatch result = templateRegistry.match(spec.namespace(), input);
+
+        if (result instanceof TemplateMatch.Matched matched) {
+            List<ResolvedStep> handler = spec.handlers().get(matched.templateName());
+            if (handler == null) {
+                return evaluateUnmatchedTemplate(spec, input, null, ctx, runner);
+            }
+
+            VariableResolver enriched = ctx.resolver()
+                .withObjectScope(matched.templateName(),
+                    name -> matched.fields().get(name));
+
+            enriched = enriched.withObjectScope("_tmatch", name ->
+                switch (name) {
+                    case "namespace" -> matched.namespace();
+                    case "template" -> matched.templateName();
+                    case "score" -> String.valueOf(matched.score());
+                    default -> null;
+                });
+
+            StepContext handlerCtx = ctx.withResolver(enriched);
+            return evaluateBlock(
+                new ResolvedStep.BlockStep(null, handler, Map.of()),
+                handlerCtx, runner);
+        }
+
+        if (result instanceof TemplateMatch.NearMiss nearMiss) {
+            LOG.info("Template near-miss in namespace '" + spec.namespace()
+                + "': input near '" + nearMiss.suggestedTemplate()
+                + "', suggested format: " + nearMiss.suggestedFormat());
+            return evaluateUnmatchedTemplate(spec, input, nearMiss, ctx, runner);
+        }
+
+        return evaluateUnmatchedTemplate(spec, input, null, ctx, runner);
+    }
+
+    private Result evaluateUnmatchedTemplate(TemplateMatchSpec spec, String input,
+                                              TemplateMatch.NearMiss nearMiss,
+                                              StepContext ctx, StepRunner runner) {
+        if (spec.unmatchedHandler().isEmpty()) {
+            return Result.of(Map.of());
+        }
+        VariableResolver enriched = ctx.resolver()
+            .withObjectScope("_tmatch", name ->
+                switch (name) {
+                    case "input" -> input;
+                    case "namespace" -> spec.namespace();
+                    case "nearMiss" -> nearMiss != null ? nearMiss.suggestedTemplate() : null;
+                    case "suggestedFormat" -> nearMiss != null ? nearMiss.suggestedFormat() : null;
+                    default -> null;
+                });
+        StepContext unmatchedCtx = ctx.withResolver(enriched);
+        return evaluateBlock(
+            new ResolvedStep.BlockStep(null, spec.unmatchedHandler(), Map.of()),
+            unmatchedCtx, runner);
     }
 
     private Result evaluateTryCatchFinally(ResolvedStep.TryCatchFinallyStep tcf,

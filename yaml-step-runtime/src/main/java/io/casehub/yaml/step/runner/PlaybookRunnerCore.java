@@ -46,6 +46,7 @@ public final class PlaybookRunnerCore {
     private final NlpProtocolMatcher nlpMatcher;
     private final List<FailureRecoveryHandler> failureHandlers;
     private final UserInputProvider userInputProvider;
+    private final io.casehub.template.registry.UnifiedTemplateRegistry templateRegistry;
     static final  int DEFAULT_MAX_RECOVERY_DEPTH = 3;
 
 
@@ -92,6 +93,19 @@ public final class PlaybookRunnerCore {
                               NlpProtocolMatcher nlpMatcher,
                               List<FailureRecoveryHandler> failureHandlers,
                               UserInputProvider userInputProvider) {
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator,
+             moduleLoader, nlpMatcher, failureHandlers, userInputProvider, null);
+    }
+
+    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
+                              ServiceRegistry serviceRegistry,
+                              Path resourceRoot,
+                              SimulationActivator simulationActivator,
+                              ModuleLoader moduleLoader,
+                              NlpProtocolMatcher nlpMatcher,
+                              List<FailureRecoveryHandler> failureHandlers,
+                              UserInputProvider userInputProvider,
+                              io.casehub.template.registry.UnifiedTemplateRegistry templateRegistry) {
         this.pluginRegistry      = pluginRegistry;
         this.serviceRegistry     = serviceRegistry;
         this.resourceRoot        = resourceRoot;
@@ -100,6 +114,7 @@ public final class PlaybookRunnerCore {
         this.nlpMatcher          = nlpMatcher;
         this.failureHandlers     = failureHandlers != null ? List.copyOf(failureHandlers) : List.of();
         this.userInputProvider   = userInputProvider;
+        this.templateRegistry    = templateRegistry;
     }
 
 
@@ -294,7 +309,7 @@ public final class PlaybookRunnerCore {
         try (var scope = new io.casehub.yaml.core.orchestration.DefaultExecutionScope()) {
             var conditionEvaluator = new io.casehub.yaml.core.condition.ConditionEvaluator(null);
 
-            var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope)
+            var evaluator = new StructuralStepEvaluator(conditionEvaluator, scope, templateRegistry)
                                     .withListener(traceCollector)
                                     .withCaptureCollector(captureCollector);
 

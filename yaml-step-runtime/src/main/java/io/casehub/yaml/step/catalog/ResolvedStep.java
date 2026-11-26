@@ -117,26 +117,26 @@ public sealed interface ResolvedStep permits
 
         public boolean isTemplateMode() { return templateSpec != null; }
 
-        static MatchStep valueMode(String name, String scrutinee,
+        public static MatchStep valueMode(String name, String scrutinee,
                 List<ResolvedMatchCase> cases, Map<String, Object> decorators) {
             java.util.Objects.requireNonNull(scrutinee, "scrutinee required for value mode");
             return new MatchStep(name, scrutinee, cases, null, decorators, List.of());
         }
 
-        static MatchStep valueMode(String name, String scrutinee,
+        public static MatchStep valueMode(String name, String scrutinee,
                 List<ResolvedMatchCase> cases, Map<String, Object> decorators,
                 List<Annotation> annotations) {
             java.util.Objects.requireNonNull(scrutinee, "scrutinee required for value mode");
             return new MatchStep(name, scrutinee, cases, null, decorators, annotations);
         }
 
-        static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
+        public static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
                 Map<String, Object> decorators) {
             java.util.Objects.requireNonNull(templateSpec, "templateSpec required for template mode");
             return new MatchStep(name, null, List.of(), templateSpec, decorators, List.of());
         }
 
-        static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
+        public static MatchStep templateMode(String name, TemplateMatchSpec templateSpec,
                 Map<String, Object> decorators, List<Annotation> annotations) {
             java.util.Objects.requireNonNull(templateSpec, "templateSpec required for template mode");
             return new MatchStep(name, null, List.of(), templateSpec, decorators, annotations);

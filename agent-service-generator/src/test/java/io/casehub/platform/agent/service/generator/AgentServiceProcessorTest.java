@@ -156,6 +156,217 @@ class AgentServiceProcessorTest {
     }
 
     @Test
+    void generatesProxyForPojoReturnType() throws IOException {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.TaskAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+            import io.casehub.platform.agent.Param;
+
+            @AgentService(model = "fast")
+            public interface TaskAgent {
+                @Query("Get task ${id}")
+                Task getTask(@Param("id") String id);
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.TaskAgentProxy");
+        assertThat(proxy).contains("ResponseFormat.json(\"Task\"");
+        assertThat(proxy).contains("config = config.withResponseFormat");
+        assertThat(proxy).contains("objectMapper.readValue(result.text(), test.Task.class)");
+        assertThat(proxy).contains("AgentResponseParseException");
+        assertThat(proxy).contains("private final String taskSchema");
+        assertThat(proxy).contains("schemaGenerator.generate(test.Task.class)");
+    }
+
+    @Test
+    void generatesProxyForListReturnType() throws IOException {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.TaskListAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+            import java.util.List;
+
+            @AgentService(model = "fast")
+            public interface TaskListAgent {
+                @Query("List all tasks")
+                List<Task> listTasks();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.TaskListAgentProxy");
+        assertThat(proxy).contains("ResponseFormat.json(\"TaskList\"");
+        assertThat(proxy).contains("config = config.withResponseFormat");
+        assertThat(proxy).contains("TypeReference<java.util.List<test.Task>>");
+        assertThat(proxy).contains("AgentResponseParseException");
+    }
+
+    @Test
+    void generatesProxyForSetReturnType() throws IOException {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.TaskSetAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+            import java.util.Set;
+
+            @AgentService(model = "fast")
+            public interface TaskSetAgent {
+                @Query("Get unique tasks")
+                Set<Task> uniqueTasks();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.TaskSetAgentProxy");
+        assertThat(proxy).contains("new java.util.LinkedHashSet<>(");
+        assertThat(proxy).contains("TypeReference<java.util.List<test.Task>>");
+    }
+
+    @Test
+    void generatesProxyForCollectionReturnType() throws IOException {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.TaskCollectionAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+            import java.util.Collection;
+
+            @AgentService(model = "fast")
+            public interface TaskCollectionAgent {
+                @Query("Get all tasks")
+                Collection<Task> allTasks();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.TaskCollectionAgentProxy");
+        assertThat(proxy).contains("TypeReference<java.util.List<test.Task>>");
+        assertThat(proxy).doesNotContain("LinkedHashSet");
+    }
+
+    @Test
+    void generatesProxyForMixedReturnTypes() throws IOException {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.FullAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.AgentEvent;
+            import io.casehub.platform.agent.AgentSession;
+            import io.casehub.platform.agent.Query;
+            import io.smallrye.mutiny.Multi;
+            import java.util.List;
+
+            @AgentService(model = "fast")
+            public interface FullAgent {
+                @Query("Ask something")
+                String ask();
+
+                @Query("Get task")
+                Task getTask();
+
+                @Query("List tasks")
+                List<Task> listTasks();
+
+                @Query("Stream it")
+                Multi<AgentEvent> stream();
+
+                AgentSession session();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.FullAgentProxy");
+        assertThat(proxy).contains("return result.text();");
+        assertThat(proxy).contains("objectMapper.readValue(result.text(), test.Task.class)");
+        assertThat(proxy).contains("TypeReference<java.util.List<test.Task>>");
+        assertThat(proxy).contains("agentProvider.invoke(config)");
+        assertThat(proxy).contains("agentProvider.openSession(init)");
+        assertThat(proxy).contains("private final String taskSchema");
+    }
+
+    @Test
+    void generatedProxyHasExpandedConstructor() throws IOException {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.SimpleAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+
+            @AgentService(model = "fast")
+            public interface SimpleAgent {
+                @Query("Do something")
+                String doIt();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.SimpleAgentProxy");
+        assertThat(proxy).contains("PlatformSchemaGenerator schemaGenerator");
+        assertThat(proxy).contains("ObjectMapper objectMapper");
+        assertThat(proxy).contains("this.schemaGenerator = schemaGenerator");
+        assertThat(proxy).contains("this.objectMapper = objectMapper");
+    }
+
+    @Test
     void generatesProxyForMixedInterface() throws IOException {
         JavaFileObject source = JavaFileObjects.forSourceString("test.MixedAgent",
                                                                 """

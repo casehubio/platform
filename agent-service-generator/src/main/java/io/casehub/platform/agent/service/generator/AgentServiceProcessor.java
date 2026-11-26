@@ -70,17 +70,50 @@ public class AgentServiceProcessor extends AbstractProcessor {
             out.println("import io.casehub.platform.agent.AgentSession;");
             out.println("import io.smallrye.mutiny.Multi;");
             out.println("import java.time.Duration;");
+            out.println("import io.casehub.schema.generator.PlatformSchemaGenerator;");
+            out.println("import com.fasterxml.jackson.databind.ObjectMapper;");
+            out.println("import io.casehub.platform.agent.AgentResponseParseException;");
+            out.println("import com.fasterxml.jackson.core.type.TypeReference;");
             out.println();
 
             out.println("public class " + proxyName + " implements " + simpleName + " {");
             out.println();
             out.println("    private final AgentProvider agentProvider;");
             out.println("    private final AgentResolver agentResolver;");
+            out.println("    private final PlatformSchemaGenerator schemaGenerator;");
+            out.println("    private final ObjectMapper objectMapper;");
             out.println();
-            out.println("    public " + proxyName + "(AgentProvider agentProvider, AgentResolver agentResolver) {");
+            out.println("    public " + proxyName + "(AgentProvider agentProvider, AgentResolver agentResolver, PlatformSchemaGenerator schemaGenerator, ObjectMapper objectMapper) {");
             out.println("        this.agentProvider = agentProvider;");
             out.println("        this.agentResolver = agentResolver;");
+            out.println("        this.schemaGenerator = schemaGenerator;");
+            out.println("        this.objectMapper = objectMapper;");
+
+            java.util.LinkedHashSet<String> schemaTypes = new java.util.LinkedHashSet<>();
+            for (Element enclosed : iface.getEnclosedElements()) {
+                if (enclosed instanceof ExecutableElement m) {
+                    TypeMirror rt = m.getReturnType();
+                    if (!isMultiAgentEvent(rt) && !isAgentSession(rt) && !isString(rt)) {
+                        if (isCollection(rt)) {
+                            TypeMirror elementType = collectionElementType(rt);
+                            if (elementType != null) schemaTypes.add(elementType.toString());
+                        } else if (rt instanceof DeclaredType) {
+                            schemaTypes.add(rt.toString());
+                        }
+                    }
+                }
+            }
+            for (String schemaType : schemaTypes) {
+                String fieldName = schemaFieldName(schemaType);
+                out.println("        this." + fieldName + " = schemaGenerator.generate(" + schemaType + ".class).toString();");
+            }
+
             out.println("    }");
+
+            for (String schemaType : schemaTypes) {
+                String fieldName = schemaFieldName(schemaType);
+                out.println("    private final String " + fieldName + ";");
+            }
 
             for (Element enclosed : iface.getEnclosedElements()) {
                 if (enclosed instanceof ExecutableElement method) {
@@ -143,8 +176,40 @@ public class AgentServiceProcessor extends AbstractProcessor {
             String timeoutExpr = timeout > 0
                 ? "Duration.ofSeconds(" + timeout + ")"
                 : "Duration.ofSeconds(60)";
-            out.println("        AgentInvocationResult result = agentProvider.invokeBlocking(config, " + timeoutExpr + ");");
-            out.println("        return result.text();");
+
+            if (isString(returnType)) {
+                out.println("        AgentInvocationResult result = agentProvider.invokeBlocking(config, " + timeoutExpr + ");");
+                out.println("        return result.text();");
+            } else if (isCollection(returnType)) {
+                TypeMirror elementType = collectionElementType(returnType);
+                String elementTypeName = elementType.toString();
+                String elementSimple = simpleTypeName(elementTypeName);
+                String kind = collectionKind(returnType);
+                String elementFieldName = schemaFieldName(elementTypeName);
+                out.println("        String listSchema = \"{\\\"type\\\":\\\"array\\\",\\\"items\\\":\" + " + elementFieldName + " + \"}\";");
+                out.println("        config = config.withResponseFormat(ResponseFormat.json(\"" + elementSimple + kind + "\", listSchema));");
+                out.println("        AgentInvocationResult result = agentProvider.invokeBlocking(config, " + timeoutExpr + ");");
+                out.println("        try {");
+                if (kind.equals("Set")) {
+                    out.println("            return new java.util.LinkedHashSet<>(objectMapper.readValue(result.text(), new TypeReference<java.util.List<" + elementTypeName + ">>(){}));");
+                } else {
+                    out.println("            return objectMapper.readValue(result.text(), new TypeReference<java.util.List<" + elementTypeName + ">>(){});");
+                }
+                out.println("        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {");
+                out.println("            throw new AgentResponseParseException(\"Failed to parse response as " + kind + "<" + elementSimple + ">\", e, result.text());");
+                out.println("        }");
+            } else {
+                String qualifiedType = returnType.toString();
+                String simpleName = simpleTypeName(qualifiedType);
+                String fieldName = schemaFieldName(qualifiedType);
+                out.println("        config = config.withResponseFormat(ResponseFormat.json(\"" + simpleName + "\", " + fieldName + "));");
+                out.println("        AgentInvocationResult result = agentProvider.invokeBlocking(config, " + timeoutExpr + ");");
+                out.println("        try {");
+                out.println("            return objectMapper.readValue(result.text(), " + qualifiedType + ".class);");
+                out.println("        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {");
+                out.println("            throw new AgentResponseParseException(\"Failed to parse response as " + simpleName + "\", e, result.text());");
+                out.println("        }");
+            }
         }
 
         out.println("    }");
@@ -193,6 +258,49 @@ public class AgentServiceProcessor extends AbstractProcessor {
             return raw.equals("io.casehub.platform.agent.AgentSession");
         }
         return false;
+    }
+
+    private boolean isString(TypeMirror type) {
+        if (type instanceof DeclaredType dt) {
+            String raw = dt.asElement().toString();
+            return raw.equals("java.lang.String");
+        }
+        return false;
+    }
+
+    private boolean isCollection(TypeMirror type) {
+        if (type instanceof DeclaredType dt) {
+            String raw = dt.asElement().toString();
+            return raw.equals("java.util.List")
+                || raw.equals("java.util.Set")
+                || raw.equals("java.util.Collection");
+        }
+        return false;
+    }
+
+    private TypeMirror collectionElementType(TypeMirror type) {
+        if (type instanceof DeclaredType dt && !dt.getTypeArguments().isEmpty()) {
+            return dt.getTypeArguments().get(0);
+        }
+        return null;
+    }
+
+    private String collectionKind(TypeMirror type) {
+        if (type instanceof DeclaredType dt) {
+            String raw = dt.asElement().toString();
+            if (raw.equals("java.util.Set")) return "Set";
+            if (raw.equals("java.util.Collection")) return "Collection";
+        }
+        return "List";
+    }
+
+    private static String schemaFieldName(String qualifiedType) {
+        String simple = qualifiedType.contains(".") ? qualifiedType.substring(qualifiedType.lastIndexOf('.') + 1) : qualifiedType;
+        return Character.toLowerCase(simple.charAt(0)) + simple.substring(1) + "Schema";
+    }
+
+    private static String simpleTypeName(String qualifiedType) {
+        return qualifiedType.contains(".") ? qualifiedType.substring(qualifiedType.lastIndexOf('.') + 1) : qualifiedType;
     }
 
     private static String escapeJava(String s) {

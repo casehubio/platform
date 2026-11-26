@@ -95,6 +95,11 @@ public record AgentSessionConfig(
         return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat, modelParameters, tools);
     }
 
+    public AgentSessionConfig withUserPrompt(String userPrompt) {
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model, modelQuery, modelChain, responseFormat, modelParameters, tools);
+    }
+
+
     public static AgentSessionConfig of(String systemPrompt, String userPrompt,
                                         Duration timeout) {
         return new AgentSessionConfig(systemPrompt, userPrompt, List.of(), timeout, null, null, null, null, null, null, List.of());

@@ -50,10 +50,7 @@ public class GuardrailAgentProviderWrapper implements AgentProvider {
         }
         return GuardrailStreamOperator.validate(
             stream, outputGuardrails, config, maxReprompts,
-            reprompt -> delegate.invoke(AgentSessionConfig.of(config.systemPrompt(), reprompt)
-                .withModel(config.model())
-                .withResponseFormat(config.responseFormat())
-                .withTools(config.tools()))
+            reprompt -> delegate.invoke(config.withUserPrompt(reprompt))
         );
     }
 

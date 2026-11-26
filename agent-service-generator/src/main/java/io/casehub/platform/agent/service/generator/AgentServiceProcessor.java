@@ -84,9 +84,13 @@ public class AgentServiceProcessor extends AbstractProcessor {
 
             for (Element enclosed : iface.getEnclosedElements()) {
                 if (enclosed instanceof ExecutableElement method) {
-                    var queryAnn = method.getAnnotation(io.casehub.platform.agent.Query.class);
-                    if (queryAnn == null) continue;
-                    generateMethod(out, method, queryAnn, model, descriptor, timeout);
+                    if (isAgentSession(method.getReturnType())) {
+                        generateSessionMethod(out, method, model, descriptor);
+                    } else {
+                        var queryAnn = method.getAnnotation(io.casehub.platform.agent.Query.class);
+                        if (queryAnn == null) continue;
+                        generateMethod(out, method, queryAnn, model, descriptor, timeout);
+                    }
                 }
             }
 
@@ -135,12 +139,6 @@ public class AgentServiceProcessor extends AbstractProcessor {
 
         if (isMultiAgentEvent(returnType)) {
             out.println("        return agentProvider.invoke(config);");
-        } else if (isAgentSession(returnType)) {
-            out.println("        var init = AgentSessionInit.of(systemPrompt);");
-            if (!model.isEmpty()) {
-                out.println("        init = init.withModel(\"" + escapeJava(model) + "\");");
-            }
-            out.println("        return agentProvider.openSession(init);");
         } else {
             String timeoutExpr = timeout > 0
                 ? "Duration.ofSeconds(" + timeout + ")"
@@ -151,6 +149,35 @@ public class AgentServiceProcessor extends AbstractProcessor {
 
         out.println("    }");
     }
+
+    private void generateSessionMethod(PrintWriter out, ExecutableElement method,
+                                       String model, String descriptor) {
+        String returnTypeName = method.getReturnType().toString();
+        String methodName     = method.getSimpleName().toString();
+
+        out.println();
+        out.println("    @Override");
+        out.print("    public " + returnTypeName + " " + methodName + "(");
+        var params = method.getParameters();
+        for (int i = 0; i < params.size(); i++) {
+            if (i > 0) {out.print(", ");}
+            out.print(params.get(i).asType() + " " + params.get(i).getSimpleName());
+        }
+        out.println(") {");
+
+        out.println("        String systemPrompt = \"\";");
+        if (!descriptor.isEmpty()) {
+            out.println("        var resolved = agentResolver.resolve(\"" + escapeJava(descriptor) + "\");");
+            out.println("        if (resolved.isPresent()) { systemPrompt = resolved.get().systemPrompt(); }");
+        }
+        out.println("        var init = AgentSessionInit.of(systemPrompt);");
+        if (!model.isEmpty()) {
+            out.println("        init = init.withModel(\"" + escapeJava(model) + "\");");
+        }
+        out.println("        return agentProvider.openSession(init);");
+        out.println("    }");
+    }
+
 
     private boolean isMultiAgentEvent(TypeMirror type) {
         if (type instanceof DeclaredType dt) {

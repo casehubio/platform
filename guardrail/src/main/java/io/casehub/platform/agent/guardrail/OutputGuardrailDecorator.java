@@ -37,10 +37,7 @@ public class OutputGuardrailDecorator implements AgentProvider {
         List<OutputGuardrail> sorted = guardrails.stream().toList();
         return GuardrailStreamOperator.validate(
             stream, sorted, config, maxReprompts,
-            reprompt -> delegate.invoke(AgentSessionConfig.of(config.systemPrompt(), reprompt)
-                .withModel(config.model())
-                .withResponseFormat(config.responseFormat())
-                .withTools(config.tools()))
+            reprompt -> delegate.invoke(config.withUserPrompt(reprompt))
         );
     }
 

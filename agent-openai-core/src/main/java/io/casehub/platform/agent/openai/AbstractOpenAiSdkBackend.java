@@ -113,11 +113,6 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
                                                                                                 .build())
                                                       .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build());
 
-        String retention = promptCacheRetention();
-        if (retention != null && !retention.isEmpty()) {
-            paramsBuilder.store(true);
-        }
-
         if (config.responseFormat() != null
             && config.responseFormat().type() == ResponseFormatType.JSON) {
             if (config.responseFormat().schema() != null) {

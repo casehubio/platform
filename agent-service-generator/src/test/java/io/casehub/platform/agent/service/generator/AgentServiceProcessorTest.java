@@ -101,4 +101,92 @@ class AgentServiceProcessorTest {
         assertThat(proxy).contains("greet(java.lang.String name)");
         assertThat(proxy).contains("summarize(java.lang.String text)");
     }
+
+    @Test
+    void generatesProxyForStreamingMethod() throws IOException {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.StreamAgent",
+                                                                """
+                                                                package test;
+                                                                import io.casehub.platform.agent.AgentService;
+                                                                import io.casehub.platform.agent.AgentEvent;
+                                                                import io.casehub.platform.agent.Query;
+                                                                import io.smallrye.mutiny.Multi;
+                                                                
+                                                                @AgentService(model = "fast")
+                                                                public interface StreamAgent {
+                                                                    @Query("Stream response for ${topic}")
+                                                                    Multi<AgentEvent> stream(@io.casehub.platform.agent.Param("topic") String topic);
+                                                                }
+                                                                """);
+
+        Compilation compilation = Compiler.javac()
+                                          .withProcessors(new AgentServiceProcessor())
+                                          .compile(source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.StreamAgentProxy");
+        assertThat(proxy).contains("agentProvider.invoke(config)");
+        assertThat(proxy).doesNotContain("invokeBlocking");
+    }
+
+    @Test
+    void generatesProxyForSessionMethod() throws IOException {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.SessionAgent",
+                                                                """
+                                                                package test;
+                                                                import io.casehub.platform.agent.AgentService;
+                                                                import io.casehub.platform.agent.AgentSession;
+                                                                import io.casehub.platform.agent.Query;
+                                                                
+                                                                @AgentService(model = "fast", descriptor = "coach")
+                                                                public interface SessionAgent {
+                                                                    @Query("Start session")
+                                                                    AgentSession start();
+                                                                }
+                                                                """);
+
+        Compilation compilation = Compiler.javac()
+                                          .withProcessors(new AgentServiceProcessor())
+                                          .compile(source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.SessionAgentProxy");
+        assertThat(proxy).contains("agentProvider.openSession(init)");
+        assertThat(proxy).doesNotContain("invokeBlocking");
+    }
+
+    @Test
+    void generatesProxyForMixedInterface() throws IOException {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.MixedAgent",
+                                                                """
+                                                                package test;
+                                                                import io.casehub.platform.agent.AgentService;
+                                                                import io.casehub.platform.agent.AgentEvent;
+                                                                import io.casehub.platform.agent.AgentSession;
+                                                                import io.casehub.platform.agent.Query;
+                                                                import io.smallrye.mutiny.Multi;
+                                                                
+                                                                @AgentService(model = "fast")
+                                                                public interface MixedAgent {
+                                                                    @Query("Ask something")
+                                                                    String ask();
+                                                                
+                                                                    @Query("Stream it")
+                                                                    Multi<AgentEvent> stream();
+                                                                
+                                                                    @Query("Open session")
+                                                                    AgentSession session();
+                                                                }
+                                                                """);
+
+        Compilation compilation = Compiler.javac()
+                                          .withProcessors(new AgentServiceProcessor())
+                                          .compile(source);
+
+        assertThat(compilation).succeeded();
+        String proxy = readGenerated(compilation, "test.MixedAgentProxy");
+        assertThat(proxy).contains("invokeBlocking");
+        assertThat(proxy).contains("agentProvider.invoke(config)");
+        assertThat(proxy).contains("agentProvider.openSession(init)");
+    }
 }

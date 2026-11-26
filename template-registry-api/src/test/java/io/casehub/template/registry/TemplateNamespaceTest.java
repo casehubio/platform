@@ -57,4 +57,26 @@ class TemplateNamespaceTest {
         templates.put("extra", new TemplateDefinition("extra", List.of("p"), Map.of()));
         assertThat(ns.templates()).hasSize(1);
     }
+
+    @Test
+    void twoArgConstructor_defaultsToEnglish() {
+        var def = new TemplateDefinition("t", List.of("p"), Map.of());
+        var ns  = new TemplateNamespace("ns", Map.of("t", def));
+        assertThat(ns.language()).isEqualTo("en");
+    }
+
+    @Test
+    void threeArgConstructor_acceptsLanguage() {
+        var def = new TemplateDefinition("t", List.of("p"), Map.of());
+        var ns  = new TemplateNamespace("ns", Map.of("t", def), "de");
+        assertThat(ns.language()).isEqualTo("de");
+    }
+
+    @Test
+    void nullLanguage_defaultsToEnglish() {
+        var def = new TemplateDefinition("t", List.of("p"), Map.of());
+        var ns  = new TemplateNamespace("ns", Map.of("t", def), null);
+        assertThat(ns.language()).isEqualTo("en");
+    }
+
 }

@@ -7,11 +7,18 @@ import java.util.Objects;
 
 public record TemplateNamespace(
     String name,
-    Map<String, TemplateDefinition> templates
+    Map<String, TemplateDefinition> templates,
+    String language
 ) {
+    public TemplateNamespace(String name,
+                             Map<String, TemplateDefinition> templates) {
+        this(name, templates, "en");
+    }
+
     public TemplateNamespace {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(templates, "templates");
+        language = language != null ? language : "en";
         if (templates.isEmpty()) {
             throw new IllegalArgumentException(
                 "Namespace must have at least one template");

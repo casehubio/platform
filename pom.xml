@@ -188,6 +188,7 @@
         <module>agent-gate-core</module>
         <module>agent-gate</module>
         <module>guardrail</module>
+        <module>agent-service-generator</module>
         <module>graphql</module>
         <module>graphql-client</module>
         <module>mcp-core</module>

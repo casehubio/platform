@@ -1,5 +1,6 @@
 package io.casehub.platform.agent.claude.config;
 
+import io.casehub.platform.agent.CachePolicy;
 import io.casehub.platform.agent.claude.AnthropicChatModelProperties;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -23,4 +24,8 @@ public interface AnthropicChatModelConfig extends AnthropicChatModelProperties {
     @Override
     @WithDefault("8192")
     int maxTokens();
+
+    @Override
+    @WithDefault("SYSTEM_AND_TOOLS")
+    CachePolicy cachePolicy();
 }

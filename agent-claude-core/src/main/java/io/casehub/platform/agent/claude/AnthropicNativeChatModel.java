@@ -1,6 +1,7 @@
 package io.casehub.platform.agent.claude;
 
 import com.anthropic.client.AnthropicClient;
+import io.casehub.platform.agent.CachePolicy;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.ToolUnion;
@@ -17,26 +18,33 @@ public class AnthropicNativeChatModel implements ChatModel {
     private final String          defaultModel;
     private final Duration        defaultTimeout;
     private final int             maxTokens;
-    private final boolean         cacheAutomatically;
+    private final CachePolicy     cachePolicy;
+
+    public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
+                                    Duration defaultTimeout, int maxTokens,
+                                    CachePolicy cachePolicy) {
+        this.client         = Objects.requireNonNull(client, "client");
+        this.defaultModel   = Objects.requireNonNull(defaultModel, "defaultModel");
+        this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(120);
+        this.maxTokens      = maxTokens > 0 ? maxTokens : 8192;
+        this.cachePolicy    = cachePolicy != null ? cachePolicy : CachePolicy.SYSTEM_AND_TOOLS;
+    }
 
     public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
                                     Duration defaultTimeout, int maxTokens,
                                     boolean cacheAutomatically) {
-        this.client             = Objects.requireNonNull(client, "client");
-        this.defaultModel       = Objects.requireNonNull(defaultModel, "defaultModel");
-        this.defaultTimeout     = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(120);
-        this.maxTokens          = maxTokens > 0 ? maxTokens : 8192;
-        this.cacheAutomatically = cacheAutomatically;
+        this(client, defaultModel, defaultTimeout, maxTokens,
+             cacheAutomatically ? CachePolicy.SYSTEM_AND_TOOLS : CachePolicy.NONE);
     }
 
     public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
                                     Duration defaultTimeout, int maxTokens) {
-        this(client, defaultModel, defaultTimeout, maxTokens, true);
+        this(client, defaultModel, defaultTimeout, maxTokens, CachePolicy.SYSTEM_AND_TOOLS);
     }
 
     public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
                                     Duration defaultTimeout) {
-        this(client, defaultModel, defaultTimeout, 8192, true);
+        this(client, defaultModel, defaultTimeout, 8192, CachePolicy.SYSTEM_AND_TOOLS);
     }
 
     @Override
@@ -45,7 +53,7 @@ public class AnthropicNativeChatModel implements ChatModel {
                            ? request.parameters().modelName()
                            : defaultModel;
 
-        var systemBlocks = LangChain4jAnthropicMapper.extractSystemBlocks(request.messages(), cacheAutomatically);
+        var systemBlocks = LangChain4jAnthropicMapper.extractSystemBlocks(request.messages(), cachePolicy);
         var messages     = LangChain4jAnthropicMapper.toAnthropicMessages(request.messages());
 
         int effectiveMaxTokens = request.parameters().maxOutputTokens() != null
@@ -63,7 +71,7 @@ public class AnthropicNativeChatModel implements ChatModel {
 
         var tools = request.parameters().toolSpecifications();
         if (tools != null && !tools.isEmpty()) {
-            var anthropicTools = LangChain4jAnthropicMapper.toAnthropicTools(tools);
+            var anthropicTools = LangChain4jAnthropicMapper.toAnthropicTools(tools, cachePolicy);
             paramsBuilder.tools(anthropicTools.stream()
                                               .map(ToolUnion::ofTool)
                                               .toList());

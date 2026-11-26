@@ -1,6 +1,7 @@
 package io.casehub.platform.agent.claude;
 
 import com.anthropic.models.messages.CacheControlEphemeral;
+import io.casehub.platform.agent.CachePolicy;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageParam;
@@ -47,6 +48,10 @@ final class LangChain4jAnthropicMapper {
             }
         }
         return blocks;
+    }
+
+    static List<TextBlockParam> extractSystemBlocks(List<ChatMessage> messages, CachePolicy cachePolicy) {
+        return extractSystemBlocks(messages, cachePolicy != null && cachePolicy != CachePolicy.NONE);
     }
 
 
@@ -99,11 +104,14 @@ final class LangChain4jAnthropicMapper {
         return result;
     }
 
-    static List<Tool> toAnthropicTools(List<ToolSpecification> tools) {
-        if (tools == null || tools.isEmpty()) return List.of();
-        List<Tool> result = new ArrayList<>();
+    static List<Tool> toAnthropicTools(List<ToolSpecification> tools) {return toAnthropicTools(tools, CachePolicy.ALL_STATIC);}
+
+    static List<Tool> toAnthropicTools(List<ToolSpecification> tools, CachePolicy cachePolicy) {
+        if (tools == null || tools.isEmpty()) {return List.of();}
+        boolean    cacheTools = cachePolicy != null && cachePolicy != CachePolicy.NONE;
+        List<Tool> result     = new ArrayList<>();
         for (int i = 0; i < tools.size(); i++) {
-            ToolSpecification tool = tools.get(i);
+            ToolSpecification   tool = tools.get(i);
             Map<String, Object> schemaMap;
             if (tool.parameters() != null) {
                 schemaMap = dev.langchain4j.internal.JsonSchemaElementJsonUtils.toMap(tool.parameters());
@@ -111,20 +119,20 @@ final class LangChain4jAnthropicMapper {
                 schemaMap = Map.of("type", "object");
             }
             var builder = Tool.builder()
-                    .name(tool.name())
-                    .description(tool.description() != null ? tool.description() : "")
-                    .inputSchema(Tool.InputSchema.builder()
-                            .properties(com.anthropic.core.JsonValue.from(
-                                    schemaMap.getOrDefault("properties", Map.of())))
-                            .build());
-            // cache_control on the last tool for prompt caching
-            if (i == tools.size() - 1) {
+                              .name(tool.name())
+                              .description(tool.description() != null ? tool.description() : "")
+                              .inputSchema(Tool.InputSchema.builder()
+                                                           .properties(com.anthropic.core.JsonValue.from(
+                                                                   schemaMap.getOrDefault("properties", Map.of())))
+                                                           .build());
+            if (cacheTools && i == tools.size() - 1) {
                 builder.cacheControl(CacheControlEphemeral.builder().build());
             }
             result.add(builder.build());
         }
         return result;
     }
+
 
     static ChatResponse toChatResponse(Message message) {
         StringBuilder text = new StringBuilder();

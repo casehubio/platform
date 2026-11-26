@@ -95,6 +95,58 @@ class UnmetRequirementHandlerTest {
         assertThat(rp.vars()).containsEntry("sub", List.of("receive"));
     }
 
+    @Test
+    void diagnose_returns_PromptUser_for_manual_with_promptText() {
+        var failure = failureWith(List.of(
+                Map.of("type", "manual", "capability", "sms",
+                       "promptText", "Enter your phone number",
+                       "variableName", "phone")));
+
+        var action = handler.diagnose((Result.Failure) failure, ctx);
+
+        assertThat(action).isInstanceOf(RecoveryAction.PromptUser.class);
+        var pu = (RecoveryAction.PromptUser) action;
+        assertThat(pu.promptText()).isEqualTo("Enter your phone number");
+        assertThat(pu.variableName()).isEqualTo("phone");
+        assertThat(pu.capability()).isEqualTo("sms");
+    }
+
+    @Test
+    void diagnose_returns_PromptUser_variableName_defaults_to_capability() {
+        var failure = failureWith(List.of(
+                Map.of("type", "manual", "capability", "sms",
+                       "promptText", "Enter your phone number")));
+
+        var action = handler.diagnose((Result.Failure) failure, ctx);
+
+        assertThat(action).isInstanceOf(RecoveryAction.PromptUser.class);
+        assertThat(((RecoveryAction.PromptUser) action).variableName()).isEqualTo("sms");
+    }
+
+    @Test
+    void diagnose_returns_Unrecoverable_for_manual_without_promptText() {
+        var failure = failureWith(List.of(
+                Map.of("type", "manual", "capability", "sms")));
+
+        var action = handler.diagnose((Result.Failure) failure, ctx);
+
+        assertThat(action).isInstanceOf(RecoveryAction.Unrecoverable.class);
+    }
+
+    @Test
+    void diagnose_prefers_provider_over_manual() {
+        var failure = failureWith(List.of(
+                Map.of("type", "manual", "capability", "sms",
+                       "promptText", "Enter phone"),
+                Map.of("type", "provider", "connector-id", "numbrrs",
+                       "setup-playbook", "setup.yaml")));
+
+        var action = handler.diagnose((Result.Failure) failure, ctx);
+
+        assertThat(action).isInstanceOf(RecoveryAction.RunPlaybook.class);
+    }
+
+
     @SuppressWarnings("unchecked")
     private static Result failureWith(List<Map<String, Object>> options) {
         return Result.failed("Capability 'sms' is not satisfied", "unmet-requirement",

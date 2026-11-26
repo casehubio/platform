@@ -33,6 +33,19 @@ public final class UnmetRequirementHandler implements FailureRecoveryHandler {
             }
         }
 
+        for (var option : options) {
+            if ("manual".equals(option.get("type"))
+                    && option.containsKey("promptText")) {
+                String capability = (String) failure.detail().getOrDefault("capability", "");
+                return new RecoveryAction.PromptUser(
+                        (String) option.get("promptText"),
+                        (String) option.getOrDefault("variableName",
+                                option.getOrDefault("capability", "input")),
+                        capability,
+                        option);
+            }
+        }
+
         return new RecoveryAction.Unrecoverable(
                 "Capability '" + failure.detail().get("capability") + "' requires manual resolution",
                 Map.of(

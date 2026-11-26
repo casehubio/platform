@@ -19,7 +19,8 @@ public class GeminiChatModelManualConfig {
         var clientBuilder = com.google.genai.Client.builder();
         properties.apiKey().ifPresent(clientBuilder::apiKey);
         GeminiNativeChatModel chatModel = new GeminiNativeChatModel(
-                clientBuilder.build(), properties.defaultModel(), properties.defaultTimeout());
+                clientBuilder.build(), properties.defaultModel(), properties.defaultTimeout(),
+                properties.cachedContent().orElse(null));
         return new SimpleChatModelBackend("gemini", chatModel);
     }
 }

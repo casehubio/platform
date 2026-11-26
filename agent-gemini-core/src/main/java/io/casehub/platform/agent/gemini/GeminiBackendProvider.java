@@ -33,6 +33,9 @@ public class GeminiBackendProvider implements BackendProvider {
             @Override public int maxConcurrentSessions() {
                 return intProperty(properties, "max-concurrent-sessions", 4);
             }
+            @Override public Optional<String> cachedContent() {
+                return Optional.ofNullable(properties.get("cached-content"));
+            }
         });
     }
 }

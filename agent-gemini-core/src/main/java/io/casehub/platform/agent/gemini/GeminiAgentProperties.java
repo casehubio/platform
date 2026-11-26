@@ -14,4 +14,8 @@ public interface GeminiAgentProperties {
     Duration defaultTimeout();
 
     int maxConcurrentSessions();
+
+    default Optional<String> cachedContent() {
+        return Optional.empty();
+    }
 }

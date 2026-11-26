@@ -13,29 +13,40 @@ import java.util.Objects;
 
 public class GeminiNativeChatModel implements ChatModel {
 
-    private final Client client;
-    private final String defaultModel;
+    private final Client   client;
+    private final String   defaultModel;
     private final Duration defaultTimeout;
+    private final String   cachedContent;
+
+    public GeminiNativeChatModel(Client client, String defaultModel,
+                                 Duration defaultTimeout, String cachedContent) {
+        this.client         = Objects.requireNonNull(client, "client");
+        this.defaultModel   = Objects.requireNonNull(defaultModel, "defaultModel");
+        this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(300);
+        this.cachedContent  = cachedContent;
+    }
 
     public GeminiNativeChatModel(Client client, String defaultModel, Duration defaultTimeout) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.defaultModel = Objects.requireNonNull(defaultModel, "defaultModel");
-        this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(300);
+        this(client, defaultModel, defaultTimeout, null);
     }
 
     @Override
     public ChatResponse chat(ChatRequest request) {
         String modelName = request.parameters().modelName() != null
-                ? request.parameters().modelName()
-                : defaultModel;
+                           ? request.parameters().modelName()
+                           : defaultModel;
 
         Content systemInstruction = LangChain4jGeminiMapper.extractSystemInstruction(request.messages());
-        var contents = LangChain4jGeminiMapper.toGeminiContents(request.messages());
+        var     contents          = LangChain4jGeminiMapper.toGeminiContents(request.messages());
 
         var configBuilder = GenerateContentConfig.builder();
 
         if (systemInstruction != null) {
             configBuilder.systemInstruction(systemInstruction);
+        }
+
+        if (cachedContent != null) {
+            configBuilder.cachedContent(cachedContent);
         }
 
         var tools = request.parameters().toolSpecifications();
@@ -63,5 +74,7 @@ public class GeminiNativeChatModel implements ChatModel {
         return LangChain4jGeminiMapper.toChatResponse(response, modelName);
     }
 
-    public String defaultModel() { return defaultModel; }
+    public String defaultModel()  {return defaultModel;}
+
+    public String cachedContent() {return cachedContent;}
 }

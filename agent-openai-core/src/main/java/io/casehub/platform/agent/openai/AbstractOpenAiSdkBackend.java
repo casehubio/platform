@@ -2,14 +2,13 @@ package io.casehub.platform.agent.openai;
 
 import com.openai.core.http.StreamResponse;
 import com.openai.models.ChatModel;
+import com.openai.models.ResponseFormatJsonSchema;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionStreamOptions;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
-import com.openai.models.ResponseFormatJsonSchema;
 import io.casehub.platform.agent.AgentBackend;
-import io.casehub.platform.agent.ResponseFormatType;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProcessException;
 import io.casehub.platform.agent.AgentSession;
@@ -17,6 +16,7 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
+import io.casehub.platform.agent.ResponseFormatType;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
@@ -61,6 +61,9 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
     protected abstract com.openai.client.OpenAIClient openAiClient();
     protected abstract Duration defaultTimeout();
     protected abstract String defaultModel();
+
+    protected String promptCacheRetention() {return null;}
+
 
     int availablePermits() {
         return semaphore.availablePermits();
@@ -109,6 +112,11 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
                                                                                                 .content(config.userPrompt())
                                                                                                 .build())
                                                       .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build());
+
+        String retention = promptCacheRetention();
+        if (retention != null && !retention.isEmpty()) {
+            paramsBuilder.store(true);
+        }
 
         if (config.responseFormat() != null
             && config.responseFormat().type() == ResponseFormatType.JSON) {

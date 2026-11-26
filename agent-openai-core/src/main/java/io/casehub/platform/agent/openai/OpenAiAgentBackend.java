@@ -57,4 +57,9 @@ public class OpenAiAgentBackend extends AbstractOpenAiSdkBackend {
 
     @Override
     protected String defaultModel() {return properties != null ? properties.defaultModel() : factoryModel;}
+
+    @Override
+    protected String promptCacheRetention() {
+        return properties != null ? properties.promptCacheRetention() : null;
+    }
 }

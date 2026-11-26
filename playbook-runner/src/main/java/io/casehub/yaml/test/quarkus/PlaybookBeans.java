@@ -60,7 +60,7 @@ public class PlaybookBeans implements PlaybookApi {
         }
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
                                             resourceRoot, simulationActivator, moduleLoader,
-                                            null, List.of(new UnmetRequirementHandler()),
+                                            List.of(new UnmetRequirementHandler()),
                                             userInputProvider);
         return runner.run(Path.of(request.playbookPath()), config);
     }

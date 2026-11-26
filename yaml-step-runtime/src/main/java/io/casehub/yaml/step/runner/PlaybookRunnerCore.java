@@ -1,7 +1,6 @@
 package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.platform.coordination.protocol.NlpProtocolMatcher;
 import io.casehub.yaml.core.annotation.AnnotationMap;
 import io.casehub.yaml.core.error.LocationIndex;
 import io.casehub.yaml.core.error.ParseError;
@@ -43,7 +42,6 @@ public final class PlaybookRunnerCore {
     private final Path resourceRoot;
     private final SimulationActivator simulationActivator;
     private final ModuleLoader moduleLoader;
-    private final NlpProtocolMatcher nlpMatcher;
     private final List<FailureRecoveryHandler> failureHandlers;
     private final UserInputProvider userInputProvider;
     private final io.casehub.template.registry.UnifiedTemplateRegistry templateRegistry;
@@ -54,7 +52,7 @@ public final class PlaybookRunnerCore {
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
                               SimulationActivator simulationActivator) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null, null, List.of());
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null, List.of());
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -62,7 +60,7 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, null, List.of());
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, List.of());
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -70,19 +68,9 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader,
-                              NlpProtocolMatcher nlpMatcher) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, nlpMatcher, List.of());
-    }
-
-    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
-                              ServiceRegistry serviceRegistry,
-                              Path resourceRoot,
-                              SimulationActivator simulationActivator,
-                              ModuleLoader moduleLoader,
-                              NlpProtocolMatcher nlpMatcher,
                               List<FailureRecoveryHandler> failureHandlers) {
         this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator,
-             moduleLoader, nlpMatcher, failureHandlers, null);
+             moduleLoader, failureHandlers, null);
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -90,11 +78,10 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader,
-                              NlpProtocolMatcher nlpMatcher,
                               List<FailureRecoveryHandler> failureHandlers,
                               UserInputProvider userInputProvider) {
         this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator,
-             moduleLoader, nlpMatcher, failureHandlers, userInputProvider, null);
+             moduleLoader, failureHandlers, userInputProvider, null);
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -102,7 +89,6 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader,
-                              NlpProtocolMatcher nlpMatcher,
                               List<FailureRecoveryHandler> failureHandlers,
                               UserInputProvider userInputProvider,
                               io.casehub.template.registry.UnifiedTemplateRegistry templateRegistry) {
@@ -111,7 +97,6 @@ public final class PlaybookRunnerCore {
         this.resourceRoot        = resourceRoot;
         this.simulationActivator = simulationActivator;
         this.moduleLoader        = moduleLoader;
-        this.nlpMatcher          = nlpMatcher;
         this.failureHandlers     = failureHandlers != null ? List.copyOf(failureHandlers) : List.of();
         this.userInputProvider   = userInputProvider;
         this.templateRegistry    = templateRegistry;
@@ -172,10 +157,7 @@ public final class PlaybookRunnerCore {
             if (content.containsKey("templates")) {
                 @SuppressWarnings("unchecked")
                 var templatesMap = (Map<String, Object>) content.get("templates");
-                var filter = TemplateMatchingFilter.fromYaml(playbookName, templatesMap, nlpMatcher);
-                if (serviceRegistry instanceof io.casehub.yaml.plugin.api.MapServiceRegistry mapRegistry) {
-                    mapRegistry.register(TemplateMatchingFilter.class, filter);
-                }
+                registerPlaybookTemplates(playbookName, templatesMap);
             }
 
             @SuppressWarnings("unchecked")
@@ -250,10 +232,7 @@ public final class PlaybookRunnerCore {
             if (content.containsKey("templates")) {
                 @SuppressWarnings("unchecked")
                 var templatesMap = (Map<String, Object>) content.get("templates");
-                var filter = TemplateMatchingFilter.fromYaml(playbookName, templatesMap, nlpMatcher);
-                if (serviceRegistry instanceof io.casehub.yaml.plugin.api.MapServiceRegistry mapRegistry) {
-                    mapRegistry.register(TemplateMatchingFilter.class, filter);
-                }
+                registerPlaybookTemplates(playbookName, templatesMap);
             }
 
             @SuppressWarnings("unchecked")
@@ -658,6 +637,48 @@ public final class PlaybookRunnerCore {
             }
         }
         return inactive;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private void registerPlaybookTemplates(String playbookName, Map<String, Object> templatesMap) {
+        if (templateRegistry == null) {
+            return;
+        }
+        var definitions = new LinkedHashMap<String, io.casehub.template.registry.TemplateDefinition>();
+        for (var entry : templatesMap.entrySet()) {
+            String templateName = entry.getKey();
+            var    templateDef  = (Map<String, Object>) entry.getValue();
+            String pattern      = (String) templateDef.get("pattern");
+
+            var builder = io.casehub.template.registry.TemplateDefinition.builder(templateName)
+                                                                         .pattern(pattern);
+
+            if (templateDef.containsKey("variables")) {
+                var varsMap = (Map<String, Object>) templateDef.get("variables");
+                for (var varEntry : varsMap.entrySet()) {
+                    var varDef = (Map<String, Object>) varEntry.getValue();
+                    builder.variable(varEntry.getKey(), parseTemplateVariableConstraint(varDef));
+                }
+            }
+            definitions.put(templateName, builder.build());
+        }
+        var namespace = new io.casehub.template.registry.TemplateNamespace(playbookName, definitions);
+        templateRegistry.replaceOrRegister(namespace);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static io.casehub.yaml.core.resolver.VariableConstraint parseTemplateVariableConstraint(Map<String, Object> varDef) {
+        String                                           type     = (String) varDef.getOrDefault("type", "string");
+        boolean                                          required = (boolean) varDef.getOrDefault("required", true);
+        io.casehub.yaml.core.resolver.VariableConstraint constraint;
+        if ("enum".equals(type)) {
+            var values = (java.util.List<String>) varDef.get("values");
+            constraint = io.casehub.yaml.core.resolver.VariableConstraint.enumOf(values.toArray(new String[0]));
+        } else {
+            constraint = io.casehub.yaml.core.resolver.VariableConstraint.string();
+        }
+        return required ? constraint : constraint.optional();
     }
 
 

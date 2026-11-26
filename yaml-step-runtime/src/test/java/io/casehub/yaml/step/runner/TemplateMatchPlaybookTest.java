@@ -55,7 +55,7 @@ class TemplateMatchPlaybookTest {
         registry.register(Definition.of("log").execute(logAction).absorbSiblings(true).build());
 
         return new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-            null, null, null, null, List.of(), null, templateRegistry);
+            null, null, null, List.of(), null, templateRegistry);
     }
 
     @Test
@@ -165,6 +165,43 @@ class TemplateMatchPlaybookTest {
         assertThat(result.success()).as("Playbook should succeed: %s", result.error()).isTrue();
         assertThat(executionLog).isEmpty();
     }
+
+    @Test
+    void endToEnd_inlineTemplates_registersAndMatches() {
+        var runner = buildRunner();
+        var config = new PlaybookRunConfig(false, Map.of("text", "I approve this architecture"), null, null);
+
+        var result = runner.run("""
+                                name: inline-template-test
+                                params:
+                                  text:
+                                    type: string
+                                templates:
+                                  vote:
+                                    pattern: "I ${decision} this ${subject}"
+                                    variables:
+                                      decision:
+                                        type: enum
+                                        values: [approve, reject]
+                                      subject:
+                                        type: string
+                                ---
+                                - match:
+                                    input: ${params.text}
+                                    namespace: inline-template-test
+                                    on:
+                                      vote:
+                                        - log:
+                                            message: vote-matched
+                                    unmatched:
+                                      - log:
+                                          message: unmatched
+                                """, config);
+
+        assertThat(result.success()).as("Playbook should succeed: %s", result.error()).isTrue();
+        assertThat(executionLog).containsExactly("vote-matched");
+    }
+
 
     private static class SimplePluginRegistry implements PluginRegistry {
         private final java.util.concurrent.ConcurrentHashMap<String, Definition> defs = new java.util.concurrent.ConcurrentHashMap<>();

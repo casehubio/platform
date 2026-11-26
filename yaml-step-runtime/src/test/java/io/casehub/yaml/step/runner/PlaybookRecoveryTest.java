@@ -46,7 +46,7 @@ class PlaybookRecoveryTest {
                 definition("configure", configureAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null, List.of(new UnmetRequirementHandler()));
+                tempDir, null, null, List.of(new UnmetRequirementHandler()));
 
         var mainPlaybook = tempDir.resolve("main.yaml");
         Files.writeString(mainPlaybook, "name: main\n---\n- require-capability:\n    capability: sms\n");
@@ -68,7 +68,7 @@ class PlaybookRecoveryTest {
         var registry = registryWith(definition("require-capability", requireAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null, List.of());
+                tempDir, null, null, List.of());
 
         var mainPlaybook = tempDir.resolve("main.yaml");
         Files.writeString(mainPlaybook, "name: test\n---\n- require-capability:\n    capability: sms\n");
@@ -92,7 +92,7 @@ class PlaybookRecoveryTest {
         var registry = registryWith(definition("require-capability", alwaysFailAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null, List.of(new UnmetRequirementHandler()));
+                tempDir, null, null, List.of(new UnmetRequirementHandler()));
 
         var mainPlaybook = tempDir.resolve("main.yaml");
         Files.writeString(mainPlaybook, "name: test\n---\n- require-capability:\n    capability: x\n");
@@ -119,7 +119,7 @@ class PlaybookRecoveryTest {
         var registry = registryWith(definition("require-capability", failAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null, List.of(new UnmetRequirementHandler()));
+                tempDir, null, null, List.of(new UnmetRequirementHandler()));
 
         var mainPlaybook = tempDir.resolve("main.yaml");
         Files.writeString(mainPlaybook, "name: test\n---\n- require-capability:\n    capability: x\n");
@@ -140,7 +140,7 @@ class PlaybookRecoveryTest {
         var registry = registryWith(definition("require-capability", requireAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null, List.of(new UnmetRequirementHandler()));
+                tempDir, null, null, List.of(new UnmetRequirementHandler()));
 
         var mainPlaybook = tempDir.resolve("main.yaml");
         Files.writeString(mainPlaybook, "name: test\n---\n- require-capability:\n    capability: sms\n");

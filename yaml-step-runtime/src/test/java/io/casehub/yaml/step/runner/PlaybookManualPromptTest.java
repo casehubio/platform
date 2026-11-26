@@ -43,7 +43,7 @@ class PlaybookManualPromptTest {
         UserInputProvider inputProvider = (prompt, context) -> "+1234567890";
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null,
+                tempDir, null, null,
                 List.of(new UnmetRequirementHandler()), inputProvider);
 
         var mainPlaybook = tempDir.resolve("main.yaml");
@@ -73,7 +73,7 @@ class PlaybookManualPromptTest {
         UserInputProvider inputProvider = (prompt, context) -> null;
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null,
+                tempDir, null, null,
                 List.of(new UnmetRequirementHandler()), inputProvider);
 
         var mainPlaybook = tempDir.resolve("main.yaml");
@@ -99,7 +99,7 @@ class PlaybookManualPromptTest {
         var registry = registryWith(definition("require-capability", requireAction));
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null,
+                tempDir, null, null,
                 List.of(new UnmetRequirementHandler()));
 
         var mainPlaybook = tempDir.resolve("main.yaml");
@@ -146,7 +146,7 @@ class PlaybookManualPromptTest {
                 prompt.contains("phone") ? "+1234567890" : "user@example.com";
 
         var runner = new PlaybookRunnerCore(registry, new MapServiceRegistry(),
-                tempDir, null, null, null,
+                tempDir, null, null,
                 List.of(new UnmetRequirementHandler()), inputProvider);
 
         var mainPlaybook = tempDir.resolve("main.yaml");

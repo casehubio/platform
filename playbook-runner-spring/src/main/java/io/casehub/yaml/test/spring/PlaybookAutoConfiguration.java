@@ -49,7 +49,7 @@ public class PlaybookAutoConfiguration {
                                                    request.corpusPath(), request.simulationProfile());
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
                                                     resourceRoot(), activator, moduleLoader,
-                                                    null, List.of(new UnmetRequirementHandler()),
+                                                    List.of(new UnmetRequirementHandler()),
                                                     inputProvider);
                 return runner.run(Path.of(request.playbookPath()), config);
             }

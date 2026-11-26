@@ -263,6 +263,7 @@
         <module>message-extraction</module>
         <module>template-registry-api</module>
         <module>template-registry</module>
+        <module>template-registry-llm</module>
     </modules>
 
     <properties>

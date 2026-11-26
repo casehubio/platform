@@ -694,7 +694,12 @@ class TemplateRegistryIntegrationTest {
                 .isInstanceOf(TemplateMatch.Unmatched.class);
         }
 
-        @ParameterizedTest(name = "paraphrase unmatched: \"{0}\"")
+        /**
+         * These semantic equivalents are NOT handled by tiers 1+2 (regex + NLP structural).
+         * Tier 3 (AdaptiveTemplateRegistry in template-registry-llm) bridges this gap via
+         * LLM classification — see AdaptiveRegistryIntegrationTest.
+         */
+        @ParameterizedTest(name = "paraphrase unmatched in tiers 1+2: \"{0}\"")
         @ValueSource(strings = {
             "I'm in favour of this design",
             "This design has my approval",
@@ -703,11 +708,12 @@ class TemplateRegistryIntegrationTest {
             "Thumbs up on this architecture",
             "I'm on board with this approach"
         })
-        void semanticEquivalentsDoNotMatch(String input) {
+        void semanticEquivalentsDoNotMatchInStructuralTiers(String input) {
             var r = registry.match("protocol:review", input);
             assertThat(r)
                 .as("'%s' is semantically equivalent to 'I approve this design' "
-                    + "but structurally different — the NLP handles inflection, not paraphrase", input)
+                    + "but structurally different — tiers 1+2 handle inflection, not paraphrase."
+                    + " Tier 3 (AdaptiveTemplateRegistry) bridges this via LLM classification.", input)
                 .isInstanceOf(TemplateMatch.Unmatched.class);
         }
 

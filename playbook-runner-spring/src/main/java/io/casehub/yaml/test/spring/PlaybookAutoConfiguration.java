@@ -12,6 +12,7 @@ import io.casehub.yaml.step.runner.PlaybookRunnerCore;
 import io.casehub.yaml.step.runner.PlaybookValidationResult;
 import io.casehub.yaml.step.runner.SimulationActivator;
 import io.casehub.yaml.step.runner.UnmetRequirementHandler;
+import io.casehub.yaml.step.runner.UserInputProvider;
 import io.casehub.yaml.test.SimulationRuntimeActivator;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -30,10 +31,12 @@ public class PlaybookAutoConfiguration {
     @ConditionalOnMissingBean(PlaybookApi.class)
     public PlaybookApi playbookApi(PluginRegistry pluginRegistry,
                                    ServiceRegistry serviceRegistry,
-                                   ObjectProvider<SimulationRuntime> simulationRuntimeProvider) {
-        SimulationRuntime runtime      = simulationRuntimeProvider.getIfAvailable();
-        SimulationActivator activator  = runtime != null ? new SimulationRuntimeActivator(runtime, Path.of(".")) : null;
-        var               moduleLoader = new FileSystemModuleLoader();
+                                   ObjectProvider<SimulationRuntime> simulationRuntimeProvider,
+                                   ObjectProvider<UserInputProvider> userInputProviderProvider) {
+        SimulationRuntime runtime         = simulationRuntimeProvider.getIfAvailable();
+        SimulationActivator activator     = runtime != null ? new SimulationRuntimeActivator(runtime, Path.of(".")) : null;
+        UserInputProvider inputProvider   = userInputProviderProvider.getIfAvailable();
+        var               moduleLoader   = new FileSystemModuleLoader();
         return new PlaybookApi() {
             private Path resourceRoot() {
                 Path root = PlaybookRunnerCore.resolveClasspathRoot("playbooks");
@@ -46,7 +49,8 @@ public class PlaybookAutoConfiguration {
                                                    request.corpusPath(), request.simulationProfile());
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
                                                     resourceRoot(), activator, moduleLoader,
-                                                    null, List.of(new UnmetRequirementHandler()));
+                                                    null, List.of(new UnmetRequirementHandler()),
+                                                    inputProvider);
                 return runner.run(Path.of(request.playbookPath()), config);
             }
 

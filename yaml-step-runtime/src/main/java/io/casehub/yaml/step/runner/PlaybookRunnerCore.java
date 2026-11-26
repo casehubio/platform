@@ -45,6 +45,7 @@ public final class PlaybookRunnerCore {
     private final ModuleLoader moduleLoader;
     private final NlpProtocolMatcher nlpMatcher;
     private final List<FailureRecoveryHandler> failureHandlers;
+    private final UserInputProvider userInputProvider;
     static final  int DEFAULT_MAX_RECOVERY_DEPTH = 3;
 
 
@@ -79,6 +80,18 @@ public final class PlaybookRunnerCore {
                               ModuleLoader moduleLoader,
                               NlpProtocolMatcher nlpMatcher,
                               List<FailureRecoveryHandler> failureHandlers) {
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator,
+             moduleLoader, nlpMatcher, failureHandlers, null);
+    }
+
+    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
+                              ServiceRegistry serviceRegistry,
+                              Path resourceRoot,
+                              SimulationActivator simulationActivator,
+                              ModuleLoader moduleLoader,
+                              NlpProtocolMatcher nlpMatcher,
+                              List<FailureRecoveryHandler> failureHandlers,
+                              UserInputProvider userInputProvider) {
         this.pluginRegistry      = pluginRegistry;
         this.serviceRegistry     = serviceRegistry;
         this.resourceRoot        = resourceRoot;
@@ -86,6 +99,7 @@ public final class PlaybookRunnerCore {
         this.moduleLoader        = moduleLoader;
         this.nlpMatcher          = nlpMatcher;
         this.failureHandlers     = failureHandlers != null ? List.copyOf(failureHandlers) : List.of();
+        this.userInputProvider   = userInputProvider;
     }
 
 
@@ -286,9 +300,10 @@ public final class PlaybookRunnerCore {
 
             evaluator.preRegisterLatches(resolved);
 
-            Map<String, Object> outputVars = new LinkedHashMap<>();
-            boolean             allPassed  = true;
-            String              errorMsg   = null;
+            Map<String, Object> outputVars        = new LinkedHashMap<>();
+            Map<String, Object> manualAccumulator = new LinkedHashMap<>();
+            boolean             allPassed         = true;
+            String              errorMsg          = null;
 
             for (int i = 0; i < resolved.size(); i++) {
                 var    step   = resolved.get(i);
@@ -298,7 +313,14 @@ public final class PlaybookRunnerCore {
                         && !failureHandlers.isEmpty()) {
                     RecoveryOutcome recovery = attemptRecovery(failure, step, i, recoveryState);
                     if (recovery.recovered()) {
-                        result = evaluator.evaluate(step, resolver, stepRunner);
+                        if (!recovery.outputVars().isEmpty()) {
+                            manualAccumulator.putAll(recovery.outputVars());
+                            resolver = resolver.withObjectScope("manual", manualAccumulator);
+                            outputVars.putAll(recovery.outputVars());
+                            result = Result.of(recovery.outputVars());
+                        } else {
+                            result = evaluator.evaluate(step, resolver, stepRunner);
+                        }
                     } else if (recovery.terminalFailure() != null) {
                         result = recovery.terminalFailure();
                     }
@@ -373,9 +395,28 @@ public final class PlaybookRunnerCore {
                 case RecoveryAction.Resolved r -> RecoveryOutcome.recovered(null);
                 case RecoveryAction.Unrecoverable u -> RecoveryOutcome.notRecovered(
                         new Result.Failure(u.reason(), failure.category(), u.enrichedDetail()));
-                case RecoveryAction.PromptUser pu -> RecoveryOutcome.notRecovered(
-                        new Result.Failure("Manual resolution not yet supported",
-                                           failure.category(), Map.of()));
+                case RecoveryAction.PromptUser pu -> {
+                    if (userInputProvider == null) {
+                        yield RecoveryOutcome.notRecovered(
+                                new Result.Failure(
+                                        "Capability '" + pu.capability() + "' requires manual resolution but no input provider configured",
+                                        failure.category(), Map.of("capability", pu.capability(),
+                                                                   "promptText", pu.promptText())));
+                    }
+                    var context = new LinkedHashMap<String, Object>();
+                    context.put("capability", pu.capability());
+                    context.put("variableName", pu.variableName());
+                    context.putAll(pu.metadata());
+                    String input = userInputProvider.prompt(pu.promptText(), context);
+                    if (input == null) {
+                        yield RecoveryOutcome.notRecovered(
+                                new Result.Failure(
+                                        "User cancelled manual input for '" + pu.capability() + "'",
+                                        failure.category(), Map.of()));
+                    }
+                    yield RecoveryOutcome.recoveredWithOutput(
+                            Map.of(pu.variableName(), input));
+                }
             };
         }
         return RecoveryOutcome.notRecovered(failure);

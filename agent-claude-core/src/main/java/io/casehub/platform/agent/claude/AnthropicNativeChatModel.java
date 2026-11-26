@@ -14,40 +14,48 @@ import java.util.Objects;
 public class AnthropicNativeChatModel implements ChatModel {
 
     private final AnthropicClient client;
-    private final String defaultModel;
-    private final Duration defaultTimeout;
-    private final int maxTokens;
+    private final String          defaultModel;
+    private final Duration        defaultTimeout;
+    private final int             maxTokens;
+    private final boolean         cacheAutomatically;
 
     public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
-                                     Duration defaultTimeout, int maxTokens) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.defaultModel = Objects.requireNonNull(defaultModel, "defaultModel");
-        this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(120);
-        this.maxTokens = maxTokens > 0 ? maxTokens : 8192;
+                                    Duration defaultTimeout, int maxTokens,
+                                    boolean cacheAutomatically) {
+        this.client             = Objects.requireNonNull(client, "client");
+        this.defaultModel       = Objects.requireNonNull(defaultModel, "defaultModel");
+        this.defaultTimeout     = defaultTimeout != null ? defaultTimeout : Duration.ofSeconds(120);
+        this.maxTokens          = maxTokens > 0 ? maxTokens : 8192;
+        this.cacheAutomatically = cacheAutomatically;
     }
 
     public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
-                                     Duration defaultTimeout) {
-        this(client, defaultModel, defaultTimeout, 8192);
+                                    Duration defaultTimeout, int maxTokens) {
+        this(client, defaultModel, defaultTimeout, maxTokens, true);
+    }
+
+    public AnthropicNativeChatModel(AnthropicClient client, String defaultModel,
+                                    Duration defaultTimeout) {
+        this(client, defaultModel, defaultTimeout, 8192, true);
     }
 
     @Override
     public ChatResponse chat(ChatRequest request) {
         String modelName = request.parameters().modelName() != null
-                ? request.parameters().modelName()
-                : defaultModel;
+                           ? request.parameters().modelName()
+                           : defaultModel;
 
-        var systemBlocks = LangChain4jAnthropicMapper.extractSystemBlocks(request.messages());
-        var messages = LangChain4jAnthropicMapper.toAnthropicMessages(request.messages());
+        var systemBlocks = LangChain4jAnthropicMapper.extractSystemBlocks(request.messages(), cacheAutomatically);
+        var messages     = LangChain4jAnthropicMapper.toAnthropicMessages(request.messages());
 
         int effectiveMaxTokens = request.parameters().maxOutputTokens() != null
-                ? request.parameters().maxOutputTokens()
-                : maxTokens;
+                                 ? request.parameters().maxOutputTokens()
+                                 : maxTokens;
 
         var paramsBuilder = MessageCreateParams.builder()
-                .model(modelName)
-                .messages(messages)
-                .maxTokens(effectiveMaxTokens);
+                                               .model(modelName)
+                                               .messages(messages)
+                                               .maxTokens(effectiveMaxTokens);
 
         if (!systemBlocks.isEmpty()) {
             paramsBuilder.systemOfTextBlockParams(systemBlocks);
@@ -57,13 +65,13 @@ public class AnthropicNativeChatModel implements ChatModel {
         if (tools != null && !tools.isEmpty()) {
             var anthropicTools = LangChain4jAnthropicMapper.toAnthropicTools(tools);
             paramsBuilder.tools(anthropicTools.stream()
-                    .map(ToolUnion::ofTool)
-                    .toList());
+                                              .map(ToolUnion::ofTool)
+                                              .toList());
         }
 
         Message response = client.messages().create(paramsBuilder.build());
         return LangChain4jAnthropicMapper.toChatResponse(response);
     }
 
-    public String defaultModel() { return defaultModel; }
+    public String defaultModel() {return defaultModel;}
 }

@@ -12,4 +12,8 @@ public interface AnthropicChatModelProperties {
     Duration defaultTimeout();
 
     int maxTokens();
+
+    default boolean cacheAutomatically() {
+        return true;
+    }
 }

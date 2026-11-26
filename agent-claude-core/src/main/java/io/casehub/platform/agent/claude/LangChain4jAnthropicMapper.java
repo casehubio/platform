@@ -8,6 +8,7 @@ import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Tool;
 import com.anthropic.models.messages.ToolResultBlockParam;
 import com.anthropic.models.messages.ToolUseBlockParam;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -20,8 +21,6 @@ import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,17 +32,23 @@ final class LangChain4jAnthropicMapper {
     private LangChain4jAnthropicMapper() {}
 
     static List<TextBlockParam> extractSystemBlocks(List<ChatMessage> messages) {
+        return extractSystemBlocks(messages, true);
+    }
+
+    static List<TextBlockParam> extractSystemBlocks(List<ChatMessage> messages, boolean cacheAutomatically) {
         List<TextBlockParam> blocks = new ArrayList<>();
         for (ChatMessage msg : messages) {
             if (msg instanceof SystemMessage sm) {
-                blocks.add(TextBlockParam.builder()
-                        .text(sm.text())
-                        .cacheControl(CacheControlEphemeral.builder().build())
-                        .build());
+                var builder = TextBlockParam.builder().text(sm.text());
+                if (cacheAutomatically) {
+                    builder.cacheControl(CacheControlEphemeral.builder().build());
+                }
+                blocks.add(builder.build());
             }
         }
         return blocks;
     }
+
 
     static List<MessageParam> toAnthropicMessages(List<ChatMessage> messages) {
         List<MessageParam> result = new ArrayList<>();

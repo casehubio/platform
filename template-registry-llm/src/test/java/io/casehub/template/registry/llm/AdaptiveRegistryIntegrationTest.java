@@ -285,9 +285,19 @@ class AdaptiveRegistryIntegrationTest {
     @Nested
     class AdaptiveLearning {
 
+        /**
+         * The core adaptive learning proof: a novel phrasing triggers an LLM call,
+         * the variation is registered, and a completely different input using the
+         * same sentence structure matches via regex with no LLM involvement.
+         *
+         * <p>This is the property that makes the system self-improving. The first
+         * "This design gets my approve" costs one LLM call. After that,
+         * "This architecture gets my reject" — different subject, different decision,
+         * same structure — matches via regex at score 1.0. The LLM call count stays
+         * at 1, proving the structural matcher is handling it.
+         */
         @Test
         void learnedVariation_matchesDifferentValuesWithoutLlm() {
-            // Step 1: A novel phrasing triggers the LLM classifier
             var llmCallCount = new AtomicInteger();
             AdaptiveFallbackMatcher fallback = (input, candidates, lang) -> {
                 llmCallCount.incrementAndGet();
@@ -299,45 +309,78 @@ class AdaptiveRegistryIntegrationTest {
             var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
-            // First match: "This design gets my approve" — no existing pattern matches.
-            // Tiers 1+2 fail. Tier 3 fires. The LLM classifies it and suggests the
-            // variation "This ${subject} gets my ${decision}".
+            // ── First occurrence: "This design gets my approve" ──
+            // No regex pattern matches (canonical is "I ${decision} this ${subject}").
+            // No NLP pattern matches (structural mismatch — word order is different).
+            // Tier 3 fires: LLM classifies it as vote, extracts fields, suggests
+            // the variation "This ${subject} gets my ${decision}".
             var first = registry.match("protocol:review", "This design gets my approve");
             assertThat(first)
-                .as("first occurrence triggers LLM classification")
+                .as("'This design gets my approve' — tiers 1+2 miss, tier 3 classifies via LLM")
                 .isInstanceOf(TemplateMatch.Matched.class);
             assertThat(((TemplateMatch.Matched) first).score())
-                .as("adaptive match returns 0.9")
+                .as("score 0.9 distinguishes LLM-classified matches from structural (1.0)")
                 .isEqualTo(0.9);
+            assertThat(((TemplateMatch.Matched) first).templateName())
+                .as("LLM correctly identifies the 'vote' template")
+                .isEqualTo("vote");
+            assertThat(((TemplateMatch.Matched) first).fields())
+                .as("LLM extracts both field values from the novel phrasing")
+                .containsEntry("decision", "approve")
+                .containsEntry("subject", "design");
             assertThat(llmCallCount.get())
-                .as("LLM was called exactly once")
+                .as("exactly one LLM call — the first occurrence of this phrasing")
                 .isEqualTo(1);
 
-            // Step 2: The variation is now registered. A DIFFERENT input using the
-            // same pattern — different subject, different decision — matches via
-            // regex (score 1.0). The LLM is NOT called again.
+            // ── The variation "This ${subject} gets my ${decision}" is now registered ──
+            // Verify it appears in the schema alongside the canonical pattern
+            assertThat(registry.schemas("protocol:review").get(0).patterns())
+                .as("registry now has 2 patterns: canonical + learned variation")
+                .hasSize(2)
+                .containsExactly(
+                    "I ${decision} this ${subject}",
+                    "This ${subject} gets my ${decision}");
+
+            // ── Second occurrence: different values, same learned structure ──
+            // "This architecture gets my reject" uses the LEARNED pattern with
+            // completely different variable values. If the variation was registered
+            // correctly, this matches via regex (score 1.0) with no LLM call.
             var second = registry.match("protocol:review", "This architecture gets my reject");
             assertThat(second)
-                .as("second occurrence matches structurally — different values, same pattern")
+                .as("'This architecture gets my reject' — matches learned pattern via regex")
                 .isInstanceOf(TemplateMatch.Matched.class);
             var matched = (TemplateMatch.Matched) second;
             assertThat(matched.score())
-                .as("regex match = 1.0, not 0.9 — proves structural matching, not LLM")
+                .as("score 1.0 proves regex handled it, not LLM (which returns 0.9)")
                 .isEqualTo(1.0);
             assertThat(matched.fields())
-                .as("correct field extraction from the learned pattern")
+                .as("field extraction works correctly from the learned pattern")
                 .containsEntry("decision", "reject")
                 .containsEntry("subject", "architecture");
+            assertThat(matched.patternIndex())
+                .as("pattern index 1 = second pattern (the learned variation)")
+                .isEqualTo(1);
             assertThat(llmCallCount.get())
-                .as("LLM still called only once — the learned variation handled this")
+                .as("LLM call count still 1 — the learned variation handled it structurally")
                 .isEqualTo(1);
         }
 
+        /**
+         * After a variation is learned, the NLP tier extends it to inflected forms
+         * automatically. This is the compounding benefit: the LLM teaches the registry
+         * one pattern, and NLP lemmatisation generalises it to all tense/number variants.
+         *
+         * <p>Learned pattern: "This ${subject} gets my ${decision}"
+         * <br>Inflected input: "This proposal <b>got</b> my reject"
+         * <br>OpenNLP lemmatises "got" → "get", which matches "gets" → "get".
+         * The NLP structural matcher finds the alignment. No LLM call needed.
+         *
+         * <p>This demonstrates that adaptive learning multiplies — each learned
+         * variation doesn't just match literally, it matches all inflected forms
+         * through the NLP tier. A single LLM call covers dozens of surface forms.
+         */
         @Test
         void learnedVariation_alsoHandlesInflectedFormsViaNlp() {
-            // After learning "This ${subject} gets my ${decision}", the NLP tier
-            // should also handle inflected forms of the learned pattern — "got"
-            // instead of "gets", "approved" instead of "approve", etc.
             var llmCallCount = new AtomicInteger();
             AdaptiveFallbackMatcher fallback = (input, candidates, lang) -> {
                 llmCallCount.incrementAndGet();
@@ -349,22 +392,35 @@ class AdaptiveRegistryIntegrationTest {
             var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
-            // Trigger learning
+            // Trigger learning: "This design gets my approve" → LLM classifies,
+            // registers "This ${subject} gets my ${decision}" as a structural pattern
             registry.match("protocol:review", "This design gets my approve");
-            assertThat(llmCallCount.get()).isEqualTo(1);
+            assertThat(llmCallCount.get())
+                .as("learning triggered — one LLM call")
+                .isEqualTo(1);
 
-            // Now test an inflected form of the LEARNED pattern:
-            // "got" is past tense of "gets" — NLP lemmatises it
+            // Inflected form of the LEARNED pattern: "got" instead of "gets".
+            // OpenNLP lemmatises both to "get", so the NLP structural matcher
+            // finds the alignment without any LLM involvement.
             var inflected = registry.match("protocol:review", "This proposal got my reject");
             assertThat(inflected)
-                .as("inflected form of a learned variation — NLP handles it, no LLM call")
+                .as("'This proposal got my reject' — inflected form of learned pattern,"
+                    + " handled by NLP lemmatisation (got → get = gets → get)")
                 .isInstanceOf(TemplateMatch.Matched.class);
             var matched = (TemplateMatch.Matched) inflected;
+            assertThat(matched.score())
+                .as("NLP match score — below 1.0 (not regex) but above threshold")
+                .isGreaterThan(0.0)
+                .isLessThanOrEqualTo(1.0);
             assertThat(matched.fields())
+                .as("correct field extraction from the inflected learned pattern")
                 .containsEntry("decision", "reject")
                 .containsEntry("subject", "proposal");
+            assertThat(matched.patternIndex())
+                .as("pattern index >= 0 — matched from compiled NLP patterns, not LLM")
+                .isGreaterThanOrEqualTo(0);
             assertThat(llmCallCount.get())
-                .as("LLM still called only once — NLP lemmatisation handles inflection")
+                .as("LLM call count still 1 — NLP handled the inflection entirely")
                 .isEqualTo(1);
         }
 
@@ -436,11 +492,19 @@ class AdaptiveRegistryIntegrationTest {
     @Nested
     class ClassificationCaching {
 
+        /**
+         * When the LLM suggests a variation that drops a variable placeholder, it
+         * can't be registered as a structural pattern. "I'm in favour of this ${subject}"
+         * drops ${decision} — the enum value "approve" is baked into the phrasing
+         * "in favour of". The registry can't generalise from that.
+         *
+         * <p>But the classification result itself IS cached. If the same user says
+         * "I'm in favour of this design" ten more times, every occurrence after the
+         * first is served from cache with no LLM call. The match is still returned
+         * (it's semantically correct) — only the structural registration is skipped.
+         */
         @Test
         void nonRegistrableVariation_cachedForRepeatedInput() {
-            // "I'm in favour of this ${subject}" drops ${decision} — can't be registered.
-            // But the classification result IS cached, so the same input doesn't trigger
-            // another LLM call.
             var llmCallCount = new AtomicInteger();
             AdaptiveFallbackMatcher fallback = (input, candidates, lang) -> {
                 llmCallCount.incrementAndGet();
@@ -806,75 +870,170 @@ class AdaptiveRegistryIntegrationTest {
             var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
-            // ── Step 1: Exact match → Tier 1 regex ──
+            // ── Step 1: Exact canonical match → Tier 1 (regex) ──
+            // "I approve this design" matches the canonical pattern exactly.
+            // The regex tier handles it at score 1.0. No NLP, no LLM.
             var exact = registry.match("protocol:review", "I approve this design");
-            assertThat(exact).isInstanceOf(TemplateMatch.Matched.class);
-            assertThat(((TemplateMatch.Matched) exact).score()).isEqualTo(1.0);
-            assertThat(llmCallCount.get()).as("step 1: regex match, no LLM").isEqualTo(0);
+            assertThat(exact)
+                .as("step 1: 'I approve this design' — exact canonical match via regex")
+                .isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(((TemplateMatch.Matched) exact).score())
+                .as("step 1: regex tier always produces score 1.0")
+                .isEqualTo(1.0);
+            assertThat(((TemplateMatch.Matched) exact).fields())
+                .as("step 1: fields extracted correctly from canonical pattern")
+                .containsEntry("decision", "approve")
+                .containsEntry("subject", "design");
+            assertThat(llmCallCount.get())
+                .as("step 1: LLM never involved — regex handled it")
+                .isEqualTo(0);
 
-            // ── Step 2: Inflection → Tier 2 NLP ──
+            // ── Step 2: Inflected canonical → Tier 2 (NLP) ──
+            // "I approved this design" — past tense "approved" doesn't match the
+            // regex (which expects literal "approve"). NLP lemmatises "approved" → "approve"
+            // and finds the structural alignment.
             var inflected = registry.match("protocol:review", "I approved this design");
-            assertThat(inflected).isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(inflected)
+                .as("step 2: 'I approved this design' — NLP lemmatises 'approved' → 'approve'")
+                .isInstanceOf(TemplateMatch.Matched.class);
             assertThat(((TemplateMatch.Matched) inflected).fields())
+                .as("step 2: NLP extracts the lemmatised enum value, not the surface form")
                 .containsEntry("decision", "approve");
-            assertThat(llmCallCount.get()).as("step 2: NLP inflection, no LLM").isEqualTo(0);
+            assertThat(llmCallCount.get())
+                .as("step 2: LLM still not called — NLP handled inflection")
+                .isEqualTo(0);
 
-            // ── Step 3: Novel paraphrase → Tier 3 LLM → learns variation ──
+            // ── Step 3: Novel structural paraphrase → Tier 3 (LLM) → learns ──
+            // "This design gets my approve" rearranges the sentence structure entirely.
+            // Regex fails (different word order). NLP fails (different structure, not just
+            // inflection). Tier 3 fires: the simulated LLM classifies it as a vote,
+            // extracts the fields, and returns the variation "This ${subject} gets my ${decision}".
+            // The registry registers this as a new structural pattern.
             var paraphrase1 = registry.match("protocol:review", "This design gets my approve");
-            assertThat(paraphrase1).isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(paraphrase1)
+                .as("step 3: 'This design gets my approve' — tiers 1+2 fail, tier 3 LLM classifies")
+                .isInstanceOf(TemplateMatch.Matched.class);
             assertThat(((TemplateMatch.Matched) paraphrase1).score())
-                .as("adaptive match = 0.9").isEqualTo(0.9);
-            assertThat(llmCallCount.get()).as("step 3: first LLM call").isEqualTo(1);
+                .as("step 3: score 0.9 = LLM classification (regex would be 1.0)")
+                .isEqualTo(0.9);
+            assertThat(llmCallCount.get())
+                .as("step 3: first LLM call of the scenario")
+                .isEqualTo(1);
+            assertThat(registry.schemas("protocol:review").get(0).patterns())
+                .as("step 3: variation learned — registry now has 2 patterns")
+                .hasSize(2);
 
-            // ── Step 4: Same pattern, different values → Tier 1 regex ──
+            // ── Step 4: Different values on the learned pattern → Tier 1 (regex) ──
+            // "This architecture gets my reject" uses the LEARNED pattern with different
+            // variable values. The learned variation was compiled as a regex pattern at
+            // registration time, so the regex tier catches it at score 1.0.
             var reuse = registry.match("protocol:review", "This architecture gets my reject");
-            assertThat(reuse).isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(reuse)
+                .as("step 4: 'This architecture gets my reject' — learned pattern matches via regex")
+                .isInstanceOf(TemplateMatch.Matched.class);
             assertThat(((TemplateMatch.Matched) reuse).score())
-                .as("learned pattern matches via regex = 1.0").isEqualTo(1.0);
+                .as("step 4: score 1.0 proves regex handled it (LLM would return 0.9)")
+                .isEqualTo(1.0);
             assertThat(((TemplateMatch.Matched) reuse).fields())
+                .as("step 4: different variable values extracted correctly from learned pattern")
                 .containsEntry("decision", "reject")
                 .containsEntry("subject", "architecture");
-            assertThat(llmCallCount.get()).as("step 4: no LLM — learned pattern").isEqualTo(1);
+            assertThat(llmCallCount.get())
+                .as("step 4: LLM call count still 1 — the learned variation handled this structurally")
+                .isEqualTo(1);
 
-            // ── Step 5: Inflected form of the learned pattern → Tier 2 NLP ──
+            // ── Step 5: Inflected form of the learned pattern → Tier 2 (NLP) ──
+            // "This proposal got my reject" — "got" is past tense of "gets".
+            // The regex tier fails (expects "gets", sees "got"). The NLP tier
+            // lemmatises both to "get" and finds the structural match.
+            // This proves NLP extends learned patterns to ALL their inflected forms.
             var learnedInflected = registry.match("protocol:review",
                 "This proposal got my reject");
-            assertThat(learnedInflected).isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(learnedInflected)
+                .as("step 5: 'This proposal got my reject' — NLP lemmatises 'got' on the learned pattern")
+                .isInstanceOf(TemplateMatch.Matched.class);
             assertThat(((TemplateMatch.Matched) learnedInflected).fields())
+                .as("step 5: fields extracted from inflected learned pattern")
                 .containsEntry("decision", "reject")
                 .containsEntry("subject", "proposal");
             assertThat(llmCallCount.get())
-                .as("step 5: NLP inflection on learned pattern, no LLM").isEqualTo(1);
+                .as("step 5: LLM still at 1 — NLP handled inflection on the learned pattern")
+                .isEqualTo(1);
 
-            // ── Step 6: Second novel paraphrase → Tier 3 LLM → learns another ──
+            // ── Step 6: Second novel paraphrase → Tier 3 (LLM) → learns another ──
+            // "My reject goes to proposal" is a completely different sentence structure.
+            // Neither the canonical pattern nor the first learned pattern covers it.
+            // Tier 3 fires again, classifies, and learns "My ${decision} goes to ${subject}".
             var paraphrase2 = registry.match("protocol:review", "My reject goes to proposal");
-            assertThat(paraphrase2).isInstanceOf(TemplateMatch.Matched.class);
-            assertThat(((TemplateMatch.Matched) paraphrase2).score()).isEqualTo(0.9);
-            assertThat(llmCallCount.get()).as("step 6: second LLM call").isEqualTo(2);
-
-            // ── Step 7: Non-registrable paraphrase → matched but not learned ──
-            var nonRegistrable = registry.match("protocol:review",
-                "I'm in favour of this design");
-            assertThat(nonRegistrable).isInstanceOf(TemplateMatch.Matched.class);
-            assertThat(llmCallCount.get()).as("step 7: third LLM call").isEqualTo(3);
+            assertThat(paraphrase2)
+                .as("step 6: 'My reject goes to proposal' — second novel structure, tier 3 fires")
+                .isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(((TemplateMatch.Matched) paraphrase2).score())
+                .as("step 6: score 0.9 = LLM classification again")
+                .isEqualTo(0.9);
+            assertThat(llmCallCount.get())
+                .as("step 6: second LLM call — one per genuinely novel structure")
+                .isEqualTo(2);
             assertThat(registry.schemas("protocol:review").get(0).patterns())
-                .as("3 patterns: 1 canonical + 2 learned (non-registrable not counted)")
+                .as("step 6: second variation learned — registry now has 3 patterns")
                 .hasSize(3);
 
-            // ── Step 8: Same non-registrable repeated → cache hit ──
-            registry.match("protocol:review", "I'm in favour of this design");
+            // ── Step 7: Semantic paraphrase that drops a variable → matched but NOT learned ──
+            // "I'm in favour of this design" substitutes "in favour of" for the enum value
+            // "approve". The LLM classifies it correctly, but the suggested variation
+            // "I'm in favour of this ${subject}" drops the ${decision} placeholder (the
+            // enum value is baked in). The variation can't be registered as a structural
+            // pattern — but the match result IS returned and cached.
+            var nonRegistrable = registry.match("protocol:review",
+                "I'm in favour of this design");
+            assertThat(nonRegistrable)
+                .as("step 7: 'I'm in favour of this design' — LLM classifies, but variation drops ${decision}")
+                .isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(((TemplateMatch.Matched) nonRegistrable).fields())
+                .as("step 7: fields extracted correctly despite non-registrable variation")
+                .containsEntry("decision", "approve")
+                .containsEntry("subject", "design");
             assertThat(llmCallCount.get())
-                .as("step 8: cache hit — no additional LLM call").isEqualTo(3);
+                .as("step 7: third LLM call — non-registrable paraphrase still needs classification")
+                .isEqualTo(3);
+            assertThat(registry.schemas("protocol:review").get(0).patterns())
+                .as("step 7: still 3 patterns — the non-registrable variation was NOT added")
+                .hasSize(3);
 
-            // ── Step 9: Unrelated input → Unmatched, negative cached ──
+            // ── Step 8: Same non-registrable input repeated → cache hit ──
+            // The classification cache stores the positive result from step 7.
+            // Same input → cache hit → match returned without LLM call.
+            var cached = registry.match("protocol:review", "I'm in favour of this design");
+            assertThat(cached)
+                .as("step 8: same non-registrable paraphrase — served from cache")
+                .isInstanceOf(TemplateMatch.Matched.class);
+            assertThat(llmCallCount.get())
+                .as("step 8: LLM call count still 3 — cache prevented a fourth call")
+                .isEqualTo(3);
+
+            // ── Step 9: Unrelated input → Tier 3 says Unmatched → negative cached ──
+            // "The weather is nice" has nothing to do with voting. All three tiers
+            // fail. The LLM returns Unmatched. The negative result is cached to
+            // prevent repeated LLM calls for the same garbage input.
             var unrelated = registry.match("protocol:review", "The weather is nice");
-            assertThat(unrelated).isInstanceOf(TemplateMatch.Unmatched.class);
-            assertThat(llmCallCount.get()).as("step 9: fourth LLM call").isEqualTo(4);
-
-            // ── Step 10: Same unrelated repeated → negative cache hit ──
-            registry.match("protocol:review", "The weather is nice");
+            assertThat(unrelated)
+                .as("step 9: 'The weather is nice' — genuinely unrelated, all tiers fail")
+                .isInstanceOf(TemplateMatch.Unmatched.class);
             assertThat(llmCallCount.get())
-                .as("step 10: negative cache hit — still 4 LLM calls total").isEqualTo(4);
+                .as("step 9: fourth LLM call — classifier confirms no match")
+                .isEqualTo(4);
+
+            // ── Step 10: Same unrelated input repeated → negative cache hit ──
+            // The negative cache entry from step 9 prevents another LLM call.
+            var cachedNegative = registry.match("protocol:review", "The weather is nice");
+            assertThat(cachedNegative)
+                .as("step 10: same unrelated input — negative cache serves Unmatched")
+                .isInstanceOf(TemplateMatch.Unmatched.class);
+            assertThat(llmCallCount.get())
+                .as("step 10: LLM call count still 4 — negative cache prevented a fifth call."
+                    + " Final tally: 4 LLM calls across 10 match attempts, covering"
+                    + " 2 learned variations, 1 cached non-registrable, and 1 cached negative.")
+                .isEqualTo(4);
         }
     }
 

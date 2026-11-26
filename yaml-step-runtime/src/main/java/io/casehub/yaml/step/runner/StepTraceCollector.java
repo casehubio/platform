@@ -89,6 +89,25 @@ public final class StepTraceCollector implements StepExecutionListener {
         }
     }
 
+    public synchronized void exitStep(String action, StepOutcome outcome,
+                                      Map<String, Object> detail, StepTraceNode recoveryTrace) {
+        Frame               frame      = stack.pop();
+        long                durationMs = (System.nanoTime() - frame.startNanos()) / 1_000_000;
+        List<StepTraceNode> children   = new ArrayList<>(frame.children());
+        if (recoveryTrace != null) {
+            children.add(recoveryTrace);
+        }
+        var node = new StepTraceNode(frame.index(), frame.name(), frame.type(),
+                                     action, outcome, durationMs, detail, children);
+
+        if (stack.isEmpty()) {
+            rootChildren.add(node);
+        } else {
+            stack.peek().children().add(node);
+        }
+    }
+
+
     public List<StepTraceNode> rootChildren() {
         return List.copyOf(rootChildren);
     }

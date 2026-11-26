@@ -14,12 +14,14 @@ import io.casehub.yaml.step.runner.PlaybookRunResult;
 import io.casehub.yaml.step.runner.PlaybookRunnerCore;
 import io.casehub.yaml.step.runner.PlaybookValidationResult;
 import io.casehub.yaml.step.runner.SimulationActivator;
+import io.casehub.yaml.step.runner.UnmetRequirementHandler;
 import io.casehub.yaml.test.SimulationRuntimeActivator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.nio.file.Path;
+import java.util.List;
 
 @ApplicationScoped
 @McpDomain("playbooks")
@@ -52,7 +54,8 @@ public class PlaybookBeans implements PlaybookApi {
             resourceRoot = Path.of(".");
         }
         var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                            resourceRoot, simulationActivator, moduleLoader);
+                                            resourceRoot, simulationActivator, moduleLoader,
+                                            null, List.of(new UnmetRequirementHandler()));
         return runner.run(Path.of(request.playbookPath()), config);
     }
 

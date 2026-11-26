@@ -11,6 +11,7 @@ import io.casehub.yaml.step.runner.PlaybookRunResult;
 import io.casehub.yaml.step.runner.PlaybookRunnerCore;
 import io.casehub.yaml.step.runner.PlaybookValidationResult;
 import io.casehub.yaml.step.runner.SimulationActivator;
+import io.casehub.yaml.step.runner.UnmetRequirementHandler;
 import io.casehub.yaml.test.SimulationRuntimeActivator;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -19,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 
 import java.nio.file.Path;
+import java.util.List;
 
 @AutoConfiguration
 @ConditionalOnBean(PluginRegistry.class)
@@ -43,7 +45,8 @@ public class PlaybookAutoConfiguration {
                 var config = new PlaybookRunConfig(request.dryRun(), request.vars(),
                                                    request.corpusPath(), request.simulationProfile());
                 var runner = new PlaybookRunnerCore(pluginRegistry, serviceRegistry,
-                                                    resourceRoot(), activator, moduleLoader);
+                                                    resourceRoot(), activator, moduleLoader,
+                                                    null, List.of(new UnmetRequirementHandler()));
                 return runner.run(Path.of(request.playbookPath()), config);
             }
 

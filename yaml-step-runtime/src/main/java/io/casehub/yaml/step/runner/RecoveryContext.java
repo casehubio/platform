@@ -1,5 +1,7 @@
 package io.casehub.yaml.step.runner;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public record RecoveryContext(
@@ -10,6 +12,8 @@ public record RecoveryContext(
         Set<String> recoveryChain) {
 
     public RecoveryContext {
-        recoveryChain = recoveryChain != null ? Set.copyOf(recoveryChain) : Set.of();
+        recoveryChain = recoveryChain != null
+                ? Collections.unmodifiableSet(new LinkedHashSet<>(recoveryChain))
+                : Set.of();
     }
 }

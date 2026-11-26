@@ -1,6 +1,7 @@
 package io.casehub.yaml.step.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.coordination.protocol.NlpProtocolMatcher;
 import io.casehub.yaml.core.annotation.AnnotationMap;
 import io.casehub.yaml.core.error.LocationIndex;
 import io.casehub.yaml.core.error.ParseError;
@@ -16,7 +17,6 @@ import io.casehub.yaml.core.playbook.PlaybookFrontMatter;
 import io.casehub.yaml.core.playbook.PlaybookVariableParser;
 import io.casehub.yaml.core.resolver.VariableResolver;
 import io.casehub.yaml.core.resolver.VariableSource;
-import io.casehub.platform.coordination.protocol.NlpProtocolMatcher;
 import io.casehub.yaml.plugin.api.PluginRegistry;
 import io.casehub.yaml.plugin.api.Result;
 import io.casehub.yaml.plugin.api.ServiceRegistry;
@@ -44,12 +44,15 @@ public final class PlaybookRunnerCore {
     private final SimulationActivator simulationActivator;
     private final ModuleLoader moduleLoader;
     private final NlpProtocolMatcher nlpMatcher;
+    private final List<FailureRecoveryHandler> failureHandlers;
+    static final  int DEFAULT_MAX_RECOVERY_DEPTH = 3;
+
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
                               ServiceRegistry serviceRegistry,
                               Path resourceRoot,
                               SimulationActivator simulationActivator) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null, null);
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, null, null, List.of());
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -57,7 +60,7 @@ public final class PlaybookRunnerCore {
                               Path resourceRoot,
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader) {
-        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, null);
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, null, List.of());
     }
 
     public PlaybookRunnerCore(PluginRegistry pluginRegistry,
@@ -66,16 +69,33 @@ public final class PlaybookRunnerCore {
                               SimulationActivator simulationActivator,
                               ModuleLoader moduleLoader,
                               NlpProtocolMatcher nlpMatcher) {
-        this.pluginRegistry = pluginRegistry;
-        this.serviceRegistry = serviceRegistry;
-        this.resourceRoot = resourceRoot;
-        this.simulationActivator = simulationActivator;
-        this.moduleLoader = moduleLoader;
-        this.nlpMatcher = nlpMatcher;
+        this(pluginRegistry, serviceRegistry, resourceRoot, simulationActivator, moduleLoader, nlpMatcher, List.of());
     }
+
+    public PlaybookRunnerCore(PluginRegistry pluginRegistry,
+                              ServiceRegistry serviceRegistry,
+                              Path resourceRoot,
+                              SimulationActivator simulationActivator,
+                              ModuleLoader moduleLoader,
+                              NlpProtocolMatcher nlpMatcher,
+                              List<FailureRecoveryHandler> failureHandlers) {
+        this.pluginRegistry      = pluginRegistry;
+        this.serviceRegistry     = serviceRegistry;
+        this.resourceRoot        = resourceRoot;
+        this.simulationActivator = simulationActivator;
+        this.moduleLoader        = moduleLoader;
+        this.nlpMatcher          = nlpMatcher;
+        this.failureHandlers     = failureHandlers != null ? List.copyOf(failureHandlers) : List.of();
+    }
+
 
     @SuppressWarnings("unchecked")
     public PlaybookRunResult run(Path playbookPath, PlaybookRunConfig config) {
+        return runInternal(playbookPath, config, RecoveryState.initial(DEFAULT_MAX_RECOVERY_DEPTH));
+    }
+
+    @SuppressWarnings("unchecked")
+    PlaybookRunResult runInternal(Path playbookPath, PlaybookRunConfig config, RecoveryState recoveryState) {
         long          start            = System.nanoTime();
         AutoCloseable simulationHandle = null;
         EventCapture  eventCapture     = new EventCapture();
@@ -141,7 +161,7 @@ public final class PlaybookRunnerCore {
             }
 
             return executeSteps(steps, playbookName, playbookPath.toString(),
-                                config, resolver, start, eventCapture, true);
+                                config, resolver, start, eventCapture, true, recoveryState);
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -159,6 +179,7 @@ public final class PlaybookRunnerCore {
             }
         }
     }
+
 
     private static final String INLINE_SOURCE = "<inline>";
 
@@ -218,7 +239,8 @@ public final class PlaybookRunnerCore {
             }
 
             return executeSteps(steps, playbookName, INLINE_SOURCE,
-                                config, resolver, start, eventCapture, false);
+                                config, resolver, start, eventCapture, false,
+                                RecoveryState.initial(DEFAULT_MAX_RECOVERY_DEPTH));
 
         } catch (io.casehub.yaml.core.module.ParameterValidationException e) {
             long durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -237,7 +259,8 @@ public final class PlaybookRunnerCore {
                                            String playbookName, String sourceLabel,
                                            PlaybookRunConfig config, VariableResolver resolver,
                                            long start, EventCapture eventCapture,
-                                           boolean enableDryRunSimulation) {
+                                           boolean enableDryRunSimulation,
+                                           RecoveryState recoveryState) {
         var runServices = new io.casehub.yaml.plugin.api.MapServiceRegistry(serviceRegistry);
         runServices.register(EventSink.class, (EventSink) eventCapture::addEvent);
 
@@ -271,6 +294,16 @@ public final class PlaybookRunnerCore {
                 var    step   = resolved.get(i);
                 Result result = evaluator.evaluate(step, resolver, stepRunner);
 
+                if (!result.isSuccess() && result instanceof Result.Failure failure
+                        && !failureHandlers.isEmpty()) {
+                    RecoveryOutcome recovery = attemptRecovery(failure, step, i, recoveryState);
+                    if (recovery.recovered()) {
+                        result = evaluator.evaluate(step, resolver, stepRunner);
+                    } else if (recovery.terminalFailure() != null) {
+                        result = recovery.terminalFailure();
+                    }
+                }
+
                 if (!result.isSuccess()) {
                     allPassed = false;
                     errorMsg  = result instanceof Result.Failure f ? f.message() : "Step failed";
@@ -303,6 +336,46 @@ public final class PlaybookRunnerCore {
                                          eventCapture.all(), outputVars, captureCollector.all(),
                                          primitiveSnapshot, errorMsg);
         }
+    }
+
+    private RecoveryOutcome attemptRecovery(Result.Failure failure, ResolvedStep step,
+                                            int stepIndex, RecoveryState state) {
+        if (state.isAtLimit()) {
+            return RecoveryOutcome.notRecovered(failure);
+        }
+        for (var handler : failureHandlers) {
+            if (!handler.canRecover(failure)) {continue;}
+
+            var ctx = new RecoveryContext(stepIndex, step.name(),
+                                          state.depth(), state.maxDepth(), state.chain());
+            RecoveryAction action = handler.diagnose(failure, ctx);
+
+            return switch (action) {
+                case RecoveryAction.RunPlaybook rp -> {
+                    Path   resolved       = resourceRoot.resolve(rp.playbookPath()).normalize();
+                    String normalizedPath = resolved.toString();
+                    if (state.wouldCycle(normalizedPath)) {
+                        yield RecoveryOutcome.notRecovered(
+                                new Result.Failure("Circular recovery: " + normalizedPath,
+                                                   "recovery-cycle", Map.of()));
+                    }
+                    var               subConfig = new PlaybookRunConfig(false, rp.vars(), null, null);
+                    var               subState  = state.descend(normalizedPath);
+                    PlaybookRunResult subResult = runInternal(resolved, subConfig, subState);
+                    if (subResult.success()) {
+                        yield RecoveryOutcome.recovered(subResult);
+                    } else {
+                        yield RecoveryOutcome.notRecovered(
+                                new Result.Failure("Recovery playbook failed: " + subResult.error(),
+                                                   "recovery-failed", Map.of()));
+                    }
+                }
+                case RecoveryAction.Resolved r -> RecoveryOutcome.recovered(null);
+                case RecoveryAction.Unrecoverable u -> RecoveryOutcome.notRecovered(
+                        new Result.Failure(u.reason(), failure.category(), u.enrichedDetail()));
+            };
+        }
+        return RecoveryOutcome.notRecovered(failure);
     }
 
 

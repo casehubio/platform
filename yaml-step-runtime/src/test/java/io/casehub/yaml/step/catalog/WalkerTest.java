@@ -1448,4 +1448,107 @@ class WalkerTest {
         assertThat(plugin.params()).containsEntry("_subject", "hello world");
         assertThat(plugin.params()).containsEntry("_value", "hello world");
     }
+
+    @Test
+    void templateMode_match_resolves() {
+        Map<String, Object> onHandlers = new LinkedHashMap<>();
+        onHandlers.put("vote", List.of(Map.of("process", Map.of("command", "vote.sh"))));
+        onHandlers.put("escalate", List.of(Map.of("process", Map.of("command", "escalate.sh"))));
+
+        Map<String, Object> matchConfig = new LinkedHashMap<>();
+        matchConfig.put("input", "${response.text}");
+        matchConfig.put("namespace", "protocol:review");
+        matchConfig.put("on", onHandlers);
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", matchConfig);
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0)).isInstanceOf(ResolvedStep.MatchStep.class);
+        var match = (ResolvedStep.MatchStep) resolved.get(0);
+        assertThat(match.isTemplateMode()).isTrue();
+        assertThat(match.templateSpec().namespace()).isEqualTo("protocol:review");
+        assertThat(match.templateSpec().inputExpression()).isEqualTo("${response.text}");
+        assertThat(match.templateSpec().handlers()).hasSize(2);
+        assertThat(match.templateSpec().handlers()).containsKey("vote");
+        assertThat(match.templateSpec().handlers()).containsKey("escalate");
+        assertThat(match.templateSpec().unmatchedHandler()).isEmpty();
+    }
+
+    @Test
+    void templateMode_match_withUnmatched_resolves() {
+        Map<String, Object> matchConfig = new LinkedHashMap<>();
+        matchConfig.put("input", "${text}");
+        matchConfig.put("namespace", "ns");
+        matchConfig.put("on", Map.of("t1", List.of(Map.of("process", Map.of("command", "matched.sh")))));
+        matchConfig.put("unmatched", List.of(Map.of("process", Map.of("command", "unmatched.sh"))));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", matchConfig);
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+        var match = (ResolvedStep.MatchStep) resolved.get(0);
+        assertThat(match.isTemplateMode()).isTrue();
+        assertThat(match.templateSpec().unmatchedHandler()).hasSize(1);
+    }
+
+    @Test
+    void templateMode_match_missingInput_throws() {
+        Map<String, Object> matchConfig = new LinkedHashMap<>();
+        matchConfig.put("namespace", "ns");
+        matchConfig.put("on", Map.of("t", List.of()));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", matchConfig);
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("input");
+    }
+
+    @Test
+    void templateMode_match_missingOn_throws() {
+        Map<String, Object> matchConfig = new LinkedHashMap<>();
+        matchConfig.put("input", "${x}");
+        matchConfig.put("namespace", "ns");
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", matchConfig);
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("on");
+    }
+
+    @Test
+    void templateMode_match_emptyOn_throws() {
+        Map<String, Object> matchConfig = new LinkedHashMap<>();
+        matchConfig.put("input", "${x}");
+        matchConfig.put("namespace", "ns");
+        matchConfig.put("on", Map.of());
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", matchConfig);
+
+        assertThatThrownBy(() -> Walker.resolve(List.of(step), registry))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("at least one");
+    }
+
+    @Test
+    void valueMode_match_unaffected_by_templateMode() {
+        Map<String, Object> caseEntry = new LinkedHashMap<>();
+        caseEntry.put("pattern", "active");
+        caseEntry.put("process", Map.of("command", "active.sh"));
+
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("match", "${status}");
+        step.put("cases", List.of(caseEntry));
+
+        List<ResolvedStep> resolved = Walker.resolve(List.of(step), registry);
+        var match = (ResolvedStep.MatchStep) resolved.get(0);
+        assertThat(match.isTemplateMode()).isFalse();
+        assertThat(match.scrutinee()).isEqualTo("${status}");
+    }
 }

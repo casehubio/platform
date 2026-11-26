@@ -143,7 +143,7 @@ public final class Walker {
             case ResolvedStep.InvokeStep s -> new ResolvedStep.InvokeStep(s.name(), s.invokeSpec(), s.decorators(), anns);
             case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), s.decorators(), anns);
             case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), s.decorators(), anns);
-            case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), s.decorators(), anns);
+            case ResolvedStep.MatchStep s -> s.isTemplateMode() ? ResolvedStep.MatchStep.templateMode(s.name(), s.templateSpec(), s.decorators(), anns) : ResolvedStep.MatchStep.valueMode(s.name(), s.scrutinee(), s.cases(), s.decorators(), anns);
             case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.concurrency(), s.decorators(), anns);
             case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), s.decorators(), anns);
             case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), s.decorators(), anns);
@@ -197,7 +197,7 @@ public final class Walker {
             case ResolvedStep.InvokeStep s -> new ResolvedStep.InvokeStep(s.name(), s.invokeSpec(), decorators);
             case ResolvedStep.BlockStep s -> new ResolvedStep.BlockStep(s.name(), s.steps(), decorators);
             case ResolvedStep.IfElseStep s -> new ResolvedStep.IfElseStep(s.name(), s.condition(), s.thenSteps(), s.elseSteps(), decorators);
-            case ResolvedStep.MatchStep s -> new ResolvedStep.MatchStep(s.name(), s.scrutinee(), s.cases(), decorators);
+            case ResolvedStep.MatchStep s -> s.isTemplateMode() ? ResolvedStep.MatchStep.templateMode(s.name(), s.templateSpec(), decorators) : ResolvedStep.MatchStep.valueMode(s.name(), s.scrutinee(), s.cases(), decorators);
             case ResolvedStep.ParallelStep s -> new ResolvedStep.ParallelStep(s.name(), s.steps(), s.advanceAfter(), s.cancelRemaining(), s.collectionTimeout(), s.concurrency(), decorators);
             case ResolvedStep.TryCatchFinallyStep s -> new ResolvedStep.TryCatchFinallyStep(s.name(), s.trySteps(), s.catchSteps(), s.finallySteps(), decorators);
             case ResolvedStep.SelectStep s -> new ResolvedStep.SelectStep(s.name(), s.branches(), decorators);
@@ -456,6 +456,15 @@ public final class Walker {
             structuralType = "match";
         }
 
+        if (hasMatch && matchValue instanceof Map<?,?> matchMap && matchMap.containsKey("namespace")) {
+            if (structuralType != null) {
+                throw new IllegalArgumentException(
+                        path + " → Step " + index + ": ambiguous — structural keyword '" + structuralType
+                        + "' and 'match' (template mode) both present");
+            }
+            structuralType = "match-template";
+        }
+
         if (structuralType != null && matchedAction != null) {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": ambiguous — structural keyword '" + structuralType
@@ -479,9 +488,9 @@ public final class Walker {
             throw new IllegalArgumentException(
                     path + " → Step " + index + ": 'cases' requires 'match'");
         }
-        if (hasMatch && !companions.containsKey("cases")) {
+        if (hasMatch && !"match".equals(structuralType) && !"match-template".equals(structuralType)) {
             throw new IllegalArgumentException(
-                    path + " → Step " + index + ": 'match' requires 'cases'");
+                    path + " → Step " + index + ": 'match' requires either 'cases' or a template config with 'namespace' + 'on'");
         }
         if (companions.containsKey("catch") && !"try".equals(structuralType)) {
             throw new IllegalArgumentException(
@@ -516,11 +525,63 @@ public final class Walker {
         }
         if ("match".equals(structuralType)) {
             var cases = (List<Map<String, Object>>) companions.get("cases");
-            return new ResolvedStep.MatchStep(
+            return ResolvedStep.MatchStep.valueMode(
                     stepName,
                     (String) matchValue,
                     resolveMatchCases(cases, registry, index, depth, stepPath, seenNames, annotations, stepKey, collector, playbookFile, locations),
                     decorators);
+        }
+        if ("match-template".equals(structuralType)) {
+            @SuppressWarnings("unchecked")
+            var config = (Map<String, Object>) matchValue;
+
+            if (!config.containsKey("on")) {
+                throw new IllegalArgumentException(
+                    stepPath + ": template-mode 'match' requires 'on:' handler map");
+            }
+
+            String inputExpr = config.containsKey("input")
+                ? String.valueOf(config.get("input"))
+                : null;
+            if (inputExpr == null) {
+                throw new IllegalArgumentException(
+                    stepPath + ": template-mode 'match' requires 'input:' expression");
+            }
+            String namespace = String.valueOf(config.get("namespace"));
+
+            @SuppressWarnings("unchecked")
+            var onHandlers = (Map<String, Object>) config.get("on");
+            if (onHandlers.isEmpty()) {
+                throw new IllegalArgumentException(
+                    stepPath + ": 'on:' must contain at least one handler");
+            }
+            var resolvedHandlers = new java.util.LinkedHashMap<String, java.util.List<ResolvedStep>>();
+            String childPrefix = stepKey + ".";
+
+            for (var entry : onHandlers.entrySet()) {
+                String templateName = entry.getKey();
+                @SuppressWarnings("unchecked")
+                var handlerSteps = (List<Map<String, Object>>) entry.getValue();
+                resolvedHandlers.put(templateName,
+                    resolve(handlerSteps, registry, depth + 1,
+                        stepPath + " → on:" + templateName, seenNames,
+                        annotations, childPrefix, 0, collector,
+                        playbookFile, locations));
+            }
+
+            @SuppressWarnings("unchecked")
+            var unmatchedRaw = (List<Map<String, Object>>) config.get("unmatched");
+            List<ResolvedStep> unmatchedSteps = unmatchedRaw != null
+                ? resolve(unmatchedRaw, registry, depth + 1,
+                    stepPath + " → unmatched", seenNames,
+                    annotations, childPrefix, 0, collector,
+                    playbookFile, locations)
+                : List.of();
+
+            var spec = new TemplateMatchSpec(
+                namespace, inputExpr, resolvedHandlers, unmatchedSteps);
+
+            return ResolvedStep.MatchStep.templateMode(stepName, spec, decorators);
         }
         if ("parallel".equals(structuralType)) {
             if (!(structuralValue instanceof java.util.List)) {

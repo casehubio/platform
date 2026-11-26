@@ -9,6 +9,7 @@ import com.openai.models.chat.completions.ChatCompletionStreamOptions;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import io.casehub.platform.agent.AgentBackend;
+import io.casehub.platform.agent.ResponseFormatType;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProcessException;
 import io.casehub.platform.agent.AgentSession;
@@ -16,7 +17,6 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.AgentSessionLimitException;
 import io.casehub.platform.agent.AgentTimeoutException;
-import io.casehub.platform.agent.ResponseFormatType;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
@@ -62,7 +62,7 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
     protected abstract Duration defaultTimeout();
     protected abstract String defaultModel();
 
-    protected String promptCacheRetention() {return null;}
+    protected boolean store() {return false;}
 
 
     int availablePermits() {
@@ -95,13 +95,9 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
         throw new UnsupportedOperationException(key() + " multi-turn sessions not yet implemented");
     }
 
-    Multi<AgentEvent> buildEventStream(AgentSessionConfig config) {
-        Duration effectiveTimeout = config.timeout() != null
-                                    ? config.timeout()
-                                    : defaultTimeout();
 
-        String modelId     = config.model() != null ? config.model() : defaultModel();
-        long   startTimeMs = System.currentTimeMillis();
+    ChatCompletionCreateParams buildParams(AgentSessionConfig config) {
+        String modelId = config.model() != null ? config.model() : defaultModel();
 
         var paramsBuilder = ChatCompletionCreateParams.builder()
                                                       .model(ChatModel.of(modelId))
@@ -112,6 +108,10 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
                                                                                                 .content(config.userPrompt())
                                                                                                 .build())
                                                       .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build());
+
+        if (store()) {
+            paramsBuilder.store(true);
+        }
 
         if (config.responseFormat() != null
             && config.responseFormat().type() == ResponseFormatType.JSON) {
@@ -136,7 +136,16 @@ public abstract class AbstractOpenAiSdkBackend implements AgentBackend {
             }
         }
 
-        ChatCompletionCreateParams params = paramsBuilder.build();
+        return paramsBuilder.build();
+    }
+
+    Multi<AgentEvent> buildEventStream(AgentSessionConfig config) {
+        Duration effectiveTimeout = config.timeout() != null
+                                    ? config.timeout()
+                                    : defaultTimeout();
+
+        ChatCompletionCreateParams params      = buildParams(config);
+        long                       startTimeMs = System.currentTimeMillis();
 
         return Multi.createFrom().emitter(emitter -> {
             AtomicReference<StreamResponse<ChatCompletionChunk>> streamRef = new AtomicReference<>();

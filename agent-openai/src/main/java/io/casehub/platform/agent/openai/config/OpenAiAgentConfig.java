@@ -17,8 +17,8 @@ public interface OpenAiAgentConfig extends OpenAiAgentProperties {
     String defaultModel();
 
     @Override
-    @WithDefault("in_memory")
-    String promptCacheRetention();
+    @WithDefault("false")
+    boolean store();
 
     @Override
     @WithDefault("PT5M")

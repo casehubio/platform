@@ -47,7 +47,8 @@ public class ClaudeBeans {
         var clientBuilder = com.anthropic.client.okhttp.AnthropicOkHttpClient.builder();
         config.apiKey().ifPresent(clientBuilder::apiKey);
         AnthropicNativeChatModel chatModel = new AnthropicNativeChatModel(
-                clientBuilder.build(), config.defaultModel(), config.defaultTimeout(), config.maxTokens());
+                clientBuilder.build(), config.defaultModel(), config.defaultTimeout(),
+                config.maxTokens(), config.cachePolicy());
         return new io.casehub.platform.agent.router.SimpleChatModelBackend("claude", chatModel);
     }
 

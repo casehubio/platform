@@ -24,8 +24,8 @@ public class OpenAiBackendProvider implements BackendProvider {
             @Override public String defaultModel() {
                 return properties.getOrDefault("default-model", "gpt-4o");
             }
-            @Override public String promptCacheRetention() {
-                return properties.getOrDefault("prompt-cache-retention", "auto");
+            @Override public boolean store() {
+                return Boolean.parseBoolean(properties.getOrDefault("store", "false"));
             }
             @Override public Duration defaultTimeout() {
                 return durationProperty(properties, "default-timeout", 120);

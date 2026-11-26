@@ -19,7 +19,8 @@ public class OpenAiChatModelManualConfig {
         var clientBuilder = com.openai.client.okhttp.OpenAIOkHttpClient.builder();
         properties.apiKey().ifPresent(clientBuilder::apiKey);
         OpenAiNativeChatModel chatModel = new OpenAiNativeChatModel(
-                clientBuilder.build(), properties.defaultModel(), properties.defaultTimeout());
+                clientBuilder.build(), properties.defaultModel(), properties.defaultTimeout(),
+                properties.store());
         return new SimpleChatModelBackend("openai", chatModel);
     }
 }

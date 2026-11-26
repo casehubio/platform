@@ -25,7 +25,7 @@ public class OpenAiBeans {
         OpenAiAgentProperties props = gate.isActive() ? new OpenAiAgentProperties() {
             public Optional<String> apiKey() { return config.apiKey(); }
             public String defaultModel() { return config.defaultModel(); }
-            public String promptCacheRetention() { return config.promptCacheRetention(); }
+            public boolean store() { return config.store(); }
             public Duration defaultTimeout() { return config.defaultTimeout(); }
             public int maxConcurrentSessions() { return 0; }
         } : config;
@@ -39,7 +39,8 @@ public class OpenAiBeans {
         var clientBuilder = com.openai.client.okhttp.OpenAIOkHttpClient.builder();
         config.apiKey().ifPresent(clientBuilder::apiKey);
         OpenAiNativeChatModel chatModel = new OpenAiNativeChatModel(
-                clientBuilder.build(), config.defaultModel(), config.defaultTimeout());
+                clientBuilder.build(), config.defaultModel(), config.defaultTimeout(),
+                config.store());
         return new io.casehub.platform.agent.router.SimpleChatModelBackend("openai", chatModel);
     }
 

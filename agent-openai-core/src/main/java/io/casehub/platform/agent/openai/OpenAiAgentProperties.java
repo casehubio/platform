@@ -9,7 +9,9 @@ public interface OpenAiAgentProperties {
 
     String defaultModel();
 
-    String promptCacheRetention();
+    default boolean store() {
+        return false;
+    }
 
     Duration defaultTimeout();
 

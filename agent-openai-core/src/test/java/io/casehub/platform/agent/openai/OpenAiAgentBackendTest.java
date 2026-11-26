@@ -152,7 +152,7 @@ class OpenAiAgentBackendTest {
         when(props.defaultModel()).thenReturn("gpt-4.1");
         when(props.defaultTimeout()).thenReturn(Duration.ofMinutes(5));
         when(props.maxConcurrentSessions()).thenReturn(maxSessions);
-        when(props.promptCacheRetention()).thenReturn("in_memory");
+        when(props.store()).thenReturn(false);
         when(props.apiKey()).thenReturn(Optional.empty());
         return new OpenAiAgentBackend(props, factory);
     }

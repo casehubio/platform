@@ -400,4 +400,131 @@ class AgentServiceProcessorTest {
         assertThat(proxy).contains("agentProvider.invoke(config)");
         assertThat(proxy).contains("agentProvider.openSession(init)");
     }
+
+    @Test
+    void rejectsVoidReturnType() {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.VoidAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+
+            @AgentService(model = "fast")
+            public interface VoidAgent {
+                @Query("Do something")
+                void doIt();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("unsupported return type");
+        assertThat(compilation).hadErrorContaining("void");
+    }
+
+    @Test
+    void rejectsPrimitiveReturnType() {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.PrimAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+
+            @AgentService(model = "fast")
+            public interface PrimAgent {
+                @Query("Count items")
+                int count();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("unsupported return type");
+        assertThat(compilation).hadErrorContaining("int");
+    }
+
+    @Test
+    void rejectsBoxedPrimitiveReturnType() {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.BoxedAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+
+            @AgentService(model = "fast")
+            public interface BoxedAgent {
+                @Query("Count items")
+                Integer count();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("unsupported return type");
+    }
+
+    @Test
+    void rejectsArrayReturnType() {
+        JavaFileObject taskType = JavaFileObjects.forSourceString("test.Task",
+            """
+            package test;
+            public record Task(String title, String description) {}
+            """);
+
+        JavaFileObject source = JavaFileObjects.forSourceString("test.ArrayAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+
+            @AgentService(model = "fast")
+            public interface ArrayAgent {
+                @Query("Get tasks")
+                Task[] getTasks();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(taskType, source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("unsupported return type");
+        assertThat(compilation).hadErrorContaining("List<Task>");
+    }
+
+    @Test
+    void rejectsRawCollectionReturnType() {
+        JavaFileObject source = JavaFileObjects.forSourceString("test.RawListAgent",
+            """
+            package test;
+            import io.casehub.platform.agent.AgentService;
+            import io.casehub.platform.agent.Query;
+            import java.util.List;
+
+            @AgentService(model = "fast")
+            @SuppressWarnings("rawtypes")
+            public interface RawListAgent {
+                @Query("Get items")
+                List getItems();
+            }
+            """);
+
+        Compilation compilation = Compiler.javac()
+            .withProcessors(new AgentServiceProcessor())
+            .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("unsupported return type");
+        assertThat(compilation).hadErrorContaining("type argument");
+    }
 }

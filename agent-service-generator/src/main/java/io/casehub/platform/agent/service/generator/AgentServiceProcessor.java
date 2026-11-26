@@ -12,6 +12,8 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.TypeKind;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Set;
@@ -88,6 +90,19 @@ public class AgentServiceProcessor extends AbstractProcessor {
             out.println("        this.agentResolver = agentResolver;");
             out.println("        this.schemaGenerator = schemaGenerator;");
             out.println("        this.objectMapper = objectMapper;");
+
+            boolean hasErrors = false;
+            for (Element enclosed : iface.getEnclosedElements()) {
+                if (enclosed instanceof ExecutableElement m) {
+                    if (!isAgentSession(m.getReturnType())) {
+                        var qAnn = m.getAnnotation(io.casehub.platform.agent.Query.class);
+                        if (qAnn != null && !validateReturnType(m)) {
+                            hasErrors = true;
+                        }
+                    }
+                }
+            }
+            if (hasErrors) return;
 
             java.util.LinkedHashSet<String> schemaTypes = new java.util.LinkedHashSet<>();
             for (Element enclosed : iface.getEnclosedElements()) {
@@ -243,6 +258,59 @@ public class AgentServiceProcessor extends AbstractProcessor {
         out.println("    }");
     }
 
+
+    private static final java.util.Set<String> BOXED_PRIMITIVES = java.util.Set.of(
+        "java.lang.Integer", "java.lang.Long", "java.lang.Double",
+        "java.lang.Float", "java.lang.Boolean", "java.lang.Byte",
+        "java.lang.Short", "java.lang.Character"
+    );
+
+    private static final String SUPPORTED_TYPES_MSG =
+        "Supported: String, Multi<AgentEvent>, AgentSession, POJO classes, List<T>, Set<T>, Collection<T>.";
+
+    private boolean validateReturnType(ExecutableElement method) {
+        TypeMirror returnType = method.getReturnType();
+        String methodName = method.getSimpleName().toString();
+        String typeName = returnType.toString();
+
+        if (returnType.getKind() == TypeKind.VOID) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                "@AgentService method '" + methodName + "' has unsupported return type 'void'. " + SUPPORTED_TYPES_MSG, method);
+            return false;
+        }
+
+        if (returnType.getKind().isPrimitive()) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                "@AgentService method '" + methodName + "' has unsupported return type '" + typeName + "'. " + SUPPORTED_TYPES_MSG, method);
+            return false;
+        }
+
+        if (returnType.getKind() == TypeKind.ARRAY) {
+            String componentType = ((ArrayType) returnType).getComponentType().toString();
+            String componentSimple = simpleTypeName(componentType);
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                "@AgentService method '" + methodName + "' has unsupported return type '" + typeName + "'. Use List<" + componentSimple + "> instead. " + SUPPORTED_TYPES_MSG, method);
+            return false;
+        }
+
+        if (returnType instanceof DeclaredType dt) {
+            String raw = dt.asElement().toString();
+
+            if (BOXED_PRIMITIVES.contains(raw)) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@AgentService method '" + methodName + "' has unsupported return type '" + typeName + "'. Use a wrapper record instead. " + SUPPORTED_TYPES_MSG, method);
+                return false;
+            }
+
+            if (isCollection(returnType) && dt.getTypeArguments().isEmpty()) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@AgentService method '" + methodName + "' has unsupported return type '" + typeName + "'. Collection types require a type argument. " + SUPPORTED_TYPES_MSG, method);
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private boolean isMultiAgentEvent(TypeMirror type) {
         if (type instanceof DeclaredType dt) {

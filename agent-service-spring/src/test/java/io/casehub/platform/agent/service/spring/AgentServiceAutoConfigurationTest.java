@@ -56,6 +56,28 @@ class AgentServiceAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(TestAdvisor.class));
     }
 
+    @Test
+    void skipsAgentServiceBeansWithoutAgentProvider() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(AgentServiceAutoConfiguration.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(AgentServiceBeans.class);
+                });
+    }
+
+    @Test
+    void worksWithoutAgentResolver() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(AgentServiceAutoConfiguration.class))
+                .withUserConfiguration(TestConfig.class)
+                .withBean(AgentProvider.class, StubAgentProvider::new)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(AgentServiceBeans.class);
+                    assertThat(context).hasSingleBean(TestAdvisor.class);
+                });
+    }
+
     static class StubAgentProvider implements AgentProvider {
         @Override
         public Multi<AgentEvent> invoke(AgentSessionConfig config) {

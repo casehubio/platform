@@ -145,3 +145,5 @@ mcp-dispatch
 message-extraction
 # NLP template registry — Spring auto-configuration deferred to consumer migration (#961)
 template-registry
+# LLM-backed template registry extensions — plain Java (template-registry + langchain4j-core), no CDI beans
+template-registry-llm

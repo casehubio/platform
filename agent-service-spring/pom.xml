@@ -27,6 +27,18 @@
             <groupId>io.casehub</groupId>
             <artifactId>casehub-platform-agent-service</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <!-- Quarkus runtime (and its JBoss LogManager SLF4J binding) must not leak into Spring apps -->
+                <exclusion>
+                    <groupId>io.quarkus</groupId>
+                    <artifactId>quarkus-arc</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- AgentServiceBeans references jakarta.enterprise.inject.Instance in its CDI constructor -->
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -5,6 +5,8 @@ import io.casehub.template.registry.CandidateTrace;
 import io.casehub.template.registry.InMemoryTemplateRegistry;
 import io.casehub.template.registry.LanguageFamilyRegistry;
 import io.casehub.template.registry.MatchTrace;
+import io.casehub.template.registry.MessageFormatResolver;
+import io.casehub.template.registry.MessageFormatSchema;
 import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.MatchingStrategy;
 import io.casehub.template.registry.NlpTokenizer;
@@ -32,20 +34,34 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
     private final ConcurrentMap<String, NamespaceState> namespaceStates = new ConcurrentHashMap<>();
 
     private record NamespaceState(
-        NlpTokenizer tokenizer,
-        MatchingStrategy strategy,
-        MatchingStrategy.Index index
+            NlpTokenizer tokenizer,
+            MatchingStrategy strategy,
+            MatchingStrategy.Index index,
+            Map<String, MessageFormatResolver.CompiledMessage> compiledMf2
     ) {}
+
+
+    private final MessageFormatResolver messageFormatResolver;
 
     public NlpTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
                                LanguageFamilyRegistry familyRegistry,
                                Map<String, MatchingStrategy> strategies,
                                double scoreThreshold) {
-        this.tokenizerFactory = Objects.requireNonNull(tokenizerFactory, "tokenizerFactory");
-        this.familyRegistry = Objects.requireNonNull(familyRegistry, "familyRegistry");
-        this.strategies = Map.copyOf(strategies);
-        this.scoreThreshold = scoreThreshold;
+        this(tokenizerFactory, familyRegistry, strategies, scoreThreshold, null);
     }
+
+    public NlpTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
+                               LanguageFamilyRegistry familyRegistry,
+                               Map<String, MatchingStrategy> strategies,
+                               double scoreThreshold,
+                               MessageFormatResolver resolver) {
+        this.tokenizerFactory      = Objects.requireNonNull(tokenizerFactory, "tokenizerFactory");
+        this.familyRegistry        = Objects.requireNonNull(familyRegistry, "familyRegistry");
+        this.strategies            = Map.copyOf(strategies);
+        this.scoreThreshold        = scoreThreshold;
+        this.messageFormatResolver = resolver;
+    }
+
 
     @Override
     public void register(TemplateNamespace namespace) {
@@ -83,9 +99,24 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                     + "Available strategies: " + strategies.keySet());
         }
 
-        NlpTokenizer tokenizer = tokenizerFactory.create(lang);
-        MatchingStrategy.Index index = strategy.buildIndex(namespace, tokenizer);
-        namespaceStates.put(namespace.name(), new NamespaceState(tokenizer, strategy, index));
+        Map<String, MessageFormatResolver.CompiledMessage> compiledMf2 = new java.util.LinkedHashMap<>();
+        for (TemplateDefinition def : namespace.templates().values()) {
+            if (def.messageFormat() != null) {
+                if (messageFormatResolver == null) {
+                    throw new IllegalStateException(
+                            "Template '" + def.name() + "' in namespace '"
+                            + namespace.name() + "' declares messageFormat but no "
+                            + "MessageFormatResolver is configured. "
+                            + "Add template-registry-mf2 to the classpath.");
+                }
+                compiledMf2.put(def.name(),
+                                messageFormatResolver.compile(def.messageFormat(), lang));
+            }
+        }
+
+        NlpTokenizer           tokenizer = tokenizerFactory.create(lang);
+        MatchingStrategy.Index index     = strategy.buildIndex(namespace, tokenizer);
+        namespaceStates.put(namespace.name(), new NamespaceState(tokenizer, strategy, index, compiledMf2));
     }
 
     @Override
@@ -219,14 +250,32 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                 new MatchTrace(allCandidates, bestCandidate, bestScore));
     }
 
+
+    @Override
+    public String generate(String namespaceName, String templateName,
+                           Map<String, String> values) {
+        NamespaceState state = namespaceStates.get(namespaceName);
+        if (state != null && state.compiledMf2().containsKey(templateName)) {
+            return messageFormatResolver.format(
+                    state.compiledMf2().get(templateName), values);
+        }
+        return super.generate(namespaceName, templateName, values);
+    }
+
     @Override
     protected TemplateSchema buildSchema(String namespaceName,
                                          TemplateDefinition def) {
         NamespaceState state = namespaceStates.get(namespaceName);
         List<TemplateSchema.StructuralSummary> summaries = state != null
-                ? state.strategy.structuralSummaries(state.index, def.name())
-                : List.of();
+                                                           ? state.strategy.structuralSummaries(state.index, def.name())
+                                                           : List.of();
+
+        MessageFormatSchema mfSchema = null;
+        if (def.messageFormat() != null && messageFormatResolver != null) {
+            mfSchema = messageFormatResolver.extractSchema(def.messageFormat());
+        }
+
         return new TemplateSchema(namespaceName, def.name(),
-                def.patterns(), def.variables(), summaries);
+                                  def.patterns(), def.variables(), summaries, mfSchema);
     }
 }

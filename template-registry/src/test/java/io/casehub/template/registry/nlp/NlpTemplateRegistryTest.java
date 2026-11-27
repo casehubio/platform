@@ -1,7 +1,6 @@
 package io.casehub.template.registry.nlp;
 
 import io.casehub.template.registry.LanguageFamilyRegistry;
-import io.casehub.template.registry.MatchingStrategy;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
@@ -297,5 +296,96 @@ class NlpTemplateRegistryTest {
 
         var afterNew = registry.match("ns", "design gets my approve");
         assertThat(afterNew).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
+    private static final io.casehub.template.registry.MessageFormatResolver STUB_RESOLVER = new io.casehub.template.registry.MessageFormatResolver() {
+        record StubCompiled(String pattern, String lang) implements CompiledMessage {}
+
+        @Override
+        public CompiledMessage compile(String pattern, String languageTag) {
+            return new StubCompiled(pattern, languageTag);
+        }
+
+        @Override
+        public String format(CompiledMessage compiled, java.util.Map<String, String> values) {
+            String count = values.getOrDefault("count", "?");
+            return "MF2:" + count;
+        }
+
+        @Override
+        public io.casehub.template.registry.MessageFormatSchema extractSchema(String pattern) {
+            return new io.casehub.template.registry.MessageFormatSchema(pattern,
+                                                                        java.util.List.of(new io.casehub.template.registry.SelectorInfo("count", "integer")),
+                                                                        java.util.List.of("1", "*"));
+        }
+    };
+
+    private static NlpTemplateRegistry createRegistryWithResolver(io.casehub.template.registry.MessageFormatResolver resolver) {
+        var factory        = new OpenNlpTokenizerFactory();
+        var strategy       = new SvoMatchingStrategy();
+        var familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        return new NlpTemplateRegistry(factory, familyRegistry,
+                                       Map.of("svo", strategy), 0.5, resolver);
+    }
+
+    @Test
+    void generateDelegatesToMf2ResolverWhenMessageFormatPresent() {
+        var mf2Registry = createRegistryWithResolver(STUB_RESOLVER);
+        var def = TemplateDefinition.builder("item-count")
+                                    .pattern("${count} items have been ${action}")
+                                    .messageFormat(".match {$count :integer}\n1 {{{$count} item}}\n* {{{$count} items}}")
+                                    .build();
+        var ns = new TemplateNamespace("test", Map.of("item-count", def));
+        mf2Registry.register(ns);
+
+        String result = mf2Registry.generate("test", "item-count",
+                                             Map.of("count", "5", "action", "approved"));
+        assertThat(result).isEqualTo("MF2:5");
+    }
+
+    @Test
+    void generateUsesSlotFillWhenNoMessageFormat() {
+        var mf2Registry = createRegistryWithResolver(STUB_RESOLVER);
+        var def = TemplateDefinition.builder("vote")
+                                    .pattern("I ${decision} this ${subject}")
+                                    .build();
+        var ns = new TemplateNamespace("test", Map.of("vote", def));
+        mf2Registry.register(ns);
+
+        String result = mf2Registry.generate("test", "vote",
+                                             Map.of("decision", "approve", "subject", "architecture"));
+        assertThat(result).isEqualTo("I approve this architecture");
+    }
+
+    @Test
+    void registerThrowsForMf2TemplateWithoutResolver() {
+        var noResolverRegistry = createRegistryWithResolver(null);
+        var def = TemplateDefinition.builder("item-count")
+                                    .pattern("${count} items")
+                                    .messageFormat(".match {$count :integer}\n1 {{{$count} item}}\n* {{{$count} items}}")
+                                    .build();
+        var ns = new TemplateNamespace("test", Map.of("item-count", def));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> noResolverRegistry.register(ns))
+                                       .isInstanceOf(IllegalStateException.class)
+                                       .hasMessageContaining("MessageFormatResolver");
+    }
+
+    @Test
+    void schemaIncludesMf2Metadata() {
+        var mf2Registry = createRegistryWithResolver(STUB_RESOLVER);
+        var def = TemplateDefinition.builder("item-count")
+                                    .pattern("${count} items")
+                                    .messageFormat(".match {$count :integer}\n1 {{{$count} item}}\n* {{{$count} items}}")
+                                    .build();
+        var ns = new TemplateNamespace("test", Map.of("item-count", def));
+        mf2Registry.register(ns);
+
+        var schema = mf2Registry.schema("test", "item-count");
+        assertThat(schema).isPresent();
+        assertThat(schema.get().messageFormatSchema()).isNotNull();
+        assertThat(schema.get().messageFormatSchema().selectors())
+                .extracting(io.casehub.template.registry.SelectorInfo::variableName)
+                .contains("count");
     }
 }

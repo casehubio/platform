@@ -11,9 +11,9 @@ import io.casehub.template.registry.CandidateTrace;
 import io.casehub.template.registry.ClassificationResult;
 import io.casehub.template.registry.CollisionDetector;
 import io.casehub.template.registry.ElementTrace;
+import io.casehub.template.registry.LanguageFamilyRegistry;
 import io.casehub.template.registry.MatchTrace;
 import io.casehub.template.registry.MatchTraceResult;
-import io.casehub.template.registry.LanguageFamilyRegistry;
 import io.casehub.template.registry.MatchingStrategy;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.template.registry.NlpTokenizerFactory;
@@ -68,8 +68,9 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                     double confidenceThreshold,
                                     ClassificationCache classificationCache) {
         this(tokenizerFactory, familyRegistry, strategies, scoreThreshold,
-             fallbackMatcher, confidenceThreshold, classificationCache, null, 0.5);
+             fallbackMatcher, confidenceThreshold, classificationCache, null, 0.5, null);
     }
+
 
     public AdaptiveTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
                                     LanguageFamilyRegistry familyRegistry,
@@ -80,7 +81,22 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                     ClassificationCache classificationCache,
                                     EmbeddingModel embeddingModel,
                                     double embeddingSimilarityThreshold) {
-        super(tokenizerFactory, familyRegistry, strategies, scoreThreshold);
+        this(tokenizerFactory, familyRegistry, strategies, scoreThreshold,
+             fallbackMatcher, confidenceThreshold, classificationCache,
+             embeddingModel, embeddingSimilarityThreshold, null);
+    }
+
+    public AdaptiveTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
+                                    LanguageFamilyRegistry familyRegistry,
+                                    Map<String, MatchingStrategy> strategies,
+                                    double scoreThreshold,
+                                    AdaptiveFallbackMatcher fallbackMatcher,
+                                    double confidenceThreshold,
+                                    ClassificationCache classificationCache,
+                                    EmbeddingModel embeddingModel,
+                                    double embeddingSimilarityThreshold,
+                                    io.casehub.template.registry.MessageFormatResolver resolver) {
+        super(tokenizerFactory, familyRegistry, strategies, scoreThreshold, resolver);
         this.tokenizerFactory             = tokenizerFactory;
         this.localScoreThreshold          = scoreThreshold;
         this.affinityThreshold            = DEFAULT_AFFINITY_THRESHOLD;

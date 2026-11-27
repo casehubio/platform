@@ -15,7 +15,9 @@ import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,23 +27,35 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
     private static final double DEFAULT_AFFINITY_THRESHOLD = 0.3;
     private static final double DEFAULT_SCORE_THRESHOLD = 0.5;
+    private static final int DEFAULT_TRIE_THRESHOLD = 100;
 
     private final NlpTokenizer tokenizer;
     private final double affinityThreshold;
     private final double scoreThreshold;
+    private final int trieActivationThreshold;
     private final ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled =
+        new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, DiscriminationTrie> namespaceTries =
         new ConcurrentHashMap<>();
 
     public NlpTemplateRegistry(NlpTokenizer tokenizer) {
-        this(tokenizer, DEFAULT_AFFINITY_THRESHOLD, DEFAULT_SCORE_THRESHOLD);
+        this(tokenizer, DEFAULT_AFFINITY_THRESHOLD, DEFAULT_SCORE_THRESHOLD, DEFAULT_TRIE_THRESHOLD);
     }
 
     public NlpTemplateRegistry(NlpTokenizer tokenizer,
                                 double affinityThreshold,
                                 double scoreThreshold) {
+        this(tokenizer, affinityThreshold, scoreThreshold, DEFAULT_TRIE_THRESHOLD);
+    }
+
+    public NlpTemplateRegistry(NlpTokenizer tokenizer,
+                                double affinityThreshold,
+                                double scoreThreshold,
+                                int trieActivationThreshold) {
         this.tokenizer = Objects.requireNonNull(tokenizer, "tokenizer");
         this.affinityThreshold = affinityThreshold;
         this.scoreThreshold = scoreThreshold;
+        this.trieActivationThreshold = trieActivationThreshold;
     }
 
     protected NlpTokenizer tokenizer() {
@@ -69,10 +83,12 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
             String key = namespace.name() + ":" + def.name();
             nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer));
         }
+        rebuildTrieIfNeeded(namespace.name());
     }
 
     @Override
     public void deregister(String namespaceName) {
+        namespaceTries.remove(namespaceName);
         for (String key : nlpCompiled.keySet()) {
             if (key.startsWith(namespaceName + ":")) {
                 nlpCompiled.remove(key);
@@ -93,6 +109,70 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
             String key = namespaceName + ":" + def.name();
             nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer));
         }
+        rebuildTrieIfNeeded(namespaceName);
+    }
+
+    private void rebuildTrieIfNeeded(String namespaceName) {
+        Map<String, NlpTemplateCompiler.CompiledNlpTemplate> nsCompiled = new java.util.LinkedHashMap<>();
+        String                                               prefix     = namespaceName + ":";
+        for (var entry : nlpCompiled.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                nsCompiled.put(entry.getKey(), entry.getValue());
+            }
+        }
+        int totalPatterns = nsCompiled.values().stream()
+                                      .mapToInt(c -> c.matchers().size()).sum();
+        if (totalPatterns >= trieActivationThreshold) {
+            namespaceTries.put(namespaceName, DiscriminationTrie.build(nsCompiled, namespaceName));
+        } else {
+            namespaceTries.remove(namespaceName);
+        }
+    }
+
+    private TemplateMatch matchViaTrie(String namespaceName, TemplateNamespace ns,
+                                       List<AnnotatedToken> inputTokens,
+                                       DiscriminationTrie trie) {
+        List<DiscriminationTrie.PatternRef> candidates       = trie.walk(inputTokens);
+        TemplateMatch.Matched               bestMatch        = null;
+        String                              nearMissTemplate = null;
+        String                              nearMissPattern  = null;
+        double                              nearMissScore    = 0.0;
+
+        for (DiscriminationTrie.PatternRef ref : candidates) {
+            TemplateDefinition def = ns.templates().get(ref.templateName());
+            if (def == null) {continue;}
+            String                                  key      = namespaceName + ":" + ref.templateName();
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
+            if (compiled == null || ref.patternIndex() >= compiled.matchers().size()) {continue;}
+
+            StructuralMatcher matcher = compiled.matchers().get(ref.patternIndex());
+            var               result  = matcher.match(inputTokens, def.variables());
+            if (result.isPresent() && result.get().score() > scoreThreshold) {
+                if (bestMatch == null || result.get().score() > bestMatch.score()) {
+                    bestMatch = new TemplateMatch.Matched(
+                            namespaceName, ref.templateName(), ref.patternIndex(),
+                            result.get().fields(), result.get().score(), ns.version());
+                }
+            } else if (result.isPresent() && result.get().score() > nearMissScore) {
+                nearMissScore    = result.get().score();
+                nearMissTemplate = ref.templateName();
+                nearMissPattern  = def.patterns().get(ref.patternIndex());
+            }
+        }
+
+        if (bestMatch != null) {return bestMatch;}
+        if (nearMissTemplate != null) {
+            String inputText = inputTokens.stream()
+                                          .map(AnnotatedToken::surface)
+                                          .collect(java.util.stream.Collectors.joining(" "));
+            return new TemplateMatch.NearMiss(
+                    namespaceName, inputText, nearMissTemplate,
+                    TemplateFormatHelper.formatSuggestion(nearMissPattern));
+        }
+        String inputText = inputTokens.stream()
+                                      .map(AnnotatedToken::surface)
+                                      .collect(java.util.stream.Collectors.joining(" "));
+        return new TemplateMatch.Unmatched(inputText);
     }
 
 
@@ -138,7 +218,13 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
             return regexResult;
         }
 
-        List<AnnotatedToken>  inputTokens      = tokenizer.tokenize(input);
+        List<AnnotatedToken> inputTokens = tokenizer.tokenize(input);
+
+        DiscriminationTrie trie = namespaceTries.get(namespaceName);
+        if (trie != null) {
+            return matchViaTrie(namespaceName, ns, inputTokens, trie);
+        }
+
         TemplateMatch.Matched bestMatch        = null;
         String                nearMissTemplate = null;
         String                nearMissPattern  = null;

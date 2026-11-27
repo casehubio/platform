@@ -8,7 +8,11 @@ import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.VariationSeeder;
-import io.casehub.template.registry.nlp.OpenNlpTokenizer;
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
+import io.casehub.template.registry.NlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -50,11 +54,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AdaptiveRegistryIntegrationTest {
 
-    private OpenNlpTokenizer tokenizer;
+    private NlpTokenizerFactory tokenizerFactory;
+    private LanguageFamilyRegistry familyRegistry;
+    private Map<String, MatchingStrategy> strategies;
 
     @BeforeEach
     void setUp() {
-        tokenizer = new OpenNlpTokenizer();
+        tokenizerFactory = new OpenNlpTokenizerFactory();
+        familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        strategies = Map.of("svo", new SvoMatchingStrategy());
     }
 
     private TemplateNamespace reviewNamespace() {
@@ -93,7 +102,7 @@ class AdaptiveRegistryIntegrationTest {
                 List.of("This ${subject} gets my ${decision}");
 
             // Fallback that throws — proves the LLM is never called
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, lang) -> { throw new RuntimeException("LLM should not be called"); },
                 0.8, newCache());
 
@@ -121,7 +130,7 @@ class AdaptiveRegistryIntegrationTest {
             VariationSeeder seeder = (def, lang) ->
                 List.of("This ${subject} gets my ${decision}");
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, lang) -> { throw new RuntimeException("LLM should not be called"); },
                 0.8, newCache());
 
@@ -146,7 +155,7 @@ class AdaptiveRegistryIntegrationTest {
             VariationSeeder seeder = (def, lang) ->
                 List.of("This ${subject} gets my ${decision}");
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, lang) -> new ClassificationResult.Unmatched(),
                 0.8, newCache());
 
@@ -168,7 +177,7 @@ class AdaptiveRegistryIntegrationTest {
                 "My ${decision} goes to this ${subject}",
                 "${subject} has my ${decision}");
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, lang) -> { throw new RuntimeException("LLM should not be called"); },
                 0.8, newCache());
 
@@ -222,7 +231,7 @@ class AdaptiveRegistryIntegrationTest {
                     Map.of("decision", "approve", "subject", extractSubject(in)),
                     "I'm in favour of this ${subject}", 0.95);
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             var result = registry.match("protocol:review", input);
@@ -251,7 +260,7 @@ class AdaptiveRegistryIntegrationTest {
                 return new ClassificationResult.Unmatched();
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // Tier 1: regex exact match — LLM never called
@@ -306,7 +315,7 @@ class AdaptiveRegistryIntegrationTest {
                     "This ${subject} gets my ${decision}", 0.95);
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // ── First occurrence: "This design gets my approve" ──
@@ -389,7 +398,7 @@ class AdaptiveRegistryIntegrationTest {
                     "This ${subject} gets my ${decision}", 0.95);
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // Trigger learning: "This design gets my approve" → LLM classifies,
@@ -443,7 +452,7 @@ class AdaptiveRegistryIntegrationTest {
                 }
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // Learn first variation
@@ -513,7 +522,7 @@ class AdaptiveRegistryIntegrationTest {
                     "I'm in favour of this ${subject}", 0.95);
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // First call: LLM classifies. Variation drops ${decision}, not registered.
@@ -544,7 +553,7 @@ class AdaptiveRegistryIntegrationTest {
                 return new ClassificationResult.Unmatched();
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             registry.match("protocol:review", "The weather is nice today");
@@ -568,7 +577,7 @@ class AdaptiveRegistryIntegrationTest {
                     "I'm in favour of this ${subject}", 0.95);
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // Populate cache
@@ -604,7 +613,7 @@ class AdaptiveRegistryIntegrationTest {
                     Map.of("decision", "approve", "subject", "design"),
                     "This ${subject} gets my ${decision}", 0.5);
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // The match is returned — useful even at low confidence
@@ -626,7 +635,7 @@ class AdaptiveRegistryIntegrationTest {
                     Map.of("decision", "approve", "subject", "design"),
                     "This ${subject} gets my ${decision}", 0.95);
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             registry.match("protocol:review", "This design gets my approve");
@@ -669,7 +678,7 @@ class AdaptiveRegistryIntegrationTest {
                     Map.of("action", "run", "thing", "test"),
                     "I ${action} this ${thing}", 0.95);
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(ns1);
 
             // ns2 has a different canonical pattern but the LLM suggests one that collides
@@ -690,7 +699,7 @@ class AdaptiveRegistryIntegrationTest {
 
         @Test
         void seedingService_filtersCollidingVariations() {
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (i, c, l) -> new ClassificationResult.Unmatched(), 0.8, newCache());
 
             // Register ns1 first
@@ -737,7 +746,7 @@ class AdaptiveRegistryIntegrationTest {
                 (input, candidates, lang) -> { throw new RuntimeException("LLM service unavailable"); };
 
             var registry = new AdaptiveTemplateRegistry(
-                tokenizer, failingFallback, 0.8, newCache());
+                tokenizerFactory, familyRegistry, strategies, 0.5, failingFallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // Structural tiers miss, LLM throws — graceful degradation
@@ -762,7 +771,7 @@ class AdaptiveRegistryIntegrationTest {
                     "pattern", 0.95);
 
             var registry = new AdaptiveTemplateRegistry(
-                tokenizer, hallucinating, 0.8, newCache());
+                tokenizerFactory, familyRegistry, strategies, 0.5, hallucinating, 0.8, newCache());
             registry.register(reviewNamespace());
 
             var result = registry.match("protocol:review", "I'm in favour of this design");
@@ -789,7 +798,7 @@ class AdaptiveRegistryIntegrationTest {
                     Map.of("decision", "approve", "subject", "design"),
                     "I'm in favour of this ${subject}", 0.95);
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             var result = registry.matchWithTrace("protocol:review",
@@ -867,7 +876,7 @@ class AdaptiveRegistryIntegrationTest {
                 return new ClassificationResult.Unmatched();
             };
 
-            var registry = new AdaptiveTemplateRegistry(tokenizer, fallback, 0.8, newCache());
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
             registry.register(reviewNamespace());
 
             // ── Step 1: Exact canonical match → Tier 1 (regex) ──

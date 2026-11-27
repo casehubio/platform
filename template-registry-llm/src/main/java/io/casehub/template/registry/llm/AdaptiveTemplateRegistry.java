@@ -13,16 +13,20 @@ import io.casehub.template.registry.CollisionDetector;
 import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.MatchTrace;
 import io.casehub.template.registry.MatchTraceResult;
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
 import io.casehub.template.registry.NlpTokenizer;
+import io.casehub.template.registry.NlpTokenizerFactory;
 import io.casehub.template.registry.TemplateCandidate;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateFormatHelper;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
-import io.casehub.template.registry.nlp.LemmatisedKeywordFilter;
-import io.casehub.template.registry.nlp.NlpTemplateCompiler;
 import io.casehub.template.registry.nlp.NlpTemplateRegistry;
-import io.casehub.template.registry.nlp.StructuralMatcher;
+import io.casehub.template.registry.nlp.svo.LemmatisedKeywordFilter;
+import io.casehub.template.registry.nlp.svo.NlpTemplateCompiler;
+import io.casehub.template.registry.nlp.svo.StructuralMatcher;
+import io.casehub.template.registry.nlp.svo.SvoStopWords;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 
 import java.util.ArrayList;
@@ -41,30 +45,45 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
     private static final Logger LOG = Logger.getLogger(
             AdaptiveTemplateRegistry.class.getName());
     private static final double SYNONYM_LEARNING_THRESHOLD = 0.7;
+    private static final double DEFAULT_AFFINITY_THRESHOLD = 0.3;
 
+    private final NlpTokenizerFactory                                        tokenizerFactory;
+    private final double                                                     localScoreThreshold;
+    private final double                                                     affinityThreshold;
+    private final AdaptiveFallbackMatcher                                    fallbackMatcher;
+    private final double                                                     confidenceThreshold;
+    private final ClassificationCache                                        classificationCache;
+    private final EmbeddingModel                                             embeddingModel;
+    private final double                                                     embeddingSimilarityThreshold;
+    private final ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, NlpTokenizer>                        namespaceTokenizers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, float[]>                             templateEmbeddings = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ConcurrentMap<String, Set<String>>>  synonyms           = new ConcurrentHashMap<>();
 
-    private final AdaptiveFallbackMatcher                                   fallbackMatcher;
-    private final double                                                    confidenceThreshold;
-    private final ClassificationCache                                       classificationCache;
-    private final EmbeddingModel                                            embeddingModel;
-    private final double                                                    embeddingSimilarityThreshold;
-    private final ConcurrentMap<String, float[]>                            templateEmbeddings = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, ConcurrentMap<String, Set<String>>> synonyms           = new ConcurrentHashMap<>();
-
-    public AdaptiveTemplateRegistry(NlpTokenizer tokenizer,
+    public AdaptiveTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
+                                    LanguageFamilyRegistry familyRegistry,
+                                    Map<String, MatchingStrategy> strategies,
+                                    double scoreThreshold,
                                     AdaptiveFallbackMatcher fallbackMatcher,
                                     double confidenceThreshold,
                                     ClassificationCache classificationCache) {
-        this(tokenizer, fallbackMatcher, confidenceThreshold, classificationCache, null, 0.5);
+        this(tokenizerFactory, familyRegistry, strategies, scoreThreshold,
+             fallbackMatcher, confidenceThreshold, classificationCache, null, 0.5);
     }
 
-    public AdaptiveTemplateRegistry(NlpTokenizer tokenizer,
+    public AdaptiveTemplateRegistry(NlpTokenizerFactory tokenizerFactory,
+                                    LanguageFamilyRegistry familyRegistry,
+                                    Map<String, MatchingStrategy> strategies,
+                                    double scoreThreshold,
                                     AdaptiveFallbackMatcher fallbackMatcher,
                                     double confidenceThreshold,
                                     ClassificationCache classificationCache,
                                     EmbeddingModel embeddingModel,
                                     double embeddingSimilarityThreshold) {
-        super(tokenizer);
+        super(tokenizerFactory, familyRegistry, strategies, scoreThreshold);
+        this.tokenizerFactory             = tokenizerFactory;
+        this.localScoreThreshold          = scoreThreshold;
+        this.affinityThreshold            = DEFAULT_AFFINITY_THRESHOLD;
         this.fallbackMatcher              = fallbackMatcher;
         this.confidenceThreshold          = confidenceThreshold;
         this.classificationCache          = classificationCache;
@@ -75,12 +94,15 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
     @Override
     public void register(TemplateNamespace namespace) {
         super.register(namespace);
+        compileAndStore(namespace);
         computeTemplateEmbeddings(namespace);
     }
 
     @Override
     public void deregister(String namespaceName) {
         templateEmbeddings.keySet().removeIf(k -> k.startsWith(namespaceName + ":"));
+        nlpCompiled.keySet().removeIf(k -> k.startsWith(namespaceName + ":"));
+        namespaceTokenizers.remove(namespaceName);
         synonyms.remove(namespaceName);
         super.deregister(namespaceName);
     }
@@ -88,10 +110,33 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
     @Override
     public void replaceOrRegister(TemplateNamespace namespace) {
         super.replaceOrRegister(namespace);
+        nlpCompiled.keySet().removeIf(k -> k.startsWith(namespace.name() + ":"));
+        compileAndStore(namespace);
         templateEmbeddings.keySet().removeIf(k -> k.startsWith(namespace.name() + ":"));
         computeTemplateEmbeddings(namespace);
         synonyms.remove(namespace.name());
         classificationCache.invalidateNamespace(namespace.name());
+    }
+
+    private void compileAndStore(TemplateNamespace namespace) {
+        String lang = namespace.language() != null ? namespace.language() : "en";
+        NlpTokenizer tokenizer = tokenizerFactory.create(lang);
+        namespaceTokenizers.put(namespace.name(), tokenizer);
+        Set<String> stopWords = SvoStopWords.forLanguage(lang);
+        for (TemplateDefinition def : namespace.templates().values()) {
+            String key = namespace.name() + ":" + def.name();
+            nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer, stopWords));
+        }
+    }
+
+    private NlpTokenizer tokenizerFor(String namespaceName) {
+        NlpTokenizer tok = namespaceTokenizers.get(namespaceName);
+        return tok != null ? tok : tokenizerFactory.create("en");
+    }
+
+    private Set<String> stopWordsFor(TemplateNamespace ns) {
+        String lang = ns.language() != null ? ns.language() : "en";
+        return SvoStopWords.forLanguage(lang);
     }
 
     @Override
@@ -107,27 +152,29 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
             return regexResult;
         }
 
-        List<AnnotatedToken>               inputTokens       = tokenizer().tokenize(input);
+        NlpTokenizer                       tokenizer         = tokenizerFor(namespaceName);
+        List<AnnotatedToken>               inputTokens       = tokenizer.tokenize(input);
         TemplateMatch.Matched              bestMatch         = null;
         String                             nearMissTemplate  = null;
         String                             nearMissPattern   = null;
         double                             nearMissScore     = 0.0;
         float[]                            inputEmbedding    = null;
         ConcurrentMap<String, Set<String>> namespaceSynonyms = synonyms.get(namespaceName);
+        Set<String>                        stopWords         = stopWordsFor(ns);
 
         for (var templateEntry : ns.templates().entrySet()) {
             TemplateDefinition                      def      = templateEntry.getValue();
             String                                  key      = namespaceName + ":" + def.name();
-            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
             if (compiled == null) {continue;}
 
             for (int i = 0; i < compiled.matchers().size(); i++) {
                 Set<String> keywords = compiled.keywordSets().get(i);
                 double affinity = namespaceSynonyms != null
                                   ? LemmatisedKeywordFilter.affinity(keywords, inputTokens, namespaceSynonyms)
-                                  : LemmatisedKeywordFilter.affinity(keywords, inputTokens);
+                                  : LemmatisedKeywordFilter.affinity(keywords, inputTokens, stopWords);
 
-                if (affinity < affinityThreshold() && !keywords.isEmpty()) {
+                if (affinity < affinityThreshold && !keywords.isEmpty()) {
                     if (embeddingModel != null) {
                         try {
                             if (inputEmbedding == null) {
@@ -140,7 +187,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                 if (similarity >= embeddingSimilarityThreshold) {
                                     StructuralMatcher matcher = compiled.matchers().get(i);
                                     var               result  = matcher.match(inputTokens, def.variables());
-                                    if (result.isPresent() && result.get().score() > scoreThreshold()) {
+                                    if (result.isPresent() && result.get().score() > localScoreThreshold) {
                                         learnSynonyms(namespaceName, keywords, inputTokens);
                                         if (bestMatch == null || result.get().score() > bestMatch.score()) {
                                             bestMatch = new TemplateMatch.Matched(
@@ -164,7 +211,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
                 StructuralMatcher matcher = compiled.matchers().get(i);
                 var               result  = matcher.match(inputTokens, def.variables());
-                if (result.isPresent() && result.get().score() > scoreThreshold()) {
+                if (result.isPresent() && result.get().score() > localScoreThreshold) {
                     if (bestMatch == null || result.get().score() > bestMatch.score()) {
                         bestMatch = new TemplateMatch.Matched(
                                 namespaceName, def.name(), i,
@@ -278,23 +325,25 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
         if (embeddingModel == null) {return candidates;}
 
-        List<AnnotatedToken>               inputTokens       = tokenizer().tokenize(input);
+        NlpTokenizer                       tokenizer         = tokenizerFor(namespaceName);
+        List<AnnotatedToken>               inputTokens       = tokenizer.tokenize(input);
         float[]                            inputEmbedding    = null;
         ConcurrentMap<String, Set<String>> namespaceSynonyms = synonyms.get(namespaceName);
+        Set<String>                        stopWords         = stopWordsFor(ns);
 
         for (var templateEntry : ns.templates().entrySet()) {
             TemplateDefinition                      def      = templateEntry.getValue();
             String                                  key      = namespaceName + ":" + def.name();
-            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
             if (compiled == null) {continue;}
 
             for (int i = 0; i < compiled.matchers().size(); i++) {
                 Set<String> keywords = compiled.keywordSets().get(i);
                 double affinity = namespaceSynonyms != null
                                   ? LemmatisedKeywordFilter.affinity(keywords, inputTokens, namespaceSynonyms)
-                                  : LemmatisedKeywordFilter.affinity(keywords, inputTokens);
+                                  : LemmatisedKeywordFilter.affinity(keywords, inputTokens, stopWords);
 
-                if (affinity < affinityThreshold() && !keywords.isEmpty()) {
+                if (affinity < affinityThreshold && !keywords.isEmpty()) {
                     try {
                         if (inputEmbedding == null) {
                             inputEmbedding = computeInputEmbedding(inputTokens);
@@ -309,7 +358,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                 var                traceResult = matcher.matchWithTrace(inputTokens, def.variables());
                                 List<ElementTrace> elements    = traceResult.elements();
                                 if (traceResult.result().isPresent()
-                                    && traceResult.result().get().score() > scoreThreshold()) {
+                                    && traceResult.result().get().score() > localScoreThreshold) {
                                     double score = traceResult.result().get().score();
                                     candidates.add(new CandidateTrace(
                                             namespaceName, def.name(), i, affinity, similarity,
@@ -339,7 +388,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         for (var templateEntry : namespace.templates().entrySet()) {
             TemplateDefinition                      def      = templateEntry.getValue();
             String                                  key      = namespace.name() + ":" + def.name();
-            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
             if (compiled == null) {continue;}
 
             for (int i = 0; i < compiled.keywordSets().size(); i++) {
@@ -525,9 +574,6 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         TemplateNamespace expandedNs = new TemplateNamespace(
                 ns.name(), expandedTemplates, ns.language());
 
-        if (snapshotReplaceNamespace(namespaceName, expandedNs)) {
-            recompileNlp(namespaceName, expandedNs);
-            classificationCache.invalidateNamespace(namespaceName);
-        }
+        replaceOrRegister(expandedNs);
     }
 }

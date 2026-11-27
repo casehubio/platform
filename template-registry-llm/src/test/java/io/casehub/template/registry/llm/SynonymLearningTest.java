@@ -8,7 +8,11 @@ import io.casehub.template.registry.ClassificationResult;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
-import io.casehub.template.registry.nlp.OpenNlpTokenizer;
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
+import io.casehub.template.registry.NlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -23,8 +27,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SynonymLearningTest {
 
-    private final OpenNlpTokenizer tokenizer = new OpenNlpTokenizer();
+    private final NlpTokenizerFactory tokenizerFactory = new OpenNlpTokenizerFactory();
+    private final LanguageFamilyRegistry familyRegistry = createFamilyRegistry();
+    private final Map<String, MatchingStrategy> strategies = Map.of("svo", new SvoMatchingStrategy());
     private static final double SYNONYM_LEARNING_THRESHOLD = 0.7;
+
+    private static LanguageFamilyRegistry createFamilyRegistry() {
+        var r = new LanguageFamilyRegistry();
+        r.register("en", "svo");
+        return r;
+    }
 
     @Test
     void embeddingRescue_learnsSynonymForMissingKeyword() {
@@ -110,7 +122,7 @@ class SynonymLearningTest {
     }
 
     private AdaptiveTemplateRegistry createRegistry(EmbeddingModel embeddingModel) {
-        return new AdaptiveTemplateRegistry(tokenizer,
+        return new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, language) -> new ClassificationResult.Unmatched(),
                 0.8, new ClassificationCache(Duration.ofMinutes(5), Duration.ofMinutes(1), 100),
                 embeddingModel, 0.5);

@@ -1,13 +1,18 @@
 package io.casehub.template.registry.nlp;
 
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,9 +20,22 @@ class NlpTemplateRegistryTest {
 
     private NlpTemplateRegistry registry;
 
+    private static NlpTemplateRegistry createRegistry() {
+        return createRegistry(0.5);
+    }
+
+    private static NlpTemplateRegistry createRegistry(double scoreThreshold) {
+        var factory = new OpenNlpTokenizerFactory();
+        var strategy = new SvoMatchingStrategy();
+        var familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        return new NlpTemplateRegistry(factory, familyRegistry,
+                Map.of("svo", strategy), scoreThreshold);
+    }
+
     @BeforeEach
     void setUp() {
-        registry = new NlpTemplateRegistry(new OpenNlpTokenizer());
+        registry = createRegistry();
         var vote = TemplateDefinition.builder("vote")
             .pattern("I ${decision} this ${subject}")
             .variable("decision", VariableConstraint.enumOf("approve", "reject"))
@@ -153,7 +171,7 @@ class NlpTemplateRegistryTest {
                                          .build();
         var templates = new LinkedHashMap<String, TemplateDefinition>();
         templates.put("escalate", escalate);
-        var escalateRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer());
+        var escalateRegistry = createRegistry();
         escalateRegistry.register(new TemplateNamespace("protocol:escalation", templates));
 
         var result = escalateRegistry.matchWithTrace("protocol:escalation",
@@ -208,7 +226,7 @@ class NlpTemplateRegistryTest {
                                          .build();
         var templates = new LinkedHashMap<String, TemplateDefinition>();
         templates.put("escalate", escalate);
-        var nearMissRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer(), 0.1, 0.7);
+        var nearMissRegistry = createRegistry(0.7);
         nearMissRegistry.register(new TemplateNamespace("protocol:ops", templates));
 
         var result = nearMissRegistry.match("protocol:ops",
@@ -242,7 +260,7 @@ class NlpTemplateRegistryTest {
                                          .build();
         var templates = new LinkedHashMap<String, TemplateDefinition>();
         templates.put("escalate", escalate);
-        var nearMissRegistry = new NlpTemplateRegistry(new OpenNlpTokenizer(), 0.1, 0.7);
+        var nearMissRegistry = createRegistry(0.7);
         nearMissRegistry.register(new TemplateNamespace("protocol:ops", templates));
 
         var result = nearMissRegistry.match("Escalating to the board");
@@ -280,5 +298,4 @@ class NlpTemplateRegistryTest {
         var afterNew = registry.match("ns", "design gets my approve");
         assertThat(afterNew).isInstanceOf(TemplateMatch.Matched.class);
     }
-
 }

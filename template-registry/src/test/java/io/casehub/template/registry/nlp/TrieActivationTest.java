@@ -1,8 +1,11 @@
 package io.casehub.template.registry.nlp;
 
+import io.casehub.template.registry.LanguageFamilyRegistry;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -13,11 +16,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TrieActivationTest {
 
-    private final OpenNlpTokenizer tokenizer = new OpenNlpTokenizer();
+    private static NlpTemplateRegistry createRegistry(double affinityThreshold,
+                                                       double scoreThreshold,
+                                                       int trieThreshold) {
+        var factory = new OpenNlpTokenizerFactory();
+        var strategy = new SvoMatchingStrategy(affinityThreshold, trieThreshold);
+        var familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        return new NlpTemplateRegistry(factory, familyRegistry,
+                Map.of("svo", strategy), scoreThreshold);
+    }
 
     @Test
     void belowThreshold_matchesCorrectly() {
-        var registry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 100);
+        var registry = createRegistry(0.3, 0.5, 100);
         registry.register(buildNamespace("test-ns", 3));
 
         TemplateMatch result = registry.match("test-ns", "Cancel my order");
@@ -27,7 +39,7 @@ class TrieActivationTest {
 
     @Test
     void aboveThreshold_matchesCorrectly() {
-        var registry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 2);
+        var registry = createRegistry(0.3, 0.5, 2);
         registry.register(buildNamespace("test-ns", 3));
 
         TemplateMatch result = registry.match("test-ns", "Cancel my order");
@@ -45,10 +57,10 @@ class TrieActivationTest {
                 "The weather is nice today"
         );
 
-        var affinityRegistry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 100);
+        var affinityRegistry = createRegistry(0.3, 0.5, 100);
         affinityRegistry.register(templates);
 
-        var trieRegistry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 2);
+        var trieRegistry = createRegistry(0.3, 0.5, 2);
         trieRegistry.register(templates);
 
         for (String input : inputs) {
@@ -67,7 +79,7 @@ class TrieActivationTest {
 
     @Test
     void deregister_clearsTrie() {
-        var registry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 2);
+        var registry = createRegistry(0.3, 0.5, 2);
         registry.register(buildNamespace("test-ns", 3));
 
         TemplateMatch before = registry.match("test-ns", "Cancel my order");
@@ -81,7 +93,7 @@ class TrieActivationTest {
 
     @Test
     void replaceOrRegister_rebuildsTrie() {
-        var registry = new NlpTemplateRegistry(tokenizer, 0.3, 0.5, 2);
+        var registry = createRegistry(0.3, 0.5, 2);
         registry.register(buildNamespace("test-ns", 3));
 
         var newTemplates = new LinkedHashMap<String, TemplateDefinition>();

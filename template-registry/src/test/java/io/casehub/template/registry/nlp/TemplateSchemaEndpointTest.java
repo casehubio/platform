@@ -1,13 +1,17 @@
 package io.casehub.template.registry.nlp;
 
+import io.casehub.template.registry.LanguageFamilyRegistry;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +21,12 @@ class TemplateSchemaEndpointTest {
 
     @BeforeEach
     void setUp() {
-        var registry = new NlpTemplateRegistry(new OpenNlpTokenizer());
+        var factory = new OpenNlpTokenizerFactory();
+        var strategy = new SvoMatchingStrategy();
+        var familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        var registry = new NlpTemplateRegistry(factory, familyRegistry,
+                Map.of("svo", strategy), 0.5);
         var vote = TemplateDefinition.builder("vote")
             .pattern("I ${decision} this ${subject}")
             .variable("decision", VariableConstraint.enumOf("approve", "reject"))

@@ -9,7 +9,11 @@ import io.casehub.template.registry.ClassificationResult;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
-import io.casehub.template.registry.nlp.OpenNlpTokenizer;
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
+import io.casehub.template.registry.NlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +27,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class EmbeddingCascadeIntegrationTest {
 
-    private final OpenNlpTokenizer tokenizer = new OpenNlpTokenizer();
+    private final NlpTokenizerFactory tokenizerFactory = new OpenNlpTokenizerFactory();
+    private final LanguageFamilyRegistry familyRegistry = createFamilyRegistry();
+    private final Map<String, MatchingStrategy> strategies = Map.of("svo", new SvoMatchingStrategy());
+
+    private static LanguageFamilyRegistry createFamilyRegistry() {
+        var r = new LanguageFamilyRegistry();
+        r.register("en", "svo");
+        return r;
+    }
 
     @Nested
     class TrailingKeywordRescueProof {
@@ -101,7 +113,7 @@ class EmbeddingCascadeIntegrationTest {
                     throw new RuntimeException("Transient API failure");
                 }
             };
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                     (input, candidates, language) -> new ClassificationResult.Unmatched(),
                     0.8, newCache(), failingModel, 0.5);
             registerTrailingKeywordTemplate(registry);
@@ -112,7 +124,7 @@ class EmbeddingCascadeIntegrationTest {
 
         @Test
         void nullEmbeddingModel_standardBehavior() {
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                     (input, candidates, language) -> new ClassificationResult.Unmatched(),
                     0.8, newCache());
             registerTrailingKeywordTemplate(registry);
@@ -146,7 +158,7 @@ class EmbeddingCascadeIntegrationTest {
         @Test
         void matchStructural_doesNotCallLlmFallback() {
             var callCount = new AtomicInteger(0);
-            var registry = new AdaptiveTemplateRegistry(tokenizer,
+            var registry = new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                                                         (input, candidates, language) -> {
                                                             callCount.incrementAndGet();
                                                             return new ClassificationResult.Unmatched();
@@ -192,7 +204,7 @@ class EmbeddingCascadeIntegrationTest {
     }
 
     private AdaptiveTemplateRegistry createRegistryWithEmbedding(float similarity) {
-        return new AdaptiveTemplateRegistry(tokenizer,
+        return new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, language) -> new ClassificationResult.Unmatched(),
                 0.8, newCache(), stubEmbeddingModel(similarity), 0.5);
     }
@@ -214,7 +226,7 @@ class EmbeddingCascadeIntegrationTest {
                         .toList());
             }
         };
-        return new AdaptiveTemplateRegistry(tokenizer,
+        return new AdaptiveTemplateRegistry(tokenizerFactory, familyRegistry, strategies, 0.5,
                 (input, candidates, language) -> new ClassificationResult.Unmatched(),
                 0.8, newCache(), model, 0.5);
     }

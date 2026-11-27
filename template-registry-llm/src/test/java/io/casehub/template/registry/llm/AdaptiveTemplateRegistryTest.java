@@ -3,12 +3,15 @@ package io.casehub.template.registry.llm;
 import io.casehub.template.registry.AdaptiveFallbackMatcher;
 import io.casehub.template.registry.CandidateOutcome;
 import io.casehub.template.registry.ClassificationResult;
-import io.casehub.template.registry.NlpTokenizer;
+import io.casehub.template.registry.LanguageFamilyRegistry;
+import io.casehub.template.registry.MatchingStrategy;
+import io.casehub.template.registry.NlpTokenizerFactory;
 import io.casehub.template.registry.TemplateCandidate;
 import io.casehub.template.registry.TemplateDefinition;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
-import io.casehub.template.registry.nlp.OpenNlpTokenizer;
+import io.casehub.template.registry.nlp.svo.OpenNlpTokenizerFactory;
+import io.casehub.template.registry.nlp.svo.SvoMatchingStrategy;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,12 +25,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdaptiveTemplateRegistryTest {
 
-    private NlpTokenizer tokenizer;
+    private NlpTokenizerFactory tokenizerFactory;
+    private LanguageFamilyRegistry familyRegistry;
+    private Map<String, MatchingStrategy> strategies;
     private TemplateNamespace reviewNamespace;
 
     @BeforeEach
     void setUp() {
-        tokenizer = new OpenNlpTokenizer();
+        tokenizerFactory = new OpenNlpTokenizerFactory();
+        familyRegistry = new LanguageFamilyRegistry();
+        familyRegistry.register("en", "svo");
+        strategies = Map.of("svo", new SvoMatchingStrategy());
         reviewNamespace = new TemplateNamespace("protocol:review", Map.of("vote",
             TemplateDefinition.builder("vote")
                 .pattern("I ${decision} this ${subject}")
@@ -48,7 +56,7 @@ class AdaptiveTemplateRegistryTest {
             "I'm in favour of this ${subject}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.match("protocol:review",
@@ -67,7 +75,7 @@ class AdaptiveTemplateRegistryTest {
         var fallback = countingFallback(counter, new ClassificationResult.Unmatched());
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.match("protocol:review", "I approve this design");
@@ -82,7 +90,7 @@ class AdaptiveTemplateRegistryTest {
             (input, candidates, lang) -> { throw new RuntimeException("LLM down"); };
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, failingFallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, failingFallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.match("protocol:review",
@@ -98,7 +106,7 @@ class AdaptiveTemplateRegistryTest {
             "I'm in favour of this ${subject}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         registry.match("protocol:review", "I'm in favour of this design");
@@ -113,7 +121,7 @@ class AdaptiveTemplateRegistryTest {
         var fallback = countingFallback(counter, new ClassificationResult.Unmatched());
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         registry.match("protocol:review", "completely unrelated");
@@ -129,7 +137,7 @@ class AdaptiveTemplateRegistryTest {
             "This ${subject} gets my ${decision}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         registry.match("protocol:review", "This design gets my approve");
@@ -137,7 +145,7 @@ class AdaptiveTemplateRegistryTest {
         AdaptiveFallbackMatcher failingFallback =
             (input, candidates, lang) -> { throw new RuntimeException("Should not be called"); };
         var registry2 = new AdaptiveTemplateRegistry(
-            tokenizer, failingFallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, failingFallback, 0.8, newCache());
         registry2.register(reviewNamespace);
 
         var schemas = registry.schemas("protocol:review");
@@ -155,7 +163,7 @@ class AdaptiveTemplateRegistryTest {
             "This ${subject} gets my ${decision}", 0.5));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.match("protocol:review",
@@ -173,7 +181,7 @@ class AdaptiveTemplateRegistryTest {
             "I'm in favour of this ${subject}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         registry.match("protocol:review", "I'm in favour of this design");
@@ -190,7 +198,7 @@ class AdaptiveTemplateRegistryTest {
             "pattern", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.matchStructural("I'm in favour of this design");
@@ -205,7 +213,7 @@ class AdaptiveTemplateRegistryTest {
             "I'm in favour of this ${subject}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.matchWithTrace("protocol:review",
@@ -228,7 +236,7 @@ class AdaptiveTemplateRegistryTest {
 
         var cache = newCache();
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, cache);
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, cache);
         registry.register(reviewNamespace);
 
         registry.match("protocol:review", "I'm in favour of this design");
@@ -247,7 +255,7 @@ class AdaptiveTemplateRegistryTest {
             "I'm in favour of this ${subject}", 0.95));
 
         var registry = new AdaptiveTemplateRegistry(
-            tokenizer, fallback, 0.8, newCache());
+            tokenizerFactory, familyRegistry, strategies, 0.5, fallback, 0.8, newCache());
         registry.register(reviewNamespace);
 
         var result = registry.match("I'm in favour of this design");

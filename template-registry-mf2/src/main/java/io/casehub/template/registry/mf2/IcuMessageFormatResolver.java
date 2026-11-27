@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+@jakarta.enterprise.context.ApplicationScoped
 public class IcuMessageFormatResolver implements MessageFormatResolver {
 
     private record IcuCompiledMessage(

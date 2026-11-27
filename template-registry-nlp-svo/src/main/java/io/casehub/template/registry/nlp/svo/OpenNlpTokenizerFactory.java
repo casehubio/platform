@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@jakarta.enterprise.context.ApplicationScoped
 public class OpenNlpTokenizerFactory implements NlpTokenizerFactory {
 
     private static final Map<String, String> TREEBANK = Map.of(

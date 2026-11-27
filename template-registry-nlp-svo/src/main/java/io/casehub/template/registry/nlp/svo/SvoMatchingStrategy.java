@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+@jakarta.enterprise.context.ApplicationScoped
 public class SvoMatchingStrategy implements MatchingStrategy {
 
     private static final double DEFAULT_AFFINITY_THRESHOLD = 0.3;

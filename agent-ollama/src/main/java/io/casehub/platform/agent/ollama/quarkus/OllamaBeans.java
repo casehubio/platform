@@ -10,6 +10,7 @@ import io.casehub.platform.agent.router.ChatModelBackend;
 import io.casehub.platform.agent.router.SimpleChatModelBackend;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 
 import java.time.Duration;
@@ -20,11 +21,17 @@ public class OllamaBeans {
 
     private OllamaAgentBackend backend;
 
+    private static Map<String, String> manifestProps(Instance<AgentManifestResult> manifest) {
+        return manifest.isResolvable()
+                ? manifest.get().providers().getOrDefault("ollama", Map.of())
+                : Map.of();
+    }
+
     @Produces
     @ApplicationScoped
     public OllamaAgentBackend ollamaAgentBackend(
-            OllamaAgentConfig config, AgentConcurrencyGate gate, AgentManifestResult manifest) {
-        Map<String, String> mp = manifest.providers().getOrDefault("ollama", Map.of());
+            OllamaAgentConfig config, AgentConcurrencyGate gate, Instance<AgentManifestResult> manifest) {
+        Map<String, String> mp = manifestProps(manifest);
         OllamaAgentProperties props = new OllamaAgentProperties() {
             public String host() {
                 return mp.getOrDefault("host", config.host());
@@ -48,8 +55,8 @@ public class OllamaBeans {
 
     @Produces
     @ApplicationScoped
-    public ChatModelBackend ollamaChatModelBackend(OllamaAgentConfig config, AgentManifestResult manifest) {
-        Map<String, String> mp = manifest.providers().getOrDefault("ollama", Map.of());
+    public ChatModelBackend ollamaChatModelBackend(OllamaAgentConfig config, Instance<AgentManifestResult> manifest) {
+        Map<String, String> mp = manifestProps(manifest);
         String host = mp.getOrDefault("host", config.host());
         String model = mp.getOrDefault("default-model", config.defaultModel());
         String timeoutVal = mp.get("default-timeout");
@@ -66,8 +73,8 @@ public class OllamaBeans {
     @Produces
     @ApplicationScoped
     public io.casehub.platform.agent.router.EmbeddingModelBackend ollamaEmbeddingModelBackend(
-            OllamaAgentConfig config, AgentManifestResult manifest) {
-        Map<String, String> mp = manifest.providers().getOrDefault("ollama", Map.of());
+            OllamaAgentConfig config, Instance<AgentManifestResult> manifest) {
+        Map<String, String> mp = manifestProps(manifest);
         String host = mp.getOrDefault("host", config.host());
         String model = mp.getOrDefault("default-model", config.defaultModel());
 

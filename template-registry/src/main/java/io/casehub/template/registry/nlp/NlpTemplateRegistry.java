@@ -52,6 +52,11 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
         return affinityThreshold;
     }
 
+    protected double scoreThreshold() {
+        return scoreThreshold;
+    }
+
+
     protected ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled() {
         return nlpCompiled;
     }

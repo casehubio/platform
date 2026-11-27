@@ -121,7 +121,7 @@ public class AgentManifestProcessor {
             var props = new LinkedHashMap<String, String>();
             if (pd.host() != null) props.put("host", pd.host());
             if (pd.hasScalarCredential()) props.put("credential", pd.scalarCredential());
-            props.putAll(pd.extraProperties());
+            if (pd.extraProperties() != null) props.putAll(pd.extraProperties());
             providers.put(pd.vendor(), props);
         }
 

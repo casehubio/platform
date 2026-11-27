@@ -5,15 +5,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public record ProviderDeclaration(String vendor, Object credential, String host,
-                                  Map<String, String> extraProperties) {
+                                  @JsonAnySetter Map<String, String> extraProperties) {
+
+    public ProviderDeclaration {
+        extraProperties = extraProperties != null ? new LinkedHashMap<>(extraProperties) : new LinkedHashMap<>();
+    }
 
     public ProviderDeclaration(String vendor, Object credential, String host) {
         this(vendor, credential, host, new LinkedHashMap<>());
-    }
-
-    @JsonAnySetter
-    public void addProperty(String key, Object value) {
-        if (value != null) extraProperties.put(key, value.toString());
     }
 
     public boolean hasScalarCredential() {

@@ -129,6 +129,16 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
                 if (affinity < affinityThreshold() && !keywords.isEmpty()) {
                     if (embeddingModel != null) {
+                        var cacheKey = new ClassificationCache.CacheKey(namespaceName, input);
+                        ClassificationCache.EmbeddingEntry cached = classificationCache.getEmbedding(cacheKey);
+                        if (cached != null) {
+                            if (cached.isPositive()) {
+                                bestMatch = new TemplateMatch.Matched(
+                                        namespaceName, cached.templateName(), cached.patternIndex(),
+                                        cached.fields(), 0.9, ns.version());
+                            }
+                            continue;
+                        }
                         try {
                             if (inputEmbedding == null) {
                                 inputEmbedding = computeInputEmbedding(inputTokens);
@@ -142,6 +152,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                     var               result  = matcher.match(inputTokens, def.variables());
                                     if (result.isPresent() && result.get().score() > scoreThreshold()) {
                                         learnSynonyms(namespaceName, keywords, inputTokens);
+                                        classificationCache.putEmbeddingPositive(cacheKey, def.name(), i, result.get().fields(), similarity);
                                         if (bestMatch == null || result.get().score() > bestMatch.score()) {
                                             bestMatch = new TemplateMatch.Matched(
                                                     namespaceName, def.name(), i,
@@ -153,6 +164,8 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                         nearMissTemplate = def.name();
                                         nearMissPattern  = def.patterns().get(i);
                                     }
+                                } else {
+                                    classificationCache.putEmbeddingNegative(cacheKey);
                                 }
                             }
                         } catch (Exception e) {

@@ -33,10 +33,21 @@ public class ClassificationCache {
         }
     }
 
+    public record EmbeddingEntry(String templateName, int patternIndex,
+                                 Map<String, String> fields, double similarity,
+                                 Instant insertedAt) {
+        public boolean isPositive() {
+            return templateName != null;
+        }
+    }
+
+
     private final Duration positiveTtl;
     private final Duration negativeTtl;
     private final int maxEntries;
     private final ConcurrentHashMap<CacheKey, Entry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<CacheKey, EmbeddingEntry> embeddingCache = new ConcurrentHashMap<>();
+
 
     public ClassificationCache(Duration positiveTtl, Duration negativeTtl, int maxEntries) {
         this.positiveTtl = Objects.requireNonNull(positiveTtl, "positiveTtl");
@@ -66,8 +77,33 @@ public class ClassificationCache {
         cache.put(key, new Entry(null, Instant.now()));
     }
 
+    public EmbeddingEntry getEmbedding(CacheKey key) {
+        EmbeddingEntry entry = embeddingCache.get(key);
+        if (entry == null) {return null;}
+
+        Duration ttl = entry.isPositive() ? positiveTtl : negativeTtl;
+        if (Instant.now().isAfter(entry.insertedAt().plus(ttl))) {
+            embeddingCache.remove(key);
+            return null;
+        }
+        return entry;
+    }
+
+    public void putEmbeddingPositive(CacheKey key, String templateName, int patternIndex,
+                                     Map<String, String> fields, double similarity) {
+        evictIfNeeded();
+        embeddingCache.put(key, new EmbeddingEntry(templateName, patternIndex, fields, similarity, Instant.now()));
+    }
+
+    public void putEmbeddingNegative(CacheKey key) {
+        evictIfNeeded();
+        embeddingCache.put(key, new EmbeddingEntry(null, -1, Map.of(), -1.0, Instant.now()));
+    }
+
+
     public void invalidateNamespace(String namespace) {
         cache.keySet().removeIf(k -> k.namespace().equals(namespace));
+        embeddingCache.keySet().removeIf(k -> k.namespace().equals(namespace));
     }
 
     private void evictIfNeeded() {

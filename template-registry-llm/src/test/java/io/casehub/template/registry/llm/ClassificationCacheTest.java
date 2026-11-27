@@ -127,4 +127,49 @@ class ClassificationCacheTest {
         if (cache.get(key3) != null) remaining++;
         assertThat(remaining).isLessThanOrEqualTo(2);
     }
+
+    @Test
+    void embeddingPositive_cachedAndReturned() {
+        var cache = new ClassificationCache(
+                Duration.ofMinutes(30), Duration.ofMinutes(5), 1000);
+        var key = new ClassificationCache.CacheKey("ns", "input text");
+        cache.putEmbeddingPositive(key, "template-name", 0, Map.of("field", "value"), 0.75);
+        var entry = cache.getEmbedding(key);
+        assertThat(entry).isNotNull();
+        assertThat(entry.isPositive()).isTrue();
+        assertThat(entry.templateName()).isEqualTo("template-name");
+        assertThat(entry.similarity()).isEqualTo(0.75);
+    }
+
+    @Test
+    void embeddingNegative_cachedAndReturned() {
+        var cache = new ClassificationCache(
+                Duration.ofMinutes(30), Duration.ofMinutes(5), 1000);
+        var key = new ClassificationCache.CacheKey("ns", "input text");
+        cache.putEmbeddingNegative(key);
+        var entry = cache.getEmbedding(key);
+        assertThat(entry).isNotNull();
+        assertThat(entry.isPositive()).isFalse();
+    }
+
+    @Test
+    void embeddingCache_invalidatedOnNamespaceReplace() {
+        var cache = new ClassificationCache(
+                Duration.ofMinutes(30), Duration.ofMinutes(5), 1000);
+        var key = new ClassificationCache.CacheKey("ns", "input text");
+        cache.putEmbeddingPositive(key, "template-name", 0, Map.of(), 0.75);
+        cache.invalidateNamespace("ns");
+        assertThat(cache.getEmbedding(key)).isNull();
+    }
+
+    @Test
+    void embeddingCache_ttlExpires() throws InterruptedException {
+        var cache = new ClassificationCache(
+                Duration.ofMillis(50), Duration.ofMillis(50), 1000);
+        var key = new ClassificationCache.CacheKey("ns", "input text");
+        cache.putEmbeddingPositive(key, "template-name", 0, Map.of(), 0.75);
+        Thread.sleep(100);
+        assertThat(cache.getEmbedding(key)).isNull();
+    }
+
 }

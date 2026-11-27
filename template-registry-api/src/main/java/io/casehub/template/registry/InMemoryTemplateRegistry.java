@@ -270,6 +270,13 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
                 "Unknown template: " + templateName
                 + " in namespace " + namespaceName);
         }
+        if (def.messageFormat() != null) {
+            throw new IllegalStateException(
+                "Template '" + templateName + "' in namespace '" + namespaceName
+                + "' declares messageFormat but InMemoryTemplateRegistry does not "
+                + "support MF2 generation. Use NlpTemplateRegistry with a "
+                + "MessageFormatResolver.");
+        }
         return TemplateGenerator.generate(def, values);
     }
 

@@ -567,7 +567,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         List<String> expanded = new ArrayList<>(def.patterns());
         expanded.add(variation);
         TemplateDefinition expandedDef =
-                new TemplateDefinition(def.name(), expanded, def.variables());
+                new TemplateDefinition(def.name(), expanded, def.variables(), def.messageFormat());
         Map<String, TemplateDefinition> expandedTemplates =
                 new LinkedHashMap<>(ns.templates());
         expandedTemplates.put(def.name(), expandedDef);

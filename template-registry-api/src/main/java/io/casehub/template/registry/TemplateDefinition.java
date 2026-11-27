@@ -10,21 +10,27 @@ import java.util.Map;
 import java.util.Objects;
 
 public record TemplateDefinition(
-    String name,
-    List<String> patterns,
-    Map<String, VariableConstraint> variables
+        String name,
+        List<String> patterns,
+        Map<String, VariableConstraint> variables,
+        String messageFormat
 ) {
     public TemplateDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(patterns, "patterns");
         if (patterns.isEmpty()) {
             throw new IllegalArgumentException(
-                "Template must have at least one pattern");
+                    "Template must have at least one pattern");
         }
-        patterns = List.copyOf(patterns);
+        patterns  = List.copyOf(patterns);
         variables = variables != null
-            ? Collections.unmodifiableMap(new LinkedHashMap<>(variables))
-            : Map.of();
+                    ? Collections.unmodifiableMap(new LinkedHashMap<>(variables))
+                    : Map.of();
+    }
+
+    public TemplateDefinition(String name, List<String> patterns,
+                              Map<String, VariableConstraint> variables) {
+        this(name, patterns, variables, null);
     }
 
     public static Builder builder(String name) {
@@ -32,9 +38,10 @@ public record TemplateDefinition(
     }
 
     public static final class Builder {
-        private final String name;
-        private final List<String> patterns = new ArrayList<>();
+        private final String                                    name;
+        private final List<String>                              patterns  = new ArrayList<>();
         private final LinkedHashMap<String, VariableConstraint> variables = new LinkedHashMap<>();
+        private       String                                    messageFormat;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -47,13 +54,18 @@ public record TemplateDefinition(
 
         public Builder variable(String name, VariableConstraint constraint) {
             variables.put(
-                Objects.requireNonNull(name, "name"),
-                Objects.requireNonNull(constraint, "constraint"));
+                    Objects.requireNonNull(name, "name"),
+                    Objects.requireNonNull(constraint, "constraint"));
+            return this;
+        }
+
+        public Builder messageFormat(String messageFormat) {
+            this.messageFormat = messageFormat;
             return this;
         }
 
         public TemplateDefinition build() {
-            return new TemplateDefinition(name, patterns, variables);
+            return new TemplateDefinition(name, patterns, variables, messageFormat);
         }
     }
 }

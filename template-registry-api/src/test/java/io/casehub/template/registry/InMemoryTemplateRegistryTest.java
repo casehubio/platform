@@ -357,4 +357,20 @@ class InMemoryTemplateRegistryTest {
         assertThatThrownBy(() -> smallRing.match("test", "hello world", 1))
                 .isInstanceOf(NamespaceVersionNotFoundException.class);
     }
+
+    @Test
+    void generateThrowsForMf2TemplateWithoutResolver() {
+        var registry = new InMemoryTemplateRegistry();
+        var def = TemplateDefinition.builder("item-count")
+                                    .pattern("${count} items")
+                                    .messageFormat(".match {$count :integer}\n1 {{{$count} item}}\n* {{{$count} items}}")
+                                    .build();
+        var ns = new TemplateNamespace("ns", Map.of("item-count", def));
+        registry.register(ns);
+        assertThatThrownBy(() -> registry.generate("ns", "item-count",
+                                                   Map.of("count", "5")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("messageFormat")
+                .hasMessageContaining("MessageFormatResolver");
+    }
 }

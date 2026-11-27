@@ -60,7 +60,7 @@ public class VariationSeedingService {
             List<String> allPatterns = new ArrayList<>(def.patterns());
             allPatterns.addAll(safeVariations);
             expandedTemplates.put(def.name(),
-                new TemplateDefinition(def.name(), allPatterns, def.variables()));
+                new TemplateDefinition(def.name(), allPatterns, def.variables(), def.messageFormat()));
         }
         return new TemplateNamespace(namespace.name(), expandedTemplates, namespace.language());
     }

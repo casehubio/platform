@@ -60,4 +60,35 @@ class TemplateDefinitionTest {
         var def = new TemplateDefinition("x", List.of("pat"), null);
         assertThat(def.variables()).isEmpty();
     }
+
+    @Test
+    void messageFormatFieldNullByDefault() {
+        var def = TemplateDefinition.builder("test")
+                                    .pattern("hello ${name}")
+                                    .build();
+        assertThat(def.messageFormat()).isNull();
+    }
+
+    @Test
+    void messageFormatFieldSetViaBuilder() {
+        var def = TemplateDefinition.builder("test")
+                                    .pattern("${count} items")
+                                    .messageFormat(".match {$count :integer}\n1 {{{$count} item}}\n* {{{$count} items}}")
+                                    .build();
+        assertThat(def.messageFormat()).startsWith(".match");
+    }
+
+    @Test
+    void threeArgConstructorSetsMessageFormatNull() {
+        var def = new TemplateDefinition("test", List.of("hello ${name}"), Map.of());
+        assertThat(def.messageFormat()).isNull();
+    }
+
+    @Test
+    void fourArgConstructorSetsMessageFormat() {
+        var mf  = ".match {$count :integer}\n1 {{one}}\n* {{many}}";
+        var def = new TemplateDefinition("test", List.of("${count} items"), Map.of(), mf);
+        assertThat(def.messageFormat()).isEqualTo(mf);
+    }
+
 }

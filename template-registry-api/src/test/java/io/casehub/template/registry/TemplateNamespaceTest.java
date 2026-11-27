@@ -79,4 +79,18 @@ class TemplateNamespaceTest {
         assertThat(ns.language()).isEqualTo("en");
     }
 
+
+    @Test
+    void version_defaultsToZero() {
+        var def = new TemplateDefinition("t", List.of("hello ${name}"), Map.of());
+        var ns  = new TemplateNamespace("test", Map.of("t", def));
+        assertThat(ns.version()).isEqualTo(0);
+    }
+
+    @Test
+    void version_preservedWhenExplicit() {
+        var def = new TemplateDefinition("t", List.of("hello ${name}"), Map.of());
+        var ns  = new TemplateNamespace("test", Map.of("t", def), "en", 42);
+        assertThat(ns.version()).isEqualTo(42);
+    }
 }

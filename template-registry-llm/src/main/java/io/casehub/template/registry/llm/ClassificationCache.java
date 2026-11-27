@@ -27,7 +27,7 @@ public class ClassificationCache {
             if (matched != null) {
                 return new TemplateMatch.Matched(
                     namespace, matched.templateName(), -1,
-                    matched.fields(), 0.9);
+                    matched.fields(), 0.9, 0);
             }
             return null;
         }

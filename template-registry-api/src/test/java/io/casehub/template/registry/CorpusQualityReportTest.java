@@ -11,7 +11,7 @@ class CorpusQualityReportTest {
 
     @Test
     void variationResult_passedWhenExpectedMatchAndCorrectTemplate() {
-        var matched = new TemplateMatch.Matched("ns", "vote", 0, Map.of("decision", "approve"), 0.9);
+        var matched = new TemplateMatch.Matched("ns", "vote", 0, Map.of("decision", "approve"), 0.9, 0);
         var result = new VariationResult("I approve this", true, matched, true);
 
         assertThat(result.passed()).isTrue();
@@ -37,7 +37,7 @@ class CorpusQualityReportTest {
 
     @Test
     void templateReport_matchRateCalculation() {
-        var matched = new TemplateMatch.Matched("ns", "vote", 0, Map.of(), 0.9);
+        var matched = new TemplateMatch.Matched("ns", "vote", 0, Map.of(), 0.9, 0);
         var unmatched = new TemplateMatch.Unmatched("miss");
         var report = new TemplateReport("vote", 4, 3, 0, 0, List.of(
             new VariationResult("a", true, matched, true),

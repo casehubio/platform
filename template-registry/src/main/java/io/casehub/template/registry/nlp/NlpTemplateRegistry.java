@@ -147,7 +147,8 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                         || result.get().score() > bestMatch.score()) {
                         bestMatch = new TemplateMatch.Matched(
                                 namespaceName, def.name(), i,
-                                result.get().fields(), result.get().score());
+                                result.get().fields(), result.get().score(),
+                                ns.version());
                     }
                 } else if (result.isPresent() && result.get().score() > nearMissScore) {
                     nearMissScore    = result.get().score();

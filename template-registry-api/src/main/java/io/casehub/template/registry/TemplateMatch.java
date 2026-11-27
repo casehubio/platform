@@ -8,11 +8,12 @@ import java.util.Objects;
 public sealed interface TemplateMatch {
 
     record Matched(
-        String namespace,
-        String templateName,
-        int patternIndex,
-        Map<String, String> fields,
-        double score
+            String namespace,
+            String templateName,
+            int patternIndex,
+            Map<String, String> fields,
+            double score,
+            long version
     ) implements TemplateMatch {
         public Matched {
             Objects.requireNonNull(namespace, "namespace");
@@ -20,10 +21,10 @@ public sealed interface TemplateMatch {
             Objects.requireNonNull(fields, "fields");
             if (score <= 0.0 || score > 1.0) {
                 throw new IllegalArgumentException(
-                    "Score must be in (0, 1.0]: " + score);
+                        "Score must be in (0, 1.0]: " + score);
             }
             fields = Collections.unmodifiableMap(
-                new LinkedHashMap<>(fields));
+                    new LinkedHashMap<>(fields));
         }
     }
 

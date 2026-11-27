@@ -6,13 +6,20 @@ import java.util.Map;
 import java.util.Objects;
 
 public record TemplateNamespace(
-    String name,
-    Map<String, TemplateDefinition> templates,
-    String language
+        String name,
+        Map<String, TemplateDefinition> templates,
+        String language,
+        long version
 ) {
     public TemplateNamespace(String name,
                              Map<String, TemplateDefinition> templates) {
-        this(name, templates, "en");
+        this(name, templates, "en", 0);
+    }
+
+    public TemplateNamespace(String name,
+                             Map<String, TemplateDefinition> templates,
+                             String language) {
+        this(name, templates, language, 0);
     }
 
     public TemplateNamespace {
@@ -21,17 +28,17 @@ public record TemplateNamespace(
         language = language != null ? language : "en";
         if (templates.isEmpty()) {
             throw new IllegalArgumentException(
-                "Namespace must have at least one template");
+                    "Namespace must have at least one template");
         }
         for (var entry : templates.entrySet()) {
             if (!entry.getKey().equals(entry.getValue().name())) {
                 throw new IllegalArgumentException(
-                    "Map key '" + entry.getKey()
-                    + "' must equal definition name '"
-                    + entry.getValue().name() + "'");
+                        "Map key '" + entry.getKey()
+                        + "' must equal definition name '"
+                        + entry.getValue().name() + "'");
             }
         }
         templates = Collections.unmodifiableMap(
-            new LinkedHashMap<>(templates));
+                new LinkedHashMap<>(templates));
     }
 }

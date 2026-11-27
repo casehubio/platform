@@ -38,7 +38,7 @@ class VariationFixtureWriterTest {
     @Test
     void fromReport_extractsPositiveFixtures() {
         var matched = new TemplateMatch.Matched("ns", "greet", 0,
-            Map.of("target", "world"), 0.9);
+            Map.of("target", "world"), 0.9, 0);
         var result = new VariationResult("hello world", true, matched, true);
         var templateReport = new TemplateReport("greet", 1, 1, 0, 0, List.of(result));
         var report = new CorpusQualityReport("ns", List.of(templateReport),

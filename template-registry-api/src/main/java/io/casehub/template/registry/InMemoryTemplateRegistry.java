@@ -127,7 +127,7 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
                 if (result.isPresent()) {
                     return new TemplateMatch.Matched(
                         namespaceName, def.name(), i,
-                        result.get(), 1.0);
+                        result.get(), 1.0, ns.version());
                 }
             }
         }

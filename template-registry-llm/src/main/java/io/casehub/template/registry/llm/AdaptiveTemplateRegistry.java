@@ -168,7 +168,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
             return new TemplateMatch.Matched(
                     namespaceName, matched.templateName(), -1,
-                    matched.fields(), 0.9);
+                    matched.fields(), 0.9, ns.version());
         }
 
         classificationCache.putNegative(cacheKey);

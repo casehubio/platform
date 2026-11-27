@@ -399,6 +399,7 @@ public final class StructuralStepEvaluator {
                     case "namespace" -> matched.namespace();
                     case "template" -> matched.templateName();
                     case "score" -> String.valueOf(matched.score());
+                    case "version" -> String.valueOf(matched.version());
                     default -> null;
                 });
 

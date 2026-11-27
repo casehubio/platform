@@ -9,6 +9,7 @@ import io.casehub.template.registry.AnnotatedToken;
 import io.casehub.template.registry.CandidateOutcome;
 import io.casehub.template.registry.CandidateTrace;
 import io.casehub.template.registry.ClassificationResult;
+import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.CollisionDetector;
 import io.casehub.template.registry.MatchTrace;
 import io.casehub.template.registry.MatchTraceResult;
@@ -265,6 +266,72 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
         return new MatchTraceResult(adaptiveResult,
                                     new MatchTrace(candidates, null, 0.0));
+    }
+
+
+    @Override
+    protected List<CandidateTrace> matchInNamespaceWithTrace(
+            String namespaceName, TemplateNamespace ns,
+            String input, Snapshot snap) {
+        List<CandidateTrace> candidates = new java.util.ArrayList<>(
+                super.matchInNamespaceWithTrace(namespaceName, ns, input, snap));
+
+        if (embeddingModel == null) {return candidates;}
+
+        List<AnnotatedToken>               inputTokens       = tokenizer().tokenize(input);
+        float[]                            inputEmbedding    = null;
+        ConcurrentMap<String, Set<String>> namespaceSynonyms = synonyms.get(namespaceName);
+
+        for (var templateEntry : ns.templates().entrySet()) {
+            TemplateDefinition                      def      = templateEntry.getValue();
+            String                                  key      = namespaceName + ":" + def.name();
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
+            if (compiled == null) {continue;}
+
+            for (int i = 0; i < compiled.matchers().size(); i++) {
+                Set<String> keywords = compiled.keywordSets().get(i);
+                double affinity = namespaceSynonyms != null
+                                  ? LemmatisedKeywordFilter.affinity(keywords, inputTokens, namespaceSynonyms)
+                                  : LemmatisedKeywordFilter.affinity(keywords, inputTokens);
+
+                if (affinity < affinityThreshold() && !keywords.isEmpty()) {
+                    try {
+                        if (inputEmbedding == null) {
+                            inputEmbedding = computeInputEmbedding(inputTokens);
+                        }
+                        String  embKey      = namespaceName + ":" + def.name() + ":" + i;
+                        float[] templateEmb = templateEmbeddings.get(embKey);
+                        if (templateEmb != null && inputEmbedding != null) {
+                            double similarity = CosineSimilarity.between(
+                                    Embedding.from(templateEmb), Embedding.from(inputEmbedding));
+                            if (similarity >= embeddingSimilarityThreshold) {
+                                StructuralMatcher  matcher     = compiled.matchers().get(i);
+                                var                traceResult = matcher.matchWithTrace(inputTokens, def.variables());
+                                List<ElementTrace> elements    = traceResult.elements();
+                                if (traceResult.result().isPresent()
+                                    && traceResult.result().get().score() > scoreThreshold()) {
+                                    double score = traceResult.result().get().score();
+                                    candidates.add(new CandidateTrace(
+                                            namespaceName, def.name(), i, affinity, similarity,
+                                            CandidateOutcome.EMBEDDING_RESCUED, elements, score));
+                                } else {
+                                    candidates.add(new CandidateTrace(
+                                            namespaceName, def.name(), i, affinity, similarity,
+                                            CandidateOutcome.STRUCTURAL_FAILED, List.of(), 0.0));
+                                }
+                            } else {
+                                candidates.add(new CandidateTrace(
+                                        namespaceName, def.name(), i, affinity, similarity,
+                                        CandidateOutcome.EMBEDDING_FILTERED, List.of(), 0.0));
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.log(Level.WARNING, "Embedding trace failed for namespace " + namespaceName, e);
+                    }
+                }
+            }
+        }
+        return candidates;
     }
 
     private void computeTemplateEmbeddings(TemplateNamespace namespace) {

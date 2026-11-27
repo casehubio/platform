@@ -167,7 +167,10 @@ public class AgentHttpService implements AgentHttpApi {
                 config.model() != null ? config.model() : agent.model(),
                 config.modelQuery(),
                 config.modelChain(),
-                config.responseFormat());
+                config.responseFormat(),
+                config.modelParameters(),
+                config.tools(),
+                config.cachePolicy());
     }
 
     private AgentSessionInit resolveInit(AgentSessionInit init, String agentId) {

@@ -10,6 +10,8 @@ import io.casehub.platform.agent.AgentSession;
 import io.casehub.platform.agent.AgentSessionConfig;
 import io.casehub.platform.agent.AgentSessionInit;
 import io.casehub.platform.agent.BackendInstanceRegistry;
+import io.casehub.platform.agent.CachePolicy;
+import io.casehub.platform.agent.ModelParameters;
 import io.casehub.platform.agent.ResolvedAgent;
 import io.casehub.platform.agent.SessionRegistry;
 import io.casehub.platform.api.mcp.ComponentStatus;
@@ -18,6 +20,7 @@ import io.casehub.platform.api.model.ModelLocality;
 import io.casehub.platform.api.model.ModelQuery;
 import io.casehub.platform.api.model.ModelRegistry;
 import io.casehub.platform.api.model.ModelTier;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +87,29 @@ class AgentHttpServiceTest {
         verify(agentProvider).invokeBlocking(captor.capture(), eq(Duration.ofSeconds(60)));
         assertEquals("resolved prompt", captor.getValue().systemPrompt());
         assertEquals("user prompt", captor.getValue().userPrompt());
+    }
+
+    @Test
+    void invoke_resolvedAgentKeepsParametersToolsAndCachePolicy() {
+        var resolved = new ResolvedAgent("my-agent", "resolved prompt", "claude-opus",
+                Duration.ofSeconds(60), Map.of());
+        when(agentResolver.resolve("my-agent")).thenReturn(Optional.of(resolved));
+        var tool = ToolSpecification.builder().name("lookup").description("Look something up").build();
+        var params = ModelParameters.of();
+        var config = AgentSessionConfig.of("ignored", "user prompt")
+                .withModelParameters(params)
+                .withTools(List.of(tool))
+                .withCachePolicy(CachePolicy.SYSTEM_AND_TOOLS);
+        when(agentProvider.invokeBlocking(any(), eq(Duration.ofSeconds(60))))
+                .thenReturn(new AgentInvocationResult("ok", 0, 0, 0, 0, 0, null, 0L, null, null));
+
+        service.invoke(config, "my-agent");
+
+        var captor = ArgumentCaptor.forClass(AgentSessionConfig.class);
+        verify(agentProvider).invokeBlocking(captor.capture(), eq(Duration.ofSeconds(60)));
+        assertSame(params, captor.getValue().modelParameters());
+        assertEquals(List.of(tool), captor.getValue().tools());
+        assertEquals(CachePolicy.SYSTEM_AND_TOOLS, captor.getValue().cachePolicy());
     }
 
     @Test

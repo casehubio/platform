@@ -44,8 +44,7 @@ class MatchTraceTest {
             new ElementTrace(ElementKind.LITERAL, "i", "i", true),
             new ElementTrace(ElementKind.VARIABLE, "decision", "approve", true)
         );
-        var candidate = new CandidateTrace("ns", "vote", 0, -1.0,
-            CandidateOutcome.MATCHED, elements, 1.0);
+        var candidate = new CandidateTrace("ns", "vote", 0, -1.0, -1.0, CandidateOutcome.MATCHED, elements, 1.0);
         assertThat(candidate.namespace()).isEqualTo("ns");
         assertThat(candidate.templateName()).isEqualTo("vote");
         assertThat(candidate.elements()).hasSize(2);
@@ -55,18 +54,16 @@ class MatchTraceTest {
     @Test
     void candidateTraceElementsAreDefensivelyCopied() {
         var elements = new ArrayList<>(List.of(
-            new ElementTrace(ElementKind.LITERAL, "x", "x", true)));
-        var candidate = new CandidateTrace("ns", "t", 0, -1.0,
-            CandidateOutcome.MATCHED, elements, 1.0);
+                new ElementTrace(ElementKind.LITERAL, "x", "x", true)));
+        var candidate = new CandidateTrace("ns", "t", 0, -1.0, -1.0, CandidateOutcome.MATCHED, elements, 1.0);
         elements.clear();
         assertThat(candidate.elements()).hasSize(1);
     }
 
     @Test
     void matchTraceConstruction() {
-        var candidate = new CandidateTrace("ns", "vote", 0, -1.0,
-            CandidateOutcome.MATCHED, List.of(), 1.0);
-        var trace = new MatchTrace(List.of(candidate), "ns:vote", 1.0);
+        var candidate = new CandidateTrace("ns", "vote", 0, -1.0, -1.0, CandidateOutcome.MATCHED, List.of(), 1.0);
+        var trace     = new MatchTrace(List.of(candidate), "ns:vote", 1.0);
         assertThat(trace.candidates()).hasSize(1);
         assertThat(trace.bestCandidate()).isEqualTo("ns:vote");
         assertThat(trace.bestScore()).isEqualTo(1.0);
@@ -74,9 +71,8 @@ class MatchTraceTest {
 
     @Test
     void matchTraceWithNoBestCandidate() {
-        var candidate = new CandidateTrace("ns", "vote", 0, -1.0,
-            CandidateOutcome.REGEX_FAILED, List.of(), 0.0);
-        var trace = new MatchTrace(List.of(candidate), null, 0.0);
+        var candidate = new CandidateTrace("ns", "vote", 0, -1.0, -1.0, CandidateOutcome.REGEX_FAILED, List.of(), 0.0);
+        var trace     = new MatchTrace(List.of(candidate), null, 0.0);
         assertThat(trace.bestCandidate()).isNull();
     }
 

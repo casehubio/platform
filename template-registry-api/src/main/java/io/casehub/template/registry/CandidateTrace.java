@@ -4,13 +4,14 @@ import java.util.List;
 import java.util.Objects;
 
 public record CandidateTrace(
-    String namespace,
-    String templateName,
-    int patternIndex,
-    double keywordAffinity,
-    CandidateOutcome outcome,
-    List<ElementTrace> elements,
-    double score
+        String namespace,
+        String templateName,
+        int patternIndex,
+        double keywordAffinity,
+        double embeddingSimilarity,
+        CandidateOutcome outcome,
+        List<ElementTrace> elements,
+        double score
 ) {
     public CandidateTrace {
         Objects.requireNonNull(namespace, "namespace");

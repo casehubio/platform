@@ -226,12 +226,10 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
                         compiled.extract(input, def.variables());
                 if (result.isPresent()) {
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, -1.0,
-                            CandidateOutcome.MATCHED, List.of(), 1.0));
+                            namespaceName, def.name(), i, -1.0, -1.0, CandidateOutcome.MATCHED, List.of(), 1.0));
                 } else {
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, -1.0,
-                            CandidateOutcome.REGEX_FAILED, List.of(), 0.0));
+                            namespaceName, def.name(), i, -1.0, -1.0, CandidateOutcome.REGEX_FAILED, List.of(), 0.0));
                 }
             }
         }

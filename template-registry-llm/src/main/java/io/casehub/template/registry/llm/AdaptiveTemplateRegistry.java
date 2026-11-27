@@ -108,8 +108,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
         if (adaptiveResult instanceof TemplateMatch.Matched matched) {
             candidates.add(new CandidateTrace(
-                namespaceName, matched.templateName(), -1, -1.0,
-                CandidateOutcome.ADAPTIVE_MATCHED, List.of(), matched.score()));
+                    namespaceName, matched.templateName(), -1, -1.0, -1.0, CandidateOutcome.ADAPTIVE_MATCHED, List.of(), matched.score()));
             return new MatchTraceResult(adaptiveResult,
                 new MatchTrace(candidates,
                     namespaceName + ":" + matched.templateName(),

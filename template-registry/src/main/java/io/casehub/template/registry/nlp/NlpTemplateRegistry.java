@@ -190,8 +190,7 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                         keywords, inputTokens);
                 if (affinity < affinityThreshold && !keywords.isEmpty()) {
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, affinity,
-                            CandidateOutcome.KEYWORD_FILTERED, List.of(), 0.0));
+                            namespaceName, def.name(), i, affinity, -1.0, CandidateOutcome.KEYWORD_FILTERED, List.of(), 0.0));
                     continue;
                 }
 
@@ -203,17 +202,14 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
                     && traceResult.result().get().score() > scoreThreshold) {
                     double score = traceResult.result().get().score();
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, affinity,
-                            CandidateOutcome.MATCHED, elements, score));
+                            namespaceName, def.name(), i, affinity, -1.0, CandidateOutcome.MATCHED, elements, score));
                 } else if (traceResult.result().isPresent()) {
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, affinity,
-                            CandidateOutcome.BELOW_THRESHOLD, elements,
+                            namespaceName, def.name(), i, affinity, -1.0, CandidateOutcome.BELOW_THRESHOLD, elements,
                             traceResult.result().get().score()));
                 } else {
                     candidates.add(new CandidateTrace(
-                            namespaceName, def.name(), i, affinity,
-                            CandidateOutcome.STRUCTURAL_FAILED, elements, 0.0));
+                            namespaceName, def.name(), i, affinity, -1.0, CandidateOutcome.STRUCTURAL_FAILED, elements, 0.0));
                 }
             }
         }

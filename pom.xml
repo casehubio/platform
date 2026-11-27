@@ -268,6 +268,7 @@
         <module>template-registry</module>
         <module>template-registry-nlp-svo</module>
         <module>template-registry-llm</module>
+        <module>template-registry-mf2</module>
     </modules>
 
     <properties>

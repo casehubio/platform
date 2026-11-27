@@ -13,8 +13,17 @@ public record TemplateSchema(
     String templateName,
     List<String> patterns,
     Map<String, VariableConstraint> variables,
-    List<StructuralSummary> structuralSummaries
+    List<StructuralSummary> structuralSummaries,
+    MessageFormatSchema messageFormatSchema
 ) {
+    public TemplateSchema(String namespace, String templateName,
+                           List<String> patterns,
+                           Map<String, VariableConstraint> variables,
+                           List<StructuralSummary> structuralSummaries) {
+        this(namespace, templateName, patterns, variables,
+             structuralSummaries, null);
+    }
+
     public TemplateSchema {
         Objects.requireNonNull(namespace, "namespace");
         Objects.requireNonNull(templateName, "templateName");

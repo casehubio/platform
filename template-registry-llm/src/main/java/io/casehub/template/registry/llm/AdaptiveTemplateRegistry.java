@@ -1,7 +1,8 @@
 package io.casehub.template.registry.llm;
 
-import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.CosineSimilarity;
 import io.casehub.template.registry.AdaptiveFallbackMatcher;
 import io.casehub.template.registry.AnnotatedToken;
@@ -14,13 +15,13 @@ import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.NlpTokenizer;
 import io.casehub.template.registry.TemplateCandidate;
 import io.casehub.template.registry.TemplateDefinition;
+import io.casehub.template.registry.TemplateFormatHelper;
 import io.casehub.template.registry.TemplateMatch;
 import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.nlp.LemmatisedKeywordFilter;
 import io.casehub.template.registry.nlp.NlpTemplateCompiler;
 import io.casehub.template.registry.nlp.NlpTemplateRegistry;
 import io.casehub.template.registry.nlp.StructuralMatcher;
-import io.casehub.template.registry.TemplateFormatHelper;
 import io.casehub.yaml.core.resolver.VariableConstraint;
 
 import java.util.ArrayList;
@@ -38,6 +39,8 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private static final Logger LOG = Logger.getLogger(
             AdaptiveTemplateRegistry.class.getName());
+    private static final double SYNONYM_LEARNING_THRESHOLD = 0.7;
+
 
     private final AdaptiveFallbackMatcher                                   fallbackMatcher;
     private final double                                                    confidenceThreshold;
@@ -137,6 +140,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                     StructuralMatcher matcher = compiled.matchers().get(i);
                                     var               result  = matcher.match(inputTokens, def.variables());
                                     if (result.isPresent() && result.get().score() > scoreThreshold()) {
+                                        learnSynonyms(namespaceName, keywords, inputTokens);
                                         if (bestMatch == null || result.get().score() > bestMatch.score()) {
                                             bestMatch = new TemplateMatch.Matched(
                                                     namespaceName, def.name(), i,
@@ -300,6 +304,55 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     ConcurrentMap<String, ConcurrentMap<String, Set<String>>> synonyms() {
         return synonyms;
+    }
+
+
+    private void learnSynonyms(String namespaceName, Set<String> templateKeywords,
+                               List<AnnotatedToken> inputTokens) {
+        if (embeddingModel == null) {return;}
+
+        Set<String> inputLemmas = new LinkedHashSet<>();
+        for (AnnotatedToken t : inputTokens) {
+            String lemma = t.lemma().toLowerCase();
+            if (!lemma.isBlank()) {inputLemmas.add(lemma);}
+        }
+
+        List<String> missing = new java.util.ArrayList<>();
+        for (String kw : templateKeywords) {
+            if (!inputLemmas.contains(kw)) {missing.add(kw);}
+        }
+        if (missing.isEmpty()) {return;}
+
+        List<String> inputLemmaList = new java.util.ArrayList<>(inputLemmas);
+        try {
+            var missingEmbeddings = embeddingModel.embedAll(
+                    missing.stream().map(TextSegment::from).toList()).content();
+            var inputEmbeddings = embeddingModel.embedAll(
+                    inputLemmaList.stream().map(TextSegment::from).toList()).content();
+
+            var namespaceSynonyms = synonyms.computeIfAbsent(namespaceName,
+                                                             k -> new ConcurrentHashMap<>());
+
+            for (int m = 0; m < missing.size(); m++) {
+                float[] mVec      = missingEmbeddings.get(m).vector();
+                double  bestSim   = 0.0;
+                String  bestLemma = null;
+                for (int j = 0; j < inputLemmaList.size(); j++) {
+                    double sim = CosineSimilarity.between(
+                            Embedding.from(mVec), inputEmbeddings.get(j));
+                    if (sim > bestSim) {
+                        bestSim   = sim;
+                        bestLemma = inputLemmaList.get(j);
+                    }
+                }
+                if (bestSim >= SYNONYM_LEARNING_THRESHOLD && bestLemma != null) {
+                    namespaceSynonyms.computeIfAbsent(missing.get(m),
+                                                      k -> ConcurrentHashMap.newKeySet()).add(bestLemma);
+                }
+            }
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Synonym learning failed for namespace " + namespaceName, e);
+        }
     }
 
     private TemplateMatch adaptiveFallback(String namespaceName, String input) {

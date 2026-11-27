@@ -44,6 +44,19 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
         this.scoreThreshold = scoreThreshold;
     }
 
+    protected NlpTokenizer tokenizer() {
+        return tokenizer;
+    }
+
+    protected double affinityThreshold() {
+        return affinityThreshold;
+    }
+
+    protected ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled() {
+        return nlpCompiled;
+    }
+
+
     @Override
     public void register(TemplateNamespace namespace) {
         super.register(namespace);

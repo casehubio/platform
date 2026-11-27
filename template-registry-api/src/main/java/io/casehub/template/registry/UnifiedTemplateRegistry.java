@@ -39,4 +39,9 @@ public interface UnifiedTemplateRegistry {
         return match(input);
     }
 
+    default TemplateMatch match(String namespaceName, String input, long version) {
+        return match(namespaceName, input);
+    }
+
+
 }

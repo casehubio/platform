@@ -289,4 +289,72 @@ class InMemoryTemplateRegistryTest {
         assertThat(result.result()).isInstanceOf(TemplateMatch.Matched.class);
         assertThat(result.trace().candidates()).isNotEmpty();
     }
+
+    @Test
+    void register_assignsVersion1() {
+        var registry = new InMemoryTemplateRegistry();
+        var def = TemplateDefinition.builder("greet").pattern("hello ${name}").build();
+        registry.register(new TemplateNamespace("test", Map.of("greet", def)));
+        var result = (TemplateMatch.Matched) registry.match("test", "hello world");
+        assertThat(result.version()).isEqualTo(1);
+    }
+
+    @Test
+    void replaceOrRegister_incrementsVersion() {
+        var registry = new InMemoryTemplateRegistry();
+        var def1 = TemplateDefinition.builder("greet").pattern("hello ${name}").build();
+        registry.register(new TemplateNamespace("test", Map.of("greet", def1)));
+        var r1 = (TemplateMatch.Matched) registry.match("test", "hello world");
+        assertThat(r1.version()).isEqualTo(1);
+
+        var def2 = TemplateDefinition.builder("greet").pattern("hi ${name}").build();
+        registry.replaceOrRegister(new TemplateNamespace("test", Map.of("greet", def2)));
+        var r2 = (TemplateMatch.Matched) registry.match("test", "hi world");
+        assertThat(r2.version()).isEqualTo(2);
+    }
+
+    @Test
+    void matchWithVersion_matchesHistoricalVersion() {
+        var registry = new InMemoryTemplateRegistry();
+        var def1 = TemplateDefinition.builder("greet").pattern("hello ${name}").build();
+        registry.register(new TemplateNamespace("test", Map.of("greet", def1)));
+
+        var def2 = TemplateDefinition.builder("greet").pattern("hi ${name}").build();
+        registry.replaceOrRegister(new TemplateNamespace("test", Map.of("greet", def2)));
+
+        var current = registry.match("test", "hello world");
+        assertThat(current).isInstanceOf(TemplateMatch.Unmatched.class);
+
+        var historical = registry.match("test", "hello world", 1);
+        assertThat(historical).isInstanceOf(TemplateMatch.Matched.class);
+        assertThat(((TemplateMatch.Matched) historical).version()).isEqualTo(1);
+    }
+
+    @Test
+    void matchWithVersion_currentVersionMatchesNormally() {
+        var registry = new InMemoryTemplateRegistry();
+        var def = TemplateDefinition.builder("greet").pattern("hello ${name}").build();
+        registry.register(new TemplateNamespace("test", Map.of("greet", def)));
+
+        var result = registry.match("test", "hello world", 1);
+        assertThat(result).isInstanceOf(TemplateMatch.Matched.class);
+    }
+
+    @Test
+    void matchWithVersion_evictedVersionThrows() {
+        var smallRing = new InMemoryTemplateRegistry(1);
+        var def1      = TemplateDefinition.builder("greet").pattern("hello ${name}").build();
+        smallRing.register(new TemplateNamespace("test", Map.of("greet", def1)));
+
+        var def2 = TemplateDefinition.builder("greet").pattern("hi ${name}").build();
+        smallRing.replaceOrRegister(new TemplateNamespace("test", Map.of("greet", def2)));
+
+        var def3 = TemplateDefinition.builder("greet").pattern("hey ${name}").build();
+        smallRing.replaceOrRegister(new TemplateNamespace("test", Map.of("greet", def3)));
+
+        assertThat(smallRing.match("test", "hi world", 2))
+                .isInstanceOf(TemplateMatch.Matched.class);
+        assertThatThrownBy(() -> smallRing.match("test", "hello world", 1))
+                .isInstanceOf(NamespaceVersionNotFoundException.class);
+    }
 }

@@ -13,8 +13,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
 
+    static final int DEFAULT_MAX_RETAINED_VERSIONS = 3;
+
     private final AtomicReference<Snapshot> snapshot =
         new AtomicReference<>(Snapshot.EMPTY);
+    private final int maxRetainedVersions;
+
+    public InMemoryTemplateRegistry() {
+        this(DEFAULT_MAX_RETAINED_VERSIONS);
+    }
+
+    public InMemoryTemplateRegistry(int maxRetainedVersions) {
+        if (maxRetainedVersions < 0) {
+            throw new IllegalArgumentException("maxRetainedVersions must be >= 0");
+        }
+        this.maxRetainedVersions = maxRetainedVersions;
+    }
 
     @Override
     public void register(TemplateNamespace namespace) {
@@ -25,7 +39,7 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
                 throw new IllegalArgumentException(
                     "Namespace already registered: " + namespace.name());
             }
-            Snapshot next = current.withNamespace(namespace);
+            Snapshot next = current.withNamespace(namespace, maxRetainedVersions);
             if (snapshot.compareAndSet(current, next)) {
                 return;
             }
@@ -49,8 +63,7 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
         Objects.requireNonNull(namespace, "namespace");
         while (true) {
             Snapshot current = snapshot.get();
-            Snapshot next = current.withoutNamespace(namespace.name())
-                                   .withNamespace(namespace);
+            Snapshot next = current.withNamespace(namespace, maxRetainedVersions);
             if (snapshot.compareAndSet(current, next)) {
                 return;
             }
@@ -74,8 +87,7 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
         while (true) {
             Snapshot current = snapshot.get();
             if (!current.namespaces.containsKey(namespaceName)) {return false;}
-            Snapshot next = current.withoutNamespace(namespaceName)
-                                   .withNamespace(expandedNs);
+            Snapshot next = current.withNamespace(expandedNs, maxRetainedVersions);
             if (snapshot.compareAndSet(current, next)) {
                 return true;
             }
@@ -109,6 +121,32 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
         }
         return matchInNamespace(namespaceName, ns, input, snap);
     }
+
+    @Override
+    public TemplateMatch match(String namespaceName, String input, long version) {
+        Objects.requireNonNull(namespaceName, "namespaceName");
+        Objects.requireNonNull(input, "input");
+        Snapshot          snap      = snapshot.get();
+        TemplateNamespace currentNs = snap.namespaces.get(namespaceName);
+        if (currentNs == null) {
+            throw new IllegalArgumentException("Unknown namespace: " + namespaceName);
+        }
+        if (currentNs.version() == version) {
+            return matchInNamespace(namespaceName, currentNs, input, snap);
+        }
+        List<VersionedEntry> ring = snap.history.getOrDefault(namespaceName, List.of());
+        for (VersionedEntry entry : ring) {
+            if (entry.version() == version) {
+                var historicalSnap = new Snapshot(
+                        Map.of(namespaceName, entry.namespace()),
+                        entry.compiled(),
+                        snap.versionCounters, snap.history);
+                return matchInNamespace(namespaceName, entry.namespace(), input, historicalSnap);
+            }
+        }
+        throw new NamespaceVersionNotFoundException(namespaceName, version, currentNs.version());
+    }
+
 
     protected TemplateMatch matchInNamespace(String namespaceName,
                                               TemplateNamespace ns,
@@ -275,33 +313,79 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
             def.patterns(), def.variables(), List.of());
     }
 
+    record VersionedEntry(long version, TemplateNamespace namespace,
+                          Map<String, List<CompiledTemplate>> compiled) {}
+
     protected static final class Snapshot {
-        static final Snapshot EMPTY = new Snapshot(Map.of(), Map.of());
+        static final Snapshot EMPTY = new Snapshot(Map.of(), Map.of(), Map.of(), Map.of());
 
         final Map<String, TemplateNamespace> namespaces;
         final Map<String, List<CompiledTemplate>> compiled;
+        final Map<String, Long> versionCounters;
+        final Map<String, List<VersionedEntry>> history;
 
         Snapshot(Map<String, TemplateNamespace> namespaces,
-                 Map<String, List<CompiledTemplate>> compiled) {
+                 Map<String, List<CompiledTemplate>> compiled,
+                 Map<String, Long> versionCounters,
+                 Map<String, List<VersionedEntry>> history) {
             this.namespaces = namespaces;
             this.compiled = compiled;
+            this.versionCounters = versionCounters;
+            this.history = history;
         }
 
-        Snapshot withNamespace(TemplateNamespace ns) {
-            var newNamespaces = new LinkedHashMap<>(namespaces);
-            newNamespaces.put(ns.name(), ns);
+        Snapshot withNamespace(TemplateNamespace ns, int maxRetainedVersions) {
+            long currentVersion = versionCounters.getOrDefault(ns.name(), 0L);
+            long newVersion = currentVersion + 1;
+
+            var versionedNs = new TemplateNamespace(
+                ns.name(), ns.templates(), ns.language(), newVersion);
+
+            var newHistory = new LinkedHashMap<>(history);
+            TemplateNamespace outgoing = namespaces.get(ns.name());
+            if (outgoing != null && maxRetainedVersions > 0) {
+                var outgoingCompiled = new LinkedHashMap<String, List<CompiledTemplate>>();
+                for (String tName : outgoing.templates().keySet()) {
+                    String key = ns.name() + ":" + tName;
+                    if (compiled.containsKey(key)) {
+                        outgoingCompiled.put(key, compiled.get(key));
+                    }
+                }
+                var ring = new ArrayList<>(newHistory.getOrDefault(ns.name(), List.of()));
+                ring.add(new VersionedEntry(outgoing.version(), outgoing,
+                    Collections.unmodifiableMap(outgoingCompiled)));
+                while (ring.size() > maxRetainedVersions) {
+                    ring.removeFirst();
+                }
+                newHistory.put(ns.name(), Collections.unmodifiableList(ring));
+            }
+
             var newCompiled = new LinkedHashMap<>(compiled);
-            for (TemplateDefinition def : ns.templates().values()) {
+            if (outgoing != null) {
+                for (String tName : outgoing.templates().keySet()) {
+                    newCompiled.remove(ns.name() + ":" + tName);
+                }
+            }
+            for (TemplateDefinition def : versionedNs.templates().values()) {
                 List<CompiledTemplate> templates = new ArrayList<>();
                 for (String pattern : def.patterns()) {
                     templates.add(RegexTemplateCompiler.compile(pattern));
                 }
-                newCompiled.put(ns.name() + ":" + def.name(),
+                newCompiled.put(versionedNs.name() + ":" + def.name(),
                     Collections.unmodifiableList(templates));
             }
+
+            var newNamespaces = new LinkedHashMap<>(namespaces);
+            newNamespaces.put(versionedNs.name(), versionedNs);
+
+            var newCounters = new LinkedHashMap<>(versionCounters);
+            newCounters.put(ns.name(), newVersion);
+
             return new Snapshot(
                 Collections.unmodifiableMap(newNamespaces),
-                Collections.unmodifiableMap(newCompiled));
+                Collections.unmodifiableMap(newCompiled),
+                Collections.unmodifiableMap(newCounters),
+                Collections.unmodifiableMap(newHistory));
         }
 
         Snapshot withoutNamespace(String name) {
@@ -315,7 +399,8 @@ public class InMemoryTemplateRegistry implements UnifiedTemplateRegistry {
             }
             return new Snapshot(
                 Collections.unmodifiableMap(newNamespaces),
-                Collections.unmodifiableMap(newCompiled));
+                Collections.unmodifiableMap(newCompiled),
+                versionCounters, history);
         }
     }
 }

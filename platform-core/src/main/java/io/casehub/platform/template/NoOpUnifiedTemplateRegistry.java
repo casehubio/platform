@@ -31,6 +31,12 @@ public class NoOpUnifiedTemplateRegistry implements UnifiedTemplateRegistry {
     }
 
     @Override
+    public TemplateMatch match(String namespaceName, String input, long version) {
+        return new TemplateMatch.Unmatched(input);
+    }
+
+
+    @Override
     public MatchTraceResult matchWithTrace(String input) {
         return new MatchTraceResult(new TemplateMatch.Unmatched(input),
                                     new MatchTrace(List.of(), null, 0.0));

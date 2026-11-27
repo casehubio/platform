@@ -48,6 +48,7 @@ public final class DiscriminationTrie {
                 MutableNode current = mutableRoot;
 
                 for (StructuralMatcher.Element elem : elements) {
+                    if (elem.optional()) continue;
                     if (elem.kind() == ElementKind.LITERAL) {
                         current = current.literalChildren.computeIfAbsent(
                                 elem.lemma().toLowerCase(), k -> new MutableNode());

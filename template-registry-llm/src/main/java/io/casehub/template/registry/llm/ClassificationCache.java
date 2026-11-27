@@ -107,17 +107,23 @@ public class ClassificationCache {
     }
 
     private void evictIfNeeded() {
-        if (cache.size() >= maxEntries) {
+        int totalSize = cache.size() + embeddingCache.size();
+        if (totalSize >= maxEntries) {
             Instant now = Instant.now();
             cache.entrySet().removeIf(e -> {
                 Duration ttl = e.getValue().isPositive() ? positiveTtl : negativeTtl;
                 return now.isAfter(e.getValue().insertedAt().plus(ttl));
             });
-            if (cache.size() >= maxEntries) {
+            embeddingCache.entrySet().removeIf(e -> {
+                Duration ttl = e.getValue().isPositive() ? positiveTtl : negativeTtl;
+                return now.isAfter(e.getValue().insertedAt().plus(ttl));
+            });
+            totalSize = cache.size() + embeddingCache.size();
+            if (totalSize >= maxEntries) {
                 cache.entrySet().stream()
-                    .min(Map.Entry.comparingByValue(
-                        (a, b) -> a.insertedAt().compareTo(b.insertedAt())))
-                    .ifPresent(oldest -> cache.remove(oldest.getKey()));
+                     .min(Map.Entry.comparingByValue(
+                             (a, b) -> a.insertedAt().compareTo(b.insertedAt())))
+                     .ifPresent(oldest -> cache.remove(oldest.getKey()));
             }
         }
     }

@@ -15,7 +15,6 @@ import io.casehub.template.registry.TemplateNamespace;
 import io.casehub.template.registry.TemplateSchema;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,35 +25,35 @@ import java.util.concurrent.ConcurrentMap;
 public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
     private static final double DEFAULT_AFFINITY_THRESHOLD = 0.3;
-    private static final double DEFAULT_SCORE_THRESHOLD = 0.5;
-    private static final int DEFAULT_TRIE_THRESHOLD = 100;
+    private static final double DEFAULT_SCORE_THRESHOLD    = 0.5;
+    private static final int    DEFAULT_TRIE_THRESHOLD     = 100;
 
-    private final NlpTokenizer tokenizer;
-    private final double affinityThreshold;
-    private final double scoreThreshold;
-    private final int trieActivationThreshold;
-    private final ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled =
-        new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, DiscriminationTrie> namespaceTries =
-        new ConcurrentHashMap<>();
+    private final NlpTokenizer                                                   tokenizer;
+    private final double                                                         affinityThreshold;
+    private final double                                                         scoreThreshold;
+    private final int                                                            trieActivationThreshold;
+    private final ConcurrentMap<String, NlpTemplateCompiler.CompiledNlpTemplate> nlpCompiled    =
+            new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, DiscriminationTrie>                      namespaceTries =
+            new ConcurrentHashMap<>();
 
     public NlpTemplateRegistry(NlpTokenizer tokenizer) {
         this(tokenizer, DEFAULT_AFFINITY_THRESHOLD, DEFAULT_SCORE_THRESHOLD, DEFAULT_TRIE_THRESHOLD);
     }
 
     public NlpTemplateRegistry(NlpTokenizer tokenizer,
-                                double affinityThreshold,
-                                double scoreThreshold) {
+                               double affinityThreshold,
+                               double scoreThreshold) {
         this(tokenizer, affinityThreshold, scoreThreshold, DEFAULT_TRIE_THRESHOLD);
     }
 
     public NlpTemplateRegistry(NlpTokenizer tokenizer,
-                                double affinityThreshold,
-                                double scoreThreshold,
-                                int trieActivationThreshold) {
-        this.tokenizer = Objects.requireNonNull(tokenizer, "tokenizer");
-        this.affinityThreshold = affinityThreshold;
-        this.scoreThreshold = scoreThreshold;
+                               double affinityThreshold,
+                               double scoreThreshold,
+                               int trieActivationThreshold) {
+        this.tokenizer               = Objects.requireNonNull(tokenizer, "tokenizer");
+        this.affinityThreshold       = affinityThreshold;
+        this.scoreThreshold          = scoreThreshold;
         this.trieActivationThreshold = trieActivationThreshold;
     }
 
@@ -130,7 +129,7 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
     }
 
     private TemplateMatch matchViaTrie(String namespaceName, TemplateNamespace ns,
-                                       List<AnnotatedToken> inputTokens,
+                                       String input, List<AnnotatedToken> inputTokens,
                                        DiscriminationTrie trie) {
         List<DiscriminationTrie.PatternRef> candidates       = trie.walk(inputTokens);
         TemplateMatch.Matched               bestMatch        = null;
@@ -162,17 +161,11 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
         if (bestMatch != null) {return bestMatch;}
         if (nearMissTemplate != null) {
-            String inputText = inputTokens.stream()
-                                          .map(AnnotatedToken::surface)
-                                          .collect(java.util.stream.Collectors.joining(" "));
             return new TemplateMatch.NearMiss(
-                    namespaceName, inputText, nearMissTemplate,
+                    namespaceName, input, nearMissTemplate,
                     TemplateFormatHelper.formatSuggestion(nearMissPattern));
         }
-        String inputText = inputTokens.stream()
-                                      .map(AnnotatedToken::surface)
-                                      .collect(java.util.stream.Collectors.joining(" "));
-        return new TemplateMatch.Unmatched(inputText);
+        return new TemplateMatch.Unmatched(input);
     }
 
 
@@ -222,7 +215,7 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
         DiscriminationTrie trie = namespaceTries.get(namespaceName);
         if (trie != null) {
-            return matchViaTrie(namespaceName, ns, inputTokens, trie);
+            return matchViaTrie(namespaceName, ns, input, inputTokens, trie);
         }
 
         TemplateMatch.Matched bestMatch        = null;
@@ -354,13 +347,13 @@ public class NlpTemplateRegistry extends InMemoryTemplateRegistry {
 
     @Override
     protected TemplateSchema buildSchema(String namespaceName,
-                                          TemplateDefinition def) {
-        String key = namespaceName + ":" + def.name();
+                                         TemplateDefinition def) {
+        String                                  key      = namespaceName + ":" + def.name();
         NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled.get(key);
         List<TemplateSchema.StructuralSummary> summaries = compiled != null
-            ? compiled.structuralSummaries()
-            : List.of();
+                                                           ? compiled.structuralSummaries()
+                                                           : List.of();
         return new TemplateSchema(namespaceName, def.name(),
-            def.patterns(), def.variables(), summaries);
+                                  def.patterns(), def.variables(), summaries);
     }
 }

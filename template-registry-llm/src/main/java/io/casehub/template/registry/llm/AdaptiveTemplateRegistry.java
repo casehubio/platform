@@ -9,8 +9,8 @@ import io.casehub.template.registry.AnnotatedToken;
 import io.casehub.template.registry.CandidateOutcome;
 import io.casehub.template.registry.CandidateTrace;
 import io.casehub.template.registry.ClassificationResult;
-import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.CollisionDetector;
+import io.casehub.template.registry.ElementTrace;
 import io.casehub.template.registry.MatchTrace;
 import io.casehub.template.registry.MatchTraceResult;
 import io.casehub.template.registry.NlpTokenizer;
@@ -129,16 +129,6 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
                 if (affinity < affinityThreshold() && !keywords.isEmpty()) {
                     if (embeddingModel != null) {
-                        var cacheKey = new ClassificationCache.CacheKey(namespaceName, input);
-                        ClassificationCache.EmbeddingEntry cached = classificationCache.getEmbedding(cacheKey);
-                        if (cached != null) {
-                            if (cached.isPositive()) {
-                                bestMatch = new TemplateMatch.Matched(
-                                        namespaceName, cached.templateName(), cached.patternIndex(),
-                                        cached.fields(), 0.9, ns.version());
-                            }
-                            continue;
-                        }
                         try {
                             if (inputEmbedding == null) {
                                 inputEmbedding = computeInputEmbedding(inputTokens);
@@ -152,7 +142,6 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                     var               result  = matcher.match(inputTokens, def.variables());
                                     if (result.isPresent() && result.get().score() > scoreThreshold()) {
                                         learnSynonyms(namespaceName, keywords, inputTokens);
-                                        classificationCache.putEmbeddingPositive(cacheKey, def.name(), i, result.get().fields(), similarity);
                                         if (bestMatch == null || result.get().score() > bestMatch.score()) {
                                             bestMatch = new TemplateMatch.Matched(
                                                     namespaceName, def.name(), i,
@@ -164,8 +153,6 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                                         nearMissTemplate = def.name();
                                         nearMissPattern  = def.patterns().get(i);
                                     }
-                                } else {
-                                    classificationCache.putEmbeddingNegative(cacheKey);
                                 }
                             }
                         } catch (Exception e) {
@@ -349,23 +336,23 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private void computeTemplateEmbeddings(TemplateNamespace namespace) {
         if (embeddingModel == null) {return;}
-        try {
-            for (var templateEntry : namespace.templates().entrySet()) {
-                TemplateDefinition                      def      = templateEntry.getValue();
-                String                                  key      = namespace.name() + ":" + def.name();
-                NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
-                if (compiled == null) {continue;}
+        for (var templateEntry : namespace.templates().entrySet()) {
+            TemplateDefinition                      def      = templateEntry.getValue();
+            String                                  key      = namespace.name() + ":" + def.name();
+            NlpTemplateCompiler.CompiledNlpTemplate compiled = nlpCompiled().get(key);
+            if (compiled == null) {continue;}
 
-                for (int i = 0; i < compiled.keywordSets().size(); i++) {
-                    Set<String> keywords = compiled.keywordSets().get(i);
-                    if (keywords.isEmpty()) {continue;}
+            for (int i = 0; i < compiled.keywordSets().size(); i++) {
+                Set<String> keywords = compiled.keywordSets().get(i);
+                if (keywords.isEmpty()) {continue;}
+                try {
                     String  phrase = String.join(" ", keywords);
                     float[] vec    = embeddingModel.embed(phrase).content().vector();
                     templateEmbeddings.put(key + ":" + i, vec);
+                } catch (Exception e) {
+                    LOG.log(Level.WARNING, "Failed to embed template " + key + " pattern " + i, e);
                 }
             }
-        } catch (Exception e) {
-            LOG.log(Level.WARNING, "Failed to compute template embeddings for " + namespace.name(), e);
         }
     }
 

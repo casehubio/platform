@@ -20,8 +20,10 @@ public class TemplateRegistryBeans {
     @ApplicationScoped
     public LanguageFamilyRegistry languageFamilyRegistry(
             Instance<MatchingStrategy> strategies,
-            Instance<NlpTokenizerFactory> factories) {
-        var registry = new LanguageFamilyRegistry();
+            Instance<NlpTokenizerFactory> factories,
+            @ConfigProperty(name = "casehub.template.language-families",
+                            defaultValue = "") String languageFamiliesConfig) {
+        var                           registry    = new LanguageFamilyRegistry();
         Map<String, MatchingStrategy> strategyMap = new LinkedHashMap<>();
         for (MatchingStrategy strategy : strategies) {
             strategyMap.put(strategy.familyId(), strategy);
@@ -33,14 +35,26 @@ public class TemplateRegistryBeans {
                     registry.register(lang, familyId);
                 }
             }
-        } else {
-            for (NlpTokenizerFactory factory : factories) {
-                for (String lang : factory.supportedLanguages()) {
-                    for (var entry : strategyMap.entrySet()) {
-                        registry.register(lang, entry.getKey());
+        } else if (!languageFamiliesConfig.isBlank()) {
+            for (String entry : languageFamiliesConfig.split(",")) {
+                String[] parts = entry.strip().split("=", 2);
+                if (parts.length == 2) {
+                    String lang     = parts[0].strip();
+                    String familyId = parts[1].strip();
+                    if (!strategyMap.containsKey(familyId)) {
+                        throw new IllegalStateException(
+                                "Language '" + lang + "' mapped to unknown strategy family '"
+                                + familyId + "'. Available: " + strategyMap.keySet());
                     }
+                    registry.register(lang, familyId);
                 }
             }
+        } else {
+            throw new IllegalStateException(
+                    "Multiple MatchingStrategy beans found (" + strategyMap.keySet()
+                    + ") but no casehub.template.language-families config provided. "
+                    + "Set casehub.template.language-families=en=svo,fr=svo to map "
+                    + "languages to strategy families.");
         }
         return registry;
     }

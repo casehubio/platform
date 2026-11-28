@@ -22,15 +22,17 @@ It falls apart the moment a template involves quantity. `"${count} items have be
 This is exactly what ICU MessageFormat 2.0 solves. MF2 is a Unicode standard (stable since CLDR 47) for data-driven message selection — given variable values and a locale, it chooses the right variant from a pre-defined set. The MF2 pattern for that item-count template:
 
 ```
-.match {$count :integer}
+.input {$count :integer}
+.match $count
 1 {{{$count} item has been {$action}}}
 * {{{$count} items have been {$action}}}
 ```
 
-The `:integer` function provides plural category selection via CLDR rules. No explicit plural logic — the locale data handles everything. French works identically:
+`.input` declares the variable and its function (`:integer` for plural selection via CLDR rules). `.match` selects on the declared variable. No explicit plural logic — the locale data handles everything. French works identically:
 
 ```
-.match {$count :integer}
+.input {$count :integer}
+.match $count
 1 {{{$count} élément a été {$action}}}
 * {{{$count} éléments ont été {$action}}}
 ```
@@ -50,17 +52,17 @@ TemplateDefinition.builder("vote")
 // Quantity template — MF2 for locale-aware generation
 TemplateDefinition.builder("item-count")
     .pattern("${count} items have been ${action}")
-    .messageFormat(".match {$count :integer}\n1 ...")
+    .messageFormat(".input {$count :integer}\n.match $count\n1 ...")
     .build();
 ```
 
-Matching is unchanged — both templates use regex and NLP structural patterns for input extraction. The divergence is only on the generation path. MF2 syntax isn't designed for extraction (its `.match`/`when` structure selects *output* forms, not *input* patterns), so the two concerns stay cleanly separated.
+Matching is unchanged — both templates use regex and NLP structural patterns for input extraction. The divergence is only on the generation path. MF2 syntax isn't designed for extraction (its `.input`/`.match` structure selects *output* forms, not *input* patterns), so the two concerns stay cleanly separated.
 
 ## Where the reviews bit
 
 Two adversarial reviews caught real problems. The decision review identified that putting a nullable `MessageFormatResolver` on `InMemoryTemplateRegistry`'s constructor contradicted a pattern the same codebase had explicitly rejected three issues earlier. The fix: MF2 lives in `NlpTemplateRegistry` (the extension subclass), not the base class. The base class just gets a fail-fast guard — if someone registers an MF2 template on bare `InMemoryTemplateRegistry`, it throws instead of silently producing broken output.
 
-The spec review caught that my YAML examples used MF1 function names (`:plural`, `:select`) and the `when` keyword — both removed from the final MF2 specification. MF2 uses `:integer` for plurals and `:string` for gender selection, with variant keys directly preceding the pattern. Getting the syntax wrong in a spec that's supposed to teach implementors the syntax would have been a rough start.
+The spec review caught that my YAML examples used MF1 function names (`:plural`, `:select`) and the `when` keyword — both removed from the final MF2 specification. MF2 uses `:integer` for plurals and `:string` for gender selection, with variant keys directly preceding the pattern. And it turned out the syntax had a further wrinkle: ICU4J 79.1 requires `.input` declarations for variable annotations, with `.match` referencing the bare variable name — not `.match {$var :function}` as the earlier spec drafts showed. The implementation tests caught this immediately.
 
 ## The SPI design
 
